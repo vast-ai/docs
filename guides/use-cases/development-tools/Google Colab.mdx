@@ -1,0 +1,69 @@
+---
+title: Google Colab
+createdAt: Tue Jan 14 2025 01:13:18 GMT+0000 (Coordinated Universal Time)
+updatedAt: Wed Mar 05 2025 21:09:59 GMT+0000 (Coordinated Universal Time)
+---
+
+Google Colab is a flavor of Jupyter notebook. The service is not meant to be run on cloud based GPUs. This guide provides a "hack" that uses SSH port forwarding so that Colab detects the Vast GPU instance as a local GPU and connects to the remote instance.
+
+>
+
+## Run any Google Colab notebook on Vast
+
+Colab supports a 'local runtime' option to allow people to run colab connecting to their local machine, using their own GPUs. This feature is **intentionally restricted** to allow only a localhost connection. Getting around that restriction requires using ssh forwarding to make a remote Jupyter instance appear local.
+
+## Known issues and limitations
+
+Colab is connecting to a remote Jupyter instance using SSH forwarding. If you close your browser, you might not be able to re-open the session. To fix that you will need to stop and then restart Jupyter through the SSH connection, get a new token, and then use that to reconnect to the local runtime in Colab.
+
+Another small limitation is that there is no way (unless you get Colabs Pro) to open a terminal from within Colab. A simple Jupyter Vast instance doesn't have that limitation and you can always open a terminal right in the browser.
+
+## Step 1 - Create a Pytorch SSH instance
+
+Use this [Colab template](https://cloud.vast.ai/?ref_id=43484\&template_id=8d383ad48fff4012d42806e4781020ef) that uses the common Pytorch image with a direct SSH launch mode.
+
+After clicking on that link, your instance configuration will be set. Setup an account, purchase credits and then select an appropriate GPU by clicking the "rent" button.
+
+## Step 2 - SSH into the instance
+
+Our default SSH command for Linux/macOS already forwards port 8080. The default SSH command can be found by clicking on the Connect button from a rented instance. Run that command. You will then have an active SSH connection to the GPU instance.
+
+## Step 2.5 - Windows Only
+
+On Windows, Colab is more complicated. The reason is that Windows has no simple SSH client built-in, unlike Linux/macOS. One solution is to install [WSL](https://learn.microsoft.com/en-us/windows/wsl/about) and then use the SSH command provided on the Vast instance. Or you can follow our [Windows SSH Guide](https://docs.vast.ai/windows-ssh-guide) and use Putty tools to generate your SSH keys and SSH into the instance.
+
+There is one additional Windows step if you use Putty tools. After making sure you can SSH into the instance, close the SSH connection and then modify your Putty configuration to forward port 8080 to local host.
+
+Go to Connection->SSH->Tunnels. In the "source port" add 8080. Then in "destination" add:
+
+```text
+localhost:8080
+```
+
+Then click back to "Session" and save your configuration. You can then click the Open button to start the Windows SSH session with port 8080 forwarded to localhost.
+
+## Step 3 - Run Jupyter
+
+Run Jupyter with options like these (adjust the port 8080 to match whatever port you forwarded over SSH):
+
+```text
+jupyter notebook --NotebookApp.allow_origin='*' --port=8080 --NotebookApp.port_retries=0 --allow-root --NotebookApp.allow_remote_access=True
+```
+
+That will output a couple of http addresses. You want to use the localhost address with the access token. Make sure to copy the entire string so you can paste it into your Colab session.
+
+## Step 4 - Connect to local runtime
+
+Open Google Colab and hit the Connect button and select the option to "connect to local runtime". Paste in the localhost URL from your SSH session into the box and hit connect. Colab will then initialize and make the connection.
+
+## If SSH connection drops
+
+If your SSH connection disconnects due to a network error or other reason, the Google colab instance will throw an error and give you the option to reconnect.
+
+The first thing to do is to reconnect via SSH to the Vast instance. Once that is established, you can try to "reconnect" to the Google colab instance, but that typically does not work.
+
+The only way to re-establish a connection is to stop the Jupyter running on the Vast instance and then restart it. Then you can take the new URL + token and reconnect on Google Colab.
+
+This can cause other problems to the running notebook. You may or may not need to then re-run all the cells of your notebook.
+
+All your data will still be on the Vast instance and available to be copied, even if Colab cannot connect to your instance.

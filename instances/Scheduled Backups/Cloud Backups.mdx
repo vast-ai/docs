@@ -1,0 +1,295 @@
+---
+title: Cloud Backups
+slug: 21YGUbPprc3RcqDHy-pWX
+createdAt: Mon Mar 24 2025 21:51:24 GMT+0000 (Coordinated Universal Time)
+updatedAt: Thu May 08 2025 20:14:08 GMT+0000 (Coordinated Universal Time)
+---
+
+# Comprehensive Guide to Cloud Backups on Vast.ai
+
+## Introduction
+
+This guide walks you through setting up and running automated backups for your Vast.ai container instances to cloud storage. Cloud backups can you help preserve your work when using Vast's Docker-based instances. With proper backup strategies, you can ensure your valuable data remains safe and accessible even if your instance goes offline.
+
+## Prerequisites
+
+- A Vast.ai account
+- Access to a Vast.ai Docker-based instance
+- [Cloud storage connection set up in Vast.ai]{href="https://docs.vast.ai/instances/cloud-sync" newTab="true" hasDisabledNofollow="false"}
+- [(Optional) Install and use vast-cli]{href="https://docs.vast.ai/cli" newTab="true" hasDisabledNofollow="false"}
+- [(Optional) Understanding of how to use cron in computers with Unix-like OS]{href="https://cronitor.io/guides/cron-jobs" newTab="true" hasDisabledNofollow="false"}
+
+## Setup
+
+### 1. Setting Up Cloud Storage Connections
+
+Before creating backup jobs, you need to ensure you have a cloud storage connection set up in your Vast.ai account. You can view your existing connections using the vast-cli:
+
+>
+
+If you don't have a connection yet, you'll need to set one up in [Vast.ai's Settings page ]{href="https://docs.vast.ai/instances/cloud-sync" newTab="true" hasDisabledNofollow="false"}before proceeding with backup operations.
+
+### 2. Understanding Backup Options
+
+Vast.ai provides multiple approaches to schedule data backups:
+
+- **Using Vast's job scheduling system via CLI** - Create hourly, daily, or weekly automated backup jobs
+- **Using cron on your personal computer** - Schedule backups with custom timing from your local machine
+
+Both approaches have their advantages depending on your workflow and requirements.
+
+## Backup Methods
+
+### 1. Using CLI for Scheduled Backups
+
+The vast-cli tool allows you to create scheduled backup jobs with several timing options. The basic structure of a scheduled backup command includes these parameters:
+
+>
+
+You can run this command to see more details about these parameters:
+
+>
+
+Let's explore the different scheduling options:
+
+To create a weekly backup job that runs every Saturday at 9 PM UTC:
+
+>
+
+In this command:
+
+- \--src /workspace specifies the source directory on your instance
+- \--dst /backups/19015821\_backups/ is the destination folder in your cloud storage
+- \--instance 19015821 is your instance's ID
+- \--connection 19447 is your cloud storage connection ID
+- \--day 6 represents Saturday (0=Sunday, 1=Monday, etc.)
+- \--hour 21 represents 9 PM UTC (0=12am UTC, 1=1am UTC, etc.)
+
+For daily backups at a specific hour (e.g., 9 PM UTC every day):
+
+>
+
+The --day "\*" parameter indicates that the job should run every day.
+
+For hourly backups that run every hour of every day:
+
+>
+
+Setting both --day "\*" and --hour "\*" along with --schedule HOURLY makes the job run every hour.
+
+To update your backup schedule, simply run the same command with the new schedule. The system will prompt you for confirmation, and upon acceptance, it will update the schedule accordingly.&#x20;
+
+>
+
+### 2. Using Cron on Your Personal Linux Computer
+
+If you prefer more granular control over your backup schedule, you can use cron on your local Linux or Mac computer. This approach allows for customized schedules beyond the hourly/daily/weekly options.
+
+First, open your crontab file for editing:
+
+>
+
+Then, add a line that specifies your backup schedule. For example, to run a backup every 4 hours:
+
+>
+
+In this cron schedule:
+
+- 0 represents the minute (0th minute of the hour)
+- \*/4 means "every 4 hours"
+- The three asterisks \* \* \* represent day of month, month, and day of week, indicating "every day"
+
+## Viewing Scheduled Backup Jobs
+
+To see all your currently scheduled backup jobs:
+
+>
+
+Example output:
+
+```bash
+Scheduled Job ID  Instance ID  API Endpoint              Start (Date/Time in UTC)  End (Date/Time in UTC)  Day of the Week  Hour of the Day in UTC  Minute of the Hour  Frequency
+1                 19778412     /api/v0/commands/rclone/  2025-04-24/23:38          2028-05-06/23:38        Everyday         4_PM                    00                  DAILY
+2                 19782577     /api/v0/commands/rclone/  2025-04-29/23:47          2025-05-09/23:47        Wednesday        10_AM                   00                  WEEKLY
+3                 19757389     /api/v0/commands/rclone/  2025-05-01/00:04          2026-05-01/00:04        Everyday         Every_hour              00                  HOURLY   
+```
+
+Understanding the Output
+
+<table isTableHeaderOn="true" selectedColumns="" selectedRows="" selectedTable="false">
+  <tr>
+    <td selected="false">
+      <p>Field</p>
+    </td>
+    <td selected="false">
+      <p>Description</p>
+    </td>
+  </tr>
+  <tr>
+    <td selected="false">
+      <p><strong>Scheduled Job ID</strong></p>
+    </td>
+    <td selected="false">
+      <p>Unique identifier for your job (needed for deletion)</p>
+    </td>
+  </tr>
+  <tr>
+    <td selected="false">
+      <p><strong>Instance ID</strong></p>
+    </td>
+    <td selected="false">
+      <p>The instance this job is associated with</p>
+    </td>
+  </tr>
+  <tr>
+    <td selected="false">
+      <p><strong>API Endpoint</strong></p>
+    </td>
+    <td selected="false">
+      <p>The endpoint being called (rclone is used for backups to cloud storage)</p>
+    </td>
+  </tr>
+  <tr>
+    <td selected="false">
+      <p><strong>Start (Date/Time)</strong></p>
+    </td>
+    <td selected="false">
+      <p>Start date/time of period when this scheduled job will be executed (in UTC)</p>
+    </td>
+  </tr>
+  <tr>
+    <td selected="false">
+      <p><strong>End (Date/Time)</strong></p>
+    </td>
+    <td selected="false">
+      <p>End date/time of period when this scheduled job will be executed (in UTC). Default is the end of the contract.</p>
+    </td>
+  </tr>
+  <tr>
+    <td selected="false">
+      <p><strong>Day of the Week</strong></p>
+    </td>
+    <td selected="false">
+      <p>Which day the job runs (can be specific day like "Wednesday", "Saturday", or "Everyday")</p>
+    </td>
+  </tr>
+  <tr>
+    <td selected="false">
+      <p><strong>Hour of the Day</strong></p>
+    </td>
+    <td selected="false">
+      <p>At what hour the job runs (formatted as 1_PM, 11_PM, 8_PM in UTC, etc.)</p>
+    </td>
+  </tr>
+  <tr>
+    <td selected="false">
+      <p><strong>Minute of the Hour</strong></p>
+    </td>
+    <td selected="false">
+      <p>At what minute of the specified hour the job runs (00, 33, 10, etc.)</p>
+    </td>
+  </tr>
+  <tr>
+    <td selected="false">
+      <p><strong>Frequency</strong></p>
+    </td>
+    <td selected="false">
+      <p>How often the job runs (HOURLY, DAILY, WEEKLY)</p>
+    </td>
+  </tr>
+</table>
+
+Examples Explained:
+
+1. **Job 1**: A **DAILY** backup that runs **every day at 4:00 PM UTC**&#x20;
+   - Runs daily at the same time
+   - Will continue running from Apr 24, 2025 until May 6, 2028
+2. **Job 2**: A **WEEKLY** backup that runs on **Wednesdays at 10:00 AM UTC**&#x20;
+   - Runs only on Wednesdays at 10:00 AM UTC
+   - Short duration job (Apr 29 - May 9, 2025)
+3. **Job 3**: A **HOURLY** backup that runs **every hour of every day**
+   - Runs every hour (1\_AM, 2\_AM, 3\_AM, etc.)
+   - Will continue running for a year
+
+## Deleting Scheduled Backup Jobs
+
+If you need to remove a scheduled backup job that you no longer want to run, you can use the delete scheduled-job command followed by the job ID:
+
+<CodeblockTabs>
+  Bash
+
+  ```bash
+  python3 vast.py delete scheduled-job JOB_ID
+  ```
+</CodeblockTabs>
+
+For example:
+
+```bash
+python3 vast.py delete scheduled-job 4462309
+```
+
+This will completely remove the scheduled job from the system. When successful, you'll receive a confirmation message:
+
+```bash
+{'success': True, 'msg': 'Scheduled job 4462309 deleted successfully'}
+```
+
+### Find Job IDs to Delete
+
+To find the ID of the job you want to delete, first run:
+
+```bash
+python3 vast.py show scheduled-jobs
+```
+
+You'll see output similar to:
+
+```bash
+Scheduled Job ID  Instance ID  API Endpoint              Start (Date/Time)  End (Date/Time)   Day of the Week  Hour of the Day  Minute of the Hour  Frequency
+4462317           19281511     /api/v0/commands/rclone/  2025-04-08/09:01   2028-06-08/18:48  Everyday         1_PM             33                  DAILY    
+4462321           19489711     /api/v0/commands/rclone/  2025-04-15/20:00   2025-04-19/20:00  Saturday         11_PM            00                  WEEKLY   
+4462322           19490133     /api/v0/commands/rclone/  2025-04-15/20:00   2025-04-19/20:00  Wednesday        8_PM             10                  WEEKLY 
+```
+
+The scheduled\_job\_id column in the output contains the IDs you'll need for deletion.
+
+## Best Practices
+
+### Choose the Right Backup Frequency
+
+Consider these factors when determining how often to back up your data:
+
+- How frequently your data changes
+- The criticality of your data
+- The cost of data loss
+- The performance impact of backup operations
+- The bandwidth costs of backing your data up in cloud storage
+
+### Back Up Only What You Need
+
+Be selective about what you back up to save time and storage costs:
+
+- Focus on backing up only important data (models, results, custom code)
+
+### Verify Your Backups
+
+Periodically check that your backups are working correctly:
+
+- Download a sample backup from cloud storage and verify its contents
+- Check logs for any cloud copy failures
+- Test the restoration process before you actually need it
+- If contract is extended, update end\_date of scheduled job
+
+## Conclusion
+
+Setting up regular backups for your Vast.ai instances can be a valuable part of a robust workflow. By choosing the appropriate backup method and schedule, you can ensure that your valuable work remains safe and accessible regardless of instance lifecycle events.
+
+Remember that the best backup system is one that you set up before you need it. Take time now to implement a backup strategy that meets your needs, and you can thank yourself later.
+
+## Additional Resources
+
+- [Vast.ai Documentation](https://vast.ai/docs/)
+- [Vast.ai CLI Repository](https://github.com/vast-ai/vast-python)
+- [Cron Job Documentation](https://en.wikipedia.org/wiki/Cron)
+

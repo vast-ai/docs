@@ -1,0 +1,86 @@
+---
+title: Instances Help
+slug: _biJ-in
+createdAt: Wed Feb 12 2025 02:06:57 GMT+0000 (Coordinated Universal Time)
+updatedAt: Wed Mar 05 2025 20:02:50 GMT+0000 (Coordinated Universal Time)
+---
+
+### How can I restart my programs once the instance restarts?
+
+If you use the "custom command" option, then your command will run automatically when the instance starts up. However, if you are using an SSH instance, there is no default startup command. You can put startup commands in "/root/onstart.sh". This startup script will be found and run automatically on container startup.
+
+### I see my instance has a Lifetime - what does that mean?
+
+Every instance offer on the Create page has a Max Duration. When you accept an offer and create an instance, this Max Duration becomes the instance lifetime and begins ticking down. When the lifetime expires, the instance is automatically stopped. The host can extend the contract, which will add more lifetime to your instance, or they may not - it's up to them. Assume your instance will be lost once the lifetime expires; copy out any important data before then.
+
+### How can I set environment variables?
+
+Use the -e docker syntax in the docker create/run options. For example, to set the env variables TZC to UTC and TASKID to "TEST":
+
+```text
+-e TZ=UTC -e TASKID="TEST"
+```
+
+Any environment variables you set will be visible only to your onstart script (or your entrypoint for entrypoint launch mode). When using the SSH or Jupyter launch modes, your env variables will not be visible inside your SSH/tmux/Jupyter session by default.
+To make custom environment variables visible to the shell, you need to export them to /etc/environment.
+
+Add something like the following to the end of your onstart to export any env variables containing an underscore '\_':
+
+```text
+env | grep _ >> /etc/environment;
+```
+
+Or to export all env variables:
+
+```text
+env >> /etc/environment;
+```
+
+Environment variables can also be set in the user account Settings page, in which case the env variables will be injected into every container onstart.
+
+How can I get the instance ID from within the container?
+The environment variable VAST\_CONTAINERLABEL is defined in the container. Ex:
+
+```text
+root@C.38250:~$ echo $VAST_CONTAINERLABEL
+C.38250
+```
+
+### How can I stop the instance from within the instance?
+
+A special instance api key should already be installed in your container. You can just install the vastai CLI and use the stop command:
+
+```text
+root@C.38250:~$ pip install vastai;
+```
+
+Then test it by starting the instance (which is a no-op as the instance is already running):
+
+```text
+vastai start instance $CONTAINER_ID;
+```
+
+If that works then you can stop the instance as well:
+
+```text
+vastai stop instance $CONTAINER_ID;
+```
+
+If $CONTAINER\_ID is not defined check your environment variables using the 'env' command.
+If you are missing the predefined env variables from an ssh session you may need to add a command to export them to /etc/environment (see above).
+
+If you don't have the instance api key for whatever reason, you can also generate it. First run the following from inside the instance to create a special per instance api key and save it in the appropriate location:
+
+```text
+cat ~/.ssh/authorized_keys | md5sum | awk '{print $1}' > ssh_key_hv; echo -n $VAST_CONTAINERLABEL | md5sum | awk '{print $1}' > instance_id_hv; head -c -1 -q ssh_key_hv instance_id_hv > ~/.vast_api_key;
+```
+
+Then install the CLI with pip or download latest from github:
+
+```text
+apt-get install -y wget; wget https://raw.githubusercontent.com/vast-ai/vast-python/master/vast.py -O vast; chmod +x vast;
+```
+
+### How can I launch another Docker container from within the instance?
+
+Vast currently does not currently support Docker within Docker due to security constraints. You will need to launch each docker container on a separate instance.

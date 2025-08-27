@@ -1,0 +1,234 @@
+---
+title: Docker Execution Environment
+createdAt: Mon Jan 13 2025 21:20:40 GMT+0000 (Coordinated Universal Time)
+updatedAt: Wed Jan 15 2025 23:11:10 GMT+0000 (Coordinated Universal Time)
+---
+
+Vast.ai provides Linux docker instances.
+Your template (or CLI command) controls most of the parameters to the underlying docker create call, but most resource constraint options naturally must be configured automatically by our system.
+
+## CPU, Memory, Shared Mem
+
+We automatically assign CPU, RAM, shared mem, and related cgroup resources automatically in proportion to your instance's cost vs the total machine cost.
+
+## SSH/Jupyter Launch Modes
+
+These launch modes attempt to 'inject' Jupyter/SSH setup in to your existing docker image.
+The image entrypoint is replaced, so if you are using Jupyter or SSH launch mode for a docker image that uses an entrypoint script, you typically want to take the entrypoint command and add it to the end of your onstart.
+Sometimes the injection scripts can cause obscure loading errors.
+If you run into such issues with a custom image it may be best to use the simpler args/entrypoint launch mode and setup ssh/jupyter yourself.
+
+## Docker Create Options
+
+You can currently set 3 types of docker create/run options in the GUI and CLI:
+
+**environment variables**: "-e JUPYTER\_DIR=/ -e TEST=OK"
+
+**hostname**: "-h billybob"
+
+**ports**: "-p 8081:8081 -p 8082:8082/udp -p 70000:70000"
+
+# Environment Variables
+
+Use the -e docker syntax in the docker create/run options to set env variables. For example, to set the env variables TZC to UTC and TASKID to "TEST":
+
+```text
+-e TZ=UTC -e TASKID="TEST"
+```
+
+Any environment variables you set will be visible only to your onstart script (or your entrypoint for entrypoint launch mode).
+When using the SSH or Jupyter launch modes, your env variables will not be visible inside your SSH/tmux/Jupyter session by default.
+To make custom environment variables visible to the shell, you need to export them to /etc/environment.
+
+Add something like the following to the end of your onstart to export any env variables containing an underscore '\_':
+
+```text
+env | grep _ >> /etc/environment;
+```
+
+Or to export all env variables:
+
+```text
+env >> /etc/environment;
+```
+
+## User Account Environment Variables
+
+Users can set their environment variables in their User Account settings, which will automatically inject these variables into every container they use.
+
+## Special Env Vars
+
+Some special environment variables are used to signal to the interface:
+
+**OPEN\_BUTTON\_PORT**: Set this to map the open button on the instance panel to a specific (external) port corresponding to the specified internal port.
+
+For example:
+
+```text
+-e OPEN_BUTTON_PORT=7860
+```
+
+Will map the open button to whatever external port maps to internal port 7860.
+
+**JUPYTER\_PORT**: Use this to control the jupyter button.  Set this to your internal jupyter port and the UI will map the jupyter button to open jupyter on the corresponding IP in a new tab.
+
+For example:
+
+```text
+-e JUPYTER_PORT=8081
+```
+
+Will map the jupyter button to whatever external port maps to internal port 8081.
+
+**JUPYTER\_TOKEN**: Use this to control the jupyter button.  Set this to your jupyter token and the UI will map the jupyter button to open jupyter using the corresponding JUPYTER\_TOKEN in a new tab.
+
+For example:
+
+```text
+-e JUPYTER_TOKEN=TOKEN
+```
+
+Will use TOKEN as a value of your jupyter Token.
+
+**DATA\_DIRECTORY**: This env variable is used as the default src or dst directory for data copy operations.
+
+## Predefined Env Vars
+
+Our system also predefines some environment variables you can use:
+
+**CONTAINER\_API\_KEY**: Per instance API key you can use to access some CLI commands from within the instance.
+
+**CONTAINER\_ID**: The unique ID of your instance.
+
+**DATA\_DIRECTORY**: Location on the instance to copy data to/from
+
+**GPU\_COUNT**: Number of GPU devices.
+
+**PUBLIC\_IPADDR**: The instance's public IP address.
+
+**SSH\_PUBLIC\_KEY**: Your SSH public key from the account page.
+
+**PYTORCH\_VERSION**: The pytorch version (if applicable)
+
+**JUPYTER\_TOKEN**: The Jupyter access token.
+
+**JUPYTER\_SERVER\_ROOT**: The root directory for Jupyter (can't navigate above this!)
+
+**JUPYTER\_SERVER\_URL**: `Configured jupyter server URL (usually https://0.0.0.0:8080/)`
+
+**VAST\_CONTAINERLABEL**: Also the unique name/ID of your instance.
+
+Port env variables:
+
+**VAST\_TCP\_PORT\_22**: The external public TCP port that maps to internal port 22 (ssh).
+**VAST\_TCP\_PORT\_8080**: The external public TCP port that maps to internal port 22 (ssh).
+
+For each internal TCP port request:
+**VAST\_TCP\_PORT\_X**: The external public TCP port that maps to internal port X.
+
+For each internal UDP port request:
+**VAST\_TCP\_PORT\_X**: The external public UDP port that maps to internal port X.
+
+You can also use ports 70000 and above for identity port mappings (see networking below).
+
+# Networking
+
+Vast.ai docker instances have full internet access, but generally do not have unique IP addresses.  Instances can have public open ports, but as IP addresses are shared across machines/instances the public external ports are partitioned somewhat randomly.
+In essence each docker instance gets a fraction of a public IP address based on a subset of ports.  Each open internal port (such as 22 or 8080 etc) is mapped to a *random* external port on the machine's (usually shared) public IP address.
+
+Selecting the ssh launch mode will open and use port 22 internal by default, whereas jupyter will open and use port 8080 (in addition to 22 for ssh).
+There are several ways to open additional application ports:
+
+## Custom Ports
+
+Note: there is currently a limit of 64 total open ports per container/instance.
+
+Any EXPOSE commands in your docker image will be automatically mapped to port requests.
+You can also open custom ports for any docker image more dynamically using -p arguments in the docker create/run options box in the image config editor pop-up menu.
+To open ports 8081 (tcp) and 8082 udp, use something like this:
+
+```text
+-p 8081:8081 -p 8082:8082/udp
+```
+
+This will result in additional arguments to docker create/run to expose those internal ports, which will be mapped to random external ports.
+Any ports exposed in these docker options are in addition to ports exposed through EXPOSE commands in the docker image, and the ports 22 or 8080 which may be opened automatically for SSH or Jupyter.
+
+After the instance has loaded, you can find the corresponding external public IP by opening the IP Port Info pop-up (button on top of the instance) and then looking for the external port which maps to your internal port.
+It will have a format of PUBLIC\_IP -> INTERNAL\_PORT.  For example:
+
+```text
+65.130.162.74:33526 -> 8081/tcp
+```
+
+In this case, the public IP 65.130.162.74:33526 can be used to access anything you run on port 8081 inside the instance.  We strongly recommend you test your port mapping.
+
+## Testing Ports
+
+You can quickly test your port mapping with a simple command to start a minimal web server inside the instance with the following command:
+
+```text
+python -m http.server 8081
+```
+
+Which you would then access in this example by loading 65.130.162.74:33526 in your web browser.  This should open a file directory.
+
+## Identity Ports
+
+In some cases you may need an identity port map like 32001:32001 where external are the same.
+
+For this just use an out-of-range port above 70000:
+
+```text
+-p 70000:70000 -p 70001:70001
+```
+
+These out of range requests will map to random external ports and matching internal ports.
+You can then find the resulting mapped port with the appropriate env variables like : $VAST\_TCP\_PORT\_70000
+
+# Using the CLI​ from Inside
+
+A special instance api key should already be installed in your container and mapped to the env variable CONTAINER\_API\_KEY.
+
+The vastai CLI may already be installed, but if not you can easily install with pip:
+
+```text
+root@C.38250:~$ pip install vastai;
+```
+
+Then test it by starting the instance (which is a no-op as the instance is already running):
+
+```text
+vastai start instance $CONTAINER_ID;
+```
+
+The instance apikey should already set, but if not, may need to specify it from env variable:
+
+```text
+vastai start instance $CONTAINER_ID --api-key $CONTAINER_API_KEY;
+```
+
+If that works then you can stop the instance as well:
+
+```text
+vastai stop instance $CONTAINER_ID;
+vastai stop instance $CONTAINER_ID --api-key $CONTAINER_API_KEY;
+```
+
+You can also use destroy instance and a few other commands using the instance API key.
+
+If $CONTAINER\_ID and or $CONTAINER\_API\_KEY is not defined check your environment variables using the 'env' command.
+If you are missing the predefined env variables from an ssh session you may need to add a command to export them to /etc/environment (see earlier section on env variables).
+
+If you don't have the instance api key for whatever reason, you can also generate it. First run the following from inside the instance to create a special per instance api key and save it in the appropriate location:
+
+```text
+cat ~/.ssh/authorized_keys | md5sum | awk '{print $1}' > ssh_key_hv; echo -n $VAST_CONTAINERLABEL | md5sum | awk '{print $1}' > instance_id_hv; head -c -1 -q ssh_key_hv instance_id_hv > ~/.vast_api_key;
+```
+
+Then you should be able to run start/stop without passing in the key:
+
+```text
+vastai start instance $CONTAINER_ID;
+```
+

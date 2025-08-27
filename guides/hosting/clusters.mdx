@@ -1,0 +1,55 @@
+---
+title: Clusters
+slug: 1fI7-cl
+createdAt: Mon Jul 07 2025 18:36:03 GMT+0000 (Coordinated Universal Time)
+updatedAt: Wed Aug 13 2025 17:54:33 GMT+0000 (Coordinated Universal Time)
+---
+
+# Introduction
+
+Vast is introducing support for several features (local VPNs for client instances \[in beta], network volumes \[in alpha]) that depend on the host's LAN configuration.&#x20;
+
+Hosts can now register a set of machines they own sharing a LAN as a cluster to allow clients renting their machines to access local network resources. This will allow their machines to support use cases such as multi-node training via NCCL; as well, this will be a prerequisite to listing network volumes when they are released.&#x20;
+
+A registered *cluster* is associated with:
+
+- A machine that acts as the *manager node* and is responsible for dispatching cluster management commands from the Vast server.
+- An IP *subnet* that machines in the cluster use to identify which network interface / which IP addresses for communication with other machines in the cluster.&#x20;
+- A set of *member* machines.&#x20;
+
+The requirements for a set of machines to be registered as a cluster are that every member machine has a (non-NATed) IP address in the cluster's subnet to which any other machine in the cluster can communicate with on all ports.
+
+# Cluster registration guide
+
+- Update to the newest version of the CLI: go to ([https://cloud.vast.ai/cli/)\[https://cloud.vast.ai/cli/](https://cloud.vast.ai/cli/\)\[https://cloud.vast.ai/cli/)] and copy+run the command starting with `wget`.
+- Identify and test the subnet to register:
+  - On the manager node ---
+    - Run `ip addr` or `ifconfig` (the `ip` utility is part of the `iproute2` package).&#x20;
+    - Identify which interface correspond's to their LAN. For most hosts this will be an ethernet interface, which have the naming format `enp$BUSs$SLOT[f$FUNCTION]]` in modern Ubuntu.&#x20;
+      - Hosts using Mellanox devices for their main ethernet connection may instead see their interface show up as `bond0`
+    - Find the IPv4 subnet corresponding to that network interface --&#x20;
+      - In `ip addr` output, the third line for each interface usually starts with `inet IPv4SUBNET` where `IPv4SUBNET` has the format `IPv4ADDRESS/MASK` where `MASK` is a non-negative integer \< 32.
+  - Test that the other machines to be added to the cluster can reach the manager node on that subnet/address.&#x20;
+    - On the manager node:
+      - run `nc -l IPv4ADDRESS 2337` where `IPv4ADDRESS` is the IPv4 address component of the chosen subnet.&#x20;
+    - On each other node:
+      - run `nc IPv4ADDRESS 2337`
+      - Type in some test text (i.e., "hello") and press enter
+      - Check that `nc` received and outputed the test text on the manager node.&#x20;
+- Run `./vast.py create cluster IPv4SUBNET MACHINE_ID_OF_MANAGER_NODE`
+- Run `./vast.py show clusters` to check the ID of the cluster you just created.&#x20;
+- Run `./vast.py join cluster MACHINE_IDS` where `MACHINE_IDS` is a space seperated list of the remaining machines to add to your cluster.&#x20;
+
+# Cluster Management Commands Reference
+
+- `./vast create cluster SUBNET MANAGER_ID`&#x20;
+  - Initializes a cluster containing the machine with ID `MANAGER_ID` as its manager node and using the network interface corresponding to `SUBNET`
+- `./vast show clusters`
+  - Shows clusters, for each cluster showing its `CLUSTER_ID`, associated `SUBNET`, manager node machine\_id, and list of member machines.&#x20;
+- `./vast join cluster CLUSTER_ID MACHINE_IDS`
+  - Takes `MACHINE_IDS` as a space seperated list, and adds them to the cluster specified by `CLUSTER_ID`
+- `./vast remove-machine-from-cluster  CLUSTER_ID MACHINE_ID [NEW_MANAGER_ID]`
+  - Removes machine `MACHINE_ID` from cluster `CLUSTER_ID`. If the machine is the only manager, another machine in the cluster `NEW_MANAGER_ID` must be specified so that the cluster still has a manager.&#x20;
+- `./vast delete cluster CLUSTER_ID`
+  - Deletes cluster `CLUSTER_ID`. Fails if cluster resources are currently in use by client instances.&#x20;
+

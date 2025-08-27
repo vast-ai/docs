@@ -1,0 +1,139 @@
+---
+title: Text Generation Inference (TGI)
+slug: Y8LH-text-gener
+createdAt: Mon Jun 02 2025 21:09:22 GMT+0000 (Coordinated Universal Time)
+updatedAt: Tue Jun 03 2025 22:10:35 GMT+0000 (Coordinated Universal Time)
+---
+
+The [Text Generation Inference serverless template]{href="https://cloud.vast.ai?ref_id=140778&template_id=e97e6c337efd5562ad419cdb392981a4" newTab="true" hasDisabledNofollow="false"} can be used to infer LLMs on Vast GPU instances. This page documents required environment variables and endpoints to get started.
+
+A full PyWorker and Client implementation can be found [here]{href="https://github.com/vast-ai/pyworker/tree/main" newTab="true" hasDisabledNofollow="false"}.
+
+# Environment Variables
+
+- `HF_TOKEN`(string): HuggingFace API token with read permissions, used to download gated models. Read more about HuggingFace tokens [here]{href="https://huggingface.co/docs/hub/en/security-tokens" newTab="true" hasDisabledNofollow="false"}.
+- `MODEL_ID`(string): ID of the model to be used for inference. Supported HuggingFace models are shown [here.](https://huggingface.co/docs/text-generation-inference/en/supported_models)
+
+<Warning>
+  Some models on HuggingFace require the user to accept the terms and conditions on their HuggingFace account before using. For such models, this must be done first before using it with a Vast template.
+</Warning>
+
+
+
+# Endpoints
+
+## /generate/&#x20;
+
+Generates the LLM's response to a given prompt in a single request.
+
+### Inputs
+
+Auth\_data:
+
+- `signature`(string): A cryptographic string that authenticates the url, cost, and reqnum fields in the response, proving they originated from the server. Clients can use this signature, along with the server's public key, to verify that these specific details have not been tampered with.
+- `cost`(float): The estimated compute resources for the request. The units of this cost are defined by the PyWorker.&#x20;
+- `endpoint`(string): Name of the Endpoint.
+- `reqnum`(int): The request number corresponding to this worker instance. Note that workers expect to receive requests in approximately the same order as these reqnums, but some flexibility is allowed due to potential out-of-order requests caused by concurrency or small delays on the proxy server.
+- `url`(string): The address of the worker instance to send the request to.
+
+Payload:
+
+- `inputs`(string): The prompt message to be used as the input for the LLM.
+- Parameters:
+  - `max_new_tokens`(int): The maximum number of tokens the model will generate for the response to the input.
+
+```javascript
+{
+  "auth_data": {
+    "signature": "a_base64_encoded_signature_string_from_route_endpoint",
+    "cost": 256,
+    "endpoint": "Your-TGI-Endpoint-Name",
+    "reqnum": 1234567890,
+    "url": "http://worker-ip-address:port"
+  },
+  "payload": {
+    "inputs": "What is the answer to the universe?",
+    "parameters": {
+      "max_new_tokens": 256
+    }
+  }
+}
+```
+
+Depending on the model being used, other parameters like 'temperature' or 'top\_p' may be supported. Passing in these values in `parameters` will forward the values to the model, but they are *not* required.
+
+### Outputs
+
+- `generated_text`(string): The model response to the input prompt.
+
+```javascript
+[
+  {
+    "generated_text": "The model's response..."
+  }
+]
+```
+
+
+
+## **/generate\_stream**/&#x20;
+
+Generates and streams the LLM's response token by token.
+
+### Inputs
+
+`/generate_stream/` takes the same inputs as `/generate/`:
+
+Auth\_data:
+
+- `signature`(string): A cryptographic string that authenticates the url, cost, and reqnum fields in the response, proving they originated from the server. Clients can use this signature, along with the server's public key, to verify that these specific details have not been tampered with.
+- `cost`(float): The estimated compute resources for the request. The units of this cost are defined by the PyWorker.&#x20;
+- `endpoint`(string): Name of the Endpoint.
+- `reqnum`(int): The request number corresponding to this worker instance. Note that workers expect to receive requests in approximately the same order as these reqnums, but some flexibility is allowed due to potential out-of-order requests caused by concurrency or small delays on the proxy server.
+- `url`(string): The address of the worker instance to send the request to.
+
+Payload:
+
+- `inputs`(string): The prompt message to be used as the input for the LLM.
+- Parameters:
+  - `max_new_tokens`(int): The maximum number of tokens the model will generate for the response to the input.
+
+<Note>
+  The `max_new_tokens` parameter, rather than the prompt size, impacts performance. For example, if an instance is benchmarked to process 100 tokens per second, a request with `max_new_tokens = 200` will take approximately 2 seconds to complete.
+</Note>
+
+
+
+```javascript
+{
+  "auth_data": {
+    "signature": "a_base64_encoded_signature_string_from_route_endpoint",
+    "cost": 256,
+    "endpoint": "Your-TGI-Endpoint-Name",
+    "reqnum": 1234567890,
+    "url": "http://worker-ip-address:port"
+  },
+  "payload": {
+    "inputs": "What is the answer to the universe?",
+    "parameters": {
+      "max_new_tokens": 256
+    }
+  }
+}
+```
+
+### Outputs
+
+`/generate_stream/` outputs are a stream of Server-Sent Events (SSE), which each event looking like:
+
+```javascript
+{
+  "token": {
+    "id": 123,           // Token ID
+    "text": "Hello",      // The actual text of the token
+    "logprob": -0.12345,  // Log probability of the token
+    "special": false      // Whether it's a special token (e.g., EOS)
+  }
+}
+```
+

@@ -1,0 +1,305 @@
+---
+title: Overview
+slug: xP4AEPJl2F6woPGcD7EWl
+createdAt: Tue Jan 14 2025 01:09:17 GMT+0000 (Coordinated Universal Time)
+updatedAt: Fri Jul 11 2025 22:44:42 GMT+0000 (Coordinated Universal Time)
+---
+
+Vast is a GPU marketplace. Hosts sell GPU resources on the marketplace. Hosts are responsible for:
+
+- Setup: installing Ubuntu, creating disk partitions, installing NVIDIA drivers, opening network ports on the router and installing the Vast hosting software.
+- Testing and troubleshooting all issues that can arise, such as driver conflicts, errors, bad GPUs, and bad network ports. **Vast does not offer support for getting your machine working.** There is a [host discord](https://discord.gg/hSuEbSQ4X8) with helpful members and the host-general channel is searchable for specific errors.
+- Managing the listings and GPU offers for rentals, including setting pricing and end dates for the offers
+- Planning for maintenance so that no client jobs are affected
+
+## Account setup and hosting agreement
+
+You must create a new account for hosting.  If you are using Vast.ai as a client, do not use the same account. A single client and hosting account is not supported and you will quickly run into issues.
+
+Once your account is created, open the [host setup guide](https://cloud.vast.ai/host/setup/). There is a link in the first paragraph to the hosting agreement. Read through the agreement. Once you accept, your account will then be converted to a hosting account. You will notice there is now a link to Machines in the navigation, along with some other changes. Your account can now list machines that are running the daemon software.
+
+## Machine setup
+
+The [host setup guide](https://cloud.vast.ai/host/setup/) is the official documentation for setting up a machine on Vast.ai. Read through each section closely.
+
+Common issues to check:
+
+- Make sure to test the networking. Clients require open ports to directly connect to the machine for most jobs.
+- Make sure to read the section on IOMMU if you have an AMD EPYC system.
+- Make sure to disable auto-updates so that your machine doesn't drop a client job to update a driver.
+
+Once you are ready to list your machine, come back to this guide to understand pricing and listing the rental contract.
+
+## General concepts
+
+Clients have high expectations coming from AWS or GCP.
+As a host, plan to offer 100% uptime for your machine during the contracted period.
+Expect that the GPU is going to be used at close to max capacity for the rental period.
+Ensure that your Internet, power source and heat dissipation systems are all functioning and that you have thought through how hosting will affect each one of those items.
+
+## Listings and Contracts
+
+Hosts can create machine *listings* (offers) through the CLI command list machine or the machine control panel GUI on the host machines page.
+
+The main listing parameters include:
+
+- the pricing for GPUs,internet,storage
+- the discount schedule param which determines the price difference between [on-demand](https://docs.vast.ai/instances/rental-types) and [reserved](https://docs.vast.ai/instances/rental-types) instances
+- the min bid price for [interruptible](https://docs.vast.ai/instances/rental-types) instances
+- the min\_gpu param controlling 'slicing' (explained below)
+- the end/expiration date which determines how long the listing lasts
+
+The listing offer is good until the end date.
+When a client creates an instance on your machine, this creates a *contract* from your listing.
+
+Once you list and get rental contracts, it is very important to honor the terms of the contract until the end date.
+
+## The Rental Contract
+
+By listing your machine or compute services, you are offering up a rental contract to potential clients.
+
+Once a client accepts this listing, you and the client have entered into a rental agreement - a contract.
+
+As the provider you are *promising* to provide the services as advertized in your listing:
+
+- the provider must provide the hardware/services according to all the advertized specs
+- the hardware can not be used for any other purposes
+- the client's data must be isolated and protected according to the data protection policy
+- the advertized services must be provided up until the end date (contract expiration)
+
+For full details, see the [hosting agreement](https://cloud.vast.ai/host/agreement) and [Service Level Agreement](https://cloud.vast.ai/host/SLA_default).
+
+### Expiration date (end date)
+
+The expiration date can be set in the hosting interface by clicking on the date field under expiration and selecting a date for when the listing contract will expire.
+The CLI command to 'list machine' includes a field for end date, which is the same date.
+
+Make sure to set an end date **before** listing your machine, or else the listing will not expire.
+
+The "client end date" is the date of the longest client contract on a given machine.
+
+### Min GPU
+
+When clicking on the set pricing button, there is a min GPU field. The min GPU field allows you to set the smallest grouping of GPU rentals available on your machine in powers of 2, or down to 1. For example, if you have an 8X 3090 and set min gpu to 2, clients can create instances with 2, 4, or 8 GPUs. If you set min gpus to 1, then clients can make instances with 1, 2, 4 or 8 GPUs.
+
+### On-demand Price
+
+The on-demand price is the price per hour for the GPU rental. On demand rentals are the highest priority and if met will stop interruptibles.
+
+### Interruptible min price (optional)
+
+The interruptible price allows for the host to set the minimum interruptible price for a client to rent. Interruptibles work in a bidding system: clients set a bid price for their instance; the current highest bid is the instance that runs, the others are paused. [more info](https://vast.ai/faq#RentalTypes)
+
+### Reserved Discount Pricing Factor
+
+Reserved Instance Discounts are a feature for clients which allows them to rent machines over a long period of time at a reduced price. The Reserved Discount Pricing Factor represents the maximum possible discount a user can achieve on your machines.
+
+The reserved discount pricing is determined by the hosts. If you intend to encourage a long term rental this is a factor that you may want to research. Use the filters in the UI to select reserved.
+
+
+
+![](https://archbee-image-uploads.s3.amazonaws.com/9WtD9F5n1L2IYJxS0qXDd/OHyFuAsFe1ZM5tGHPGLRx_image.png)
+
+Once that filter is selected, hosts who offer that discount will become easily visible. Hover over the rental button to see the discount rates that are offered. The original vs. the updated price will be shown as denoted by a stikethrough in the original amount:
+
+
+
+![](https://archbee-image-uploads.s3.amazonaws.com/9WtD9F5n1L2IYJxS0qXDd/6hCCmmqVIi2ueuDyNFqgN_image.png)
+
+
+
+This discount is not static, but rather scales over time that the user rents the machine for. These values are determined by the individual host(s).
+
+As a host, you can set this number yourself to 0 if you wish to opt out of this feature.
+
+## Volume Contracts
+
+In addition to GPU contracts, hosts can now offer volume contracts on machines. This is a contract for storage space, and can be priced separately from GPU contracts. The space allocated for storage contracts is in the same pool of space as that for GPU contracts, meaning that space will not be subtracted from available offers unless it is in use.&#x20;
+When a client rents a volume listing, they rent a subset of the total space set for the listing, up to the total amount.
+
+### Storage Usage
+
+Allocated storage (that is, storage in use by client contracts) is subtracted from the total storage available on a machine, and split up proportionally among the machines GPUs in remaining ask contracts.
+
+For example, on a machine with 1000Gb of disk available and 2 GPUs, a host can create a volume listing of up to 1000 Gb.&#x20;
+
+If they create a volume listing of 500 Gb, and it is not rented, the machine will be available for rent with 2 offers of 1xGPU 500Gb and 1 offer of 2xGPU 1000Gb.&#x20;
+
+If 200 Gb of the volume contract are rented, the GPU offers will reduce to 2 1xGPU 400Gb offers and 1 2xGPU 800Gb offer. The volume contract will still remain, as there is still available space, and update to offer 300Gb.&#x20;
+
+Similarly, if stored instances on the machine are taking up 800Gb, the volume offer will reduce to 200Gb.
+
+If stored instances are only taking up 400 Gb, the volume offer will not update, as there is still enough space on the machine to cover the volume offer.
+
+### Listing Volumes
+
+By default, volume offers will be listed with contract listings at the same disk price for half of the available space on the machine. Only rented space will impact the amount of space available for contract offers, not the space in the listing itself. You can control the amount of space listed with the -v CLI option, and the price of the space with the -z option.
+
+Space is listed in Gigabytes, and price in $/Gb/Month.
+
+```none
+vastai list machine <machine_id> -v <space> -z <price> -g .5 -e "12/23/2027" -r 0 -m 1
+```
+
+You can also directly list available space for volume contracts by running the `vastai list volume` command.
+
+```none
+vastai list volume <machine_id> -s <space> -p <price>
+```
+
+<Warning>
+  Volume offer end dates **must** align with normal contract offer end dates.&#x20;
+  Setting an end date on a volume will not update if there is an existing contract offer.
+  Setting a contract offer end date will update volume offer end dates.
+</Warning>
+
+Volume contracts will be unlisted when the machine is unlisted. They can additionally be unlisted with the command:
+
+```none
+vastai unlist volume <volume_id>
+```
+
+### Out of sync Contracts
+
+When a client deletes a volume, the space is automatically freed on the machine. If the machine is offline at this time, there is a job that runs hourly to free the space. If for some reason this is not working, or if you want to free the space automatically, you can run the command
+
+```none
+vastai cleanup machine <machine_id>
+```
+
+This will automatically remove expired/deleted contracts from the machine, and available storage will update on offers.
+
+## Extending contracts
+
+To extend the current contracts for all clients on a given machine, change the expiration date to a later time with the same or lower pricing.
+
+If you have raised the pricing, you cannot extend the current contract.
+
+## Testing your own machine
+
+It is vital to test your own machine to ensure the ports and software is running smoothly.
+
+### Setup a separate client account
+
+There are two supported ways to test your own machine. If you want to use the website GUI, you will need to setup a new account on a different email address, add a credit card and then find your machine and create instances on it like a client. This has the benefit of showing you the entire client experience. Testing the recommended Pytorch template is vital to ensure that SSH and Jupyter are working properly.
+
+### Use the CLI (preferred)
+
+The preferred method of testing your own machine is to run the [CLI](https://cloud.vast.ai/cli/). For Windows users, we suggest setting up [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) which will require you to install Ubuntu on your Windows machine and change your bios settings to allow virtualization. Then you can start an Ubuntu terminal and run the CLI.
+
+To rent your own machine you will need to first search the offers with your machine ID to find the ID and then create an instance using that ID. The show machine command will show all your connected machines.
+
+```text
+./vastai show machines
+```
+
+Then for each machine id you will need to find the available instance IDs.
+
+```text
+./vastai search offers 'machine_id=12345  verified=any'
+```
+
+Replace 12345 with your actual machine ID in question.
+You can see the number of available listings as well as information about the machine. This is the fastest way to also see all the offers listed for a given machine.
+The website GUI stacks similar offers and so it is not easy to see all the listings for a given machine. That is not a problem for the CLI.
+
+Take the ID number from the first column and use that to create a free instance on your own machine. This example loads the latest pytorch image along with both jupyter and ssh direct launch modes.
+
+```text
+./vastai create instance <ID> --image pytorch/pytorch:latest --jupyter --direct --env '-e TZ=PDT -p 22:22 -p 8080:8080'
+```
+
+You can then look at your [instance tab](https://cloud.vast.ai/instances/) to make sure that pytorch loaded correctly along with jupyter and ssh. Click on the \<\_ button to get the ssh command to connect to the instance. Test the direct ssh command. Click on the open button to test jupyter. If the button is stuck "connecting" then there is most likely a problem with the port configuration on the router in front of the machine. Once finished, destroy the instance.
+
+## Maintenance
+
+The proper way to perform maintenance on your machine is to wait until all active contracts have expired or the machine is vacant.
+
+Unlisting will prevent new contracts from starting on the machine. However if you have a current client rental, you could set the end date to the client end date to allow for other clients to create instances on that machine that expire at the same date. Once the end date is reached, you can then unlist the machine and then perform maintenance.
+
+For unplanned or unscheduled maintenance, use the CLI and the schedule maint command. That will notify the client that you **have** to take the machine down and that they should save their work. You can specify a date and duration.
+
+## Uninstalling
+
+To uninstall, use the Vast uninstall script located at [https://s3.amazonaws.com/vast.ai/uninstall](https://s3.amazonaws.com/vast.ai/uninstall).
+
+## Common Questions
+
+### How do I host my machine(s) on Vast? How can I rent my PC?
+
+Hosting on Vast will require some Linux knowledge, as you will be maintaining a server. Our setup guide is [here](https://vast.ai/console/host/setup/). After the first paragraph of the guide there is a link to the hosting agreement. Once you agree, your account will be converted to a hosting account. You can review our [FAQ](https://vast.ai/faq/#Hosting-General) that answers many of your hosting questions.
+
+### How do I get an invoice?
+
+You can create an invoice by going to the "Billing" page, and then click the box for "Include Charges" under "Generate Billing History".
+
+### How do I check if my machine is listed?
+
+If your machine seems unlisted, try this command `vastai search offers 'machine_id=MACHINE_ID verified=any'` to see if the CLI finds it. If there is a result, your machine is properly listed
+
+### Can you verify my machine?
+
+Verification is conducted in a randomized and automated fashion. We only run manual verification tests are for datacenters and high end machines.
+
+### How does verification work?
+
+Verification is mostly for higher end machines, mining rigs may never be verified.
+Verification is also based on supply vs demand and is machine/gpu specific.
+Right now the only machines which can expect fast verification are $10k+:
+H100 or A100 80GB - if not tested quickly in a day or so let us know.
+8x4090, 4xA6000 - should be tested in less than a week, especially if you have a number of them
+The only manual verification tests are for datacenters and high end machines.
+For everything else we run more random auto verification roughly about once a week.
+For datacenter partner inquiries email us at [contact@vast.ai](mailto\:contact@vast.ai) directly.
+
+### How do I gain datacenter status?
+
+To apply for datacenter status we have a number of requirements. There is a minimum number of servers and the datacenter where the equipment is located will need to have a third party certification such as ISO 27001. Please read the complete requirement list and application instructions [here](https://docs.vast.ai/datacenter-status).
+
+### How do I uninstall vast from my machine?
+
+You can use the [uninstall script](https://s3.amazonaws.com/vast.ai/uninstall)
+
+### Help I am getting this error on my machine?
+
+For help with machine setup, specific questions about hardware, and for errors or other issues, go to [our discord](https://discord.gg/hSuEbSQ4X8).
+
+### Why is my machine not listed?
+
+You won't be able to see it on the GUI right away, but you can search using the [CLI](https://docs.vast.ai/instances).
+
+### Can I send a message to a customer using my machine letting them know that I fixed an issue that they were having?
+
+No, there is not an established process for hosts to message customers on Vast.
+
+### I fear I will decrease my reliability from restarting my machine and potentially lose my verification.
+
+Your machine's reliability does not directly affect your verification standing. Verification is independent of reliability. Though, whenever taking your machine offline and working on it you should procede with caution as it is easy to introduce new issues or errors that will cause your machine to be de-verified.
+
+### How much can I make hosting on Vast?
+
+To get an understanding of prices, the best place is 500farms which is a third party website that monitors Vast listings. The link is [here](https://500.farm/vastai/charts/d/a6RgL05nk/vast-ai-stats).
+
+### Why did the reliability on my machine decrease?
+
+If the machine loses connection or if there is a client instance that does not want to start the machine's reliability will drop.
+
+### How do I minimize my reliability dropping?
+
+Do not take your machine offline. If you must take your machine offline, minimize the time you have it offline. Note: reliability takes into account the average earnings of the machine, and machines with less earnings get penalized less from offline time.
+
+### If someone has already used an image on my machine does redownload happen or is the system smart?
+
+Prior images are cached.
+
+### My storage for clients is somehow full. I just have a few jobs stored in my server and most of them are old and didn't delete once the job finished. A lot of them are really old, can I remove them to free up some space?
+
+We suggest that you try cleaning up the docker build cache, as it sometimes frees up far more space than it claims. You can also clean up old unused images.
+
+### I can't find my machine?
+
+If your machine seems unlisted, try this command  `vastai search offers 'machine_id=MACHINE_ID verified=any'` to see if the CLI finds it. If there is a result, your machine is properly listed.
+
+### Why can't I see my machine on the Search page in the console?
+
+There are over 10,000+ listings on Vast, and search only displays a small subset. You will usually not be able to find any one specific machine through most normal searches. This is expected and intentional behavior of our system. You can use `vastai search offers 'machine_id=MACHINE_ID verified=any'`, to see your machine's listing. If you want to get an understanding of the machines ranking above yours you can use very narrow filters to see what similar machines are ranking above you. For example, something like: `vastai search offers 'gpu_name=RTX_4090 cpu_ram>257 cpu_ram<258'` is a decently constrained search that will most likely include a given machine you are looking for (that fits these filters) amongst others that are similar. Keep in mind our Auto Sort that `search offers` defaults to is comprised of both ranking various factors as well as an element of randomness.

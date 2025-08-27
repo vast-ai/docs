@@ -1,0 +1,90 @@
+---
+title: Inside a Serverless GPU
+slug: 755doS_etBSXtfevOrV7b
+createdAt: Tue Jan 14 2025 01:54:58 GMT+0000 (Coordinated Universal Time)
+updatedAt: Mon Jul 21 2025 22:29:03 GMT+0000 (Coordinated Universal Time)
+---
+
+All GPU instances on Vast Serverless contain three parts:
+
+1. The core ML model.
+2. The model server code that handles requests and inferences the ML model.
+3. The [PyWorker]{href="https://docs.vast.ai/serverless/overview" newTab="true" hasDisabledNofollow="false"} server code that wraps the ML model, which formats incoming HTTP requests into a compatible format for the model server.
+
+![Backend diagram](https://archbee-image-uploads.s3.amazonaws.com/FhZr-Q9v-XzefBwGFb_3x-b8eeHBorQrlVO4Uul4drG-20250619-223401.png)
+
+The term 'Backend' refers to the machine learning model itself, and the supplementary code used to make its inference work.
+
+On Vast Serverless, the only way to access the ML model is through the PyWorker that wraps it. This allows the PyWorker to report accurate metrics to the serverless system so it can size the number of GPU instances appropriatley.&#x20;
+
+## Backend Configuration
+
+Once a User has connected to a GPU Instance over Vast, the backend will start its own launch script. The launch script will:
+
+- Setup a log file.
+- Start a webserver to communicate with the ML model and PyWorker.
+- Set environment variables.
+- Launch the PyWorker and create a directory for it.
+- Monitor the webserver and PyWorker processes.
+
+After launch, the PyWorker acts as an inference API server façade, receiving HTTP requests, parsing them, and turning them into internal calls. &#x20;
+
+The 'Model Server' icon in the image above represents the inference runtime. This piece loads the model, exposes an interface, performs the model forward pass, and returns the resulting tensors to the PyWorker.
+
+## Adding Endpoints
+
+To add an endpoint to an existing backend, follow the instructions in the [PyWorker Extension Guide](https://docs.vast.ai/serverless/extension-guide). This guide can also be used to write new backends.
+
+## Authentication
+
+The authentication information returned by [https://run.vast.ai/route/ ](https://docs.vast.ai/serverless/route)must be included in the request JSON to the PyWorker, but will be filtered out before forwarding to the model server. For example, a PyWorker expects to receive auth data in the request:
+
+<CodeblockTabs>
+  JSON
+
+  ```javascript
+  {
+    "auth_data": {
+      "signature": "a_base64_encoded_signature_string_from_route_endpoint",
+      "cost": 256,
+      "endpoint": "Your-Endpoint-Name",
+      "reqnum": 1234567890,
+      "url": "http://worker-ip-address:port"
+    },
+    "payload": {
+      "inputs": "What is the answer to the universe?",
+      "parameters": {
+        "max_new_tokens": 256,
+        "temperature": 0.7,
+        "top_p": 0.9,
+        "do_sample": true
+      }
+    }
+  }
+  ```
+</CodeblockTabs>
+
+Once authenticated, the PyWorker will forward the following to the model server:
+
+```javascript
+{
+  "inputs": "What is the answer to the universe?",
+  "parameters": {
+    "max_new_tokens": 256,
+    "temperature": 0.7,
+    "top_p": 0.9,
+    "do_sample": true
+  }
+}
+```
+
+When the Serverless system returns an instance address from the `/route/` endpoint, it provides a unique signature with your request. The authentication server verifies this signature to ensure that only authorized clients can send requests to your server.
+
+## More Information
+
+For more detailed information and advanced configuration, visit the [Vast PyWorker repository](https://github.com/vast-ai/pyworker/).
+
+Vast also has pre-made backends in our supported templates, which can be found in the Serverless section [here]{href="https://cloud.vast.ai/templates/" newTab="true" hasDisabledNofollow="false"}.&#x20;
+
+##
+

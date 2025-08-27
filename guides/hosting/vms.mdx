@@ -1,0 +1,123 @@
+---
+title: VMs
+createdAt: Mon Jan 13 2025 21:20:40 GMT+0000 (Coordinated Universal Time)
+updatedAt: Wed Jan 15 2025 00:37:08 GMT+0000 (Coordinated Universal Time)
+---
+
+>
+
+# Introduction
+
+Vast now supports VM instances running on Kernel Virtual Machine (KVM) in addition to Docker container based instances.
+VM support is currently an optional feature for hosts as it usually requires additional configuration steps on top of those needed to support Docker-based instances.
+
+Host machines are not required to be VM compatible; the Vast hosting software will automatically test and enable the feature on machines on which VMs are supported.
+On new machines the tests will be run on install; for machines configured before the VM-feature release, testing for VM-compatability will happen when the machine is unoccupied.
+
+Machines that do not have VM support enabled will be hidden in the search page for clients who have VM-based templates selected.
+
+## VM Support Benefits/Drawbacks
+
+### Benefits
+
+VM support will allow your machine to take advantage of demand for use cases that Docker cannot easily support, in addition to demand for conventional Docker-based instances.
+
+VMs support the following features/use-cases that Docker-based instances do not:
+
+<table isTableHeaderOn="true" selectedColumns="" selectedRows="" selectedTable="false">
+  <tr>
+    <td selected="false" align="left">
+      <p>Feature</p>
+    </td>
+    <td selected="false" align="left">
+      <p>Use cases</p>
+    </td>
+  </tr>
+</table>
+
+Systemd/Docker
+
+Multi-Application Server Tooling and DevOps (e.g., Docker Compose, Kubernetes, Docker Build)
+
+Non-Linux OSes
+
+Windows Graphics (e.g., for rendering or cloud gaming)
+
+ptrace
+
+Program analysis for CUDA-performance optimization (e.g., via Nvidia NSight)
+
+Currently no other peer-to-peer GPU rental marketplace offers full VMs; instead full VMs are only available from traditional providers at much higher costs.
+Thus we believe that hosts who have VMs enabled can expect to command a substantial preumium.
+
+### Drawbacks
+
+- Due to greater user control over hardware, VM support requires IOMMU settings for securing PCIe communications that can degrade the performance of NCCL on non-RTX 40X0 multi-GPU machines that rely on PCI-based GPU peer-to-peer communication.
+- VMs require more disk space than Docker containers as they do not share components with the host OS. Hosts with VMs enabled may want to set higher disk and internet bandwidth prices.
+
+### Summary
+
+We recommend all hosts with single-GPU rigs to try to ensure VM support as the drawbacks for single-GPU machines are minimal.
+
+We also generally recommend multi-GPU Hosts with RTX 40X0 series GPUs try enabling VMs, especially if they have plentiful disk space and fast (500Mbps+) internet speed,
+as rendering/gaming users will benefit from those, as well as users who need multi-application orchestration tools.
+
+We do not recommend multi-GPU hosts with datacenter GPUs enable VMs until we can ensure better GPU P2P communication support in VMs, including support for NVLink.
+
+## Configuring VMs on your machine
+
+### Checking VM enablement status.
+
+Run `python3 /var/lib/vastai_kaalia/enable_vms.py check`.
+
+Possible results are:
+
+- `on`: VMs are enabled on your machine.
+- `off`: VMs are disabled on your machine. Either you disabled VMs or our previous tests failed.
+- `pending`: VMs are not disabled, but will try to enable once the machine is idle.
+
+### Disabling VMs.
+
+To prevent VMs from being enabled on your machine, or to disable VMs after they have been enabled, run `python3 /var/lib/vastai_kaalia/enable_vms.py off`.
+
+Note that default configuration settings for most machines will not support VMs, and we can detect that, so most hosts who do not want VMs enabled do not need to take any action.
+
+### Configuring your machine to support VMs.
+
+### Hardware prerequisites
+
+You will require a CPU and a chipset that support Intel VT-d or AMD-Vi.
+
+### Configure BIOS
+
+Check that virtualization is enabled in your BIOS. On most machines, this should be enabled by default.
+
+### Configure Kernel Commandline Arguments
+
+For further reference refer to [Preparing the IOMMU](https://ubuntu.com/server/docs/gpu-virtualization-with-qemu-kvm#preparing-the-input-output-memory-management-unit-iommu).
+
+We will need to ensure IOMMU, a technology that secures and isolates communication between PCIe devices, is set up, along with disabling all driver features that interfere with VMs.
+
+Open `/etc/default/grub` and add to the `GRUB_CMDLINE_LINUX=` the following:
+
+- `amd_iommu=on` or `intel_iommu=on` depending on whether you have an AMD or Intel CPU.
+- `nvidia_drm.modeset=0`
+
+Some hosts may also need to add the following settings:
+
+- `rd.driver.blacklist=nouveau`
+- `modprobe.blacklist=nouveau`
+
+Then run `sudo update-grub` and reboot.
+
+### Disable display managers/background GPU processes.
+
+If you have a display manager (e.g., GDM) or display server (XOrg, Wayland, etc) running, you must disable them.
+
+You may not run any background GPU processes for VMs to work (`nvidia-persitenced` is OK, it is managed by our hosting software).
+
+### Enabling VMs
+
+We will check/test your configuration when your machine is idle and enable VMs by default if your machine is capable of supporting VMs, and you have not set VMs to `off`.
+
+If you have VMs set to off, and you'd like to retry enabling VMs, run `sudo python3 /var/lib/vastai_kaalia/enable_vms.py on -f` while your machine is idle.

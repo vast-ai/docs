@@ -1,0 +1,213 @@
+---
+title: Linux Virtual Machines
+slug: qklV-sdfsdf
+createdAt: Tue Jan 14 2025 19:59:40 GMT+0000 (Coordinated Universal Time)
+updatedAt: Tue May 13 2025 15:44:25 GMT+0000 (Coordinated Universal Time)
+---
+
+# Complete Guide to Running Virtual Machines on Vast.ai
+
+## Introduction
+
+Vast.ai provides virtual machine (VM) capabilities alongside its Docker-based instance rentals. This guide walks you through everything you need to know about running VMs on machines with GPUs found at Vast.
+
+## Prerequisites
+
+- A Vast.ai account
+- [SSH client installed on your local machine and SSH public key added the Keys section at cloud.vast.ai]{href="https://docs.vast.ai/instances/sshscp" newTab="true" hasDisabledNofollow="false"}&#x20;
+- [(Optional) Install and use vast-cli]{href="https://docs.vast.ai/cli" newTab="true" hasDisabledNofollow="false"}&#x20;
+
+## VM vs Docker: Understanding the Differences
+
+### VM Advantages
+
+- Full support for init managers like `systemd`
+  - Enable running Docker, Kubernetes, and Snap applications
+  - Perfect for containerization within your instance
+- Process tracing support via `ptrace`
+  - Ideal for debugging and system monitoring
+- Complete system isolation
+  - Full control over the virtual environment
+
+### VM Limitations
+
+- Longer instance creation and boot times compared to Docker
+- Higher disk space requirements
+- Limited machine selection
+- Fewer preconfigured templates
+- Currently restricted to SSH-only launch mode
+
+## Common Use Cases
+
+### Deep Learning Development Environments
+
+- **Custom ML Framework Setups**: Run multiple ML framework versions simultaneously with full control over CUDA versions, perfect for maintaining compatibility with legacy projects while using newer frameworks.
+- **Distributed Training Systems**: Set up complete Kubernetes clusters for distributed machine learning, enabling efficient training of large models across multiple nodes.
+
+### Development and Testing
+
+- **Docker Compose Development**: Deploy and test multi-container applications with full Docker Compose support, including volume mounts and network configurations not possible in regular Docker instances.
+- **CUDA Performance Profiling**: Profile CUDA applications with full system access and hardware counters, enabling detailed performance analysis and optimization.
+- **Containerization Development**: Test Docker and Kubernetes configurations in fully isolated environments with Docker-in-Docker capabilities.
+- **System-Level Development**: Develop and test custom drivers and kernel modules with direct access to system resources.
+
+### Production Workloads
+
+- **Database Systems**: Run database servers with full control over system parameters and storage configurations for optimal performance.
+- **Web Services**: Deploy web applications requiring specific system-level configurations or systemd integration.
+
+### Research and Academic Use
+
+- **Reproducible Research**: Create and preserve complete system environments to ensure research reproducibility across different setups.
+- **GPU Architecture Research**: Conduct low-level GPU research with direct hardware access and custom driver configurations.
+
+### Security Testing
+
+**Isolated Security Research**: Perform security testing and malware analysis in completely isolated environments without risking host system contamination.
+
+### Legacy Application Support
+
+**Legacy Software**: Run older applications that require specific operating system versions or library combinations not available in containers.
+
+### Resource-Intensive Applications
+
+- **High-Performance Computing**: Configure custom parallel computing environments with specific network and scheduler requirements.
+- **Graphics and Rendering**: Set up rendering systems with precise control over GPU configurations and driver versions.
+
+## Getting Started
+
+### Prerequisites
+
+**SSH Key Setup (Required)**
+
+NOTE: You must add your SSH public key to the Keys section after logging into your Vast.ai account before creating a VM instance. If you start a VM before any SSH keys have been added to your account, the VM will not be accessible.&#x20;
+
+Steps to setup your SSH key:
+
+1. Generate an SSH key and copy your public key
+2. Access your account settings page
+3. Navigate to the SSH keys section
+4. Add your public key
+
+NOTE: SSH keys cannot be modified once a VM is running
+
+
+
+## Creating and Configuring VMs
+
+### Search for Ubuntu VM Template
+
+Go to [Templates tab]{href="https://cloud.vast.ai/templates/" newTab="true" hasDisabledNofollow="false"} and search for recommended Ubuntu 22.04 VM template.
+
+### Edit Template as Needed
+
+When you find the Ubuntu 22.04 VM template, you can edit the template.&#x20;
+
+### **Environment Variables**
+
+You can set environment variables by editing the VM template and adding a specific environment variable name and value in the Environment Variables section or adding a line like this to "Docker options" field:
+
+<CodeblockTabs>
+  Docker
+
+  ```linux
+  -e JUPYTER_DIR=/ -e TEST=OK
+  ```
+</CodeblockTabs>
+
+Variables are written to `/etc/environment.`To use these environment variables in a script once you're inside your machine, run this command:
+
+<CodeblockTabs>
+  Linux
+
+  ```linux
+  source /etc/environment
+  ```
+</CodeblockTabs>
+
+### Expose Ports Publicly
+
+You can expose ports publicly by editing the VM template and adding specific ports in  Ports section or adding a line similar to this in "Docker options" field:
+
+<CodeblockTabs>
+  Docker
+
+  ```linux
+  -p 8081:8081 -p 8082:8082/udp -p 70000:70000
+  ```
+</CodeblockTabs>
+
+### Specify On-Start Script Configuration&#x20;
+
+The On-start script field allows specifying a script to run on instance start. Unlike in docker-based instances, the interpreter must be specified by a shebang. Here's an example for bash:
+
+<CodeblockTabs>
+  Linux
+
+  ```linux
+  #!/bin/bash
+  ```
+</CodeblockTabs>
+
+## Rent a Machine
+
+Rent a machine of your choice from the [Search tab]{href="https://cloud.vast.ai/create/" newTab="true" hasDisabledNofollow="false"}.
+
+You can see the instance being created in the Instances tab. It can take some time to load.
+
+## Connect to Your VM
+
+Once the blue button the instance card says **>\_CONNECT**, you can click the button and copy the ssh command to execute in your terminal in your Mac or Linux-based computer. You can also use [Powershell or Windows Putty tools]{href="https://docs.vast.ai/instances/sshscp" newTab="true" hasDisabledNofollow="false"} if you have a Windows computer.
+
+## VM Management
+
+### Cloud Copy Utility
+
+- Different from Docker-based instances
+- Use cli command: `vastai vm copy $SRC_VM_ID $DEST_VM_ID`
+- Limitations:
+  - Only supports full VM migration
+  - Copying between VMs only (no external storage support)
+  - No individual folder copy support
+
+### Best Practices
+
+- **Resource Management**
+  - Monitor disk usage due to higher overhead
+  - Plan for longer boot times in your workflows
+- **Security**
+  - Keep SSH keys secure
+  - Configure firewall rules appropriately
+  - Regular security updates
+- **Performance Optimization**
+  - Use appropriate VM sizes for your workload
+  - Monitor resource utilization
+  - Clean up unused resources
+
+## Troubleshooting
+
+### Common Issues
+
+- **VM Won't Start**
+  - Check if SSH key is added in Account
+  - Verify that rented machine supports VMs
+- **Environment Variables Not Working**
+  - Ensure variables are properly set in Docker options
+  - Check if `/etc/environment` is being sourced
+  - Verify script permissions
+- **Connectivity Issues**
+  - Verify SSH key permissions
+  - Check network configuration
+  - Confirm port forwarding setup
+  - Try a different host machine
+
+### Support Resources
+
+- [Vast.ai documentation]{href="https://docs.vast.ai/" newTab="true" hasDisabledNofollow="false"}
+- [Vast.ai Discord]{href="https://discord.gg/hSuEbSQ4X8" newTab="true" hasDisabledNofollow="false"}
+- [Support chat at Vast.ai]{href="https://vast.ai/" newTab="true" hasDisabledNofollow="false"}
+
+## Conclusion
+
+Virtual Machines on Vast.ai provide powerful capabilities for specific use cases, particularly those requiring full system control or containerization support. While they have some limitations compared to Docker instances, their flexibility and isolation make them ideal for many advanced computing scenarios.
+

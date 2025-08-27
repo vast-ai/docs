@@ -1,0 +1,56 @@
+---
+title: Overview
+createdAt: Mon Jan 13 2025 21:20:40 GMT+0000 (Coordinated Universal Time)
+updatedAt: Tue May 06 2025 15:29:42 GMT+0000 (Coordinated Universal Time)
+---
+
+A rental contract grants a client access to specified resources (GPU, CPU, RAM, disk, io, etc) of a machine for some period of time.
+Each rental contract is associated with one or more *instances*: currently implemented via docker containers.
+
+## Resources
+
+### GPU
+
+Each running instance currently has access to 1 or more GPUs.  Currently GPUs are exclusive resources: they are never shared between multiple users at the same time.  Each contract grants instances exclusive access to specific GPUs while that instance is running.
+Stopped instances have no GPU reservation.
+
+### CPU
+
+Each contract/instance is allocated baseline CPU power in proportion to its fraction of attached GPUs out of the total.  For example a 1-GPU instance on a 4-GPU machine will get 25% of CPU baseline.
+Instances can burst above their CPU allocation while there are extra CPU cycles to share, but during contention only the baseline is reserved.
+
+### RAM
+
+System RAM is allocated similar to system CPU: each instance gets a fraction of RAM as baseline in proportion to its fraction of attached GPUs.
+Instances can temporarily use additional RAM above their allocation when free RAM is available, but doing so risks having processes killed by the OOM killer when free system RAM is scarce.
+
+### Disk
+
+Each instance has a disk storage allocation reserved in advance at instance creation time. Currently this allocation is static - can't be changed after creation - so make sure to size correctly on start.
+
+### Misc
+
+Misc resources such as shared memory (dev/shm, shm-size) are also assigned automatically in proportion to GPU fraction.
+
+## Duration
+
+Each contract and thus instance has a duration/lifetime. You can see this max duration on each offer on the search page before you create an instance.
+Once an instance hits its end date it expires and is automatically stopped.  Expired instances can not restart while expired.
+Expired instances may be deleted 48 hours after expiration, so make sure to get your data off before then.
+Hosts can opt to extend contracts and often do, but this is not guaranteed and subjection to market conditions.
+If your contract is extended the duration will update automatically, but this is entirely up to the provider.
+
+## Image
+
+Vast.ai currently provides Linux docker instances. Each such docker instance is a container created from a docker image.
+You can use any docker image along with an optional custom repository and login credentials for private images.
+
+## Launch Modes
+
+We support several launch modes: entrypoint/args, ssh, and jupyter.
+The entrypoint/args launch mode just runs a container from your image in the obvious way, but also allows you to override the entrypoint and or launch args.
+If you use the entrypoint/args launch mode you are responsible for setting up any connectivity such as ssh, jupyter, or web UI.
+
+For the ssh and jupyter launch modes, we attempt to inject ssh and or jupyter access into the container.  Our ssh mode attempts to setup both direct (using an open port) and proxy connections.
+Our jupyter launch mode supports either proxy or direct, but not both.  It also includes ssh.  Our jupyter connection is secured with both https and a token.
+Using the jupyter direct option first requires installing our https certificate once.
