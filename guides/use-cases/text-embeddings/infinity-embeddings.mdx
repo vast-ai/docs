@@ -14,19 +14,19 @@ One of its best features is that you can deploy multiple models on the same GPU 
 
 This guide will show you how to setup Infinity Embeddings to serve an LLM on Vast. We reference a note book that you can use [here](https://nbviewer.org/urls/bitbucket.org/%21api/2.0/snippets/jsbcannell/nE66og/f86a1c070ddc362abc6572eb300926a0b7190ad3/files/serve_infinity_on_vast.ipynb)
 
-```bash
+```bash Bash
 pip install --upgrade vastai
 ```
 
 Once you create your account, you can go [here](https://cloud.vast.ai/cli/) to set your API Key.
 
-```bash
+```bash Bash
 vastai set api-key <Your-API-Key-Here>
 ```
 
 For serving an LLM, we're looking for a machine that has a static IP address, ports available to host on, plus a single modern GPU with decent RAM since these embedding models will be small. We will query the vast API to get a list of these types of machines.
 
-```bash
+```bash Bash
 vastai search offers 'compute_cap > 800 gpu_ram > 20 num_gpus = 1 static_ip=true direct_port_count > 1' 
 ```
 
@@ -39,7 +39,7 @@ The easiest way to deploy a single model on this instance is to use the command 
 
 We particularly need `v2` so that we use the correct version of the api, `--port 8000` so it serves on the correct model, and `--model-id michaelfeil/bge-small-en-v1.5` to serve the correct model.
 
-```bash
+```bash Bash
 
 vastai create instance <instance-id> --image michaelf34/infinity:latest --env '-p 8000:8000' --disk 40 --args v2 --model-id michaelfeil/bge-small-en-v1.5 --port 8000
 ```
@@ -48,21 +48,26 @@ vastai create instance <instance-id> --image michaelf34/infinity:latest --env '-
 
 Once your instance is done setting up, you should see something like this:
 
-![IP\_address\_view](https://vast.ai/uploads/ip_address_view_infinity.png "IP_address_view")
+<Frame caption="IP_address_view">
+![IP\_address\_view](https://vast.ai/uploads/ip_address_view_infinity.png)
+</Frame>
 
 Click on the highlighted button to see the IP address and correct port for our requests. To connect to your instance, we'll first need to get the IP address and port number.
 
-![Instance\_view](https://vast.ai/uploads/instance_view_infinity.png "Instance_view")
+
+<Frame caption="Instance_view">
+![Instance\_view](https://vast.ai/uploads/instance_view_infinity.png)
+</Frame>
 
 Now we'll call this with the Open AI SDK:
 
-```bash
+```bash Bash
 pip install openai
 ```
 
 We will copy over the IP address and the port into the cell below.
 
-```python
+```python icon="python" Python
 
 from openai import OpenAI
 
@@ -85,18 +90,18 @@ In this, we can see that the embeddings from our model. Feel free to delete this
 
 The following steps will show you how to use Rerankers, Classifiers, and deploy them at the same time. First, we'll deploy two models on the same GPU and container, the first is a reranker and the second is a classifier. Note that all we've done is change the value for `--model-id`, and added a new `--model-id` with its own value. These represent the two different models that we're running.
 
-```bash
+```bash Bash
 vastai create instance <instance-id> --image michaelf34/infinity:latest --env '-p 8000:8000' --disk 40 --args v2 --model-id mixedbread-ai/mxbai-rerank-xsmall-v1 --model-id  SamLowe/roberta-base-go_emotions --port 8000
 ```
 
 Now, we'll call these models with the requests library and follow `Infinity`'s API spec. Add your new IP address and Port here:
 
-```python
+```python icon="python" Python
 import requests
 base_url = "http://<Instance-IP-Address>:<Port>"
 ```
 
-```python
+```python icon="python" Python
 rerank_url = base_url + "/rerank"
 model1 = "mixedbread-ai/mxbai-rerank-xsmall-v1"
 input_json = {"query": "Where is Munich?","documents": ["Munich is in Germany.", "The sky is blue."],"return_documents": "false","model": "mixedbread-ai/mxbai-rerank-xsmall-v1"}
@@ -126,7 +131,7 @@ We can see from the output of the cell that it gives us a list of jsons for each
 
 And we'll now query the classification model:
 
-```python
+```python icon="python" Python
 classify_url = base_url + "/classify"
 model2 = "SamLowe/roberta-base-go_emotions"
 
