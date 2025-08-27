@@ -1,0 +1,178 @@
+---
+title: Multi-Node training using Torch + NCCL
+slug: fAVE-running
+createdAt: Tue Jul 08 2025 18:31:35 GMT+0000 (Coordinated Universal Time)
+updatedAt: Thu Aug 14 2025 17:00:53 GMT+0000 (Coordinated Universal Time)
+---
+
+<Note>
+  Need RoCE or Infiniband? Submit a [cluster request]{href="https://vast.ai/products/clusters" newTab="true" hasDisabledNofollow="false"}. Availability currently limited to A100/H100/H200 machines.
+</Note>
+
+<Note>
+  Note: Private networking currently only available on Docker-based templates; not available for VM-based templates. &#x20;
+</Note>
+
+NCCL expects all nodes to be on the same network. By default, Vast instances on different physical machines are on separate bridge networks isolated from the host's LAN and must go through a NAT to reach the outside internet.&#x20;
+
+Vast now supports creating *overlay* networks for instances, allowing client instances on different machines on the same physical LAN to share a private, virtual LAN separate from both the host network and the networks of other clients' instances.&#x20;
+
+Overlay networks can be created for instances located in the same *physical cluster* --- these are groups of machines that support fast local networking to each other.&#x20;
+
+This allows direct communication between the instances on all ports, which is expected by NCCL.&#x20;
+
+## Creating a Virtual Cluster
+
+- Make sure to update to/install the newest version of the CLI first: go to our [CLI docs ]{href="https://cloud.vast.ai/cli/" newTab="true" hasDisabledNofollow="false"}and copy+run the command starting with `wget`.
+- View physical clusters with instances matching your requirements by running `./vast search offers --raw cluster_id!=None [YOUR_INSTANCE_SEARCH_FILTERS] | grep cluster_id`
+  - This will print out cluster\_ids for clusters with offers available for instances matching your search parameters.&#x20;
+  - For a detailed view of the available offers within a specific cluster, run `./vast search offers cluster_id=CLUSTER_ID [YOUR_INSTANCE_SEARCH_FILTERS]`&#x20;
+- Once you've chosen a physical cluster, create your overlay network inside the cluster---
+  - `./vast create overlay CLUSTER_ID NAME_FOR_NETWORK_TO_CREATE`
+- Search for instance offers in the physical cluster you created your overlay network in---
+  - `./vast search offers cluster_id=CLUSTER_ID [YOUR_INSTANCE_SEARCH_FILTERS]`
+- Create instances attached to your overlay by appending `--env "-n YOUR_NETWORK_NAME"` to your `./vast create instance` command.&#x20;
+
+## TCP Initialization for NCCL + PyTorch
+
+Depending on your setup, you will have one or more worker processes running on each node. NCCL expects each worker process to be assigned a unique rank that's an integer from 0-(NUM\_WORKERS - 1).&#x20;
+
+NCCL expects to be able to perform a TCP rendezvous during initialization at the local IP address of the node running the rank 0 worker process.&#x20;
+
+### Finding the IPv4 address for TCP rendezvous
+
+- On the node that will run the rank 0 worker, run `ip a` (`apt install iproute2` if not already installed).&#x20;
+  - You should have three network interfaces: `lo`, `eth0`, and `eth1`.&#x20;
+  - Unless you added/removed networks after instant creation, `eth0` should be the interface to the overlay network between your instances. ( `lo` is the loopback interface; `eth1` is a bridge to the host machine's gateway to the external internet).&#x20;
+    - Under the `eth0` entry, there should be the line that starts with `inet IPv4ADDRESS/MASK`, this `IPv4ADDRESS` will be the address you will want to use for TCP initialization.&#x20;
+
+### Running the training script
+
+- In your training script, you'll want to initialize your process group at the beginning every worker process with the parameters `backend='nccl'` and `init_method = 'tcp://IPv4ADDRESS:PORT'` where `IPv4ADDRESS` is the IPv4 address of your `eth0` device as found using the instructions above, and port is a free port number chosen between 1000 and 65535 (all ports are exposed between instances on the same overlay network).&#x20;
+- You may need to set the `NCCL_SOCKET_IFNAME=eth0` environment variable for the script, as NCCL is sometimes unable to detect that the `eth1` device on the different nodes are not directly connected to each other.&#x20;
+- Other debugging notes:
+  - NCCL may not initialize all channels until the first communication function is called.&#x20;
+  - Setting the `NCCL_DEBUG=INFO` environment variable may be useful for getting additional debug info.
+  - PyTorch sometimes does not block on communication methods finishing until the output tensors area actually used. &#x20;
+
+### Example
+
+Here we will use a python script called `nccl_speedtest.py` using the following contents:&#x20;
+
+
+
+```python
+import torch as t 
+import torch.distributed as dist 
+import sys
+import time 
+import string
+
+# tests nccl bandwidth between two nodes.
+# Run this script on both nodes, setting one as RANK 0 and the other as RANK 1
+# Invoke: python3 nccl_speedtest.py NODE_0_IP:PORT SIZE[K|M|G] RANK(0|1)
+
+if __name__ == "__main__":
+    handshake_ip = sys.argv[1]
+    size_s = sys.argv[2]
+    split_idx = size_s.find(string.ascii_letters)
+    sizes = { "K" : 1024, "M" : 1024**2, "G" : 1024 ** 3, "":1}
+    size = int(size_s[0:split_idx]) * sizes[size_s[split_idx:]]
+    rank = int(sys.argv[3])
+    if len(sys.argv) >= 5:
+        device = int(sys.argv[4])
+    else:
+        device = 0
+
+
+    print("Initializing tensors...")
+    # number of fp32 to allocate is bytes >> 2
+    v1 = t.rand(size>>3, device=f'cuda:{device}') # for bidirectional test
+    warmup1 = t.rand(size>>13, device=f'cuda:{device}')
+    if rank:
+        warmup = t.rand(size>>12, device=f'cuda:{device}')
+        v = t.rand(size>>2, device=f'cuda:{device}')
+    else:
+        warmup = t.zeros(size>>12,device=f'cuda:{device}')
+        v = t.zeros(size>>2, device=f'cuda:{device}')
+
+    print("Executing NCCL TCP handshake...")
+    dist.init_process_group(init_method = f"tcp://{handshake_ip}", rank = rank, world_size=2)
+    print("NCCL TCP handshake done, warming up connection...")
+    if rank:
+        dist.send(warmup, 0)
+    else:
+        dist.recv(warmup,1)
+    ignore = t.sum(warmup).to('cpu') # force sync
+
+    print("Warmup done; starting uni-directional speedtest...")
+
+    start = time.time()
+    if rank: 
+        dist.send(v, 0)
+    else:
+        dist.recv(v,1)
+    # Torch returns from dist.send/dist.recv as soon as the communication channels initialize; it does not block on the full tensor being received.
+    # t.sum(v) will block on communication operations on v completing though, so we don't check end time until that is done. 
+    checksum = t.sum(v).to('cpu')
+    end = time.time()
+    print(f"Checksum: {checksum}")
+    print(f"elapsed: {end-start}")
+    print(f"unidirectional bandwidth: {size / (end-start) / sizes['M']} MiB/s")
+
+    print("Warming up bidirection speedtest...")
+    dist.all_gather_into_tensor(warmup,warmup1)
+
+    print("Warmup done, starting bidirectional speedtest...")
+    start = time.time()
+    dist.all_gather_into_tensor(v, v1)
+    checksum = t.sum(v).to('cpu')
+    end = time.time()
+
+    print(f"Checksum: {checksum}")
+    print(f"elapsed: {end-start}")
+    print(f"bidirectional bandwidth: {size / (end-start) / sizes['M']} MiB/s")
+
+
+    print("Done, cleaning up!")
+    dist.destroy_process_group()
+```
+
+We will have rented two instances on the same overlay network already.
+
+On the first instance:&#x20;
+
+Run `apt update; apt install iproute2` then run `ip a`:&#x20;
+
+We should get output that looks like this ----
+
+
+
+```none
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host noprefixroute 
+       valid_lft forever preferred_lft forever
+ 2: eth0@if23: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/ether 62:82:b2:1b:38:a6 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 10.0.0.1/24 scope global eth0
+       valid_lft forever preferred_lft forever
+ 3: lo: <BROADCAST,MULTICAST,LOWER_UP> mtu 1500 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/ether 94:04:a2:fb:a1:66 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 172.17.0.2/16 brd 172.17.255.255 scope global eth1
+       valid_lft forever preferred_lft forever
+
+```
+
+From this we see that we will want to use `10.0.0.1` as our rendezvous address; we can choose any available  port above 1000 (e.g. `5000`) for our rendezvous port.
+
+Then, run `NCCL_SOCKET_IFNAME=eth0 python3 nccl_speedtest.py 10.0.0.1:5000 10G 0`&#x20;
+
+The script will start, then, once it reaches `init_process_group` it will wait for the worker process on the other node to reach the same point and complete the rendezvous before proceeding.&#x20;
+
+On the second instance, we run `NCCL_SOCKET_IFNAME=eth0 python3 nccl_speedtest.py 10.0.0.1:5000 10G 1`
+
+Once we've done the script on the second instance reaches the TCP rendezvous, both processes will continue and start communicating over NCCL.&#x20;
+

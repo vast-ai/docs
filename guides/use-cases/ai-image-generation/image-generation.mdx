@@ -1,0 +1,280 @@
+---
+title: Image Generation
+slug: GHt2-image
+createdAt: Fri Jan 17 2025 21:19:15 GMT+0000 (Coordinated Universal Time)
+updatedAt: Wed Mar 05 2025 21:05:31 GMT+0000 (Coordinated Universal Time)
+---
+
+# Running Image Generation on Vast.ai: A Complete Guide
+
+## Introduction
+
+This guide walks you through setting up and running image generation workloads on Vast.ai, a marketplace for renting GPU compute power. Whether you're using Stable Diffusion or other image generation models, this guide will help you get started efficiently.
+
+## Prerequisites
+
+- A Vast.ai account
+- Basic familiarity with image generation models
+- [(Optional) Read Jupyter guide]{href="https://docs.vast.ai/instances/jupyter" newTab="true" hasDisabledNofollow="false"}
+- [(Optional) SSH client installed on your local machine and SSH public key added the Keys section at cloud.vast.ai]{href="https://docs.vast.ai/instances/sshscp" newTab="true" hasDisabledNofollow="false"} &#x20;
+- (Optional) Basic understanding of model management
+
+## Setting Up Your Environment
+
+### 1. Selecting the Right Template
+
+Navigate to the [Templates tab]{href="https://cloud.vast.ai/templates/" newTab="true" hasDisabledNofollow="false"} to view available templates. For image generation, we recommend searching for "SD Web UI Forge" among the recommended templates.
+
+- **Stable Diffusion Web UI Forge Template**
+  - Pre-installed with:
+    - Latest SD Web UI version
+    - Popular extensions
+    - Common models
+    - Optimized settings for vast.ai
+
+Choose this template if:
+
+- You want a ready-to-use environment for image generation
+- You need a user-friendly web interface
+- You want access to multiple models and extensions
+- You're looking for an optimized setup
+
+Edit the template and add/update key environment variables if needed:
+
+```bash
+# Core Configuration
+AUTO_UPDATE=false        # Auto-update to latest release
+FORGE_REF=latest        # Git reference for updates
+FORGE_ARGS=""           # Launch arguments
+
+# Authentication Tokens
+CF_TUNNEL_TOKEN=""      # Cloudflare Zero Trust
+CIVITAI_TOKEN=""        # Access gated Civitai models
+HF_TOKEN=""             # Access gated HuggingFace models
+
+# Custom Setup
+PROVISIONING_SCRIPT=""  # URL to custom setup script
+```
+
+**Important**: Never save your template as public if you've included tokens in Docker Options or added your docker login password.
+
+### 2. Choosing an Instance
+
+When selecting a GPU for image generation, consider:
+
+- **GPU Memory**:
+  - Minimum 8GB for basic models
+  - 12GB+ recommended for larger models
+  - 24GB+ for advanced techniques (img2img, inpainting, etc.)
+- **GPU Type**:
+  - RTX 3090, 4090 for best performance
+  - RTX 3080, 3080 Ti for good balance
+  - A4000, A5000 for stability
+- **Disk Space**:
+  - Minimum 50GB for base models
+  - 100GB+ recommended for multiple models
+  - Consider SSD speed for model loading
+
+### 3. Connecting to Your Instance
+
+The Forge template provides multiple ways to access your instance:
+
+- **AI-Dock Landing Page (Recommended)**:
+  - Click the "Open" button in Instances tab once the blue button says "Open" on your instance
+  - You'll be automatically logged in to the AI-Dock landing page
+  - Access Forge and other management tools from there
+- **Direct Access**:
+  - Basic authentication is enabled by default
+  - Username: `vastai`
+  - Password: Check `OPEN_BUTTON_TOKEN` value
+  - To find token: `echo $OPEN_BUTTON_TOKEN` in terminal
+- **API Access**:
+
+```bash
+curl -X POST https://[INSTANCE_IP]:[MAPPED_PORT]/endpoint \
+-H 'Authorization: Bearer <OPEN_BUTTON_TOKEN>' \
+...
+```
+
+- **Security Setup**:
+  - HTTPS and token authentication enabled by default
+  - Install TLS certificate to avoid browser warnings
+  - Configure via `WEB_ENABLE_HTTPS` and `WEB_ENABLE_AUTH` variables
+- **Jupyter Access for Uploading/Downloading**:
+  - You can access jupyter clicking on the jupyter button on the instance card to easily upload and download files
+
+## Working with Models
+
+### Managing Models
+
+### Default Setup
+
+The template includes a default provisioning script that downloads:
+
+- Base Stable Diffusion XL models
+- Popular extensions
+- Common configurations
+
+### Custom Provisioning
+
+Create your own setup by:
+
+1. Copy the default provisioning script by editing the SD Web UI Forge template and grabbing the value of `PROVISIONING_SCRIPT` environment variable and downloading it
+2. Modify it to download your preferred:
+   - Models
+   - Extensions
+   - Configurations
+3. Upload to Gist/Pastebin
+4. Edit the template and set `PROVISIONING_SCRIPT` environment variable to the raw URL
+
+Example for adding more models:
+
+```bash
+# Navigate to models directory
+cd /workspace/stable-diffusion-webui/models/Stable-diffusion
+
+# Download new models (example)
+wget https://civitai.com/api/download/models/[MODEL_ID]
+```
+
+### Model Organization
+
+Keep your models organized:
+
+```text
+/workspace/stable-diffusion-webui/models/
+├── Stable-diffusion/      # Main models
+├── Lora/                  # LoRA models
+├── VAE/                   # VAE files
+└── embeddings/            # Textual inversions
+```
+
+You can access jupyter clicking on the jupyter button on the instance card to easily upload and download files.
+
+## Optimization Tips
+
+### &#x20;Performance Settings
+
+Access Settings > Performance in Web UI:
+
+- Enable xformers memory efficient attention
+- Use float16 precision when possible
+- Optimize VRAM usage based on your GPU
+
+### Batch Processing
+
+For multiple images:
+
+- Use batch count for variations
+- Use batch size for parallel processing
+- Monitor GPU memory usage
+
+### Memory Management
+
+```python
+# Recommended settings for different GPU sizes
+8GB GPU:
+- max_batch_count: 4
+- max_batch_size: 2
+
+12GB GPU:
+- max_batch_count: 6
+- max_batch_size: 3
+
+24GB+ GPU:
+- max_batch_count: 10
+- max_batch_size: 5
+```
+
+## Advanced Features
+
+### Custom Scripts
+
+Place custom scripts in:
+
+```bash
+/workspace/stable-diffusion-webui/scripts/
+```
+
+### Extensions Management
+
+Popular extensions are pre-installed. Add more via Web UI:
+
+- Extensions tab
+- Install from URL
+- Restart UI to apply
+
+### API Usage
+
+Enable API in settings:
+
+```bash
+# Add to config.json
+{
+    "api": {
+        "enable_api": true,
+        "api_auth": false
+    }
+}
+```
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+- **Out of Memory (OOM)**
+  - Reduce batch size
+  - Lower resolution
+  - Enable optimization settings
+- **Slow Generation**
+  - Check GPU utilization
+  - Verify model loading
+  - Consider switching to half precision
+- **Connection Issues**
+  - Use --listen flag for network access
+  - Check instance status
+  - Verify network settings
+
+## Best Practices
+
+### Workflow Management
+
+- Save prompts for reuse
+- Use version control for custom scripts
+- Document model combinations
+
+### Resource Optimization
+
+- Monitor costs in Billing tab
+- Use appropriate batch sizes
+- Clean up unused models
+
+### Quality Control
+
+- Maintain prompt libraries
+- Document successful settings
+- Track model performance
+
+## Cost Optimization
+
+### Instance Selection
+
+- Compare GPU prices
+- Consider spot instances
+- Monitor usage patterns
+
+### Storage Management
+
+- Remove unused models
+- Archive generated images
+- Use efficient formats
+
+## Additional Resources
+
+- [Vast.ai Documentation](https://vast.ai/docs/)
+- [Stable Diffusion Web UI Wiki](https://github.com/AUTOMATIC1111/stable-diffusion-webui/wiki)
+- [CivitAI Models](https://civitai.com/)
+
+## Conclusion
+
+Running image generation workloads on Vast.ai provides a cost-effective way to access powerful GPUs. By following this guide and best practices, you can efficiently set up and manage your image generation pipeline while optimizing costs and performance.

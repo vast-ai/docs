@@ -1,0 +1,155 @@
+---
+title: Infinity Embeddings
+createdAt: Mon Jan 13 2025 21:20:40 GMT+0000 (Coordinated Universal Time)
+updatedAt: Tue Jan 21 2025 19:58:56 GMT+0000 (Coordinated Universal Time)
+---
+
+# Serving Infinity Embeddings with Vast.ai
+
+## Background:
+
+Infinity Embeddings is a helpful serving framework to serve embedding models. It is particularly great at enabling embedding, re-ranking, and classification out of the box. It supports multiple different runtime frameworks to deploy on different types of GPU’s while still achieving great speed. Infinity Embeddings also supports dynamic batching, which allows it to process requests faster under significant load.
+
+One of its best features is that you can deploy multiple models on the same GPU at the same time, which is particularly helpful as often times embedding models are much smaller than GPU RAM. We also love that it complies with the OpenAI embeddings spec, which enables developers to quickly integrate this into their application for rag, clustering, classification and re-ranking tasks.
+
+This guide will show you how to setup Infinity Embeddings to serve an LLM on Vast. We reference a note book that you can use [here](https://nbviewer.org/urls/bitbucket.org/%21api/2.0/snippets/jsbcannell/nE66og/f86a1c070ddc362abc6572eb300926a0b7190ad3/files/serve_infinity_on_vast.ipynb)
+
+```bash
+pip install --upgrade vastai
+```
+
+Once you create your account, you can go [here](https://cloud.vast.ai/cli/) to set your API Key.
+
+```bash
+vastai set api-key <Your-API-Key-Here>
+```
+
+For serving an LLM, we're looking for a machine that has a static IP address, ports available to host on, plus a single modern GPU with decent RAM since these embedding models will be small. We will query the vast API to get a list of these types of machines.
+
+```bash
+vastai search offers 'compute_cap > 800 gpu_ram > 20 num_gpus = 1 static_ip=true direct_port_count > 1' 
+```
+
+## Deploying the Image:
+
+### Hosting a Single Embedding Model:
+
+For now, we'll host just one embedding model.
+The easiest way to deploy a single model on this instance is to use the command line. Copy and paste a specific instance id you choose from the list above into `instance-id` below.
+
+We particularly need `v2` so that we use the correct version of the api, `--port 8000` so it serves on the correct model, and `--model-id michaelfeil/bge-small-en-v1.5` to serve the correct model.
+
+```bash
+
+vastai create instance <instance-id> --image michaelf34/infinity:latest --env '-p 8000:8000' --disk 40 --args v2 --model-id michaelfeil/bge-small-en-v1.5 --port 8000
+```
+
+## Connecting and Testing:
+
+Once your instance is done setting up, you should see something like this:
+
+![IP\_address\_view](https://vast.ai/uploads/ip_address_view_infinity.png "IP_address_view")
+
+Click on the highlighted button to see the IP address and correct port for our requests. To connect to your instance, we'll first need to get the IP address and port number.
+
+![Instance\_view](https://vast.ai/uploads/instance_view_infinity.png "Instance_view")
+
+Now we'll call this with the Open AI SDK:
+
+```bash
+pip install openai
+```
+
+We will copy over the IP address and the port into the cell below.
+
+```python
+
+from openai import OpenAI
+
+# Modify OpenAI's API key and API base to use vLLM's's API server.
+openai_api_key = "EMPTY"
+openai_api_base = "http://<Instance-IP-Address>:<Port>/v1"
+client = OpenAI(
+    api_key=openai_api_key,
+    base_url=openai_api_base,
+)
+model = "michaelfeil/bge-small-en-v1.5"
+embeddings = client.embeddings.create(model=model, input="What is Deep Learning?").data[0].embedding
+print("Embeddings:")
+print(embeddings)
+```
+
+In this, we can see that the embeddings from our model. Feel free to delete this instance as we'll redeploy a different configuration now.
+
+### Advanced Usage: Rerankers, Classifiers, and Multiple Models at the same time
+
+The following steps will show you how to use Rerankers, Classifiers, and deploy them at the same time. First, we'll deploy two models on the same GPU and container, the first is a reranker and the second is a classifier. Note that all we've done is change the value for `--model-id`, and added a new `--model-id` with its own value. These represent the two different models that we're running.
+
+```bash
+vastai create instance <instance-id> --image michaelf34/infinity:latest --env '-p 8000:8000' --disk 40 --args v2 --model-id mixedbread-ai/mxbai-rerank-xsmall-v1 --model-id  SamLowe/roberta-base-go_emotions --port 8000
+```
+
+Now, we'll call these models with the requests library and follow `Infinity`'s API spec. Add your new IP address and Port here:
+
+```python
+import requests
+base_url = "http://<Instance-IP-Address>:<Port>"
+```
+
+```python
+rerank_url = base_url + "/rerank"
+model1 = "mixedbread-ai/mxbai-rerank-xsmall-v1"
+input_json = {"query": "Where is Munich?","documents": ["Munich is in Germany.", "The sky is blue."],"return_documents": "false","model": "mixedbread-ai/mxbai-rerank-xsmall-v1"}
+headers = {
+    "accept": "application/json",
+    "Content-Type": "application/json"
+}
+    
+payload = {
+    "query": input_json["query"],
+    "documents": input_json["documents"],
+    "return_documents": input_json["return_documents"],
+    "model": model1
+}
+
+response = requests.post(rerank_url, json=payload, headers=headers)
+    
+if response.status_code == 200:
+    resp_json = response.json()
+    print(resp_json)
+else: 
+    print(response.status_code)
+    print(response.text)
+```
+
+We can see from the output of the cell that it gives us a list of jsons for each score, in order of highest relevance. Therefore in this case, the first entry in the list had a relevancy of .74, meaning that it "won" the ranking of samples for this query.
+
+And we'll now query the classification model:
+
+```python
+classify_url = base_url + "/classify"
+model2 = "SamLowe/roberta-base-go_emotions"
+
+headers = {
+    "accept": "application/json",
+    "Content-Type": "application/json"
+}
+
+payload = {
+        "input": ["I am feeling really happy today"],
+        "model": model2
+    }
+
+response = requests.post(classify_url, json=payload, headers=headers)
+    
+if response.status_code == 200:
+    resp_json = response.json()
+    print(resp_json)
+else: 
+    print(response.status_code)
+    print(response.text)
+```
+
+We can see from this that the most likely emotion from this model's choices was "joy".
+
+So there you have it, now you can see how with Vast and Infinity, you can serve embedding, reranking, and classifier models all from just one GPU on the most affordable compute on the market.

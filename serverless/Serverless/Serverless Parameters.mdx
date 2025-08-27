@@ -1,0 +1,113 @@
+---
+title: Serverless Parameters
+slug: 90KV-s
+createdAt: Fri Jul 18 2025 22:41:40 GMT+0000 (Coordinated Universal Time)
+updatedAt: Sat Aug 02 2025 00:13:25 GMT+0000 (Coordinated Universal Time)
+---
+
+The Vast.ai Serverless system has parameters that allow control over the scaling behavior.&#x20;
+
+# Endpoint Parameters
+
+## cold\_mult
+
+A multiplier applied to your target capacity for longer-term planning (1+ hours). This parameter controls how much extra capacity the serverless engine will plan for in the future compared to immediate needs. For example, if your current target capacity is 100 tokens/sec and cold\_mult is 2.0, the system will plan to have capacity for 200 tokens/sec for longer-term scenarios.
+
+This helps ensure your endpoint has sufficient "cold" (stopped but ready) workers available to handle future load spikes without delay. A higher value means more aggressive capacity planning and better preparedness for sudden traffic increases, while a lower value reduces costs from maintaining stopped instances.
+
+If not specified during endpoint creation, the default value is 2.5.
+
+## cold\_workers
+
+The minimum number of workers that must be kept in a "ready quick" state before the serverless engine is allowed to destroy any workers. A worker is considered "ready quick" if it's either:
+\- Actively serving (status = "idle" with model loaded)
+\- Stopped but ready (status = "stopped" with model loaded)
+
+Cold workers are not shut-down, they are stopped but have the model fully loaded. This means they can start serving requests very quickly (seconds) without having to re-download the model or benchmark the GPU performance.
+
+If not specified during endpoint creation, the default value is 5.
+
+## max\_workers
+
+A hard upper limit on the total number of worker instances (ready, stopped, loading, etc.) that your endpoint can have at any given time.
+
+If not specified during endpoint creation, the default value is 20.
+
+## min\_load
+
+A minimum baseline load (measured in tokens/second for LLMs) that the serverless system will assume your Endpoint needs to handle, regardless of actual measured traffic. This acts as a "floor" for load predictions across all time horizons (1 second to 24+ hours), ensuring your endpoint maintains minimum capacity even during periods of zero or very low traffic.
+
+For example, if your min\_load is set to 100 tokens/second, but your endpoint currently has zero traffic, the serverless system will still plan capacity as if you need to handle at least 100 tokens/second. This prevents the endpoint from scaling down to zero capacity and ensures you're always ready for incoming requests.
+
+If not specified during endpoint creation, the default value is 10.
+
+## target\_util
+
+The target utilization ratio determines how much spare capacity (headroom) the serverless system maintains. For example, if your predicted load is 900 tokens/second and target\_util is 0.9, the serverless engine will plan for 1000 tokens/second of capacity (900 ÷ 0.9 = 1000), leaving 100 tokens/second (11%) as buffer for traffic spikes.
+
+A lower target\_util means more headroom:
+\- target\_util = 0.9 → 11.1% spare capacity relative to load
+\- target\_util = 0.8 → 25% spare capacity relative to load
+\- target\_util = 0.5 → 100% spare capacity relative to load
+\- target\_util = 0.4 → 150% spare capacity relative to load
+
+If not specified during endpoint creation, the default value is 0.9.
+
+# Workergroup Parameters
+
+The following parameters can be specified specifically for a Workergroup and override Endpoint parameters. The Endpoint parameters will continue to apply for other Workergroups contained in it, unless specifically set.&#x20;
+
+- min\_load
+- target\_util
+- cold\_mult
+
+The parameters below are specific to only Workergroups, not Endpoints.
+
+## gpu\_ram
+
+The amount of GPU memory (VRAM) in gigabytes that your model or workload requires to run. This parameter tells the serverless engine how much GPU memory your model needs.
+
+If not specified during workergroup creation, the default value is 24.
+
+## launch\_args
+
+A command-line style string containing additional parameters for instance creation that will be parsed and applied when the serverless engine creates new workers. This allows you to customize instance configuration beyond what's specified in templates.
+
+There is no default value for launch\_args.
+
+## search\_params
+
+A query string, list, or dictionary that specifies the hardware and performance criteria for filtering GPU offers in the vast.ai marketplace. It uses a simple query syntax to define requirements for the machines that your Workergroup will consider when searching for workers to create.
+
+Example:
+
+```python
+{"verified": {"eq": true}, "rentable": {"eq": true}, "rented": {"eq": false}}
+```
+
+There is no default value for search\_params. To see all available search filters, see the CLI docs [here]{href="https://docs.vast.ai/api/commands#DtIdq" newTab="true" hasDisabledNofollow="false"}.
+
+## template\_hash
+
+A unique hexadecimal identifier that references a pre-configured template containing all the configuration needed to create instances. Templates are comprehensive specifications that include the Docker image, environment variables, onstart scripts, resource requirements, and other deployment settings.
+
+There is no default value for template\_hash.
+
+## template\_id
+
+A numeric (integer) identifier that uniquely references a template in the Vast.ai database. This is an alternative way to reference the same template that `template_hash` points to, but using the template's database primary key instead of its hash string.
+
+There is no default value for template\_id.
+
+## test\_workers
+
+The number of different physical machines that a Workergroup should test during its initial "exploration" phase to gather performance data before transitioning to normal demand-based scaling. The Worker Group remains in "exploring" mode until it has successfully tested at least `floor(test_workers / 2)` machines.
+
+If not specified during workergroup creation, the default value is 3.
+
+
+
+
+
+
+

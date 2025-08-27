@@ -1,0 +1,37 @@
+---
+title: Debugging
+createdAt: Mon Jan 13 2025 21:20:40 GMT+0000 (Coordinated Universal Time)
+updatedAt: Fri Jul 18 2025 19:01:35 GMT+0000 (Coordinated Universal Time)
+---
+
+## Worker Errors
+
+The [Vast PyWorker](https://github.com/vast-ai/pyworker/tree/main) framework automatically detects some errors, while others may cause the instance to timeout. When an error is detected, the Serverless system will destroy or
+reboot the instance. To manually debug an issue, check the instance logs available via the logs button on the instance page in the GUI. All PyWorker issues will be logged here.
+If further investigation is needed, ssh into the instance and find the model backend logs location by running:
+
+```sh
+echo "$MODEL_LOG"
+```
+
+And PyWorker logs:
+
+```sh
+echo "${WORKSPACE_DIR:-/workspace}/pyworker.log"
+```
+
+### Increasing Load
+
+To handle high load on instances:
+
+- **Set&#x20;**`test_workers`**&#x20;high**: Create more instances initially for Worker Groups with anticipated high load.
+- **Adjust&#x20;**`cold_workers`: Keep enough workers around to prevent them from being destroyed during low initial load.
+- **Increase&#x20;**`cold_mult`: Quickly create instances by predicting higher future load based on current high load. Adjust back down once enough instances are created.
+- **Check&#x20;**`max_workers`: Ensure this parameter is set high enough to create the necessary number of workers.
+
+### Decreasing Load
+
+To manage decreasing load:
+
+- **Reduce&#x20;**`cold_workers`: Stop instances quickly when the load decreases to avoid unnecessary costs. The serverless system will handle this automatically, but manual adjustment can help if needed.
+

@@ -1,0 +1,148 @@
+---
+title: Instance Portal
+slug: 6tmv-instance-p
+createdAt: Wed Mar 19 2025 09:47:31 GMT+0000 (Coordinated Universal Time)
+updatedAt: Mon Aug 04 2025 17:24:15 GMT+0000 (Coordinated Universal Time)
+---
+
+## What is the Instance Portal?
+
+The Instance Portal is the first application you will see after clicking the 'Open' button to access an instance that has been loaded with a :Link[Vast.ai Docker image]{href="https://github.com/vast-ai/base-image/" newTab="true" hasDisabledNofollow="false"}. Many of our recommended templates include the Instance Portal.
+
+![Instance card interface shows the open button](https://archbee-image-uploads.s3.amazonaws.com/9WtD9F5n1L2IYJxS0qXDd/a_gX2JQFvR7lSXzxC5ghi_open-button.png "Click the Open button to access the Instance Portal")
+
+## Loading Process
+
+Upon opening the Instance Portal you will see a loading indicator for a short time.&#x20;
+
+
+
+<Image src="https://archbee-image-uploads.s3.amazonaws.com/9WtD9F5n1L2IYJxS0qXDd/zBtC9yGpG2f0jWdRW4Mfl_portal-loading.png" signedSrc="https://archbee-image-uploads.s3.amazonaws.com/9WtD9F5n1L2IYJxS0qXDd/zBtC9yGpG2f0jWdRW4Mfl_portal-loading.png" size="50" width="345" height="246" position="center" caption="Loading Indicator" alt="Loading Indicator" darkWidth="800" darkHeight="570"></Image>
+
+During this loading phase, a secure Cloudflare tunnel will be created for each of your instance's open ports and the browser will test whether these tunnel links are accessible.
+
+The secure tunnel link will be formatted like this:
+
+https\://four-randomly-selected-words.trycloudflare.com
+
+When the secure tunnel for port `1111` becomes accessible, the instance Portal will redirect to this link before revealing the full interface.
+
+If it is taking too long for the tunnels to be ready, you will see the Instance Portal interface revealed at `http://ip_address:port_1111`
+
+If you would like the default application URLs to be **https\://** rather than **http\://** you can add the following environment variable to your :Link[account level environment variables]{href="https://cloud.vast.ai/account/" newTab="true" hasDisabledNofollow="false"}:
+
+
+
+![Account settings interface](https://archbee-image-uploads.s3.amazonaws.com/9WtD9F5n1L2IYJxS0qXDd/XTRB709RvokQmX2FJmKXk_enable-https.png "Enable HTTPS Variable")
+
+
+
+If you set this variable, it is important to add the Vast.ai Jupyter certificate  to your local system to avoid browser warnings.  See :Link[this page]{href="https://docs.vast.ai/instances/jupyter#1SmCz" newTab="true" hasDisabledNofollow="false"} for more information about installing the certificate.
+
+## Landing Page
+
+The instance Portal has a simple interface to help you access other web applications that may be running in the instance. See the configuration section of this document for further details on application startup.
+
+
+
+![Instance Portal landing page](https://archbee-image-uploads.s3.amazonaws.com/9WtD9F5n1L2IYJxS0qXDd/cShvzCQIPl-Up888NMTlY_portal-landing.png "Landing Page")
+
+The large blue 'Launch Application' buttons will open your running applications in a new browser tab. &#x20;
+
+If a secure tunnel is available, the button will open the 'trycloudflare.com' link.  If a tunnel is not yet available then the button will open the direct IP address link.
+
+In both cases, a secure token is appended to the link to prevent unauthorised access to your applications.
+
+You can also click the 'Advanced Connection Options' link to see all available connection methods.
+
+## Tunnels Page
+
+Use this page to manage existing secure tunnels and add new tunnels to get access to ports that have not directly been opened in the instance
+
+
+
+![Instance Portal tunnels interface](https://archbee-image-uploads.s3.amazonaws.com/9WtD9F5n1L2IYJxS0qXDd/Ohi4B0HuHZ7Z_AiAr54hI_portal-tunnels.png "Tunnels Page")
+
+Use this interface to create links to applications you have started after configuring your instance. For example:
+
+If you started an instance but later decide that you want to install some new software that listens on port `7860`, it will not be available directly if you did not configure the port when creating or editing the template.
+
+Simply enter `http://localhost:7860` in the top input box and click the blue 'Create New Tunnel' button.  A tunnel will be created for this port. It may take a moment to be available after creation.&#x20;
+
+You can use the 'Manage' buttons to stop existing tunnels or to refresh them if you want a new URL.
+
+If you would like to link your own domain name to the instance then please see 'Named Tunnels' in the configuration section of this document.
+
+## Instance Logs Page
+
+The logs page will show a live stream of entries added to any `.log` files in the `/var/log/portal/` directory.
+
+
+
+Use the 'Copy Logs' button to copy the currently displayed logging output to your clipboard.  You can also use the 'Download Logs' button to download a zip file containing all files and directories in the `/var/log/` directory of your instance.
+
+
+
+![Instance Portal logs interface](https://archbee-image-uploads.s3.amazonaws.com/9WtD9F5n1L2IYJxS0qXDd/FiE-tIaVUG8f8EYYwTgBN_portal-logs.png "Logs Page")
+
+## Tools & Help Page
+
+This page links to useful pages in the Vast.ai documentation to help you get the most from your instance.
+
+
+
+![Instance Portal tools and help page](https://archbee-image-uploads.s3.amazonaws.com/9WtD9F5n1L2IYJxS0qXDd/GnUIcdrhK4m21dXwaH3pb_portal-help.png "Tools & Help Page")
+
+## Configuration
+
+Initial configuration of the Instance Portal is via the `PORTAL_CONFIG` enviroment variable.  The default value looks like this:
+
+```bash
+localhost:1111:11111:/:Instance Portal|localhost:8080:18080:/:Jupyter|localhost:8080:8080:/terminals/1:Jupyter Terminal|localhost:8384:18384:/:Syncthing|localhost:6006:16006:/:Tensorboard
+```
+
+Each application is separated by a pipe (`|`) character, and each application option is separated by a colon (`:`)&#x20;
+
+For each application, we provide the following configuration options
+
+- Interface to bind the application (currently always `localhost`)
+- External port to proxy the application. This must have been added to the template. Eg. `-p 1111:1111`)
+- Internal port where the running application will be bound
+- URL path for links to open (often `/`)
+- Application Name
+
+Where the external port and internal port **are not equal**, a reverse proxy (Caddy) will make your application available on the external port.
+
+Where the external port and internal port **are equal** the application will not be proxied to the external port but secure tunnel application links will be created.
+
+### In Place Configuration
+
+On first boot the configuration variable will be processed and is used to create the configuration file `/etc/portal.yaml`
+
+You can edit this file in a running instance to add or remove applications from the interface.
+
+Any applications you have added after the instance has started will not initially be reachable so you will need to reboot the instance.
+
+### Disable Default Applictions
+
+The startup scripts we use for the default applications we provide will read this configuration and will not start if they are not specified in the configuration file.
+
+### Named Tunnels
+
+While the default behavior of the Instance Portal is to create 'quick' tunnels with a randomly assigned subdomain of 'trycloudflare.com', it is also possible to assign a pre-configured subdomain of your own domain name.
+
+To do this you will need a free :Link[Cloudflare Zero Trust]{href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/" newTab="true" hasDisabledNofollow="false"} account and a domain name linked to that account.
+
+Here's an example of how your tunnel configuration might look in the Cloudflare dashboard:
+
+![](https://archbee-image-uploads.s3.amazonaws.com/9WtD9F5n1L2IYJxS0qXDd/dupMEmL7mTzYYpuY66mDJ_named-tunnel.png)
+
+Once you have created your named tunnel, you can link it to your instance by providing the token associated with your tunnel as the value of environment variable `CF_TUNNEL_TOKEN`. You can save this in the 'Environment Variables' section in your :Link[account settings]{href="https://cloud.vast.ai/account/" newTab="true" hasDisabledNofollow="false"} or directly in the template if you are saving it privately.
+
+If the instance is already running you can provide then token in the `/etc/environment` file and reboot the instance.
+
+Named tunnels are generally more reliable than quick tunnels and will provide consistent URLs you can use to access applications running in an instance.
+
+When named tunnels are configured, the 'Launch Application' button will direct to the named tunnel rather than the quick tunnel.
+
+**Important:&#x20;**&#x55;sing the same tunnel token for multiple running instances is not possible and will cause broken links.  If you need several instances then you will need a separate tunnel token for each of them.

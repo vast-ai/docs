@@ -1,0 +1,239 @@
+---
+title: PyTorch
+slug: 4p7Y48wx7yWp_C_Xl7Dsp
+createdAt: Mon Jan 13 2025 21:48:31 GMT+0000 (Coordinated Universal Time)
+updatedAt: Mon May 12 2025 19:49:08 GMT+0000 (Coordinated Universal Time)
+---
+
+# Running PyTorch on Vast.ai: A Complete Guide
+
+## Introduction
+
+This guide walks you through setting up and running PyTorch workloads on Vast.ai, a marketplace for renting GPU compute power. Whether you're training large models or running inference, this guide will help you get started efficiently.
+
+## Prerequisites
+
+- A Vast.ai account
+- Basic familiarity with PyTorch
+- [Install TLS Certificate for Jupyter]{href="https://docs.vast.ai/instances/jupyter" newTab="true" hasDisabledNofollow="false"}
+- [(Optional) SSH client installed on your local machine and SSH public key added in Account tab at cloud.vast.ai]{href="https://docs.vast.ai/instances/sshscp" newTab="true" hasDisabledNofollow="false"}&#x20;
+- [(Optional) Install and use vast-cli]{href="https://docs.vast.ai/cli" newTab="true" hasDisabledNofollow="false"}&#x20;
+- [(Optional) Docker knowledge for custom environments]{href="https://docs.docker.com/get-started/" newTab="true" hasDisabledNofollow="false"}
+
+## Setting Up Your Environment
+
+### 1. Selecting PyTorch Template
+
+Navigate to the [Templates tab]{href="https://cloud.vast.ai/templates/" newTab="true" hasDisabledNofollow="false"} to view available templates. Before choosing a specific instance, you'll need to select the appropriate PyTorch template for your needs:
+
+- **Choose recommended&#x20;**[**PyTorch**]{href="https://cloud.vast.ai?ref_id=62897&template_id=a33b72bd045341cfcd678ce7c932a614" newTab="true" hasDisabledNofollow="false"}**&#x20;template:&#x20;**
+  - A container is built on the Vast.ai base image, inheriting its core functionality
+  - It provides a flexible development environment with pre-configured libraries
+  - PyTorch is pre-installed at `/venv/main/` for immediate use
+  - Supports for both **AMD64&#x20;**&#x61;nd **ARM64&#x20;**(Grace) architectures, especially on CUDA 12.4+
+  - You can select specific PyTorch versions via the Version Tag selector
+
+![](https://archbee-image-uploads.s3.amazonaws.com/9WtD9F5n1L2IYJxS0qXDd/Ybz0v1FJwbXxU6_5Pyhao_image.png "PyTorch")
+
+### 2. Choosing an Instance
+
+Click the play button to select the template and see GPUs you can rent. For PyTorch workloads, consider:
+
+- GPU Memory: Minimum 8GB for most models
+- CUDA Version: PyTorch 2.0+ works best with CUDA 11.7 or newer
+- Disk Space: Minimum 50GB for datasets and checkpoints
+- Internet Speed: Look for instances with >100 Mbps for dataset downloads
+
+Rent the GPU of your choice.
+
+### 3. Connecting to Your Instance
+
+Click blue button on instance card in Instances tab when it says "Open" to access Jupyter.
+
+## Setting Up Your PyTorch Environment
+
+### 1. Basic Environment Check
+
+Open Python's Interactive Shell in the jupyter terminal
+
+![](https://archbee-image-uploads.s3.amazonaws.com/9WtD9F5n1L2IYJxS0qXDd/E6EHFmLJKfx8pkGekiyGz_screenshot-2025-04-06-at-41910-pm.png)
+
+![](https://archbee-image-uploads.s3.amazonaws.com/9WtD9F5n1L2IYJxS0qXDd/_xLL6bXVEF1PvYYcsUIcU_python3kernel.png)
+
+Verify your setup by executing these commands in Python's Interactive Shell in a Jupyter terminal:
+
+```python
+import torch
+print(f"PyTorch version: {torch.__version__}")
+print(f"CUDA available: {torch.cuda.is_available()}")
+print(f"GPU device: {torch.cuda.get_device_name(0)}")
+```
+
+### 2. Data Management
+
+For efficient data handling:
+
+a) Fast local storage:
+
+```bash
+mkdir /workspace/data
+cd /workspace/data
+```
+
+b) Dataset downloads:
+
+```bash
+# Using wget
+wget your_dataset_url
+
+# Using git lfs for larger files: https://git-lfs.com/
+sudo apt-get install git-lfs
+git lfs install
+git clone your_dataset_repo
+```
+
+## Training Best Practices
+
+### Checkpoint Management
+
+Always save checkpoints to prevent data loss:
+
+```python
+checkpoint_dir = '/workspace/checkpoints'
+os.makedirs(checkpoint_dir, exist_ok=True)
+
+checkpoint = {
+    'epoch': epoch,
+    'model_state_dict': model.state_dict(),
+    'optimizer_state_dict': optimizer.state_dict(),
+    'loss': loss,
+}
+torch.save(checkpoint, f'{checkpoint_dir}/checkpoint_{epoch}.pt')
+```
+
+### Resource Monitoring
+
+Monitor GPU usage:
+
+```bash
+watch -n 1 nvidia-smi
+```
+
+Or in Python:
+
+```python
+def print_gpu_utilization():
+    print(torch.cuda.memory_allocated() / 1024**2, "MB Allocated")
+    print(torch.cuda.memory_reserved() / 1024**2, "MB Reserved")
+```
+
+## Cost Optimization
+
+### Instance Selection
+
+- Use [vast cli search offers command ]{href="https://vast.ai/docs/cli/commands#search-offers" newTab="true" hasDisabledNofollow="false"}to search for machines that fit your budget&#x20;
+- Monitor your spending in Vast.ai's Billing tab
+
+### Resource Utilization
+
+- Use appropriate batch sizes to maximize GPU utilization
+- Enable gradient checkpointing for large models
+- Implement early stopping to avoid unnecessary compute time
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+- Out of Memory (OOM) Errors
+  - Reduce batch size
+  - Enable gradient checkpointing
+  - Use mixed precision training
+
+```python
+from torch.cuda.amp import autocast, GradScaler
+
+scaler = GradScaler()
+with autocast():
+    outputs = model(inputs)
+    loss = criterion(outputs, labels)
+scaler.scale(loss).backward()
+```
+
+- Slow Training
+  - Check GPU utilization
+  - Verify data loading pipeline
+  - Consider using `torch.compile()` for PyTorch 2.0+
+
+```python
+model = torch.compile(model)
+```
+
+- Connection Issues
+  - Use `tmux` or `screen` for persistent sessions
+  - Set up automatic reconnection in your SSH config
+
+## Best Practices
+
+### Environment Management
+
+- Document your setup and requirements
+- Keep track of software versions
+
+### Data Management
+
+- Use data versioning tools
+- Implement proper data validation
+- Set up efficient data loading pipelines
+
+### Training Management
+
+- Implement logging (e.g., WandB, TensorBoard)
+- Set up experiment tracking
+- Use configuration files for hyperparameters
+
+## Advanced Topics
+
+### Multi-GPU Training
+
+For distributed training:
+
+```python
+model = torch.nn.DataParallel(model)
+```
+
+### Mixed Precision Training
+
+Enable AMP for faster training:
+
+```python
+from torch.cuda.amp import autocast
+
+with autocast():
+    outputs = model(inputs)
+```
+
+### Custom Docker Images
+
+Create a custom Docker image from your own Dockerfile and [create your own template]{href="https://vast.ai/docs/use-cases/create-your-own-template" newTab="true" hasDisabledNofollow="false"} as needed:
+
+```dockerfile
+FROM pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime
+
+# Install additional dependencies
+RUN pip install wandb tensorboard
+
+# Add your custom requirements
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+```
+
+## Conclusion
+
+Running PyTorch on Vast.ai provides a cost-effective way to rent cheap GPUs and accelerate deep learning workloads. By following this guide and best practices, you can efficiently set up and manage your PyTorch workloads while optimizing costs and performance.
+
+## Additional Resources
+
+- [PyTorch Documentation]{href="https://pytorch.org/docs/stable/index.html" newTab="true" hasDisabledNofollow="false"}&#x20;
+- [Vast.ai Documentation]{href="https://docs.vast.ai/" newTab="true" hasDisabledNofollow="false"}&#x20;
+- [PyTorch Performance Tuning Guide]{href="https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html" newTab="true" hasDisabledNofollow="false"}&#x20;
+

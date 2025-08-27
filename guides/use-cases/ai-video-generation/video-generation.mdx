@@ -1,0 +1,129 @@
+---
+title: Video Generation
+slug: yyrsk9K8K5rJT2Kxew6yN
+createdAt: Tue Jan 21 2025 21:36:39 GMT+0000 (Coordinated Universal Time)
+updatedAt: Thu May 29 2025 17:02:32 GMT+0000 (Coordinated Universal Time)
+---
+
+# Video Generation Guide: Using ComfyUI on Vast.ai
+
+This guide will walk you through setting up and using ComfyUI for video generation on Vast.ai. ComfyUI provides a powerful node-based interface for creating advanced stable diffusion pipelines, making it ideal for video generation workflows.
+
+## Prerequisites
+
+- A Vast.ai account
+- Basic familiarity with image or video generation models
+- [(Optional) Read Jupyter guide]{href="https://docs.vast.ai/instances/jupyter" newTab="true" hasDisabledNofollow="false"}
+- [(Optional) SSH client installed on your local machine and SSH public key added in Account tab at cloud.vast.ai]{href="https://docs.vast.ai/instances/sshscp" newTab="true" hasDisabledNofollow="false"}&#x20;
+
+## Setting Up Your Instance
+
+### 1. Select the Right Template
+
+Navigate to the Templates tab to view available templates. For video generation, we recommend searching for "ComfyUI" among the recommended templates.  [The ComfyUI template]{href="https://cloud.vast.ai/?ref_id=62897&creator_id=62897&name=ComfyUI" newTab="true" hasDisabledNofollow="false"} provides a powerful and modular stable diffusion GUI for designing and executing advanced pipelines using a graph/nodes/flowchart based interface.
+
+**Template Features:**
+
+- Access through both Jupyter and SSH
+- Instance Portal
+- Token-based authentication enabled by default
+- Built-in provisioning script for models and custom nodes
+
+### 2. **Edit your Template Configuration&#x20;**
+
+**Add/update these environment variables as needed:**
+
+```bash
+# Core Settings
+COMFYUI_ARGS="--disable-auto-launch --port 18188 --enable-cors-header"         # ComfyUI launch arguments
+
+# Authentication
+WEB_ENABLE_HTTPS=false   # Enable/disable direct HTTPS
+WEB_ENABLE_AUTH=true    # Enable/disable authentication
+
+# Access Tokens
+CF_TUNNEL_TOKEN=""      # Cloudflare Zero Trust token
+CIVITAI_TOKEN=""        # Access gated Civitai models
+HF_TOKEN=""            # Access gated HuggingFace models
+
+# Custom Setup
+PROVISIONING_SCRIPT=""  # URL to custom provisioning script
+```
+
+**Provisioning Script:**
+
+- Default script includes popular image models and custom nodes
+- Fully customizable - Create your own script for a custom instance
+- Must be Bash-compatible and start with `#!/bin/bash`
+- Upload modified script to a GitHub Gist or respository and update the PROVISIONING\_SCRIPT variable to point to the raw file
+
+⚠**Important: Never save your template as public if you've included tokens or other secrets in the Docker Options field.**
+
+Select your template from '[My Templates](https://cloud.vast.ai/templates/)' after making any desired edits to it.
+
+### 3. Create Your Instance
+
+1. In the [Search interface](https://cloud.vast.ai/create/), look for machines that have **sufficient VRAM** to handle your chosen video model.  ⚠All models are different so check the model requirements carefully.
+2. Click RENT to create an instance on the machine with the GPU of your choice
+
+### 3. Connect to Your Instance
+
+1. Go to [Instances tab](https://cloud.vast.ai/instances/) to see your instance loading
+2. When the blue button says "OPEN", click this button to access the [Instance Portal](https://docs.vast.ai/instance-portal) which will provide access to ComfyUI and other useful applications.
+3. Click the direct link or cloudflare quick tunnel link to access ComfyUI. Here's a [beginner's guide to using ComfyUI](https://stable-diffusion-art.com/comfyui/).
+
+### 4.  Select a Video Workflow
+
+ComfyUI has a workflow browser, so for a quick start you can choose on of their templates
+
+![ComfyUI template workflows](https://archbee-image-uploads.s3.amazonaws.com/9WtD9F5n1L2IYJxS0qXDd/lX5fx-u9_u5WQ3eS4kL4O_image.png "ComfyUI Workflows")
+
+We'll pick the LTX Video workflow for this guide.  Simply click it to proceed.
+
+### 5. Download Missing Files
+
+Your new instance will not yet have the required models, but fortunately ComfyUI will alert us to this and offer the models for download.
+
+<Image src="https://archbee-image-uploads.s3.amazonaws.com/9WtD9F5n1L2IYJxS0qXDd/LBlwnmJDRFHwMqFDRiTlE_image.png" signedSrc="https://archbee-image-uploads.s3.amazonaws.com/9WtD9F5n1L2IYJxS0qXDd/LBlwnmJDRFHwMqFDRiTlE_image.png" size="54" width="577" height="457" position="center" caption=""></Image>
+
+Unfortunately, the interface does not know it is running in the cloud so clicking the download buttons will download the models to your local machine.  To work around this you can either:&#x20;
+
+- Download the models to your computer and then upload them to the instance
+- SSH to the instance and use `curl` or `wget` to directly download the models to their correct locations
+
+To complete this guide we will use SSH
+
+```bash
+# Download the models
+wget --content-disposition -P /workspace/ComfyUI/models/checkpoints/ "https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.safetensors"
+wget --content-disposition -P /workspace/ComfyUI/models/clip/ "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors"
+
+# Download the workflow source image
+wget --content-disposition -P /workspace/ComfyUI/input/ "https://comfyanonymous.github.io/ComfyUI_examples/ltxv/island.jpg"
+```
+
+The above commands will download the required models into the instance.  When the downloads have completed you can refresh the browser window to clear the missing models error.
+
+### 6. Run the Workflow
+
+Finally, click the **Run** button to process the workflow.
+
+![](https://archbee-image-uploads.s3.amazonaws.com/9WtD9F5n1L2IYJxS0qXDd/9DX6xCJBmMCFqsyTFE1f1_image.png)
+
+Feel free to modify the prompts and experiement!
+
+## Pre-Configured Templates
+
+We have some pre-configured ComfyUI templates - And one for this guide.  Check them out here
+
+- [ComfyUI + LTX Video](https://cloud.vast.ai/?ref_id=62897&creator_id=62897&name=ComfyUI%20%2B%20LTX%20Video)
+- [Open-Sora](https://cloud.vast.ai/?ref_id=62897&creator_id=62897&name=Open-Sora)
+
+## Resources and Further Reading
+
+1. [ComfyUI Official Repository](https://github.com/comfyanonymous/ComfyUI)
+2. [Vast.ai Documentation](https://docs.vast.ai/)
+3. [Comfy Workflows](https://comfyworkflows.com/)
+4. [Vast.ai support chat on website](https://vast.ai/)
+
+Remember to always check VRAM usage and adjust parameters accordingly. Start with smaller frames and resolutions, then scale up as you become more comfortable with the workflow.
