@@ -15,9 +15,9 @@ This guide walks you through setting up and running automated backups for your V
 
 - A Vast.ai account
 - Access to a Vast.ai Docker-based instance
-- [Cloud storage connection set up in Vast.ai]{href="https://docs.vast.ai/instances/cloud-sync" newTab="true" hasDisabledNofollow="false"}
-- [(Optional) Install and use vast-cli]{href="https://docs.vast.ai/cli" newTab="true" hasDisabledNofollow="false"}
-- [(Optional) Understanding of how to use cron in computers with Unix-like OS]{href="https://cronitor.io/guides/cron-jobs" newTab="true" hasDisabledNofollow="false"}
+- [Cloud storage connection set up in Vast.ai](https://docs.vast.ai/instances/cloud-sync)
+- [(Optional) Install and use vast-cli](https://docs.vast.ai/cli)
+- [(Optional) Understanding of how to use cron in computers with Unix-like OS](https://cronitor.io/guides/cron-jobs)
 
 ## Setup
 
@@ -25,9 +25,14 @@ This guide walks you through setting up and running automated backups for your V
 
 Before creating backup jobs, you need to ensure you have a cloud storage connection set up in your Vast.ai account. You can view your existing connections using the vast-cli:
 
->
+```text
+python3 vast.py show connections
 
-If you don't have a connection yet, you'll need to set one up in [Vast.ai's Settings page ]{href="https://docs.vast.ai/instances/cloud-sync" newTab="true" hasDisabledNofollow="false"}before proceeding with backup operations.
+ID     NAME                          Cloud Type
+19447  karthik_vast_ai_google_drive  drive
+```
+
+If you don't have a connection yet, you'll need to set one up in [Vast.ai's Settings page ](https://docs.vast.ai/instances/cloud-sync)before proceeding with backup operations.
 
 ### 2. Understanding Backup Options
 
@@ -44,17 +49,30 @@ Both approaches have their advantages depending on your workflow and requirement
 
 The vast-cli tool allows you to create scheduled backup jobs with several timing options. The basic structure of a scheduled backup command includes these parameters:
 
->
+
+
+```text
+--schedule SCHEDULE      Values: HOURLY, DAILY, WEEKLY
+--start_date START_DATE  Start date in format 'YYYY-MM-DD HH:MM:SS PM' (UTC) 
+--end_date END_DATE      End date in format 'YYYY-MM-DD HH:MM:SS PM' (UTC) 
+--day DAY                Day of week (0-6, where 0=Sunday) or "*"
+--hour HOUR              Hour of day (0-23) or "*"
+```
+
 
 You can run this command to see more details about these parameters:
 
->
+```text
+python3 vast.py cloud copy --help
+```
 
 Let's explore the different scheduling options:
 
 To create a weekly backup job that runs every Saturday at 9 PM UTC:
 
->
+```text
+python3 vast.py cloud copy --src /workspace --dst /backups/19015821_backups/ --instance 19015821 --connection 19447 --transfer "Instance To Cloud" --schedule WEEKLY --day 6 --hour 21
+``` 
 
 In this command:
 
@@ -67,19 +85,26 @@ In this command:
 
 For daily backups at a specific hour (e.g., 9 PM UTC every day):
 
->
+```text
+python3 vast.py cloud copy --src /workspace --dst /backups/19015821_backups/ --instance 19015821 --connection 19447 --transfer "Instance To Cloud" --schedule DAILY --day "*" --hour 21
+```
 
 The --day "\*" parameter indicates that the job should run every day.
 
 For hourly backups that run every hour of every day:
 
->
+```text
+python3 vast.py cloud copy --src /workspace --dst /backups/19015821_backups/ --instance 19015821 --connection 19447 --transfer "Instance To Cloud" --schedule HOURLY --day "*" --hour "*"
+```
 
 Setting both --day "\*" and --hour "\*" along with --schedule HOURLY makes the job run every hour.
 
 To update your backup schedule, simply run the same command with the new schedule. The system will prompt you for confirmation, and upon acceptance, it will update the schedule accordingly.&#x20;
 
->
+```text
+Existing scheduled job found. Do you want to update it (y|n)? y
+add_scheduled_job update: success - Scheduling DAILY job to cloud copy from 1745599087.0 to 1746599887.0
+```
 
 ### 2. Using Cron on Your Personal Linux Computer
 
@@ -87,11 +112,15 @@ If you prefer more granular control over your backup schedule, you can use cron 
 
 First, open your crontab file for editing:
 
->
+```text
+crontab -e
+```
 
 Then, add a line that specifies your backup schedule. For example, to run a backup every 4 hours:
 
->
+```text
+0 */4 * * * python3 vast.py cloud copy --src /workspace --dst /backups/19015821_backups/ --instance 19015821 --connection 19447 --transfer 'Instance To Cloud'
+```
 
 In this cron schedule:
 
@@ -103,11 +132,13 @@ In this cron schedule:
 
 To see all your currently scheduled backup jobs:
 
->
+```text
+python3 vast.py show scheduled-jobs
+```
 
 Example output:
 
-```bash
+```bash Bash
 Scheduled Job ID  Instance ID  API Endpoint              Start (Date/Time in UTC)  End (Date/Time in UTC)  Day of the Week  Hour of the Day in UTC  Minute of the Hour  Frequency
 1                 19778412     /api/v0/commands/rclone/  2025-04-24/23:38          2028-05-06/23:38        Everyday         4_PM                    00                  DAILY
 2                 19782577     /api/v0/commands/rclone/  2025-04-29/23:47          2025-05-09/23:47        Wednesday        10_AM                   00                  WEEKLY
@@ -215,23 +246,20 @@ Examples Explained:
 
 If you need to remove a scheduled backup job that you no longer want to run, you can use the delete scheduled-job command followed by the job ID:
 
-<CodeblockTabs>
-  Bash
+```bash Bash
+python3 vast.py delete scheduled-job JOB_ID
+```
 
-  ```bash
-  python3 vast.py delete scheduled-job JOB_ID
-  ```
-</CodeblockTabs>
 
 For example:
 
-```bash
+```bash Bash
 python3 vast.py delete scheduled-job 4462309
 ```
 
 This will completely remove the scheduled job from the system. When successful, you'll receive a confirmation message:
 
-```bash
+```bash Bash
 {'success': True, 'msg': 'Scheduled job 4462309 deleted successfully'}
 ```
 
@@ -239,13 +267,13 @@ This will completely remove the scheduled job from the system. When successful, 
 
 To find the ID of the job you want to delete, first run:
 
-```bash
+```bash Bash
 python3 vast.py show scheduled-jobs
 ```
 
 You'll see output similar to:
 
-```bash
+```bash Bash
 Scheduled Job ID  Instance ID  API Endpoint              Start (Date/Time)  End (Date/Time)   Day of the Week  Hour of the Day  Minute of the Hour  Frequency
 4462317           19281511     /api/v0/commands/rclone/  2025-04-08/09:01   2028-06-08/18:48  Everyday         1_PM             33                  DAILY    
 4462321           19489711     /api/v0/commands/rclone/  2025-04-15/20:00   2025-04-19/20:00  Saturday         11_PM            00                  WEEKLY   
