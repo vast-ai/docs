@@ -1,0 +1,252 @@
+---
+title: Permissions-and-authorization
+createdAt: Tue Jan 14 2025 02:09:39 GMT+0000 (Coordinated Universal Time)
+updatedAt: Tue Apr 29 2025 16:45:10 GMT+0000 (Coordinated Universal Time)
+---
+
+# API Endpoints and Permission Categories
+
+This document outlines the various API endpoints and their associated permission categories, providing a clear reference for understanding the access control within our system.
+
+<Note>
+**Note:** In the early days we are going to describe these concepts as things like 'instance_read' or 'instance_write', We realize these are confusing. Any questions about what permissions are attributed to what actions should be asked via our support channels.
+</Note>
+
+Every API Key has a list of permissions associated with it. Every user has the ability to create keys with restricted permissions on their own account. Users can also create restricted keys in team environments using the team-centric endpoints.
+
+### Creating Custom Roles
+
+- **Accessing Role Management**: Custom roles can be created and managed through the CLI. Team roles can be managed on the 'Manage' page by users with team\_read level access.
+- **Defining Permissions**: When creating a custom role, anyone can select from a wide range of permissions, such as instance creation, billing access, monitoring, etc. This allows for precise control over what each role can and cannot do.
+- **Assigning Custom Roles**: Once a custom role is created, it can be assigned to team members through the team management interface.
+
+### Important Elements
+
+- **constraints**: Constraints can be added at different levels to enforce certain parameters of the body to be specific values
+- **params**: You can use wildcards to represent placeholder values. (Useful if you want to generate many keys all doing similar operations)
+
+### Examples
+
+The following json would create a user that has access to the specified categories. In this instance, someone with these permissions would be able to create an instance as well as access billing information
+
+```text Text
+{
+    "api": {
+        "misc": {}, 
+        "user_read":{}, 
+        "instance_read": {}, 
+        "instance_write": {},
+		"billing_read": {},
+		"billing_write": {}
+    }
+}
+```
+
+The following json would create restricted access to only the presented categories. In this example, someone with these permissions would be able to create an instance, but they would not be able to access billing information
+
+```text Text
+{
+    "api": {
+        "misc": {}, 
+        "user_read":{}, 
+        "instance_read": {}, 
+        "instance_write": {}
+    }
+}
+```
+
+You can see a full list of permission types as well as the endpoints attached to that permission below
+
+## Permission Categories
+
+### instance\_read
+
+- [Get Instances](https://docs.vast.ai/api/retrieve-user-instances)
+- [Request Logs](https://docs.vast.ai/api/request-instance-logs)
+
+The following permissions would allow a user to read the instance logs of instance id 1227 only
+
+```text Text
+{
+    "api": {
+        "misc": {}, 
+        "user_read":{}, 
+        "instance_read": {}, 
+        "instance_write": {},
+        "billing_read": {
+            "api.instance.request_logs": {
+                "constraints": {
+                    "id": {
+                        "eq": 1227
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+The following permissions would allow a user to read the instance logs of instance id from $1 to $2. Apikeys using this feature have to be created using the CLI call [create api-key](https://docs.vast.ai/api/commands)
+
+```text Text
+{
+    "api": {
+        "instance_read": {
+            "api.instance.request_logs": {
+                "constraints": {
+                    "id": {
+                        "lte": $1,
+                        "gte": $2
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+### instance\_write
+
+```text
+{
+	"api": {
+        "instance_write": {}
+    }
+}
+```
+
+- [Create Instances](https://docs.vast.ai/api/launch-an-instance)
+- [Update Instances](https://docs.vast.ai/api/update-user-data)
+- [Destroy Instances](https://docs.vast.ai/api/destroy-an-instance)
+- [Reboot Instances](https://docs.vast.ai/api/reboot-an-instance)
+- [Execute Command](https://docs.vast.ai/api/execute-remote-command)
+- [Change Bid Price](https://docs.vast.ai/api/change-bid-price)
+
+### user\_read
+
+```text Text
+{
+	"api": {
+        "user_read": {}
+    }
+}
+```
+
+- [Show User](https://docs.vast.ai/api/retrieve-current-user-information)
+- [Show IP Addresses](https://docs.vast.ai/api/retrieve-ip-address-history)
+- [Get Subaccount](https://docs.vast.ai/api/retrieve-subaccounts)
+
+### user\_write
+
+```text Text
+{
+	"api": {
+        "user_write": {}
+    }
+}
+```
+
+- [Create Subaccount](https://docs.vast.ai/api/create-new-user-account-or-subaccount)
+- [Reset API Key](https://docs.vast.ai/api/reset-api-key)
+
+### billing\_read
+
+```text Text    
+{
+	"api": {
+        "billing_read": {}
+    }
+}
+```
+
+- [Get Machine Earnings](https://docs.vast.ai/api/retrieve-earnings-history)
+- [Get Invoices](https://docs.vast.ai/api/search-and-retrieve-invoices)
+
+### billing\_write
+
+```text Text
+{
+	"api": {
+        "billing_write": {}
+    }
+}
+```
+
+- [Transfer Credit](https://docs.vast.ai/api/transfer-credits-to-another-user)
+
+### machine\_read
+
+```text Text
+{
+	"api": {
+        "machine_read": {}
+    }
+}
+```
+
+- [Get Machines](https://docs.vast.ai/api/retrieve-a-list-of-machines)
+
+### machine\_write
+
+```text
+{
+	"api": {
+        "machine_write": {}
+    }
+}
+```
+
+- [Set Minimum Bid](https://docs.vast.ai/api/set-minimum-bid-price-for-a-machine)
+- [Set Default Job](https://docs.vast.ai/api/set-defjob)
+- [Remove Default Job](https://docs.vast.ai/api/remove-default-job)
+- [Schedule Maintenance](https://docs.vast.ai/api/schedule-maintenance)
+- [List Machine](https://docs.vast.ai/api/list-a-machine-for-rent)
+- [Unlist Machine](https://docs.vast.ai/api/unlist-a-machine)
+
+### misc
+
+```text Text
+{
+	"api": {
+        "misc": {}
+    }
+}
+```
+
+- [Copy Data](https://docs.vast.ai/api/initiate-a-remote-copy-operation)
+- [Cancel Copy](https://docs.vast.ai/api/cancel-remote-sync-operation)
+- [Search GPUs](https://docs.vast.ai/api/search-and-filter-gpu-offers)
+- [Search GPUs Advanced](https://docs.vast.ai/api/search-and-filter-gpu-offers)
+
+### team\_read
+
+```text Text    
+{
+	"api": {
+        "team_read": {}
+    }
+}
+```
+
+- [Get Team Role](https://docs.vast.ai/api/retrieve-team-role)
+- [Get Team Roles](https://docs.vast.ai/api/retrieve-team-roles)
+- [Get Team Members](https://docs.vast.ai/api/retrieve-team-members)
+
+### team\_write
+
+```json JSON
+{
+	"api": {
+        "team_write": {}
+    }
+}
+```
+
+- [Create Team](https://docs.vast.ai/api/create-a-new-team)
+- [Delete Team](https://docs.vast.ai/api/destroy-team)
+- [Create Team Role](https://docs.vast.ai/api/create-a-new-team-role)
+- [Update Team Role](https://docs.vast.ai/api/update-a-team-role)
+- [Delete Team Role](https://docs.vast.ai/api/remove-a-team-role)
+- [Invite Team Member](https://docs.vast.ai/api/invite-a-new-member-to-join-a-team%20copy)
+- [Delete Team Member](https://docs.vast.ai/api/remove-a-team-member)
+
