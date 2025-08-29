@@ -1,18 +1,12 @@
-# Mintlify Starter Kit
+# Vast.ai Docs: Pages
 
-Use the starter kit to get your docs deployed and ready to customize.
+This directory contains the docs pages shown at [docs.vast.ai](https://docs.vast.ai).
 
-Click the green **Use this template** button at the top of this repo to copy the Mintlify starter kit. The starter kit contains examples with
+(API Docs are in this [separate repo]([url](https://github.com/vast-ai/vast-cli/blob/master/openapi/readme.md)))
 
-- Guide pages
-- Navigation
-- Customizations
-- API reference pages
-- Use of popular components
+## Mintlify Information
 
 **[Follow the full quickstart guide](https://starter.mintlify.com/quickstart)**
-
-## Development
 
 Install the [Mintlify CLI](https://www.npmjs.com/package/mint) to preview your documentation changes locally. To install, use the following command:
 
