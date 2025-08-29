@@ -2,7 +2,7 @@
 
 This directory contains the docs pages shown at [docs.vast.ai](https://docs.vast.ai).
 
-(API Docs are in this [separate repo]([url](https://github.com/vast-ai/vast-cli/blob/master/openapi/readme.md)))
+(API Docs are in this [separate repo](https://github.com/vast-ai/vast-cli/blob/master/openapi/readme.md))
 
 ## Mintlify Information
 
