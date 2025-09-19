@@ -1,0 +1,143 @@
+---
+title: Environment Setup
+description: Configure environment variables and SSL certificates for serverless deployments
+---
+
+## Environment Variables
+
+### Setting User Environment Variables
+
+Navigate to the [account settings page](https://cloud.vast.ai/account/) and expand the "Environment Variables" tab.
+
+#### Common Variables
+
+| Variable | Purpose | Example |
+|----------|---------|---------|
+| `HF_TOKEN` | HuggingFace access token for gated models | `hf_xxxxxxxxxxxxx` |
+| `OPENAI_API_KEY` | OpenAI API key for compatible services | `sk-xxxxxxxxxxxxx` |
+| `WANDB_API_KEY` | Weights & Biases tracking | `wandb_xxxxxxxxxxxxx` |
+
+To add a variable:
+1. Enter the key name (e.g., `HF_TOKEN`)
+2. Enter the value (your actual token)
+3. Click the "+" button
+4. Click "Save Edits"
+
+<Warning>
+  Environment variables set here will be available to all your serverless workers. Keep sensitive tokens secure and rotate them regularly.
+</Warning>
+
+### Template Environment Variables
+
+When creating or editing a template, you can set model-specific environment variables:
+
+- `MODEL_NAME` - The HuggingFace model ID or path
+- `QUANTIZATION` - Quantization method (e.g., `awq`, `gptq`, `bitsandbytes`)
+- `MAX_MODEL_LEN` - Maximum context length
+- `GPU_MEMORY_UTILIZATION` - GPU memory allocation (0.0-1.0)
+
+## SSL Certificate Installation
+
+Vast.ai serverless workers use SSL by default with self-signed certificates. For production use, install the root certificate to avoid SSL warnings.
+
+### Python Clients
+
+1. Download Vast AI's certificate:
+```bash
+curl -O https://console.vast.ai/static/jvastai_root.cer
+```
+
+2. Use the certificate in your requests:
+```python
+import requests
+
+# Specify the certificate path for each request
+response = requests.post(
+    "https://worker-url/v1/chat/completions",
+    json=payload,
+    verify='/path/to/jvastai_root.cer'
+)
+```
+
+This approach only affects Vast.ai requests and won't interfere with other services.
+
+### Browser Installation
+
+For web-based clients or browser testing:
+
+#### Chrome/Edge
+1. Go to Settings → Privacy and Security → Security
+2. Click "Manage certificates"
+3. Go to the "Authorities" tab
+4. Click "Import" and select `jvastai_root.cer`
+
+#### Firefox
+1. Go to Settings → Privacy & Security
+2. Scroll to "Certificates" section
+3. Click "View Certificates"
+4. Go to "Authorities" tab
+5. Click "Import" and select `jvastai_root.cer`
+
+#### Safari (macOS)
+1. Double-click the downloaded `jvastai_root.cer` file
+2. Keychain Access will open
+3. Add to "System" keychain
+4. Right-click the certificate and select "Get Info"
+5. Expand "Trust" and set to "Always Trust"
+
+### Node.js Clients
+
+For Node.js applications, set the environment variable:
+```bash
+export NODE_EXTRA_CA_CERTS=/path/to/jvastai_root.cer
+```
+
+Or in your application:
+```javascript
+process.env.NODE_EXTRA_CA_CERTS = '/path/to/jvastai_root.cer';
+```
+
+### Disabling SSL (Development Only)
+
+If you prefer to disable SSL verification during development:
+
+#### Python
+```python
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# In requests
+response = requests.post(url, verify=False)
+```
+
+#### cURL
+```bash
+curl -k https://worker-url/v1/chat/completions
+```
+
+#### Node.js
+```javascript
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+```
+
+<Warning>
+  Never disable SSL verification in production. Always use proper certificate installation for secure communications.
+</Warning>
+
+## Troubleshooting
+
+### Certificate Errors
+- **"SSL: CERTIFICATE_VERIFY_FAILED"**: Certificate not installed correctly
+- **"Self-signed certificate"**: Need to install Vast's root certificate
+- **"Certificate expired"**: Download the latest certificate
+
+### Environment Variable Issues
+- Variables not appearing: Ensure you clicked "Save Edits" after adding
+- Token authentication failures: Verify token is valid and has correct permissions
+- Variables not updating: Workers may need to be restarted to pick up changes
+
+## Next Steps
+
+- [Create your first deployment](/serverless/quickstart)
+- [Configure templates](/serverless/templates)
+- [Monitor your endpoints](/serverless/monitoring)
