@@ -21,7 +21,7 @@ These are in addition to standard ssh based copy protocols such as scp or sftp w
 
 The 3 built-in methods discussed here are unique in that they offer ways to copy data to/from a *stopped instance*, with some constraints. Copying data between instances accrues internet bandwidth usage charges (with prices varying across providers), unless the copy is between two instances on the same machine or local network, in which case there is no bandwidth charge.
 
-## Instance\<->Cloud copy (cloud sync) (Docker)
+## Instance\<->Cloud copy (cloud sync)
 
 The cloud sync feature allows you to copy data to/from instance local storage and several cloud storage providers (S3, gdrive, backblaze, etc) - even when the instance is stopped.
 
@@ -77,18 +77,34 @@ For VM based instances you will see a confirmation dialog instead; the copy will
 
 You can also access this feature using the `vastai copy` [CLI command](https://docs.vast.ai/api/commands).
 
-## CLI Copy Command (Docker)
+## CLI Copy Command
 
 You can use the [CLI](https://docs.vast.ai/api/overview-and-quickstart) copy command to copy from/to directories on a remote instance and your local machine, or to copy data between two remote instances.
 The copy command uses rsync and is generally fast and efficient, subject to single link upload/download constraints.
 
-Example:
+The copy command supports multiple location formats:
+
+- `[instance_id:]path` - Legacy format (still supported)
+- `C.instance_id:path` - Container copy format
+- `cloud_service:path` - Cloud service format
+- `cloud_service.cloud_service_id:path` - Cloud service with ID
+- `local:path` - Explicit local path
+
+Examples:
 
 ```text Text
-vastai copy ~/workspace 4330147:/workspace
+vastai copy 6003036:/workspace/ 6003038:/workspace/
+vastai copy C.11824:/data/test local:data/test
+vastai copy local:data/test C.11824:/data/test
+vastai copy drive:/folder/file.txt C.6003036:/workspace/
+vastai copy s3.101:/data/ C.6003036:/workspace/
 ```
 
-That will copy the local \~/workspace (workspace folder of current user home directory) into the absolute path /workspace on instance 4330147.
+The first example copy syncs all files from the absolute directory '/workspace' on instance 6003036 to the directory '/workspace' on instance 6003038.
+The second example copy syncs files from container 11824 to the local machine using structured syntax.
+The third example copy syncs files from local to container 11824 using structured syntax.
+The fourth example copy syncs files from Google Drive to an instance.
+The fifth example copy syncs files from S3 bucket with id 101 to an instance.
 
 ## CLI Copy Command (VMs)
 
