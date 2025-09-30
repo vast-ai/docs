@@ -1,0 +1,106 @@
+---
+title: Instances FAQ
+sidebarTitle: Instances
+description: Questions about creating and managing instances
+---
+
+## Instance Lifecycle
+
+### What does "Lifetime" mean on my instance?
+
+Every instance offer has a **Max Duration**. When you accept an offer and create an instance, this becomes the instance lifetime and begins counting down. When the lifetime expires, the instance is automatically stopped. 
+
+The host can extend the contract (adding more lifetime), but this is at their discretion. **Important:** Always assume your instance will be lost once the lifetime expires and copy out any important data before then.
+
+### How can I restart programs when my instance restarts?
+
+**For custom command instances:** Your command runs automatically on startup.
+
+**For SSH instances:** Place startup commands in `/root/onstart.sh`. This script runs automatically on container startup.
+
+```bash
+# Example /root/onstart.sh
+#!/bin/bash
+cd /workspace
+python train.py --resume
+```
+
+## Environment Configuration
+
+### How do I set environment variables?
+
+Use the `-e` Docker syntax in the docker create/run options:
+
+```bash
+-e TZ=UTC -e TASKID="TEST"
+```
+
+To make variables visible in SSH/Jupyter sessions, export them to `/etc/environment`:
+
+```bash
+# Export variables with underscores
+env | grep _ >> /etc/environment
+
+# Or export all variables
+env >> /etc/environment
+```
+
+You can also set global environment variables in your account Settings page.
+
+### How do I get the instance ID from within the container?
+
+Use the `VAST_CONTAINERLABEL` environment variable:
+
+```bash
+echo $VAST_CONTAINERLABEL
+# Output: C.38250
+```
+
+### How can I find OPEN_BUTTON_TOKEN?
+
+SSH into your instance or open Jupyter terminal and run:
+
+```bash
+echo $OPEN_BUTTON_TOKEN
+```
+
+Alternatively, check the instance logs.
+
+## Controlling Instances
+
+### How do I stop an instance from within itself?
+
+A special instance API key is pre-installed. Install the CLI and use it:
+
+```bash
+# Install CLI
+pip install vastai
+
+# Test with start (no-op if already running)
+vastai start instance $CONTAINER_ID
+
+# Stop the instance
+vastai stop instance $CONTAINER_ID
+```
+
+If `$CONTAINER_ID` is not defined, check your environment variables with `env`.
+
+### Can I run Docker within my instance?
+
+No, Vast.ai does not support Docker-in-Docker due to security constraints. Each Docker container must run on a separate instance.
+
+## Data and Storage
+
+### Can I change disk size after creating an instance?
+
+**No.** Disk size is permanent and cannot be changed after instance creation. If you run out of space, you'll need to create a new instance with a larger disk. 
+
+**Tip:** Always allocate more space than you think you need to avoid interruptions.
+
+### What happens to my data when an instance stops?
+
+- **Stopped instances:** Data persists, storage charges continue
+- **Destroyed instances:** All data is permanently deleted
+- **Lifetime expired:** Instance stops, data remains until destroyed
+
+Always backup important data to external storage.

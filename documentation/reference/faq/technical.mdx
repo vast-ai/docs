@@ -1,0 +1,157 @@
+---
+title: Technical FAQ
+sidebarTitle: Technical
+description: Docker configuration, performance, and advanced topics
+---
+
+## Docker Configuration
+
+### What Docker options can I use?
+
+Add Docker run arguments in the template configuration:
+
+```bash
+# Port mapping
+-p 8080:8080 -p 8081:8081
+
+# Environment variables  
+-e TZ=UTC -e CUDA_VISIBLE_DEVICES=0
+
+# Shared memory (for PyTorch)
+--shm-size=32gb
+```
+
+### Can I use my own Docker images?
+
+Yes! When creating a template:
+1. Specify your Docker image URL
+2. Ensure it's publicly accessible or provide auth
+3. Use standard Docker Hub, GHCR, or other registries
+4. Include all dependencies in the image
+
+### Why can't I run Docker inside my instance?
+
+Docker-in-Docker is disabled for security. Alternatives:
+- Use separate instances for different containers
+- Build multi-service images
+- Use process managers like supervisord
+
+## Performance Optimization
+
+### How can I maximize GPU utilization?
+
+1. **Batch size optimization:**
+   - Increase until GPU memory is nearly full
+   - Monitor with `nvidia-smi`
+
+2. **Data pipeline:**
+   - Pre-process data
+   - Use multiple data loader workers
+   - Cache datasets locally
+
+3. **Mixed precision training:**
+   ```python
+   # PyTorch example
+   from torch.cuda.amp import autocast
+   with autocast():
+       output = model(input)
+   ```
+
+### Why is my training slower than expected?
+
+Common issues:
+- **CPU bottleneck** - Check data loading
+- **Network I/O** - Download data to local storage first
+- **Wrong GPU mode** - Ensure CUDA is enabled
+- **Thermal throttling** - Some consumer GPUs throttle
+- **PCIe bandwidth** - Multi-GPU setups may be limited
+
+## Storage and Volumes
+
+### What's the difference between instance storage and volumes?
+
+**Instance Storage:**
+- Included with every instance
+- Deleted when instance is destroyed
+- Size set at creation (cannot change)
+- Faster performance
+
+**Volumes:**
+- Persistent across instances
+- Can be attached/detached
+- Additional cost
+- Good for datasets and checkpoints
+
+### How do I use volumes?
+
+1. Create a volume in the Volumes section
+2. Attach when creating an instance
+3. Mount point specified in template
+4. Data persists after instance destruction
+
+See [Volumes Guide](../../instances/volumes) for details.
+
+## Environment Setup
+
+### How do I install additional packages?
+
+In Jupyter terminal or SSH:
+
+```bash
+# System packages
+apt-get update && apt-get install -y package-name
+
+# Python packages
+pip install package-name
+
+# Conda (if available)
+conda install package-name
+```
+
+Add to `/root/onstart.sh` for persistence across restarts.
+
+### How do I use specific CUDA versions?
+
+CUDA version depends on the Docker image. To check:
+```bash
+nvcc --version
+nvidia-smi
+```
+
+To use specific versions, choose appropriate templates or create custom images with your required CUDA version.
+
+## Debugging
+
+### How do I view instance logs?
+
+- Through web console: Click "Logs" on instance card
+- Via CLI: `vastai logs INSTANCE_ID`
+- Inside instance: Check `/var/log/` directory
+
+### My instance won't start - how do I debug?
+
+1. Check instance logs for errors
+2. Verify Docker image exists and is accessible
+3. Check if ports are already in use
+4. Ensure sufficient disk space requested
+5. Try a different provider
+6. Contact support with instance ID
+
+### How do I monitor resource usage?
+
+```bash
+# GPU monitoring
+watch -n 1 nvidia-smi
+
+# CPU and memory
+htop
+
+# Disk usage
+df -h
+
+# Network
+iftop or nethogs
+
+# All resources
+gpustat -cp
+```
