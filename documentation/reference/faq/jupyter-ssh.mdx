@@ -1,0 +1,132 @@
+---
+title: Jupyter & SSH FAQ
+sidebarTitle: Jupyter & SSH
+description: Connecting to instances via Jupyter and SSH
+---
+
+## Jupyter
+
+### What is the HTTPS security warning?
+
+When accessing Jupyter, browsers show a security warning because we use self-signed certificates. To fix:
+
+1. Download and install our [TLS certificate](../../instances/jupyter)
+2. **Windows/Linux:** Can bypass by clicking Advanced → Proceed
+3. **macOS:** Must install certificate in Keychain Access
+
+Installing the certificate removes the warning permanently.
+
+### Why are Jupyter transfers slow?
+
+Jupyter's upload/download is not optimized for large files. Alternatives:
+- Use SCP/SFTP for large transfers
+- Use cloud storage (S3, GCS)
+- Use the Vast CLI copy commands
+- Zip multiple files before downloading
+
+### How do I delete files in Jupyter to free space?
+
+Jupyter moves deleted files to trash. To permanently delete:
+
+```bash
+# In Jupyter terminal
+rm -r ~/.local/share/Trash
+```
+
+### How do I run Colab notebooks?
+
+1. Select the [PyTorch template](https://cloud.vast.ai/?ref_id=43484&template_id=e4c5e88bc289f4eecb0c955c4fe7430d) with Jupyter enabled
+2. Start your instance
+3. Download the Colab notebook as `.ipynb`
+4. Upload to Jupyter
+5. Install any missing dependencies with `pip install`
+
+For direct Colab connection, see our [Colab guide](https://docs.vast.ai/google-colab).
+
+### How do I download multiple files from Jupyter?
+
+**Jupyter Lab:** Shift-click to select multiple files, right-click to download
+
+**Jupyter Notebook:** Must download individually or zip first:
+
+```bash
+# Install zip
+apt-get install -y zip
+
+# Zip a directory
+zip -r all_files.zip /path/to/files/
+```
+
+### Missing library or package errors?
+
+Install dependencies in Jupyter terminal:
+
+```bash
+# System packages
+apt-get install -y PACKAGE_NAME
+
+# Python packages  
+pip install PACKAGE_NAME
+```
+
+## SSH Access
+
+### How do I connect via SSH on Linux/Mac?
+
+1. Generate an SSH keypair:
+```bash
+ssh-keygen -t rsa
+```
+
+2. Load the key and verify:
+```bash
+ssh-add
+ssh-add -l
+```
+
+3. Get your public key:
+```bash
+cat ~/.ssh/id_rsa.pub
+```
+
+4. Copy the **entire output** (including `ssh-rsa` prefix and `user@host` suffix) to your [Keys section](https://cloud.vast.ai/manage-keys/)
+
+Example of complete SSH key:
+```
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAZBAQDdxWwxwN5Lz7ubkMrxM5FCHhVz... bob@velocity
+```
+
+### How do I connect via SSH from Windows?
+
+Two options:
+1. **Windows Subsystem for Linux (WSL)** - Follow Linux/Mac instructions above
+2. **PuTTY** - See our [Windows SSH Guide](../../instances/windows-ssh-guide)
+
+Make sure to save the key in SSH RSA-2 format when using PuTTY.
+
+### What is tmux and how do I use it?
+
+We connect you to a tmux session by default for reliability. Common commands:
+- **Create new terminal:** `Ctrl+b, c`
+- **Switch terminals:** `Ctrl+b, n`
+- **Split screen:** `Ctrl+b, %` (vertical) or `Ctrl+b, "` (horizontal)
+
+Search "tmux cheat sheet" for more commands.
+
+### Can I disable tmux?
+
+Not recommended (SSH can be unstable), but if needed, add to your onstart:
+
+```bash
+touch ~/.no_auto_tmux
+```
+
+### SSH asks for a password - what's wrong?
+
+There is no SSH password - Vast.ai uses SSH key authentication only. If SSH asks for a password:
+- Your SSH key wasn't added correctly to your account
+- You didn't copy the entire public key (must include `ssh-rsa` prefix and `user@host` suffix)
+- Your SSH client is misconfigured
+- The private key isn't loaded in your SSH agent
+
+Double-check that you copied the complete public key to your Keys section.
