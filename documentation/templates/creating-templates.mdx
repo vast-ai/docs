@@ -1,0 +1,414 @@
+---
+title: Creating Templates
+sidebarTitle: Creating Templates
+createdAt: Fri Feb 21 2025 13:42:13 GMT+0000 (Coordinated Universal Time)
+updatedAt: Mon Aug 04 2025 17:45:23 GMT+0000 (Coordinated Universal Time)
+---
+
+## Introduction
+
+This guide walks you through the template editor and shows you how to configure each field to create custom templates for running containers on Vast.ai.
+
+Vast instances are currently Linux Docker containers and Ubuntu virtual machines. Many Linux based images should work within Vast.&#x20;
+
+## Prerequisites
+
+- A Vast.ai account
+- [SSH client installed on your local machine and SSH public key added in the SSH Keys tab in the Keys section of your console](https://cloud.vast.ai/manage-keys/)&#x20;
+- [(Optional) Install and use vast-cli](https://docs.vast.ai/cli)&#x20;
+
+## Configuring Your Template
+
+You can create a template by either:
+- **Editing an existing template** (recommended) - Start with one of our recommended templates and customize it
+- **Creating from scratch** - Click "+ New" on the templates page for a blank template
+
+For this guide we will edit the NVIDIA CUDA template we used in the [Introduction Quick Start](/documentation/templates/introduction#quick-start) section. All the fields work the same way whether you're editing or creating new.
+
+From the templates page, click the pencil icon on the template card to open up the template editor. You'll see two tabs `Config` and `ReadMe`. We'll start with the config tab:
+
+### Identification
+
+The first section helps you to keep your templates organized.
+
+<Frame caption="Identification section of the template editor">
+![Identification section of the template editor](/images/console-templates-5.webp)
+</Frame>
+
+**Template Name**
+
+This will be displayed in bold on the template card. Choose something that helps you identify the template amongst your other templates. For this guide, we will change the name to 'NVIDIA CUDA - Demo'
+
+**Template Description**
+
+This field helps describe the function and purpose of the template. Completely optional for your own purposes, but very helpful if you intend to make this template public or share it with others.
+
+### Docker Repository And Environment
+
+This is where you define the Docker image you want to run, along with any options we want to pass into the container.
+
+
+
+<Frame caption="Docker section of the template editor">
+![Docker section of the template editor](/images/console-templates-6.webp)
+</Frame>
+
+**Choosing Your Docker Image**
+
+You have two ways to customize templates:
+
+1. **Customize at runtime with PROVISIONING_SCRIPT** - Add a setup script that runs when the instance starts
+   - Works with any Docker image (Vast base-image/pytorch, public images, your own)
+   - Simplest approach - no Docker build needed
+   - See [PROVISIONING_SCRIPT](#provisioning-script) below for detailed examples
+
+2. **Build a custom Docker image** - Create your own Dockerfile with everything pre-installed
+   - Can start FROM Vast base images (recommended for built-in security features)
+   - Or FROM any other base image
+   - Full control, faster instance startup
+   - See [Base Images](#base-images) below for detailed examples and security benefits
+
+You can use Docker images from any registry - DockerHub, GitHub Container Registry (ghcr.io), Google Container Registry (gcr.io), etc.
+
+**Image Path\:Tag**
+
+Here is where you can define the docker image to run. This field must be in the format `repository/image_name:tag`.
+
+Many of our templates pull from DockerHub but you can use any container registry - Just remember to add the full path if you're using an alternative registry. Eg. `nvcr.io/nvidia/pytorch:25.04-py3`
+
+**Version Tag**
+
+For many registries we are able to pull the available list of tags so this field allows you to quickly select another version.
+
+There is also a special `[Automatic]` tag you can use. With this selected, the machine you choose for your instance will pull the most recent docker image that is compatible with that machine's own CUDA version.&#x20;
+
+This will only work if the image tag contains the CUDA version string. For example: `my-image-cuda-12.8` would be loaded on a machine supporting CUDA 12.8, but a machine with only CUDA 12.6 would pull `my-image-cuda-12.6`
+
+**Docker Options**
+
+This field is a textual representation of the ports and environment variables declared in the sections beneath it. You can edit it directly or you can use the page widgets.
+
+<Note>
+  This field will only accept ports and environment variables. Other docker run options will be ignored.
+</Note>
+
+**Ports**
+
+To access your instance via the external IP address, you will need to add some ports to the template. You can add both TCP and UDP ports.
+
+When your instance is created, a port will be randomly assigned to the external interface which will map into the instance port you selected.
+
+You can also use SSH to open a tunnel to access ports. Use a command like:
+
+```text
+ssh -p [SSH_PORT] [USER]@[REMOTE_HOST] -L [LOCAL_PORT]:localhost:[REMOTE_PORT]
+ssh -p 22 user@remote.example.com -L 8080:localhost:8080
+```
+
+The machine will forward traffic from the host machine's public port to the container port you specified.
+
+**Environment Variables**
+
+Here you can add any environment variables that your docker image requires. Do not save any sensitive information here if you are planning to make the template public.
+
+Place any variables with sensitive values into the Environment Variables section of your [account settings page](https://cloud.vast.ai/account/). They will then be made available in any instance you create, regardless of the template used.
+
+Special environment variables like `PROVISIONING_SCRIPT` can be used to customize Vast templates (see Vast-Specific Features below for examples).
+
+You can find out more about port mapping and special environment variables in our [Docker Execution Environment](https://docs.vast.ai/instances/docker-execution-environment) guide.
+
+### **Select Launch Mode**
+
+Templates offer three launch modes you can select from. Our recommended templates will usually launch in Jupyter mode for easiest access, but you are free to choose whichever suits your needs.
+
+<Frame caption="Launch mode selection options">
+![Launch mode selection options](/images/console-templates-7.webp)
+</Frame>
+
+**Jupyter-python notebook + SSH**
+
+When you run the template in this mode, we will install Jupyter and SSH at runtime. Jupyter will be available on mapped port `8080` and SSH will be available on mapped port `22`.
+
+**Interactive shell server, SSH**
+
+As above, but SSH only with no Jupyter installation.
+
+<Warning>
+  In both Jupyter and SSH mode, the docker entrypoint for your image will not be run. It will be replaced with our instance setup script so you should use the on start section (documented below) to start any services.
+</Warning>
+
+**docker ENTRYPOINT**
+
+In this mode, your Docker image will run precisely as it is. We will not include any additional software or access methods. If your Docker image does not offer SSH or another appropriate interface, please select one of the alternative modes if you need to interact with the running instance.
+An additional field will be shown when using this launch mode to allow passing arguments to the image entrypoint.
+
+<Frame caption="Field allowing for argument passing">
+![Field allowing for argument passing](/images/console-templates-8.webp)
+</Frame>
+
+### On-start Script
+
+Here you can enter a short Bash script which will be run during instance startup. It is only available when using the Jupyter or SSH launch modes, and is most useful for starting any services that your docker image would have launched if run if the entrypoint had been executed.
+
+<Frame caption="On-start Script">
+![On-start Script](/images/console-templates-9.webp)
+</Frame>
+
+In our example 'NVIDIA CUDA' template we are simply calling the `entrypoint.sh` script which contains the logic for preparing the instance.
+
+**Additional On-start Script Examples**
+
+You can execute custom startup scripts:
+
+```text
+chmod +x /usr/local/bin/start.sh
+bash /usr/local/bin/start.sh
+```
+
+You can also overwrite existing files built into the image. Make sure you can switch to a user that has write permissions to that particular file.
+
+For example, you can remove all instances of '-sslOnly' in a particular file using sed:
+
+```text
+sed -i 's/-sslOnly//g' /dockerstartup/vnc_startup.sh
+```
+
+You can also make directories:
+
+```text
+sudo -i -u kasm-user mkdir -p /home/kasm-user/Desktop
+```
+
+Make sure to append environment variables to /etc/environment file in your on-start section because this makes environment variables available to all users and processes and ensures they are persisted even if your instance/docker container is rebooted:
+
+```text
+env >> /etc/environment
+```
+
+Also make sure to find the image's ENTRYPOINT or CMD command and call that command at the end of the on-start section. We overwrite that command to set up jupyter/ssh server, etc. under the hood.
+
+### Extra Filters
+
+Use this area to place restrictions on the machines that should show up in the search page when the template is selected.
+
+<Frame caption="Extra filters showing this template is configured for both AMD64 and ARM64 CPUs">
+![Extra filters showing this template is configured for both AMD64 and ARM64 CPUs](/images/console-templates-10.webp)
+</Frame>
+
+### **Docker Repository Authentication**
+
+If you are using a private Docker image then you will need to add authentication credentials so the machine running the instance can download it.
+
+<Frame caption="Docker Repository Authentication">
+![Docker Repository Authentication](/images/console-templates-11.webp)
+</Frame>
+
+**Docker Registry Server Names**
+
+You don't have to specify docker.io as the server name if your repository is Docker Hub. Docker automatically uses docker.io to pull the image if no other registry is specified.
+
+You do have to specify your server name if your repository is something else. For example:
+
+- GitHub Container Registry (GHCR) - Server Name: `ghcr.io`
+- Google Container Registry (GCR) - Server Name: `gcr.io`
+
+### Disk Space
+
+By setting the disk space in the template, you can ensure that new instances created from the template will use this amount as a minimum.&#x20;
+
+![](/images/console-templates-12.webp)
+
+### Template Visibility
+
+Any template marked as public will be available in the template search system, while private images will not.
+
+Private templates can still be used by others if you have shared the template URL.
+
+![](/images/console-templates-13.webp)
+
+<Danger>
+  Never save a template as public if it contains sensitive information or secrets. Use the account level environment variables as an alternative.
+</Danger>
+
+### CLI Command
+
+Templates can be translated directly into CLI launch commands. This read-only area shows what you would need to type or copy to the CLI if you wanted to programatically launch an instance this way.
+
+<Frame caption="Launch a template via the CLI">
+![Launch a template via the CLI](/images/console-templates-14.webp)
+</Frame>
+
+To learn more about starting instance from the CLI, check out our [quickstart guide](https://docs.vast.ai/api/overview-and-quickstart).
+
+### Save the Template
+
+Finally, you can save the template. If you are creating a new template or editing one which is not associated with your account - Such as one of our recommended templates - The buttons you see will be labelled 'Create'. For your own templates, you will see them labelled 'Save'
+
+<Frame caption="Buttons for saving">
+![Buttons for saving](/images/console-templates-15.webp)
+</Frame>
+
+The 'Create' button will create a copy of the template in the 'My Templates' section of the [templates page](https://cloud.vast.ai/templates/) for you to use later  The 'Create & Use' button will save the template, load it and then open up the [offers page](https://cloud.vast.ai/create/).
+
+## Vast-Specific Features
+
+Templates that we have created will often be found in the **Recommended&#x20;**&#x73;ection as they go through a QA process to ensure they function correctly and provide a positive user experience. They contain extras not found in all templates so we will address the differences here.
+
+### Instance Portal
+
+You will notice that after clicking the Open button on template running one of the Vast.ai templates a screen like this will appear.
+
+<Frame caption="Instance portal landing page">
+![Instance portal landing page](/images/console-templates-18.webp)
+</Frame>
+
+This is our **Instance Portal** and it provides easy to access links to services running in your instance. It places an authentication layer in front of these services to prevent access by anyone who does not have the correct authentication token. You are also able to create tunnels to your services without exposing ports.
+
+Full documentation for the **Instance Portal** is available [here](https://docs.vast.ai/instance-portal).
+
+### PROVISIONING_SCRIPT
+
+Vast.ai templates support running a remote script on start to help configure the instance and download models and extensions that may not already be available in the Docker image.
+
+This is the simplest way to customize a template - you start with one of our recommended templates (like `vastai/base-image` or `vastai/pytorch`) and add custom setup via a provisioning script.
+
+**How to use:**
+
+1. Go to the [Templates tab](https://cloud.vast.ai/templates/) in Vast.ai interface
+2. Search for "base-image" or "Pytorch" depending on your needs:&#x20;
+   - `vastai/base-image` is a general purpose image
+   - `vastai/pytorch` is a base image for working with PyTorch-based applications on Vast
+3. Click "Edit" on your chosen template
+4. Add the PROVISIONING\_SCRIPT environment variable:&#x20;
+   - In the Environment Variables section, add a new variable named "PROVISIONING\_SCRIPT"
+   - The value should be a URL pointing to a shell script (from GitHub, Gist, etc.)
+
+```curl Example URL
+https://raw.githubusercontent.com/karthik-vast-ai/vast-cli/distributed-inference-integration/provisioning_script.sh
+```
+
+5. Make sure to click "+" to add the environment variable
+6. Click Create and Use
+
+<Frame caption="Add PROVISIONING_SCRIPT variable">
+![](/images/console-create-custom-template.webp)
+</Frame>
+
+**Example PROVISIONING\_SCRIPT:**
+
+```bash Bash
+#!/bin/bash
+
+#
+cd /workspace/
+# Cause the script to exit on failure.
+set -eo pipefail
+
+# Activate the main virtual environment
+. /venv/main/bin/activate
+
+# Install your packages
+pip install your-packages
+
+# Download some useful files
+wget -P "${WORKSPACE}/" https://example.org/my-application.tar.gz
+tar xvf ${WORKSPACE}/my-application.tar.gz"
+
+# Set up any additional services
+echo "my-supervisor-config" > /etc/supervisor/conf.d/my-application.conf
+echo "my-supervisor-wrapper" > /opt/supervisor-scripts/my-application.sh
+chmod +x /opt/supervisor-scripts/my-application.sh
+
+# Reconfigure the instance portal
+rm -f /etc/portal.yaml
+export PORTAL_CONFIG="localhost:1111:11111:/:Instance Portal|localhost:1234:11234:/:My Application"
+
+# Reload Supervisor
+supervisorctl reload
+```
+
+This script will run on first boot to set up your environment. All installations should go to /workspace/ for proper persistence.
+
+**Configuring Application Access with PORTAL\_CONFIG**
+
+The base-image template includes PORTAL\_CONFIG for secure application access management. This environment variable controls how applications are exposed and accessed.
+
+```bash PORTAL\_CONFIG structure
+hostname:external_port:local_port:url_path:Application Name|hostname:external_port:local_port:url_path:Application Name
+```
+
+The structure of this variable is:
+
+- Each application is separated by the `|` character
+- Each application parameter is separated by the `:` character
+- Each application must specify `hostname:external_port:local_port:url_path:Application Name`
+
+Example:
+
+```bash Bash
+"localhost:8002:18002:/hello:MyApp|localhost:1111:11111:/:Instance Portal|localhost:8080:18080:/:Jupyter|localhost:8080:8080:/terminals/1:Jupyter Terminal|localhost:8384:18384:/:Syncthing|localhost:6006:16006:/:Tensorboard"
+```
+
+The hostname in Docker instances will always be `localhost`
+
+Where the internal port and local port are not equal then Caddy will be configured to listen on `0.0.0.0:external_port` acting as a reverse proxy for `hostname:local_port`
+
+If the `external_port` and `local_port` are equal then Caddy will not act as a proxy but the Instance Portal UI will still create links. This is useful because it allows us to create links to Jupyter which is not controlled by Supervisor in Jupyter Launch mode.
+
+`url_path` will be appended to the instance address and is generally set to `/` but can be used to create application deep links.
+
+The `caddy_manager` script will write an equivalent config file at `/etc/portal.yaml` on boot if it does not already exist. This file can be edited in a running instance.
+
+Important: When defining multiple links to a single application, only the first should have non equal ports - We cannot proxy one application multiple times.
+
+Note: Instance Portal UI is **not** required and its own config declaration can be removed from `PORTAL_CONFIG`. This will not affect the authentication system.
+
+### Base Images
+
+You can find the source code for the Docker images we used to create the Vast templates on [`GitHub`](https://github.com/vast-ai/base-image/).
+
+These are large Docker images that contain CUDA development libraries, node + npm, OpenCL and other useful libraries. Despite their large size you'll find they generally start quickly because they have been cached on many of the host machines. This makes them ideal for using as a base for your own images.
+
+**Why Use Vast.ai Base Images?**
+
+- Built-in security features through Caddy proxy
+- Automatic TLS encryption for web services
+- Authentication token protection
+- Proper isolation between external and internal services
+
+**Building Custom Images from Vast Base Images**
+
+Start with a [Vast.ai base image](https://hub.docker.com/r/vastai/base-image/tags) or [Vast.ai Pytorch base image](https://hub.docker.com/r/vastai/pytorch/tags) in your Dockerfile:
+
+```dockerfile Dockerfile
+#For example
+FROM vastai/base-image:cuda-12.6.3-cudnn-devel-ubuntu22.04-py313
+# or
+FROM vastai/pytorch:2.6.0-cuda-12.6.3-py312
+
+# Install your applications into /opt/workspace-internal/
+# This ensures files can be properly synced between instances
+WORKDIR /opt/workspace-internal/
+
+# Activate virtual environment from base image
+RUN . /venv/main/bin/activate
+
+RUN your-installation-commands
+```
+
+After building your image:
+1. [Build](https://docs.docker.com/build/) and [push your image](https://docs.docker.com/reference/cli/docker/image/push/) to a container registry
+2. Create a new template and enter your custom image path in the [Docker Repository And Environment](#docker-repository-and-environment) section
+
+### Virtual Machine Templates
+
+Currently we offer two VM templates; A CLI and a desktop GUI. These differ from a standard template because they launch a full virtual machine environment rather than a docker container.
+
+You can edit these templates as described above, but you should not change the docker image field. Only the images we distribute from `docker.io/vastai/kvm` will work, but feel free to add extra environment variables and ports.
+
+Use the VM templates when you need to:
+
+- Run applications that require namespace support
+- Run more than one Docker container in an instance
+- Load kernel modules or run profiling jobs
+- Mount remote drives with rclone or similar
