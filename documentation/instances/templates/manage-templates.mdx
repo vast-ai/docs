@@ -1,0 +1,264 @@
+---
+title: Create & Manage Templates
+description: Learn how to create, customize, and manage Vast.ai templates for Docker instances.
+---
+
+## Creating a Custom Template
+
+To customize a template, you can start from an existing one or create a new one from scratch.
+
+### Starting from Existing Template
+
+1. Navigate to [Templates](https://cloud.vast.ai/templates/)
+2. Find a template similar to your needs
+3. Click the edit button (pencil icon) to bring up the template editor
+4. Modify the settings as needed
+5. Save as a new template (you cannot overwrite recommended/popular templates)
+
+### Template Editor Access
+
+You can access the template editor from two places:
+
+1. **Templates Page**: Click edit on any template card
+2. **Search Interface**: Click "Change Template" button to bring up the Select Template pop-up
+
+## Configuring Docker Image
+
+### Specify a Docker Image
+
+Enter the Docker image from the Docker pull command. The interface will attempt to load the version tags from Docker Hub and provide them as selections.
+
+Example formats:
+- `ubuntu:latest` - Docker Hub official image
+- `nvidia/cuda:11.8.0-runtime-ubuntu22.04` - NVIDIA's CUDA image
+- `pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime` - PyTorch with specific versions
+- `myregistry.com/myimage:tag` - Custom registry image
+
+<Warning>
+Always specify a version tag rather than using "latest" to ensure consistency. Using "latest" can lead to unexpected changes when the image updates.
+</Warning>
+
+### Docker Repository Authentication
+
+Vast can connect to custom Docker repositories and authenticate to private registries.
+
+To use a private registry:
+1. Scroll to the "Docker Repository Credentials" section in template editor
+2. Enter your registry URL (leave blank for Docker Hub)
+3. Provide your username
+4. Enter your password or access token
+5. Test the connection before saving
+
+## Docker Create/Run Options
+
+Vast supports several Docker run options that you can configure in the template:
+
+### Environment Variables
+
+Use the `-e` flag to set environment variables:
+
+```text
+-e TZ=UTC -e PYTHONPATH=/workspace -e MODEL_NAME=llama2
+```
+
+These variables will be available to your on-start script and applications.
+
+<Note>
+For SSH/Jupyter launch modes, environment variables need to be exported to `/etc/environment` to be visible in interactive sessions. See [Docker Environment](/documentation/instances/templates/docker-environment) for details.
+</Note>
+
+### Hostname
+
+Set a custom hostname for your container:
+
+```text
+-h myinstance
+```
+
+### Port Configuration
+
+Open additional ports for your applications:
+
+```text
+-p 5000:5000 -p 8081:8081 -p 8082:8082/udp
+```
+
+For detailed port configuration, see [Networking & Ports](/documentation/instances/connect/networking).
+
+## Launch Mode Configuration
+
+### Direct vs Proxy Connections
+
+Vast offers both proxy (default) and direct connection methods:
+
+**Proxy Connections**:
+- Work on all machines
+- Use Vast proxy server
+- Slower for data transfer
+- Default option
+
+**Direct Connections**:
+- Only work on machines with open ports
+- Faster and more reliable
+- Preferred when available
+- Enable by checking "Direct" option
+
+### SSH Configuration
+
+When selecting SSH launch mode:
+- Port 22 opens automatically
+- Tmux session starts by default
+- Direct SSH available on compatible machines
+- SSH keys required (no password auth)
+
+For SSH setup details, see [SSH Connection](/documentation/instances/connect/ssh).
+
+### Jupyter Configuration
+
+When selecting Jupyter launch mode:
+- Port 8080 opens automatically
+- Web interface accessible via browser
+- Direct HTTPS option available (requires certificate)
+- Includes terminal access
+
+For Jupyter setup, see [Jupyter Connection](/documentation/instances/connect/jupyter).
+
+## On-start Scripts
+
+Add bash commands that run after the machine starts. Use semicolons to separate commands:
+
+```bash
+apt update;
+apt install -y git wget;
+pip install -r requirements.txt;
+python setup.py;
+```
+
+### Best Practices for On-start Scripts
+
+1. **Keep it simple**: Complex setups should be in your Docker image
+2. **Handle failures**: Use `&&` to chain dependent commands
+3. **Log output**: Redirect output for debugging
+4. **Test thoroughly**: Verify scripts work on fresh instances
+5. **Use absolute paths**: Don't assume working directory
+
+### Common On-start Tasks
+
+```bash
+# Clone a repository
+git clone https://github.com/user/repo.git /workspace/repo;
+
+# Install Python packages
+pip install numpy pandas torch;
+
+# Download models or data
+wget https://example.com/model.pt -O /models/model.pt;
+
+# Set up environment
+echo "export MYVAR=value" >> /etc/environment;
+
+# Start background services
+nohup python server.py > server.log 2>&1 &
+```
+
+## Disk Size Selection
+
+When creating an instance, disk size is set and cannot be modified. Configure default disk size in your template:
+
+1. Use the disk size slider in template editor
+2. Set appropriate default (minimum 10GB)
+3. Consider your typical workload needs
+4. Users can adjust when creating instance
+
+<Warning>
+Disk size cannot be changed after instance creation. Estimate generously to avoid running out of space.
+</Warning>
+
+## Volume Configuration
+
+Templates can include volume settings for persistent storage:
+
+1. Check "Add recommended volume settings"
+2. Specify volume size
+3. Set mount path (default: `/data`)
+
+For volume details, see [Volumes](/documentation/instances/storage/volumes).
+
+## Saving and Sharing Templates
+
+### Saving Templates
+
+After configuring your template:
+1. Click "Save & Use" to save and select it
+2. Click "Create & Use Template" for new templates
+3. Template appears in your "Recent" section
+
+### Making Templates Public
+
+Public templates can:
+- Be used by other users
+- Earn referral credits
+- Help the community
+
+To make public:
+1. Ensure template works reliably
+2. Add clear description
+3. Toggle "Public" option
+4. Share referral link
+
+## Template Management
+
+### Organizing Templates
+
+- **Recent**: Your last used templates
+- **Favorites**: Star templates for quick access
+- **Public**: Templates you've shared
+- **Private**: Your personal templates
+
+### Updating Templates
+
+1. Templates are versioned
+2. Edit creates a new version
+3. Cannot modify recommended/popular templates
+4. Delete old versions to clean up
+
+### Template Validation
+
+Before sharing templates, verify:
+- Docker image exists and pulls successfully
+- Ports don't conflict
+- On-start script executes without errors
+- Disk size is reasonable
+- Description is clear and helpful
+
+## Common Questions
+
+### Can I change my template on an existing instance?
+
+No, templates are recipes for new instances. Any changes to a template only affect new instances created from it.
+
+### How do I use a custom Docker image?
+
+1. Build and push your image to a registry
+2. Configure registry authentication if private
+3. Specify the full image path in template
+4. Test with a small instance first
+
+### Why isn't my on-start script working?
+
+Common issues:
+- Missing semicolons between commands
+- Incorrect paths
+- Missing dependencies
+- Permission errors
+- Not exported to /etc/environment for SSH/Jupyter
+
+### Can I import/export templates?
+
+Currently templates are managed through the web interface. You can share templates via referral links but not export as files.
+
+## Next Steps
+
+- [Docker Environment](/documentation/instances/templates/docker-environment) - Advanced Docker configuration
+- [Virtual Machines](/documentation/instances/templates/virtual-machines) - VM template options
+- [Connection Methods](/documentation/instances/connect/overview) - Understanding launch modes

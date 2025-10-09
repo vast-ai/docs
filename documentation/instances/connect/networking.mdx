@@ -1,0 +1,137 @@
+---
+title: Networking & Ports
+description: Understand how Vast.ai handles networking, port mapping, and environment variables for Docker instances.
+---
+
+## How Networking Works
+
+Vast.ai docker instances have full internet access, but generally do not have unique IP addresses. Instances can have public open ports, but as IP addresses are shared across machines/instances the public external ports are partitioned somewhat randomly.
+
+In essence each docker instance gets a fraction of a public IP address based on a subset of ports. Each open internal port (such as 22 or 8080 etc) is mapped to a *random* external port on the machine's (usually shared) public IP address.
+
+Selecting the ssh launch mode will open and use port 22 internal by default, whereas jupyter will open and use port 8080 (in addition to 22 for ssh).
+
+## Opening Custom Ports
+
+There are several ways to open additional application ports:
+
+<Note>
+There is currently a limit of 64 total open ports per container/instance.
+</Note>
+
+### Using Docker Options
+
+You can open custom ports for any docker image using -p arguments in the docker create/run options box in the image config editor pop-up menu.
+
+To open ports 8081 (tcp) and 8082 udp, use something like this:
+
+```text Text
+-p 8081:8081 -p 8082:8082/udp
+```
+
+This will result in additional arguments to docker create/run to expose those internal ports, which will be mapped to random external ports.
+
+Any ports exposed in these docker options are in addition to:
+- Ports exposed through EXPOSE commands in the docker image
+- Ports 22 or 8080 which may be opened automatically for SSH or Jupyter
+
+### Using EXPOSE in Dockerfile
+
+Any EXPOSE commands in your docker image will be automatically mapped to port requests.
+
+## Finding Your Mapped Ports
+
+After the instance has loaded, you can find the corresponding external public IP by opening the IP Port Info pop-up (button on top of the instance) and then looking for the external port which maps to your internal port.
+
+It will have a format of PUBLIC_IP -> INTERNAL_PORT. For example:
+
+```text Text
+65.130.162.74:33526 -> 8081/tcp
+```
+
+In this case, the public IP 65.130.162.74:33526 can be used to access anything you run on port 8081 inside the instance.
+
+## Testing Your Ports
+
+We strongly recommend you test your port mapping. You can quickly test your port mapping with a simple command to start a minimal web server inside the instance:
+
+```text Text
+python -m http.server 8081
+```
+
+Which you would then access in this example by loading 65.130.162.74:33526 in your web browser. This should open a file directory.
+
+## Identity Ports
+
+In some cases you may need an identity port map like 32001:32001 where external and internal ports are the same.
+
+For this just use an out-of-range port above 70000:
+
+```text Text
+-p 70000:70000 -p 70001:70001
+```
+
+These out of range requests will map to random external ports and matching internal ports.
+You can then find the resulting mapped port with the appropriate env variables like: `$VAST_TCP_PORT_70000`
+
+## Port Environment Variables
+
+Our system predefines environment variables for port mappings that you can use:
+
+### Default Ports
+- **VAST_TCP_PORT_22**: The external public TCP port that maps to internal port 22 (ssh)
+- **VAST_TCP_PORT_8080**: The external public TCP port that maps to internal port 8080 (jupyter)
+
+### Custom Ports
+For each internal TCP port request:
+- **VAST_TCP_PORT_X**: The external public TCP port that maps to internal port X
+
+For each internal UDP port request:
+- **VAST_UDP_PORT_X**: The external public UDP port that maps to internal port X
+
+## Special Environment Variables for UI
+
+You can use special environment variables to control the Vast.ai interface:
+
+### OPEN_BUTTON_PORT
+Set this to map the open button on the instance panel to a specific (external) port corresponding to the specified internal port.
+
+```text Text
+-e OPEN_BUTTON_PORT=7860
+```
+
+This will map the open button to whatever external port maps to internal port 7860.
+
+### JUPYTER_PORT
+Use this to control the jupyter button. Set this to your internal jupyter port and the UI will map the jupyter button to open jupyter on the corresponding IP in a new tab.
+
+```text Text
+-e JUPYTER_PORT=8081
+```
+
+This will map the jupyter button to whatever external port maps to internal port 8081.
+
+### JUPYTER_TOKEN
+Use this to control the jupyter button. Set this to your jupyter token and the UI will map the jupyter button to open jupyter using the corresponding JUPYTER_TOKEN in a new tab.
+
+```text Text
+-e JUPYTER_TOKEN=TOKEN
+```
+
+This will use TOKEN as a value of your jupyter Token.
+
+## Docker Create Options
+
+You can currently set 3 types of docker create/run options in the GUI and CLI:
+
+1. **Environment variables**: `-e JUPYTER_DIR=/ -e TEST=OK`
+2. **Hostname**: `-h billybob`
+3. **Ports**: `-p 8081:8081 -p 8082:8082/udp -p 70000:70000`
+
+## Best Practices
+
+1. **Test your ports**: Always verify port mappings work after instance creation
+2. **Use identity ports sparingly**: Only when absolutely necessary (ports above 70000)
+3. **Document your port usage**: Keep track of which services use which ports
+4. **Check the limit**: Remember the 64 port limit per instance
+5. **Use environment variables**: Leverage predefined port variables in your scripts
