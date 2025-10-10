@@ -8,9 +8,33 @@ updatedAt: Wed Jan 15 2025 23:11:10 GMT+0000 (Coordinated Universal Time)
 Vast.ai provides Linux docker instances.
 Your template (or CLI command) controls most of the parameters to the underlying docker create call, but most resource constraint options naturally must be configured automatically by our system.
 
-## CPU, Memory, Shared Mem
+## Resource Allocation
 
-We automatically assign CPU, RAM, shared mem, and related cgroup resources automatically in proportion to your instance's cost vs the total machine cost.
+Vast.ai automatically configures resource allocation for your instance based on your GPU allocation. This section explains how CPU, RAM, disk, and shared memory are assigned and managed.
+
+### GPU
+
+Each running instance has access to 1 or more GPUs. GPUs are exclusive resources: they are never shared between multiple users at the same time. Each instance has exclusive access to its assigned GPUs while running. Stopped instances have no GPU reservation.
+
+### CPU
+
+Each instance is allocated baseline CPU power in proportion to its fraction of attached GPUs out of the total machine capacity. For example, a 1-GPU instance on a 4-GPU machine will get 25% of CPU baseline.
+
+Instances can burst above their CPU allocation while there are extra CPU cycles to share, but during contention only the baseline is reserved. This means you may see higher CPU usage when the machine has spare capacity, but you're only guaranteed your proportional baseline.
+
+### RAM
+
+System RAM is allocated similar to system CPU: each instance gets a fraction of RAM as baseline in proportion to its fraction of attached GPUs. Like CPU, this is based on your instance's cost vs the total machine cost.
+
+Instances can temporarily use additional RAM above their allocation when free RAM is available, but doing so risks having processes killed by the OOM (Out of Memory) killer when free system RAM becomes scarce. To avoid unexpected process termination, keep your RAM usage within your allocated baseline.
+
+### Disk
+
+Each instance has a disk storage allocation reserved in advance at instance creation time. **This allocation is static and cannot be changed after creation**, so make sure to size your disk correctly when you create your instance.
+
+### Shared Memory
+
+Shared memory resources (such as `/dev/shm`, controlled by the `shm-size` parameter) are also assigned automatically in proportion to your GPU fraction. This is handled by the underlying cgroup resource configuration.
 
 ## SSH/Jupyter Launch Modes
 

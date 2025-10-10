@@ -1,0 +1,289 @@
+---
+title: SSH Connection
+description: Learn how to securely connect to Vast.ai instances using SSH. Generate keys, establish connections, use port forwarding, and integrate with VS Code.
+---
+
+## About SSH
+
+**SSH (Secure Shell)** is a protocol for safely connecting to remote servers. It encrypts your connection so you can:
+
+- Log in securely
+- Run commands remotely
+- Transfer files without exposing your data
+
+<Note>
+  Vast.ai instances are configured to accept keys only - Password authentication is disabled for improved security.
+</Note>
+
+## Quick start: Generate and add your SSH key to your Vast account
+
+<Tabs>
+  <Tab title="Terminal">
+    **1. Generate a SSH key pair in your terminal**
+
+    <CodeGroup>
+
+      ```bash Bash
+      ssh-keygen -t ed25519 -C "your_email@example.com"
+      ```
+
+      ```powershell PowerShell
+      ssh-keygen -t ed25519 -C "your_email@example.com"
+      ```
+    </CodeGroup>
+
+    1. Creates two files (by default in ~/.ssh/):
+       - id_ed25519 → your **private key** (keep safe, never share).
+       - id_ed25519.pub → your **public key** (safe to share, add to servers).
+    2. -C "your_email@example.com" is optional. Whatever you put there is stored as a comment in the public key file (e.g., id_ed25519.pub). It's just for identification (helpful if you use multiple keys), not for security.
+
+    <Note>
+      When you run ssh-keygen -t ed25519 in **Windows PowerShell**, the keys are created in your Windows user profile folder:
+      `C:\Users\<YourUsername>\.ssh\`
+    </Note>
+
+    **2. Copy your public key.**
+
+    <CodeGroup>
+
+      ```bash Bash
+      # Print the public key
+      cat ~/.ssh/id_ed25519.pub
+      ssh-ed25519 AAAAC3NzaC1lZ9DdI1NTE5AAAAIHWGYlMT8CxcILI/i3DsRvX74HNChkm4JSNFu0wmcv0a
+      ```
+
+      ```powershell PowerShell
+      # Print the public key
+      Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub
+      ssh-ed25519 AAAAC3NzaC1lZ9DdI1NTE5AAAAIHWGYlMT8CxcILI/i3DsRvX74HNChkm4JSNFu0wm
+      ```
+    </CodeGroup>
+    **3. Add it in your** [**vast account**](https://cloud.vast.ai/manage-keys/)
+
+    ![](/images/instances-sshscp.webp)
+  </Tab>
+
+  <Tab title="Vast CLI">
+    **Add & Generate SSH Key (using** [**Vast CLI**](/cli/get-started)**)**
+
+    1. **Install Vast CLI:**
+
+        <CodeGroup>
+         ```bash Bash
+         pip install vastai
+         ```
+
+         ```powershell PowerShell
+         py -m pip install vastai
+         # or
+         python -m pip install vastai
+         ```
+        </CodeGroup>
+
+    2. **Generate an API key in your vast account:**
+       1. Open [CLI page](https://cloud.vast.ai/cli/)
+       2. Create an API key
+          <Frame caption="API Key creation">
+            ![API Key creation](/images/instances-sshscp-2.webp)
+          </Frame>
+    3. **Generate a new SSH key pair** (you will need your vast API key):
+
+        <CodeGroup>
+         ```cli CLI
+         vastai create ssh-key --api-key YOUR_API_KEY
+         ```
+
+         ```cli CLI
+         vastai set api-key YOUR_API_KEY
+         vastai create ssh-key
+         ```
+        </CodeGroup>
+    - Saves keys as ~/.ssh/id_ed25519 (private) and ~/.ssh/id_ed25519.pub (public).
+    - Backs up existing keys as .backup_[timestamp].
+    - Keys are stored in your Vast account and used for new instances.
+  </Tab>
+</Tabs>
+
+<Warning>
+  - Adding a key to your account keys only applies to **new instances**.
+  - Existing instances will **not** get the new key automatically. To add a key, use the **instance-specific SSH interface**.
+  - For **VM instances**, changing keys requires recreating the VM.
+</Warning>
+
+## Connecting to your Instance
+
+Start a new instance and click the SSH icon to see your connection information.
+
+<Frame caption="Terminal Connection Options">
+![Connection details](/images/instances-sshscp-3.webp)
+</Frame>
+
+Now you can enter the connection command string into your terminal
+
+```bash Bash
+ssh -p 20544 root@142.214.185.187 -L 8080:localhost:8080
+
+The authenticity of host '[142.214.185.187]:20544 ([142.214.185.187]:20544)' can't be established.
+ED25519 key fingerprint is SHA256:WTUphznpN0zikMp+L5EtZpiCH6EeZ2PA/7+DSXDRjT0.
+This key is not known by any other names.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+```
+
+You should now see a screen similar to this. You will, by default, be placed into a tmux session.
+
+<Frame caption="Connected to Instance">
+![Instance SSH session](/images/instances-sshscp-4.webp)
+</Frame>
+
+### Direct vs Proxy Connections
+
+Vast offers both proxy (default) and direct connection methods for SSH:
+
+- **Proxy SSH**: Works on all machines, slower for data transfer, uses Vast proxy server
+- **Direct SSH**: Requires machines with open ports, faster and more reliable, preferred method
+
+## Tmux
+
+We connect you to a tmux session by default for reliability and to prevent unintentional termination of foreground processes. You can create a new bash terminal window with `ctrl+b` + `c`. Cycle through your windows with `ctrl+b` + `n`
+
+There is an excellent guide for getting to grips with tmux at [https://tmuxcheatsheet.com](https://tmuxcheatsheet.com/)
+
+If, however, you would prefer to disable TMUX, you can apply the following either in a terminal or from your template's on-start section.
+
+```text Text
+touch ~/.no_auto_tmux
+```
+
+## SSH Local Port Forwarding
+
+An often overlooked feature of SSH is its ability to forward local ports to another machine. When you access a server remotely over SSH, you can make ports from the remote machine available as if they were listening on your own device. This is a secure alternative to opening ports on the public interface as all data is transported over the SSH connection.
+
+```bash Bash
+ssh -p 1234 root@180.123.123.123 -L 8080:localhost:8080 -L 5000:localhost:5000
+```
+
+This SSH command connects to the remote instance and sets up **local port forwarding** (SSH tunneling):
+
+**Connection details:**
+
+- Connects to IP 180.123.123.123 as user root
+- Uses port 1234 instead of the default SSH port 22
+
+**Port forwarding (the key part):**
+
+- `-L 8080:localhost:8080` - Creates a tunnel so when you access localhost:8080 on your local machine, it forwards to port `8080` on the remote server
+- `-L 5000:localhost:5000` - Same thing for port `5000`
+
+You can repeat the `-L` arguments to forward as many ports as you need.
+
+**What this means:** After connecting, you can open your web browser and go to https://localhost:8080 or http://localhost:5000 on your local computer, and you'll actually be accessing services running on those ports on the remote server. It's like creating secure "tunnels" through the SSH connection to reach applications on the remote machine that might not be directly accessible from the internet.
+
+## SSH Alternative - Jupyter Terminal
+
+As a simple alternative to SSH, you might like to consider Jupyter Terminal instead. All instances started in Jupyter launch mode will have this enabled. It is a very straightforward web-based terminal with session persistence. It's great for a quick CLI session.
+
+Access the terminal from the SSH connections interface.
+
+![](/images/instances-sshscp-5.webp)
+
+## Troubleshooting
+
+### Permission Denied (publickey)
+If you get this error when trying to SSH:
+1. Ensure your SSH key is added to your [Vast account](https://cloud.vast.ai/manage-keys/)
+2. Verify you're using the correct private key
+3. Check key file permissions: `chmod 600 ~/.ssh/id_ed25519`
+4. Use `-vv` flag for detailed debug info: `ssh -vv -p PORT root@IP`
+
+### SSH Key Changes
+- New account keys only apply to NEW instances created after adding the key
+- Existing instances keep their original keys (won't get new keys automatically)
+- For VM instances, changing keys requires recreating the VM
+- To add keys to existing instances, use the instance-specific SSH interface
+
+### General Connection Issues
+You can often determine the exact cause of a connection failure by using the -vv arguments with ssh to get more information.
+
+Common reasons include:
+- Using the wrong private key
+- Incorrect permissions for your private key
+- Public key not added to instance or account
+- Connecting to the wrong port
+
+## SCP & SFTP File Transfer
+
+Both **SCP** (Secure Copy Protocol) and **SFTP** (SSH File Transfer Protocol) are tools for securely transferring files that piggyback on the SSH protocol. They use the same authentication and encryption as SSH.
+
+### SCP (Secure Copy Protocol)
+
+- **What it is:** Simple, command-line tool for copying files between local and remote machines
+- **Best for:** Quick, one-time file transfers
+- **Syntax:** `scp -P <port> source destination`
+
+**Examples:**
+
+```bash Bash
+# Copy file TO instance
+scp -P <ssh_port> my_file.txt root@<instance_ip>:/workspace/
+# Copy file FROM remote server
+scp -P <ssh_port> root@<instance_ip>:/workspace/my_file.txt ./
+# Copy entire directory
+scp -P <ssh_port> -r  myfolder/ root@<instance_ip>:/workspace/
+```
+
+### SFTP (SSH File Transfer Protocol)
+
+- **What it is:** Interactive file transfer program with a full command set
+- **Best for:** Managing files, browsing directories, multiple operations
+- **Usage:** CLI or GUI tools available
+
+**Example:**
+
+```bash Bash
+# Establish connection
+sftp -P <ssh_port> root@<instance_ip>
+
+Welcome to vast.ai. If authentication fails, try again after a few seconds, and double check your ssh key.
+Have fun!
+Connected to 79.116.73.220.
+sftp> ls
+hasbooted   onstart.sh
+```
+
+<Note>
+  Note that both scp and sftp take the `-P` argument in uppercase. This differs from the ssh command which uses lowercase.
+</Note>
+
+## VS Code Integration
+
+Once you have your ssh keys set up, connecting to VS Code is quite straightforward. We will cover the basics here.
+
+### Install the Remote SSH extension
+
+You will need to add the remote extension named 'Remote - SSH'.
+
+![](/images/instances-sshscp-6.webp)
+
+### Open Remote Window
+
+<Columns cols={2}>
+  <div>
+    Click the open remote window button.
+    <Frame caption="Open Remote Window">
+      ![](/images/instances-sshscp-7.webp)
+    </Frame>
+  </div>
+  <div>
+    Enter your ssh address details in the box that appears at the top of your window
+    ![](/images/instances-sshscp-8.webp)
+
+  </div>
+</Columns>
+
+Now simply allow a moment for VS code to configure the instance and you will be able to work with the instance as if it was a local machine.
+
+For more information, see the [VS Code documentation](https://code.visualstudio.com/docs/remote/ssh).
+
+## Windows GUI Clients
+
+For Windows users who prefer GUI tools, please see our [Windows Connection Guide](/documentation/instances/connect/windows-guide) for detailed setup instructions for PuTTY, MobaXterm, and other GUI clients.
