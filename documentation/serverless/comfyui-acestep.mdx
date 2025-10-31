@@ -1,0 +1,519 @@
+---
+title: ComfyUI ACE Step
+description: Learn how to use ComfyUI with ACE Step v1 3.5B on Vast.ai Serverless for text-to-music generation.
+"canonical": "/documentation/serverless/comfyui-acestep"
+---
+
+<script type="application/ld+json" dangerouslySetInnerHTML={{
+  __html: JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "ComfyUI ACE Step with Vast.ai Serverless",
+    "description": "Complete guide to using ComfyUI with ACE Step v1 3.5B on Vast.ai Serverless for text-to-music generation workflows, covering template setup, S3 storage configuration, benchmarking, workflow submission via /generate/sync endpoint, and testing.",
+    "author": {
+      "@type": "Organization",
+      "name": "Vast.ai"
+    },
+    "articleSection": "Serverless Documentation",
+    "keywords": ["ComfyUI", "ACE Step", "music generation", "text-to-music", "audio generation", "serverless", "API", "vast.ai", "workflow", "benchmarking", "S3 storage", "PyWorker", "generate endpoint"]
+  })
+}} />
+
+The [ComfyUI Serverless ACE Step template](https://cloud.vast.ai/?ref_id=62897&creator_id=62897&name=ACE%20Step%20v1%203.5b%20(Serverless)) allows you to send text-to-music generation requests to ComfyUI and have generated audio assets automatically uploaded to S3-compatible storage. The template returns pre-signed URLs in response to requests, along with detailed process updates emitted by ComfyUI during generation.
+
+# Template Components
+
+The ComfyUI ACE Step template includes:
+
+**In the Docker Image:**
+- ComfyUI
+- ComfyUI API Wrapper
+- Stable Diffusion 1.5 (for benchmarking)
+
+**Downloaded on first boot:**
+- PyWorker (comfyui-json worker)
+- Provisioning Script for custom configuration
+  - Adds cron job to remove older output files (older than 24 hours) if available disk space is less than 512MB
+  - Adds benchmarking workflow file
+  - Downloads ACE Step v1 3.5B model (`checkpoints/ace_step_v1_3.5b.safetensors`)
+
+<Note>
+  Before using this template, familiarize yourself with the [Serverless Documentation](/documentation/serverless/overview) and [Getting Started With Serverless](/documentation/serverless/getting-started-with-serverless) guide. Learn more about ACE Step v1 3.5B on [Hugging Face](https://huggingface.co/ACE-Step/ACE-Step-v1-3.5B).
+</Note>
+
+# Environment Variables
+
+## Required for S3 Storage
+
+The API wrapper manages asset uploads to S3-compatible storage. Configure these variables in your [Account Settings](https://cloud.vast.ai/settings/):
+
+- `S3_ACCESS_KEY_ID`(string): Access key ID for S3-compatible storage
+- `S3_SECRET_ACCESS_KEY`(string): Secret access key for S3-compatible storage
+- `S3_BUCKET_NAME`(string): Bucket name for S3-compatible storage
+- `S3_ENDPOINT_URL`(string): Endpoint URL for S3-compatible storage
+- `S3_REGION`(string): Optional region for S3-compatible storage
+
+<Note>
+  These S3 values can be overridden on a per-request basis in the request payload.
+</Note>
+
+## Optional Configuration
+
+- `WEBHOOK_URL`(string): Optional webhook to call after generation completion or failure
+- `PYWORKER_REPO`(string): Custom PyWorker git repository URL (default: https://github.com/vast-ai/pyworker)
+- `PYWORKER_REF`(string): Git reference to checkout from PyWorker repository
+
+<Warning>
+  Store sensitive information like API keys in the 'Environment Variables' section of your [Account Settings](https://cloud.vast.ai/settings/). These will be available in all instances you create.
+</Warning>
+
+# Worker Startup Process
+
+When a worker is first started with this template, the following will happen:
+
+1. Docker image is downloaded if not already cached on the host machine
+2. Worker (Docker container) is created on the host machine
+3. Template on-start script is executed:
+   - Docker image entrypoint is executed
+   - Download and run provisioning script (remotely stored Bash script)
+   - Start supervisord (ComfyUI & API wrapper process manager)
+   - Current version of [Vast PyWorker](https://github.com/vast-ai/pyworker) bootstrapping script is downloaded and executed
+   - ComfyUI and API Wrapper become available
+4. PyWorker begins benchmarking
+5. Benchmarking completes and worker score is sent to the serverless system
+
+When this process completes, the worker enters either the 'Ready' (hot) or 'Inactive' (cold) state.
+
+**Worker States:**
+- **Ready (hot)**: Worker is fully initialized and immediately available to process requests. You pay for idle time.
+- **Inactive (cold)**: Worker is shut down to save costs. You pay only for storage.
+
+# Benchmarking
+
+An ACE Step music generation benchmark runs when each worker initializes to validate GPU performance and identify underperforming machines. The benchmark file is downloaded on first start and stored in the pyworker directory at `workers/comfyui-json/misc/benchmark.json`. The workflow is static but a random seed will be generated for each benchmarking run.
+
+**Performance expectations:**
+- Benchmark duration should remain consistent across identical GPU models
+- Significant variation (>20%) may indicate thermal, power, or configuration issues
+
+## Understanding Worker Scores
+
+The benchmarking system calculates a performance score for each worker that determines how requests are distributed:
+
+**How scoring works:**
+- Each benchmark is assigned a baseline complexity score of `100` (representing 100% of the work)
+- If a worker completes the benchmark in 100 seconds, it receives a score of `1.0` (it processes 1% of the work per second)
+- If a worker completes the same benchmark in 50 seconds, it receives a score of `2.0` (twice as fast)
+- If a worker completes the same benchmark in 200 seconds, it receives a score of `0.5` (half as fast)
+
+**How this affects your endpoint:**
+- Faster workers (higher scores) receive more requests proportionally
+- To serve 1 request per second on average with score-1.0 workers, you need 100 workers
+- With score-2.0 workers, you only need 50 workers for the same throughput
+- The system automatically balances load based on these scores
+
+<Note>
+  If you choose to use your own worker code, it's recommended to implement a custom benchmark that closely matches the music generation workflows you intend to process.
+</Note>
+
+# Endpoints
+
+The ComfyUI ACE Step template provides endpoints for executing workflows and generating music. After obtaining a worker address from the `/route/` endpoint (see [route documentation](/documentation/serverless/route)), you can send requests to the following endpoints.
+
+## /generate/sync
+
+The primary endpoint for submitting ComfyUI workflows. This endpoint accepts complete, user-defined ComfyUI workflows in JSON format and processes them synchronously.
+
+### Request Structure
+
+First, get worker routing information:
+
+```bash
+curl -X POST https://run.vast.ai/route/ -d '{
+  "endpoint": "comfyui-json",
+  "api_key": "your-endpoint-api-key",
+  "cost": 100
+}'
+```
+
+Then send your workflow request to the worker URL:
+
+### Inputs
+
+`auth_data`:
+
+- `signature`(string): A cryptographic string that authenticates the url, cost, and reqnum fields in the response, proving they originated from the server. Clients can use this signature, along with the server's public key, to verify that these specific details have not been tampered with.
+- `cost`(float): The estimated compute resources for the request. The units of this cost are defined by the PyWorker.
+- `endpoint`(string): Name of the Endpoint.
+- `reqnum`(int): The request number corresponding to this worker instance. Note that workers expect to receive requests in approximately the same order as these reqnums, but some flexibility is allowed due to potential out-of-order requests caused by concurrency or small delays on the proxy server.
+- `request_idx` (int): The request index.
+- `url`(string): The address of the worker instance to send the request to.
+
+`payload`:
+
+- `input`:
+  - `request_id`(string): Optional unique identifier for tracking the request
+  - `workflow_json`(object): Complete ComfyUI workflow graph in JSON format
+  - `s3`(object): Optional S3 configuration override
+    - `access_key_id`(string)
+    - `secret_access_key`(string)
+    - `endpoint_url`(string)
+    - `bucket_name`(string)
+    - `region`(string)
+  - `webhook`(object): Optional webhook configuration
+    - `url`(string): Webhook URL to call after generation
+    - `extra_params`(object): Additional parameters to include in webhook payload
+
+<Note>
+  The string `"__RANDOM_INT__"` in your workflow will be replaced with a random integer prior to posting the workflow to ComfyUI, allowing for varied outputs without manually specifying different seeds.
+</Note>
+
+**Example Request:**
+
+```json JSON icon="js"
+{
+  "auth_data": {
+    "cost": 100.0,
+    "endpoint": "comfyui-json",
+    "reqnum": reqnum_from_route_endpoint,
+    "signature": "signature_from_route_endpoint",
+    "request_idx": request_idx_from_route_endpoint,
+    "url": "https://worker-address:port"
+  },
+  "payload": {
+    "input": {
+      "request_id": "",
+      "workflow_json": {
+        "14": {
+          "inputs": {
+            "tags": "funk, pop, soul, rock, melodic, guitar, drums, bass, keyboard, percussion, 105 BPM, energetic, upbeat, groovy, vibrant, dynamic",
+            "lyrics": "[verse]\nNeon lights they flicker bright\nCity hums in dead of night\nRhythms pulse through concrete veins\nLost in echoes of refrains\n\n[verse]\nBassline groovin in my chest\nHeartbeats match the citys zest\nElectric whispers fill the air\nSynthesized dreams everywhere\n\n[chorus]\nTurn it up and let it flow\nFeel the fire let it grow\nIn this rhythm we belong\nHear the night sing out our song",
+            "lyrics_strength": 0.99,
+            "clip": ["40", 1]
+          },
+          "class_type": "TextEncodeAceStepAudio",
+          "_meta": {
+            "title": "TextEncodeAceStepAudio"
+          }
+        },
+        "17": {
+          "inputs": {
+            "seconds": 180,
+            "batch_size": 1
+          },
+          "class_type": "EmptyAceStepLatentAudio",
+          "_meta": {
+            "title": "EmptyAceStepLatentAudio"
+          }
+        },
+        "18": {
+          "inputs": {
+            "samples": ["52", 0],
+            "vae": ["40", 2]
+          },
+          "class_type": "VAEDecodeAudio",
+          "_meta": {
+            "title": "VAE Decode Audio"
+          }
+        },
+        "40": {
+          "inputs": {
+            "ckpt_name": "ace_step_v1_3.5b.safetensors"
+          },
+          "class_type": "CheckpointLoaderSimple",
+          "_meta": {
+            "title": "Load Checkpoint"
+          }
+        },
+        "44": {
+          "inputs": {
+            "conditioning": ["14", 0]
+          },
+          "class_type": "ConditioningZeroOut",
+          "_meta": {
+            "title": "ConditioningZeroOut"
+          }
+        },
+        "49": {
+          "inputs": {
+            "model": ["51", 0],
+            "operation": ["50", 0]
+          },
+          "class_type": "LatentApplyOperationCFG",
+          "_meta": {
+            "title": "LatentApplyOperationCFG"
+          }
+        },
+        "50": {
+          "inputs": {
+            "multiplier": 1.15
+          },
+          "class_type": "LatentOperationTonemapReinhard",
+          "_meta": {
+            "title": "LatentOperationTonemapReinhard"
+          }
+        },
+        "51": {
+          "inputs": {
+            "shift": 6,
+            "model": ["40", 0]
+          },
+          "class_type": "ModelSamplingSD3",
+          "_meta": {
+            "title": "ModelSamplingSD3"
+          }
+        },
+        "52": {
+          "inputs": {
+            "seed": "__RANDOM_INT__",
+            "steps": 65,
+            "cfg": 4,
+            "sampler_name": "er_sde",
+            "scheduler": "linear_quadratic",
+            "denoise": 1,
+            "model": ["49", 0],
+            "positive": ["14", 0],
+            "negative": ["44", 0],
+            "latent_image": ["17", 0]
+          },
+          "class_type": "KSampler",
+          "_meta": {
+            "title": "KSampler"
+          }
+        },
+        "59": {
+          "inputs": {
+            "filename_prefix": "audio/ComfyUI",
+            "quality": "V0",
+            "audioUI": "",
+            "audio": ["18", 0]
+          },
+          "class_type": "SaveAudioMP3",
+          "_meta": {
+            "title": "Save Audio (MP3)"
+          }
+        }
+      },
+      "s3": {
+        "access_key_id": "",
+        "secret_access_key": "",
+        "endpoint_url": "",
+        "bucket_name": "",
+        "region": ""
+      },
+      "webhook": {
+        "url": "",
+        "extra_params": {
+          "user_id": "12345",
+          "project_id": "abc-def"
+        }
+      }
+    }
+  }
+}
+```
+
+### Outputs
+
+- `id`(string): Unique identifier for the request
+- `status`(string): Request status - `completed`, `failed`, `processing`, `generating`, or `queued`
+- `message`(string): Human-readable status message
+- `comfyui_response`(object): Detailed response from ComfyUI including:
+  - `prompt`: The workflow that was executed
+  - `outputs`: Generated outputs organized by node ID
+  - `status`: Execution status with completion messages and timestamps
+  - `meta`: Metadata about the execution
+  - `execution_details`: Progress updates and timing information with detailed progress_updates array showing generation progress
+- `output`(array): Array of output objects, each containing:
+  - `filename`(string): Name of the generated file (e.g., "ComfyUI_00006_.mp3")
+  - `local_path`(string): Path to file on worker
+  - `url`(string): Pre-signed URL for downloading the generated audio asset (if S3 is configured)
+  - `type`(string): Output type (e.g., "output")
+  - `subfolder`(string): Subfolder within output directory (e.g., "audio")
+  - `node_id`(string): ComfyUI node that produced this output
+  - `output_type`(string): Type of output (e.g., "audio")
+- `timings`(object): Timing information for the request
+
+**Example Response:**
+
+```json JSON icon="js"
+{
+  "id": "bb655244-bc6a-4efe-8037-4ece54385f22",
+  "message": "Processing complete.",
+  "status": "completed",
+  "comfyui_response": {
+    "082ab76d-d286-4dc4-b628-b00030b151fd": {
+      "prompt": [
+        4,
+        "082ab76d-d286-4dc4-b628-b00030b151fd",
+        {
+          "14": {
+            "inputs": {
+              "tags": "funk, pop, soul, rock, melodic, guitar, drums, bass, keyboard, percussion, 105 BPM, energetic, upbeat, groovy, vibrant, dynamic",
+              "lyrics": "[verse]\nNeon lights they flicker bright\nCity hums in dead of night\nRhythms pulse through concrete veins\nLost in echoes of refrains\n\n[verse]\nBassline groovin in my chest\nHeartbeats match the citys zest\nElectric whispers fill the air\nSynthesized dreams everywhere\n\n[chorus]\nTurn it up and let it flow\nFeel the fire let it grow\nIn this rhythm we belong\nHear the night sing out our song",
+              "lyrics_strength": 0.99,
+              "clip": ["40", 1]
+            },
+            "class_type": "TextEncodeAceStepAudio",
+            "_meta": {
+              "title": "TextEncodeAceStepAudio"
+            }
+          },
+          "52": {
+            "inputs": {
+              "seed": 655798145,
+              "steps": 65,
+              "cfg": 4,
+              "sampler_name": "er_sde",
+              "scheduler": "linear_quadratic",
+              "denoise": 1,
+              "model": ["49", 0],
+              "positive": ["14", 0],
+              "negative": ["44", 0],
+              "latent_image": ["17", 0]
+            },
+            "class_type": "KSampler",
+            "_meta": {
+              "title": "KSampler"
+            }
+          },
+          "59": {
+            "inputs": {
+              "filename_prefix": "audio/ComfyUI",
+              "quality": "V0",
+              "audioUI": "",
+              "audio": ["18", 0]
+            },
+            "class_type": "SaveAudioMP3",
+            "_meta": {
+              "title": "Save Audio (MP3)"
+            }
+          }
+        },
+        {
+          "client_id": "worker_1_1759925918.420156"
+        },
+        ["59"]
+      ],
+      "outputs": {
+        "59": {
+          "audio": [
+            {
+              "filename": "ComfyUI_00006_.mp3",
+              "subfolder": "audio",
+              "type": "output"
+            }
+          ]
+        }
+      },
+      "status": {
+        "status_str": "success",
+        "completed": true,
+        "messages": [
+          [
+            "execution_start",
+            {
+              "prompt_id": "082ab76d-d286-4dc4-b628-b00030b151fd",
+              "timestamp": 1759933401519
+            }
+          ],
+          [
+            "execution_cached",
+            {
+              "nodes": ["14", "40", "44", "49", "50", "51"],
+              "prompt_id": "082ab76d-d286-4dc4-b628-b00030b151fd",
+              "timestamp": 1759933401522
+            }
+          ],
+          [
+            "execution_success",
+            {
+              "prompt_id": "082ab76d-d286-4dc4-b628-b00030b151fd",
+              "timestamp": 1759933427895
+            }
+          ]
+        ]
+      },
+      "meta": {
+        "59": {
+          "node_id": "59",
+          "display_node": "59",
+          "parent_node": null,
+          "real_node_id": "59"
+        }
+      }
+    },
+    "execution_details": {
+      "prompt_id": "082ab76d-d286-4dc4-b628-b00030b151fd",
+      "nodes_executed": ["18", "59"],
+      "progress_updates": [
+        {
+          "time": 0.112,
+          "value": 1,
+          "max": 65,
+          "percentage": 1.54
+        },
+        {
+          "time": 0.382,
+          "value": 2,
+          "max": 65,
+          "percentage": 3.08
+        },
+        {
+          "time": 16.972,
+          "value": 65,
+          "max": 65,
+          "percentage": 100
+        }
+      ],
+      "completed": true,
+      "error": null
+    }
+  },
+  "output": [
+    {
+      "filename": "ComfyUI_00006_.mp3",
+      "local_path": "/workspace/ComfyUI/output/bb655244-bc6a-4efe-8037-4ece54385f22/ComfyUI_00006_.mp3",
+      "type": "output",
+      "subfolder": "audio",
+      "node_id": "59",
+      "output_type": "audio",
+      "url": "https://url-to-generated-asset"
+    }
+  ],
+  "timings": {}
+}
+```
+
+<Warning>
+  Ensure that the ACE Step model and any required custom nodes are already installed before sending a request. This template pre-installs the ACE Step v1 3.5B model during first boot.
+</Warning>
+
+# Testing Before Deployment
+
+Although this template is designed for serverless deployment, you can test it as an interactive instance first.
+
+To access ComfyUI and the API wrapper:
+
+1. Start an interactive instance with this template
+2. Connect via SSH with port forwarding:
+   ```bash
+   ssh -L 18188:localhost:18188 -L 18288:localhost:18288 root@instance-address -p port
+   ```
+3. Access ComfyUI at http://localhost:18188
+4. Access the API Wrapper documentation at http://localhost:18288/docs
+
+The benchmarking process will be visible in the instance logs, but applications won't be available over the public interface without port forwarding.
+
+# About ACE Step v1 3.5B
+
+ACE Step v1 3.5B is a text-to-music generation model that creates audio from text prompts including lyrics and musical style tags. The model generates music up to 180 seconds in length with high-quality audio output.
+
+**Key features:**
+- Text-to-music generation with lyrics support
+- Musical style control via tags (genre, instruments, tempo, mood)
+- Adjustable lyrics strength parameter
+- High-quality MP3 audio output
+- Supports up to 180 seconds of audio generation
+
+Learn more about ACE Step on [Hugging Face](https://huggingface.co/ACE-Step/ACE-Step-v1-3.5B).
