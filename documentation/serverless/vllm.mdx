@@ -25,15 +25,36 @@ A full PyWorker and Client implementation can be found [here](https://github.com
 
 This endpoint generates a text completion that attempts to match any context or pattern  provided in a given prompt. Provide a text prompt, and the model returns the predicted continuation. This endpoint is best suited for single-turn tasks, whereas the /v1/chat/completions endpoint is optimized for multi-turn conversational scenarios.
 
+### Quickstart
+
+Here's a simple script using the `vastai-sdk` pip package to get up and running fast with vLLM:
+```python
+import asyncio
+from vastai import Serverless
+
+MAX_TOKENS = 128
+
+async def main():
+    async with Serverless() as client:
+        endpoint = await client.get_endpoint(name="my-endpoint")
+
+        payload = {
+            "input" : {
+                "model": "Qwen/Qwen3-8B",
+                "prompt" : "Who are you?",
+                "max_tokens" : MAX_TOKENS,
+                "temperature" : 0.7
+            }
+        }
+        
+        response = await endpoint.request("/v1/completions", payload, cost=MAX_TOKENS)
+        print(response["response"]["choices"][0]["text"])
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
 ### Inputs
-
-auth\_data:
-
-- `signature`(string): A cryptographic string that authenticates the url, cost, and reqnum fields in the response, proving they originated from the server. Clients can use this signature, along with the server's public key, to verify that these specific details have not been tampered with.
-- `cost`(float): The estimated compute resources for the request. The units of this cost are defined by the PyWorker.&#x20;
-- `endpoint`(string): Name of the Endpoint.
-- `reqnum`(int): The request number corresponding to this worker instance. Note that workers expect to receive requests in approximately the same order as these reqnums, but some flexibility is allowed due to potential out-of-order requests caused by concurrency or small delays on the proxy server.
-- `url`(string): The address of the worker instance to send the request to.
 
 payload:
 
@@ -48,23 +69,14 @@ payload:
 
 ```json JSON icon="js"
 {
-  "auth_data": {
-    "signature": "a_base64_encoded_signature_string_from_route_endpoint",
-    "cost": 256,
-    "endpoint": "Your-Endpoint-Name",
-    "reqnum": 1234567890,
-    "url": "http://worker-ip-address:port"
-  },
-  "payload": {
-    "input": {
-      "prompt": "The capital of the United States is",
-      "model": "Qwen/Qwen3-8B",
-      "max_tokens": 256,
-      "temperature": 0.7,
-      "top_k": 20,
-      "top_p": 0.4,
-      "stream": false
-    }
+  "input": {
+    "prompt": "The capital of the United States is",
+    "model": "Qwen/Qwen3-8B",
+    "max_tokens": 256,
+    "temperature": 0.7,
+    "top_k": 20,
+    "top_p": 0.4,
+    "stream": false
   }
 }
 ```
@@ -117,7 +129,51 @@ Depending on the model being used, other parameters like 'temperature' or 'top\_
 }
 
 ```
+### Streaming
 
+To use streaming, set the `stream` flag to `true` in the request payload.
+
+```python
+import asyncio
+from vastai import Serverless
+
+MAX_TOKENS = 1024
+
+async def main():
+    async with Serverless() as client:
+        endpoint = await client.get_endpoint(name="my-vllm-endpoint")
+
+        system_prompt = (
+            "You are Qwen, a helpful AI assistant.\n"
+            "You are to only speak in English.\n"
+            "Please answer the users response.\n"
+            "When you are done, use the <stop> token.\n"
+        )
+
+
+        user_prompt = """
+        What is the 118th element in the periodic table?
+        """
+
+        payload = {
+            "input" : {
+                "model": "Qwen/Qwen3-8B",
+                "prompt" : f"{system_prompt}\n{user_prompt}\n",
+                "max_tokens" : MAX_TOKENS,
+                "temperature" : 0.8,
+                "stop" : ["<stop>"],
+                "stream" : True,
+            }
+        }
+
+        response = await endpoint.request("/v1/completions", payload, cost=MAX_TOKENS, stream=True)
+        stream = response["response"]
+        async for event in stream:
+            print(event["choices"][0]["text"], end="", flush=True)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
 
 
 ## **/v1**/chat/completions/&#x20;
@@ -131,17 +187,7 @@ This endpoint generates a model response for a given conversational history. Unl
 
 
 ### Inputs
-
-`auth_data`:
-
-- `signature`(string): A cryptographic string that authenticates the url, cost, and reqnum fields in the response, proving they originated from the server. Clients can use this signature, along with the server's public key, to verify that these specific details have not been tampered with.
-- `cost`(float): The estimated compute resources for the request. The units of this cost are defined by the PyWorker.&#x20;
-- `endpoint`(string): Name of the Endpoint.
-- `reqnum`(int): The request number corresponding to this worker instance. Note that workers expect to receive requests in approximately the same order as these reqnums, but some flexibility is allowed due to potential out-of-order requests caused by concurrency or small delays on the proxy server.
-- `url`(string): The address of the worker instance to send the request to.
-
 `payload`:
-
 - `input`:
   - `model`(string): The specific identifier of the model to be used for generating the text completion.
   - `messages`(array): A list of message objects that form the conversation history.
@@ -271,5 +317,69 @@ This endpoint generates a model response for a given conversational history. Unl
 }
 ```
 
+### Streaming
+
+To use streaming, set the `stream` flag to `true` in the request payload
+
+```python
+import asyncio
+from vastai import Serverless
+
+MAX_TOKENS = 1024
+
+async def main():
+    async with Serverless() as client:
+        endpoint = await client.get_endpoint(name="my-vllm-endpoint")
+
+        system_prompt = (
+            "You are Qwen.\n"
+            "You are to only speak in English.\n"
+        )
+
+        user_prompt = "What is the integral of 2x^2 from 0 to 5?"
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+
+        payload = {
+            "input": {
+                "model": "Qwen/Qwen3-8B",
+                "messages": messages,
+                "stream": True,
+                "max_tokens": MAX_TOKENS,
+                "temperature": 0.7,
+            }
+        }
+
+        response = await endpoint.request("/v1/chat/completions", payload, cost=MAX_TOKENS, stream=True)
+        stream = response["response"]
+
+        printed_reasoning = False
+        printed_answer = False
+
+        async for chunk in stream:
+            delta = chunk["choices"][0].get("delta", {})
+
+            rc = delta.get("reasoning_content", None)
+            if rc:
+                if not printed_reasoning:
+                    printed_reasoning = True
+                    print("Reasoning:\n", end="", flush=True)
+                print(rc, end="", flush=True)
+
+            content = delta.get("content", None)
+            if content:
+                if not printed_answer:
+                    printed_answer = True
+                    if printed_reasoning:
+                        print("\n\nAnswer:\n", end="", flush=True)
+                    else:
+                        print("Answer:\n", end="", flush=True)
+                print(content, end="", flush=True)
 
 
+if __name__ == "__main__":
+    asyncio.run(main())
+```
