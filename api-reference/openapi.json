@@ -2279,7 +2279,7 @@
     "/api/v0/asks/{id}/": {
       "put": {
         "summary": "create instance",
-        "description": "Creates a new instance by accepting an \"ask\" contract from a provider.\nThis is the main endpoint for launching new instances on Vast.ai.\n\nCLI Usage: `vastai create instance <offer_id> <image> [options]`",
+        "description": "Creates a new instance by accepting an \"ask\" contract from a provider.\n\n- Use the search offers endpoint to discover available machines.\n- If `template_id` or `template_hash_id` is provided, those template defaults are either merged or overridden by parameters specified in the request body.\n\nCLI Usage: `vastai create instance <offer_id> <image> [options]`",
         "security": [
           {
             "BearerAuth": []
@@ -2296,7 +2296,7 @@
             "schema": {
               "type": "integer"
             },
-            "description": "ID of the offer to accept"
+            "description": "ID of the offer to accept (ask_id)"
           }
         ],
         "requestBody": {
@@ -2311,37 +2311,29 @@
                 "properties": {
                   "image": {
                     "type": "string",
-                    "description": "Docker image to use for the instance",
-                    "default": "tensorflow/tensorflow:latest-gpu",
-                    "maxLength": 1024
+                    "default": "vastai/base-image:@vastai-automatic-tag",
+                    "description": "Docker image to use for the instance.\n"
                   },
                   "template_id": {
                     "type": "integer",
-                    "description": "Template ID to use for instance configuration"
+                    "description": "ID of an existing template to use for instance configuration. Alternative to providing template_hash_id.\n\nExample : `62897`\n"
                   },
                   "template_hash_id": {
                     "type": "string",
-                    "description": "Template hash ID to use for instance configuration"
+                    "description": "Hash ID of a template. Alternative to providing template_id\n\nExample : `4e17788f74f075dd9aab7d0d4427968f`\n"
+                  },
+                  "label": {
+                    "type": "string",
+                    "description": "Custom name for the instance"
                   },
                   "disk": {
                     "type": "number",
-                    "description": "Amount of storage (in GB) to allocate to the instance",
-                    "minimum": 8.0,
-                    "default": 10.0
-                  },
-                  "price": {
-                    "type": "number",
-                    "description": "Bid price per hour for interruptible instances",
-                    "minimum": 0.001,
-                    "maximum": 128.0
-                  },
-                  "env": {
-                    "type": "object",
-                    "description": "Environment variables and port mappings"
+                    "format": "float",
+                    "description": "Size of local disk partition (in GB)\n"
                   },
                   "runtype": {
                     "type": "string",
-                    "description": "Instance run type",
+                    "description": "Launch mode for the instance. If omitted, defaults to 'ssh' unless `args/args_str` is provided.\n",
                     "enum": [
                       "ssh",
                       "jupyter",
@@ -2352,66 +2344,46 @@
                       "jupyter_direct"
                     ]
                   },
-                  "target_reliability": {
-                    "type": "number",
-                    "description": "Target reliability (0.0 to 1.0)",
-                    "minimum": 0,
-                    "maximum": 1
-                  },
-                  "last_known_min_bid": {
-                    "type": "number",
-                    "description": "Last known minimum bid price"
-                  },
-                  "onstart": {
-                    "type": "string",
-                    "description": "Commands to run when instance starts",
-                    "maxLength": 4096
-                  },
-                  "label": {
-                    "type": "string",
-                    "description": "User-defined label for the instance",
-                    "maxLength": 256
-                  },
-                  "image_login": {
-                    "type": "string",
-                    "description": "Docker registry credentials if needed"
-                  },
                   "target_state": {
                     "type": "string",
-                    "description": "Desired initial state of the instance",
+                    "description": "Desired initial state of the instance\n",
                     "enum": [
                       "running",
                       "stopped"
-                    ],
-                    "default": "running"
+                    ]
+                  },
+                  "price": {
+                    "type": "number",
+                    "description": "Bid price per machine (in $/hour). Only for interruptible instances",
+                    "minimum": 0.001,
+                    "maximum": 128.0
+                  },
+                  "env": {
+                    "type": "object",
+                    "description": "Environment variables\n\nExample :\n`\n{ \n  \"HF_TOKEN\": \"hf_xxx123456789\",\n  \"MODEL_ID\": \"TheBloke/Llama-2-7B-Chat-GPTQ\",\n}`\n"
                   },
                   "cancel_unavail": {
                     "type": "boolean",
-                    "description": "Whether to cancel if instance cannot start immediately. Defaults to false for interruptibles, true for on-demand with target_state='running'"
+                    "description": "Whether to cancel if instance cannot start immediately. Defaults to false for interruptibles. Defaults to true for on-demand with target_state='running'"
                   },
                   "vm": {
                     "type": "boolean",
-                    "description": "Whether this is a VM instance",
-                    "default": false
+                    "description": "Whether this is a VM instance"
+                  },
+                  "onstart": {
+                    "type": "string",
+                    "description": "Commands to run when instance starts\n\nExample : `env | grep _ >> /etc/environment; echo 'starting up'` \n"
                   },
                   "args": {
                     "type": "array",
                     "items": {
                       "type": "string"
                     },
-                    "description": "Arguments to pass to the container entrypoint"
+                    "description": "Arguments array to passed to the image entrypoint\n\nExample : `[\"bash\", \"-c\", \"env | grep _ >> /etc/environment; echo 'starting up'\"]`\n"
                   },
                   "args_str": {
                     "type": "string",
-                    "description": "Command line arguments as a string (alternative to args array)"
-                  },
-                  "python_utf8": {
-                    "type": "boolean",
-                    "description": "Set python's locale to C.UTF-8"
-                  },
-                  "lang_utf8": {
-                    "type": "boolean",
-                    "description": "Install and generate locales before instance launch, set locale to C.UTF-8"
+                    "description": "Arguments string to pass to the entrypoint (alternative to args)\n\nExample : `args_str: bash -c \"env | grep _ >> /etc/environment; echo 'starting up'\"`\n"
                   },
                   "use_jupyter_lab": {
                     "type": "boolean",
@@ -2419,11 +2391,15 @@
                   },
                   "jupyter_dir": {
                     "type": "string",
-                    "description": "Directory in instance to use to launch jupyter"
+                    "description": "Directory to launch Jupyter from\n\nExample : `/home/notebooks`\n"
                   },
-                  "bid_test": {
+                  "python_utf8": {
                     "type": "boolean",
-                    "description": "Test if bid price is valid without creating instance"
+                    "description": "Set python's locale to C.UTF-8"
+                  },
+                  "lang_utf8": {
+                    "type": "boolean",
+                    "description": "Set locale to C.UTF-8"
                   },
                   "force": {
                     "type": "boolean",
@@ -2432,6 +2408,10 @@
                   "user": {
                     "type": "string",
                     "description": "User to use with docker create (breaks some images, use with caution)"
+                  },
+                  "image_login": {
+                    "type": "string",
+                    "description": "Docker registry credentials if needed"
                   },
                   "volume_info": {
                     "type": "object",
@@ -2452,18 +2432,13 @@
                       "mount_path": {
                         "type": "string",
                         "description": "Mount path for the volume inside the container"
-                      },
-                      "name": {
-                        "type": "string",
-                        "description": "Label for the new volume"
                       }
                     }
                   }
                 }
               },
               "example": {
-                "id": 1234567,
-                "image": "tensorflow/tensorflow:latest-gpu"
+                "image": "vastai/base-image:@vastai-automatic-tag"
               }
             }
           }
@@ -3690,7 +3665,7 @@
     "/api/v0/template/": {
       "post": {
         "summary": "create template",
-        "description": "Creates a new template for launching instances. If an identical template already exists, returns the existing template instead of creating a duplicate.\n\nCLI Usage: `vastai create template [options]`",
+        "description": "Creates a new template for launching instances.\n\nCLI Usage: `vastai create template <name> <image> [options]`",
         "tags": [
           "Templates"
         ],
@@ -3705,67 +3680,70 @@
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "name",
+                  "image"
+                ],
                 "properties": {
                   "name": {
                     "type": "string",
-                    "maxLength": 256,
-                    "description": "Name of the template",
-                    "example": "My Template"
+                    "default": "My Template",
+                    "description": "Name of the template"
                   },
                   "image": {
                     "type": "string",
-                    "maxLength": 1024,
-                    "description": "Docker image path",
-                    "example": "ghcr.io/huggingface/text-generation-inference:1.0.3"
+                    "default": "vastai/base-image",
+                    "description": "Docker image path. Used when launching instances from this template."
                   },
                   "tag": {
                     "type": "string",
-                    "description": "Docker image tag"
+                    "default": "@vastai-automatic-tag",
+                    "description": "Docker image tag specifying version of the image\nThis can be included in the image instead of here\n"
                   },
                   "env": {
-                    "type": "string",
-                    "maxLength": 1024,
-                    "description": "Docker environment variables and run arguments",
-                    "example": "-p 3000:3000 -e MODEL_ARGS='--model-id TheBloke/Llama-2-7B-chat-GPTQ'"
+                    "type": "object",
+                    "description": "Environment variables\n\nExample : `{ \"HF_TOKEN\": \"hf_xxx123456789\", \"MODEL_ID\": \"TheBloke/Llama-2-7B-Chat-GPTQ\", }`\n"
                   },
                   "onstart": {
                     "type": "string",
-                    "maxLength": 2048,
-                    "description": "Command to run on instance startup"
+                    "description": "Commands to run when instance starts\n\nExample : `env | grep _ >> /etc/environment; echo 'starting up'` \n"
                   },
-                  "jup_direct": {
-                    "type": "boolean",
-                    "description": "Enable direct Jupyter connection"
+                  "runtype": {
+                    "type": "string",
+                    "enum": [
+                      "ssh",
+                      "jupyter",
+                      "args"
+                    ],
+                    "description": "Type of instance runtime"
                   },
                   "ssh_direct": {
                     "type": "boolean",
                     "description": "Enable direct SSH connection"
                   },
+                  "jup_direct": {
+                    "type": "boolean",
+                    "description": "Enable direct Jupyter connection"
+                  },
+                  "jupyter_dir": {
+                    "type": "string",
+                    "description": "Directory to launch Jupyter from\n\nExample : `/home/notebooks`\n"
+                  },
                   "use_jupyter_lab": {
                     "type": "boolean",
                     "description": "Use JupyterLab instead of Jupyter Notebook"
                   },
-                  "runtype": {
-                    "type": "string",
-                    "enum": [
-                      "jupyter",
-                      "ssh",
-                      "args"
-                    ],
-                    "description": "Type of instance runtime"
-                  },
-                  "use_ssh": {
-                    "type": "boolean",
-                    "description": "Enable SSH access"
-                  },
-                  "jupyter_dir": {
-                    "type": "string",
-                    "maxLength": 256,
-                    "description": "Jupyter notebook directory"
-                  },
                   "docker_login_repo": {
                     "type": "string",
-                    "description": "Docker repository requiring authentication"
+                    "description": "Name of the private Docker repo (i.e docker.io)"
+                  },
+                  "docker_login_user": {
+                    "type": "string",
+                    "description": "Username for private Docker repo"
+                  },
+                  "docker_login_pass": {
+                    "type": "string",
+                    "description": "Access token or password for private Docker repo."
                   },
                   "extra_filters": {
                     "type": "object",
@@ -3773,13 +3751,14 @@
                   },
                   "recommended_disk_space": {
                     "type": "number",
-                    "description": "Recommended disk space in GB"
+                    "description": "Recommended disk space in GB. Defaults to 16GB if not specified."
                   }
-                },
-                "required": [
-                  "name",
-                  "image"
-                ]
+                }
+              },
+              "example": {
+                "name": "My Template",
+                "image": "vastai/base-image",
+                "tag": "@vastai-automatic-tag"
               }
             }
           }
@@ -7865,12 +7844,7 @@
     "/api/v0/bundles/": {
       "post": {
         "summary": "search offers",
-        "description": "Search for available GPU machine offers with advanced filtering and sorting.\n\nEach filter parameter (such as `verified`, `gpu_name`, `num_gpus`, etc.) should be an object specifying the operator and value you want to match.\n\n**Filter operators:**\n\n| Operator | Meaning                | Example                        |\n|:---------|:-----------------------|:-------------------------------|\n| `eq`     | Equal to               | `{ \"eq\": true }`               |\n| `neq`    | Not equal to           | `{ \"neq\": false }`             |\n| `gt`     | Greater than           | `{ \"gt\": 0.99 }`               |\n| `lt`     | Less than              | `{ \"lt\": 10000 }`              |\n| `gte`    | Greater than or equal  | `{ \"gte\": 4 }`                 |\n| `lte`    | Less than or equal     | `{ \"lte\": 8 }`                 |\n| `in`     | Value is in a list     | `{ \"in\": [\"RTX_3090\", \"RTX_4090\"] }` |\n| `nin`    | Value is not in a list | `{ \"nin\": [\"TW\", \"SE\"] }`      |\n\nDefault filters applied unless --no-default:\n- verified: true\n- rentable: true\n- rented: false\n\nCLI Usage: `vastai search offers 'reliability > 0.99 num_gpus>=4' --order=dph_total`",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
+        "description": "Search for available GPU machine offers with advanced filtering and sorting.\n\nEach filter parameter (such as `verified`, `gpu_name`, `num_gpus`, etc.) should be an object specifying the operator and value you want to match.\n\n**Filter operators:**\n\n| Operator | Meaning                | Example                        |\n|:---------|:-----------------------|:-------------------------------|\n| `eq`     | Equal to               | `{ \"eq\": true }`               |\n| `neq`    | Not equal to           | `{ \"neq\": false }`             |\n| `gt`     | Greater than           | `{ \"gt\": 0.99 }`               |\n| `lt`     | Less than              | `{ \"lt\": 10000 }`              |\n| `gte`    | Greater than or equal  | `{ \"gte\": 4 }`                 |\n| `lte`    | Less than or equal     | `{ \"lte\": 8 }`                 |\n| `in`     | Value is in a list     | `{ \"in\": [\"RTX_3090\", \"RTX_4090\"] }` |\n| `nin`    | Value is not in a list | `{ \"nin\": [\"TW\", \"SE\"] }`      |\n\nCLI Usage: `vastai search offers 'reliability > 0.99 num_gpus>=4' --order=dph_total`",
         "requestBody": {
           "required": true,
           "content": {
@@ -8061,13 +8035,15 @@
                   },
                   "order": {
                     "type": "array",
+                    "description": "Sort fields and directions",
                     "items": {
                       "type": "array",
                       "items": {
                         "type": "string"
                       }
                     },
-                    "description": "Sort fields and directions"
+                    "minItems": 2,
+                    "maxItems": 2
                   },
                   "disable_bundling": {
                     "type": "boolean",
@@ -8077,6 +8053,19 @@
                     "type": "number",
                     "description": "Storage allocation size in GB for the instance.\nThis sets the disk size when creating the instance and cannot be changed later.\nDefault is 8GB.\n"
                   }
+                }
+              },
+              "example": {
+                "limit": 100,
+                "type": "on-demand",
+                "verified": {
+                  "eq": true
+                },
+                "rentable": {
+                  "eq": true
+                },
+                "rented": {
+                  "eq": false
                 }
               }
             }
@@ -8246,7 +8235,6 @@
                   "properties": {
                     "error": {
                       "type": "string",
-                      "example": "auth_error",
                       "msg": "Invalid user key"
                     }
                   }
