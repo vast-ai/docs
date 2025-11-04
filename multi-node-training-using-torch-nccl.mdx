@@ -5,6 +5,42 @@ createdAt: Tue Jul 08 2025 18:31:35 GMT+0000 (Coordinated Universal Time)
 updatedAt: Thu Aug 14 2025 17:00:53 GMT+0000 (Coordinated Universal Time)
 ---
 
+<script type="application/ld+json" dangerouslySetInnerHTML={{
+  __html: JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "How to Set Up Multi-Node Training using Torch + NCCL on Vast.ai",
+    "description": "A technical guide to configuring and running multi-node distributed training with PyTorch and NCCL on Vast.ai using overlay networks for direct instance communication.",
+    "step": [
+      {
+        "@type": "HowToStep",
+        "name": "Update CLI and View Physical Clusters",
+        "text": "Update to the newest version of the CLI by going to CLI docs and copying/running the command starting with 'wget'. View physical clusters with instances matching your requirements by running './vast search offers --raw cluster_id!=None [YOUR_INSTANCE_SEARCH_FILTERS] | grep cluster_id'. This will print cluster_ids for clusters with available offers."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Create Overlay Network",
+        "text": "Once you've chosen a physical cluster, create your overlay network inside the cluster with './vast create overlay CLUSTER_ID NAME_FOR_NETWORK_TO_CREATE'. This creates a virtual LAN for your instances to communicate directly."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Create Instances on Overlay Network",
+        "text": "Search for instance offers in the physical cluster with './vast search offers cluster_id=CLUSTER_ID [YOUR_INSTANCE_SEARCH_FILTERS]'. Create instances attached to your overlay by appending '--env \"-n YOUR_NETWORK_NAME\"' to your './vast create instance' command."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Find IPv4 Address for TCP Rendezvous",
+        "text": "On the node that will run the rank 0 worker, run 'ip a' (install iproute2 if needed with 'apt install iproute2'). You should have three network interfaces: lo, eth0, and eth1. eth0 should be the interface to the overlay network. Under the eth0 entry, find the line starting with 'inet IPv4ADDRESS/MASK' - this IPv4ADDRESS will be used for TCP initialization."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Run Training Script with NCCL",
+        "text": "In your training script, initialize process group with backend='nccl' and init_method='tcp://IPv4ADDRESS:PORT' where IPv4ADDRESS is from eth0 and PORT is a free port between 1000-65535. Set the NCCL_SOCKET_IFNAME=eth0 environment variable. Run the script on all nodes with appropriate rank parameters (0 for master node, 1+ for worker nodes)."
+      }
+    ]
+  })
+}} />
+
 <Note>
   Need RoCE or Infiniband? Submit a [cluster request](https://vast.ai/products/clusters). Availability currently limited to A100/H100/H200 machines.
 </Note>
