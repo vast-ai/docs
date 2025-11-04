@@ -33,6 +33,20 @@ pip install vastai_sdk
   The SDK provides an async Python interface for making requests to your endpoints. You'll use this after setting up your infrastructure.
 </Note>
 
+### API Key Setup
+
+Set your Vast.ai API key as an environment variable:
+
+```bash
+export VAST_API_KEY="your-api-key-here"
+```
+
+The SDK will automatically use this environment variable for authentication. Alternatively, you can pass the API key directly when initializing the client:
+
+```python
+client = Serverless(api_key="your-api-key-here")
+```
+
 ### HuggingFace Token Setup
 
 Many popular models like Llama and Mistral require authentication to download. Configure your HuggingFace token once at the account level:
@@ -72,7 +86,7 @@ Many popular models like Llama and Mistral require authentication to download. C
 
     ![](/images/serverless_quickstart_create_endpoint.png)
 
-    Click **"Create"** to proceed.
+    Click **"Next"** to proceed.
   </Step>
 
   <Step title="Create a Workergroup">
@@ -87,7 +101,7 @@ Many popular models like Llama and Mistral require authentication to download. C
 
     ![](/images/serverless_quickstart_create_workergroup.png)
 
-    Click **"Create"** to proceed with the default settings.
+    Click **"Next"** to proceed with the default settings.
   </Step>
 
   <Step title="Wait for Workers to Initialize">
@@ -102,16 +116,21 @@ Many popular models like Llama and Mistral require authentication to download. C
     </Warning>
 
     Monitor the worker status in the dashboard:
-    - **Inactive**: Worker is initializing or downloading the model
-    - **Loading**: Worker is loading the model into GPU memory
-    - **Ready**: Worker is available to handle requests (this is what you're waiting for)
+    - **Stopped**: Worker has the model loaded and is ready to activate on-demand (cold worker)
+    - **Loading**: Worker is starting up and loading the model into GPU memory
+    - **Ready**: Worker is active and handling requests
 
     You can view detailed statistics by clicking **"View detailed stats"** on the Workergroup.
+
+    Monitor the instance logs to track the loading process:
+    - Click on any worker in the dashboard to view its logs
+    - Logs show model download progress, loading status, and any startup errors
+    - This helps identify issues early rather than waiting for timeouts
 
     ![](/images/serverless_quickstart_loading_workers.png)
 
     <Note>
-      Do not attempt to make API calls until at least one worker shows "Ready" status. API calls made before workers are ready will fail with "No workers available" errors.
+      The SDK automatically holds and retries requests until workers are ready. However, for best performance, wait for at least one worker to show "Ready" or "Stopped" status before making your first call.
     </Note>
   </Step>
 </Steps>
@@ -124,16 +143,12 @@ With the SDK installed, here's how to make your first API call:
 
 ```python
 import asyncio
-from vastai_sdk import Serverless
-import os
-
-# Set your API key (or use VAST_API_KEY environment variable)
-API_KEY = ""  # Replace with your actual API key
-MAX_TOKENS = 100
+from vastai import Serverless
 
 async def main():
-    # Initialize the client
-    client = Serverless(API_KEY)  # or just Serverless() if VAST_API_KEY is set
+    # Initialize the client with your API key
+    # The SDK will automatically use the VAST_API_KEY environment variable if set
+    client = Serverless()  # Uses VAST_API_KEY environment variable
 
     # Get your endpoint
     endpoint = await client.get_endpoint(name="vLLM-Qwen3-8B")
@@ -149,7 +164,7 @@ async def main():
     }
 
     # Make the request
-    result = await endpoint.request("/v1/completions", payload, cost=MAX_TOKENS)
+    result = await endpoint.request("/v1/completions", payload, cost=100)
 
     # The SDK returns a wrapper object with metadata
     # Access the OpenAI-compatible response via result["response"]
@@ -176,19 +191,16 @@ if __name__ == "__main__":
     - Ensure your HF_TOKEN is properly configured for gated models
   </Accordion>
   <Accordion title="'No workers available' error">
-    - Wait 30-60 seconds for workers to initialize
-    - Check endpoint status in the [Serverless Dashboard](https://cloud.vast.ai/serverless/)
-    - Verify you have active workers showing "Ready" status
-  </Accordion>
-  <Accordion title="SSL certificate warnings">
-    - This is expected with self-signed certificates
-    - For development: Use `verify=False` in requests
-    - For production: Install Vast's root certificate
+    - The SDK automatically retries requests until workers are ready
+    - If this persists, check endpoint status in the [Serverless Dashboard](https://cloud.vast.ai/serverless/)
+    - Verify workers are not stuck in "Loading" state (see troubleshooting above)
   </Accordion>
   <Accordion title="Slow response times">
-    - First request to a cold worker takes longer
-    - Increase `cold_workers` for better availability
-    - Check if workers are in the same region as your users
+    - First request may take longer as workers activate from cold state
+    - Increase `max_workers` if all workers are full with requests
+    - Increase `min_load` if there aren't enough workers immediately available when multiple requests are sent
+    - If there are large spikes of requests, increase `cold_workers` or decrease target utilization
+    - Consider worker region placement relative to your users
   </Accordion>
 </AccordionGroup>
 
