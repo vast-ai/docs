@@ -1,0 +1,574 @@
+---
+title: ComfyUI Wan 2.2
+description: Learn how to use ComfyUI with Wan 2.2 T2V A14B on Vast.ai Serverless for text-to-video generation.
+"canonical": "/documentation/serverless/comfyui-wan-2.2"
+---
+
+<script type="application/ld+json" dangerouslySetInnerHTML={{
+  __html: JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "ComfyUI Wan 2.2 T2V A14B with Vast.ai Serverless",
+    "description": "Complete guide to using ComfyUI with Wan 2.2 T2V A14B on Vast.ai Serverless for text-to-video generation workflows, covering template setup, S3 storage configuration, benchmarking, workflow submission via /generate/sync endpoint, and testing.",
+    "author": {
+      "@type": "Organization",
+      "name": "Vast.ai"
+    },
+    "articleSection": "Serverless Documentation",
+    "keywords": ["ComfyUI", "Wan 2.2", "video generation", "text-to-video", "t2v", "serverless", "API", "vast.ai", "workflow", "benchmarking", "S3 storage", "PyWorker", "generate endpoint"]
+  })
+}} />
+
+The [ComfyUI Serverless Wan 2.2 template](https://cloud.vast.ai/?ref_id=62897&creator_id=62897&name=Wan%202.2%2014B%20t2v%20(Serverless)) allows you to send text-to-video generation requests to ComfyUI and have generated video assets automatically uploaded to S3-compatible storage. The template returns pre-signed URLs in response to requests, along with detailed process updates emitted by ComfyUI during generation.
+
+# Template Components
+
+The ComfyUI Wan 2.2 template includes:
+
+**In the Docker Image:**
+- ComfyUI
+- ComfyUI API Wrapper
+- Stable Diffusion 1.5 (for benchmarking)
+
+**Downloaded on first boot:**
+- PyWorker (comfyui-json worker)
+- Provisioning Script for custom configuration
+  - Adds cron job to remove older output files (older than 24 hours) if available disk space is less than 512MB
+  - Adds benchmarking workflow file
+  - Downloads Wan 2.2 models:
+    - `text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors`
+    - `vae/wan_2.1_vae.safetensors`
+    - `diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors`
+    - `diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors`
+    - `loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors`
+    - `loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors`
+
+<Note>
+  Before using this template, familiarize yourself with the [Serverless Documentation](/documentation/serverless/overview) and [Getting Started With Serverless](/documentation/serverless/getting-started-with-serverless) guide. Learn more about Wan 2.2 T2V A14B on [Hugging Face](https://huggingface.co/Wan-AI/Wan2.2-T2V-A14B).
+</Note>
+
+# Environment Variables
+
+## Required for S3 Storage
+
+The API wrapper manages asset uploads to S3-compatible storage. Configure these variables in your [Account Settings](https://cloud.vast.ai/settings/):
+
+- `S3_ACCESS_KEY_ID`(string): Access key ID for S3-compatible storage
+- `S3_SECRET_ACCESS_KEY`(string): Secret access key for S3-compatible storage
+- `S3_BUCKET_NAME`(string): Bucket name for S3-compatible storage
+- `S3_ENDPOINT_URL`(string): Endpoint URL for S3-compatible storage
+- `S3_REGION`(string): Optional region for S3-compatible storage
+
+<Note>
+  These S3 values can be overridden on a per-request basis in the request payload.
+</Note>
+
+## Optional Configuration
+
+- `WEBHOOK_URL`(string): Optional webhook to call after generation completion or failure
+- `PYWORKER_REPO`(string): Custom PyWorker git repository URL (default: https://github.com/vast-ai/pyworker)
+- `PYWORKER_REF`(string): Git reference to checkout from PyWorker repository
+
+<Warning>
+  Store sensitive information like API keys in the 'Environment Variables' section of your [Account Settings](https://cloud.vast.ai/settings/). These will be available in all instances you create.
+</Warning>
+
+# Worker Startup Process
+
+When a worker is first started with this template, the following will happen:
+
+1. Docker image is downloaded if not already cached on the host machine
+2. Worker (Docker container) is created on the host machine
+3. Template on-start script is executed:
+   - Docker image entrypoint is executed
+   - Download and run provisioning script (remotely stored Bash script)
+   - Start supervisord (ComfyUI & API wrapper process manager)
+   - Current version of [Vast PyWorker](https://github.com/vast-ai/pyworker) bootstrapping script is downloaded and executed
+   - ComfyUI and API Wrapper become available
+4. PyWorker begins benchmarking
+5. Benchmarking completes and worker score is sent to the serverless system
+
+When this process completes, the worker enters either the 'Ready' (hot) or 'Inactive' (cold) state.
+
+**Worker States:**
+- **Ready (hot)**: Worker is fully initialized and immediately available to process requests. You pay for idle time.
+- **Inactive (cold)**: Worker is shut down to save costs. You pay only for storage.
+
+# Benchmarking
+
+A Wan 2.2 video generation benchmark runs when each worker initializes to validate GPU performance and identify underperforming machines. The benchmark file is downloaded on first start and stored in the pyworker directory at `workers/comfyui-json/misc/benchmark.json`. The workflow is static but a random seed will be generated for each benchmarking run.
+
+**Performance expectations:**
+- Benchmark duration should remain consistent across identical GPU models
+- Significant variation (>20%) may indicate thermal, power, or configuration issues
+
+## Understanding Worker Scores
+
+The benchmarking system calculates a performance score for each worker that determines how requests are distributed:
+
+**How scoring works:**
+- Each benchmark is assigned a baseline complexity score of `100` (representing 100% of the work)
+- If a worker completes the benchmark in 100 seconds, it receives a score of `1.0` (it processes 1% of the work per second)
+- If a worker completes the same benchmark in 50 seconds, it receives a score of `2.0` (twice as fast)
+- If a worker completes the same benchmark in 200 seconds, it receives a score of `0.5` (half as fast)
+
+**How this affects your endpoint:**
+- Faster workers (higher scores) receive more requests proportionally
+- To serve 1 request per second on average with score-1.0 workers, you need 100 workers
+- With score-2.0 workers, you only need 50 workers for the same throughput
+- The system automatically balances load based on these scores
+
+<Note>
+  If you choose to use your own worker code, it's recommended to implement a custom benchmark that closely matches the video generation workflows you intend to process.
+</Note>
+
+# Endpoints
+
+The ComfyUI Wan 2.2 template provides endpoints for executing workflows and generating videos. After obtaining a worker address from the `/route/` endpoint (see [route documentation](/documentation/serverless/route)), you can send requests to the following endpoints.
+
+## /generate/sync
+
+The primary endpoint for submitting ComfyUI workflows. This endpoint accepts complete, user-defined ComfyUI workflows in JSON format and processes them synchronously.
+
+### Request Structure
+
+
+### Input
+
+`payload`:
+
+- `input`:
+  - `request_id`(string): Optional unique identifier for tracking the request
+  - `workflow_json`(object): Complete ComfyUI workflow graph in JSON format
+  - `s3`(object): Optional S3 configuration override
+    - `access_key_id`(string)
+    - `secret_access_key`(string)
+    - `endpoint_url`(string)
+    - `bucket_name`(string)
+    - `region`(string)
+  - `webhook`(object): Optional webhook configuration
+    - `url`(string): Webhook URL to call after generation
+    - `extra_params`(object): Additional parameters to include in webhook payload
+
+<Note>
+  The string `"__RANDOM_INT__"` in your workflow will be replaced with a random integer prior to posting the workflow to ComfyUI, allowing for varied outputs without manually specifying different seeds.
+</Note>
+
+**Example Request:**
+
+<CodeGroup>
+```python vastai-sdk icon=python
+from vastai import Serverless
+import asyncio
+
+ENDPOINT_NAME="comfyui-json"
+
+async def main():
+    async with Serverless() as client:
+        endpoint = await client.get_endpoint(name=ENDPOINT_NAME)
+
+        # ComfyUI API compatible json workflow for Wan 2.2 T2V
+        workflow = {
+          "90": {
+            "inputs": {
+              "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+              "type": "wan",
+              "device": "default"
+            },
+            "class_type": "CLIPLoader",
+            "_meta": {
+              "title": "Load CLIP"
+            }
+          },
+          "91": {
+            "inputs": {
+              "text": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走，裸露，NSFW",
+              "clip": ["90", 0]
+            },
+            "class_type": "CLIPTextEncode",
+            "_meta": {
+              "title": "CLIP Text Encode (Negative Prompt)"
+            }
+          },
+          "92": {
+            "inputs": {
+              "vae_name": "wan_2.1_vae.safetensors"
+            },
+            "class_type": "VAELoader",
+            "_meta": {
+              "title": "Load VAE"
+            }
+          },
+          "93": {
+            "inputs": {
+              "shift": 8.000000000000002,
+              "model": ["101", 0]
+            },
+            "class_type": "ModelSamplingSD3",
+            "_meta": {
+              "title": "ModelSamplingSD3"
+            }
+          },
+          "94": {
+            "inputs": {
+              "shift": 8,
+              "model": ["102", 0]
+            },
+            "class_type": "ModelSamplingSD3",
+            "_meta": {
+              "title": "ModelSamplingSD3"
+            }
+          },
+          "95": {
+            "inputs": {
+              "add_noise": "disable",
+              "noise_seed": 0,
+              "steps": 20,
+              "cfg": 3.5,
+              "sampler_name": "euler",
+              "scheduler": "simple",
+              "start_at_step": 10,
+              "end_at_step": 10000,
+              "return_with_leftover_noise": "disable",
+              "model": ["94", 0],
+              "positive": ["99", 0],
+              "negative": ["91", 0],
+              "latent_image": ["96", 0]
+            },
+            "class_type": "KSamplerAdvanced",
+            "_meta": {
+              "title": "KSampler (Advanced)"
+            }
+          },
+          "96": {
+            "inputs": {
+              "add_noise": "enable",
+              "noise_seed": "__RANDOM_INT__",
+              "steps": 20,
+              "cfg": 3.5,
+              "sampler_name": "euler",
+              "scheduler": "simple",
+              "start_at_step": 0,
+              "end_at_step": 10,
+              "return_with_leftover_noise": "enable",
+              "model": ["93", 0],
+              "positive": ["99", 0],
+              "negative": ["91", 0],
+              "latent_image": ["104", 0]
+            },
+            "class_type": "KSamplerAdvanced",
+            "_meta": {
+              "title": "KSampler (Advanced)"
+            }
+          },
+          "97": {
+            "inputs": {
+              "samples": ["95", 0],
+              "vae": ["92", 0]
+            },
+            "class_type": "VAEDecode",
+            "_meta": {
+              "title": "VAE Decode"
+            }
+          },
+          "98": {
+            "inputs": {
+              "filename_prefix": "video/ComfyUI",
+              "format": "auto",
+              "codec": "auto",
+              "video": ["100", 0]
+            },
+            "class_type": "SaveVideo",
+            "_meta": {
+              "title": "Save Video"
+            }
+          },
+          "99": {
+            "inputs": {
+              "text": "Beautiful young European woman with honey blonde hair gracefully turning her head back over shoulder, gentle smile, bright eyes looking at camera. Hair flowing in slow motion as she turns. Soft natural lighting, clean background, cinematic portrait.",
+              "clip": ["90", 0]
+            },
+            "class_type": "CLIPTextEncode",
+            "_meta": {
+              "title": "CLIP Text Encode (Positive Prompt)"
+            }
+          },
+          "100": {
+            "inputs": {
+              "fps": 16,
+              "images": ["97", 0]
+            },
+            "class_type": "CreateVideo",
+            "_meta": {
+              "title": "Create Video"
+            }
+          },
+          "101": {
+            "inputs": {
+              "unet_name": "wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors",
+              "weight_dtype": "default"
+            },
+            "class_type": "UNETLoader",
+            "_meta": {
+              "title": "Load Diffusion Model"
+            }
+          },
+          "102": {
+            "inputs": {
+              "unet_name": "wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors",
+              "weight_dtype": "default"
+            },
+            "class_type": "UNETLoader",
+            "_meta": {
+              "title": "Load Diffusion Model"
+            }
+          },
+          "104": {
+            "inputs": {
+              "width": 640,
+              "height": 640,
+              "length": 81,
+              "batch_size": 1
+            },
+            "class_type": "EmptyHunyuanLatentVideo",
+            "_meta": {
+              "title": "EmptyHunyuanLatentVideo"
+            }
+          }
+        }
+
+        payload = {
+          "input": {
+            "request_id": "",
+            "workflow_json": workflow,
+            "s3": {
+              "access_key_id": "",
+              "secret_access_key": "",
+              "endpoint_url": "",
+              "bucket_name": "",
+              "region": ""
+            },
+            "webhook": {
+              "url": "",
+              "extra_params": {
+                "user_id": "12345",
+                "project_id": "abc-def"
+              }
+            }
+          }
+        }
+
+        response = await endpoint.request("/generate/sync", payload)
+
+        # Response contains status, output, and any errors
+        print(response["response"])
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+</CodeGroup>
+
+
+### Outputs
+
+- `id`(string): Unique identifier for the request
+- `status`(string): Request status - `completed`, `failed`, `processing`, `generating`, or `queued`
+- `message`(string): Human-readable status message
+- `comfyui_response`(object): Detailed response from ComfyUI including:
+  - `prompt`: The workflow that was executed
+  - `outputs`: Generated outputs organized by node ID
+  - `status`: Execution status with completion messages and timestamps
+  - `meta`: Metadata about the execution
+  - `execution_details`: Progress updates and timing information with detailed progress_updates array showing generation progress
+- `output`(array): Array of output objects, each containing:
+  - `filename`(string): Name of the generated file (e.g., "ComfyUI_00003_.mp4")
+  - `local_path`(string): Path to file on worker
+  - `url`(string): Pre-signed URL for downloading the generated video asset (if S3 is configured)
+  - `type`(string): Output type (e.g., "output")
+  - `subfolder`(string): Subfolder within output directory (e.g., "video")
+  - `node_id`(string): ComfyUI node that produced this output
+  - `output_type`(string): Type of output (e.g., "images")
+- `timings`(object): Timing information for the request
+
+**Example Response:**
+
+```json JSON icon="js"
+{
+  "id": "66f4fac5-3f72-4390-b837-d3e4d961d4f9",
+  "message": "Processing complete.",
+  "status": "completed",
+  "comfyui_response": {
+    "b469e34f-eab3-43a9-ba64-60e4c60621de": {
+      "prompt": [
+        2,
+        "b469e34f-eab3-43a9-ba64-60e4c60621de",
+        {
+          "90": {
+            "inputs": {
+              "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+              "type": "wan",
+              "device": "default"
+            },
+            "class_type": "CLIPLoader",
+            "_meta": {
+              "title": "Load CLIP"
+            }
+          },
+          "99": {
+            "inputs": {
+              "text": "Beautiful young European woman with honey blonde hair gracefully turning her head back over shoulder, gentle smile, bright eyes looking at camera. Hair flowing in slow motion as she turns. Soft natural lighting, clean background, cinematic portrait.",
+              "clip": ["90", 0]
+            },
+            "class_type": "CLIPTextEncode",
+            "_meta": {
+              "title": "CLIP Text Encode (Positive Prompt)"
+            }
+          },
+          "104": {
+            "inputs": {
+              "width": 640,
+              "height": 640,
+              "length": 81,
+              "batch_size": 1
+            },
+            "class_type": "EmptyHunyuanLatentVideo",
+            "_meta": {
+              "title": "EmptyHunyuanLatentVideo"
+            }
+          }
+        },
+        {
+          "client_id": "worker_1_1759767551.908173"
+        },
+        ["98"]
+      ],
+      "outputs": {
+        "98": {
+          "images": [
+            {
+              "filename": "ComfyUI_00003_.mp4",
+              "subfolder": "video",
+              "type": "output"
+            }
+          ],
+          "animated": [true]
+        }
+      },
+      "status": {
+        "status_str": "success",
+        "completed": true,
+        "messages": [
+          [
+            "execution_start",
+            {
+              "prompt_id": "b469e34f-eab3-43a9-ba64-60e4c60621de",
+              "timestamp": 1759767867981
+            }
+          ],
+          [
+            "execution_cached",
+            {
+              "nodes": ["90", "91", "92", "93", "94", "99", "101", "102", "104"],
+              "prompt_id": "b469e34f-eab3-43a9-ba64-60e4c60621de",
+              "timestamp": 1759767867984
+            }
+          ],
+          [
+            "execution_success",
+            {
+              "prompt_id": "b469e34f-eab3-43a9-ba64-60e4c60621de",
+              "timestamp": 1759768010485
+            }
+          ]
+        ]
+      },
+      "meta": {
+        "98": {
+          "node_id": "98",
+          "display_node": "98",
+          "parent_node": null,
+          "real_node_id": "98"
+        }
+      }
+    },
+    "execution_details": {
+      "prompt_id": "b469e34f-eab3-43a9-ba64-60e4c60621de",
+      "nodes_executed": ["95", "97", "100", "98"],
+      "progress_updates": [
+        {
+          "time": 5.1010000000023865,
+          "value": 1,
+          "max": 10,
+          "percentage": 10
+        },
+        {
+          "time": 11.872999999999593,
+          "value": 2,
+          "max": 10,
+          "percentage": 20
+        },
+        {
+          "time": 133.73400000000402,
+          "value": 10,
+          "max": 10,
+          "percentage": 100
+        }
+      ],
+      "completed": true,
+      "error": null
+    }
+  },
+  "output": [
+    {
+      "filename": "ComfyUI_00003_.mp4",
+      "local_path": "/workspace/ComfyUI/output/66f4fac5-3f72-4390-b837-d3e4d961d4f9/ComfyUI_00003_.mp4",
+      "type": "output",
+      "subfolder": "video",
+      "node_id": "98",
+      "output_type": "images",
+      "url": "https://url-to-generated-asset"
+    }
+  ],
+  "timings": {}
+}
+```
+
+<Warning>
+  Ensure that the Wan 2.2 T2V A14B models and any required custom nodes are already installed before sending a request. This template pre-installs all necessary Wan 2.2 T2V A14B models during first boot.
+</Warning>
+
+# Testing Before Deployment
+
+Although this template is designed for serverless deployment, you can test it as an interactive instance first.
+
+To access ComfyUI and the API wrapper:
+
+1. Start an interactive instance with this template
+2. Connect via SSH with port forwarding:
+   ```bash
+   ssh -L 18188:localhost:18188 -L 18288:localhost:18288 root@instance-address -p port
+   ```
+3. Access ComfyUI at http://localhost:18188
+4. Access the API Wrapper documentation at http://localhost:18288/docs
+
+The benchmarking process will be visible in the instance logs, but applications won't be available over the public interface without port forwarding.
+
+# About Wan 2.2 T2V A14B
+
+Wan 2.2 T2V A14B is a text-to-video generation model that creates high-quality video from text prompts. The model uses a two-stage diffusion process with separate high-noise and low-noise models for improved video quality and temporal consistency.
+
+**Key features:**
+- Text-to-video generation with positive and negative prompts
+- Two-stage diffusion process (high-noise and low-noise models)
+- Support for LoRA models for faster inference (LightX2V 4-step variants)
+- Configurable video dimensions (width, height, length)
+- Adjustable frame rate (FPS)
+- High-quality MP4 video output
+
+**Model architecture:**
+- UMT5-XXL text encoder (FP8 quantized)
+- Wan 2.1 VAE for video encoding/decoding
+- Dual 14B diffusion models (FP8 quantized) for high-noise and low-noise stages
+- Optional LoRA models for accelerated inference
+
+Learn more about Wan 2.2 T2V A14B on [Hugging Face](https://huggingface.co/Wan-AI/Wan2.2-T2V-A14B).
