@@ -1,174 +1,298 @@
 ---
 title: Comfy UI
 description: Learn how to use Comfy UI with Vast.ai Serverless for image generation workflows.
+"canonical": "/documentation/serverless/comfy-ui"
 ---
 
-The [Comfy UI serverless template](https://cloud.vast.ai/?template_id=f8aac491656a1d1040e7dfc5f8fcf059) can be used to run Comfy stable diffusion models on Vast GPU instances. This page documents required environment variables and endpoints to get started.
+<script type="application/ld+json" dangerouslySetInnerHTML={{
+  __html: JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "Comfy UI with Vast.ai Serverless",
+    "description": "Complete guide to using ComfyUI with Vast.ai Serverless for image generation workflows, covering template setup, S3 storage configuration, benchmarking, workflow submission via /generate/sync endpoint, and testing.",
+    "author": {
+      "@type": "Organization",
+      "name": "Vast.ai"
+    },
+    "articleSection": "Serverless Documentation",
+    "keywords": ["ComfyUI", "image generation", "stable diffusion", "serverless", "API", "vast.ai", "workflow", "benchmarking", "S3 storage", "PyWorker", "generate endpoint"]
+  })
+}} />
 
-A full PyWorker and Client implementation can be found [here](https://github.com/vast-ai/pyworker/tree/main).
+The [ComfyUI Serverless template](https://cloud.vast.ai/?ref_id=62897&creator_id=62897&name=ComfyUI%20(Serverless)) allows you to send requests to ComfyUI and have generated assets automatically uploaded to S3-compatible storage. The template returns pre-signed URLs in response to requests, along with detailed process updates emitted by ComfyUI during generation.
+
+# Template Components
+
+The ComfyUI template includes:
+
+**In the Docker Image:**
+- ComfyUI
+- ComfyUI API Wrapper
+- Stable Diffusion 1.5 (for benchmarking)
+
+**Downloaded on first boot:**
+- PyWorker (comfyui-json worker)
+- Provisioning Script for custom configuration
+  - Adds cron job to remove older output files (older than 24 hours) if available disk space is less than 512MB
+
+<Note>
+  Before using this template, familiarize yourself with the [Serverless Documentation](/documentation/serverless/overview) and [Getting Started With Serverless](/documentation/serverless/getting-started-with-serverless) guide.
+</Note>
 
 # Environment Variables
 
-- `HF_TOKEN`(string): HuggingFace API token with read permissions, used to download gated models. Read more about HuggingFace tokens [here](https://huggingface.co/docs/hub/en/security-tokens).
-- `COMFY_MODEL`(string): Text2Image model being used.&#x20;
-  - options: `"sd3"`, `"flux"`
+## Required for S3 Storage
+
+The API wrapper manages asset uploads to S3-compatible storage. Configure these variables in your [Account Settings](https://cloud.vast.ai/settings/):
+
+- `S3_ACCESS_KEY_ID`(string): Access key ID for S3-compatible storage
+- `S3_SECRET_ACCESS_KEY`(string): Secret access key for S3-compatible storage
+- `S3_BUCKET_NAME`(string): Bucket name for S3-compatible storage
+- `S3_ENDPOINT_URL`(string): Endpoint URL for S3-compatible storage
+- `S3_REGION`(string): Optional region for S3-compatible storage
+
+<Note>
+  These S3 values can be overridden on a per-request basis in the request payload.
+</Note>
+
+## Optional Configuration
+
+- `WEBHOOK_URL`(string): Optional webhook to call after generation completion or failure
+- `PYWORKER_REPO`(string): Custom PyWorker git repository URL (default: https://github.com/vast-ai/pyworker)
+- `PYWORKER_REF`(string): Git reference to checkout from PyWorker repository
+- `BENCHMARK_TEST_WIDTH`(int): Image width in pixels for default benchmark only (default: 512)
+- `BENCHMARK_TEST_HEIGHT`(int): Image height in pixels for default benchmark only (default: 512)
+- `BENCHMARK_TEST_STEPS`(int): Number of denoising steps for default benchmark only (default: 20)
+
+<Warning>
+  Store sensitive information like API keys in the 'Environment Variables' section of your [Account Settings](https://cloud.vast.ai/settings/). These will be available in all instances you create.
+</Warning>
+
+# Benchmarking
+
+When a worker initializes, it runs a benchmark to validate GPU performance and calculate a performance score. This score determines how requests are distributed across workers.
+
+## Custom Benchmark Workflows
+
+You can provide a custom ComfyUI workflow for benchmarking by creating `workers/comfyui-json/misc/benchmark.json`. Use the placeholder `__RANDOM_INT__` in place of static seed values to ensure varied generations.
+
+<Note>
+  The `__RANDOM_INT__` placeholder can also be used in any workflow you send to the worker. It will be replaced with a random integer for each generation, allowing for varied outputs without manually specifying different seeds.
+</Note>
+
+## Default Benchmark
+
+If no custom benchmark is provided, the template uses Stable Diffusion v1.5 with ComfyUI's default text-to-image workflow. Configure the benchmark complexity using the environment variables listed above.
+
+**How worker scores work:**
+- Each benchmark has a baseline complexity score of `100` (representing 100% of the work)
+- A worker completing the benchmark in 100 seconds receives a score of `1.0` (processes 1% of work per second)
+- A worker completing in 50 seconds receives a score of `2.0` (twice as fast)
+- Faster workers (higher scores) receive proportionally more requests
+
+<Note>
+  Configure your benchmark to match your actual workload complexity. If your typical workflow is more complex than the default SD1.5 benchmark, increase `BENCHMARK_TEST_STEPS` proportionally.
+</Note>
 
 
 
 # Endpoints
 
-## **/**&#x70;rompt/
+The ComfyUI template provides endpoints for executing workflows and generating images. After obtaining a worker address from the `/route/` endpoint (see [route documentation](/documentation/serverless/route)), you can send requests to the following endpoints.
 
-The ComfyUI defined endpoint to generate an image. After receving a GPU worker address from the `/route/` endpoint, a `/prompt/` endpoint would have the following structure.
+## /generate/sync
 
-### Inputs
+The primary endpoint for submitting ComfyUI workflows. This endpoint accepts complete, user-defined ComfyUI workflows in JSON format and processes them synchronously.
 
-For both "sd3" and "flux":&#x20;
+### Request Structure
 
-Payload:
 
-- `prompt`(string): The model prompt used to generate the image.
-- `width`(int): Width in pixels of the resulting generated image.
-- `height`(int): Height in pixels of the resulting generated image.
-- `steps`(int): Number of diffusion steps taken during image generation. The assumed default is 28.
-- `seed`(int): The value used to initialize the random noise pattern in the diffusion model. Used for reproducability.&#x20;
+### Input
 
-Auth\_data:
+`payload`:
 
-- `signature`(string): A cryptographic string that authenticates the url, cost, and reqnum fields in the response, proving they originated from the server. Clients can use this signature, along with the server's public key, to verify that these specific details have not been tampered with.
-- `cost`(float): The estimated compute resources for the request. The units of this cost are defined by the PyWorker.&#x20;
-- `endpoint`(string): Name of the Endpoint.
-- `reqnum`(int): The request number corresponding to this worker instance. Note that workers expect to receive requests in approximately the same order as these reqnums, but some flexibility is allowed due to potential out-of-order requests caused by concurrency or small delays on the proxy server.
-- `url`(string): The address of the worker instance to send the request to.
+- `input`:
+  - `request_id`(string): Optional unique identifier for tracking the request
+  - `workflow_json`(object): Complete ComfyUI workflow graph in JSON format
+  - `s3`(object): Optional S3 configuration override
+    - `access_key_id`(string)
+    - `secret_access_key`(string)
+    - `endpoint_url`(string)
+    - `bucket_name`(string)
+    - `region`(string)
+  - `webhook`(object): Optional webhook configuration
+    - `url`(string): Webhook URL to call after generation
+    - `extra_params`(object): Additional parameters to include in webhook payload
 
-```json JSON icon="js"
-{
-  "payload": {
-    "prompt": "a majestic lion with a flowing mane, fantasy art style",
-    "width": 1024,
-    "height": 1024,
-    "steps": 28,
-    "seed": 55512345
-  },
-  "auth_data": {
-    "signature": "mock_signature_from_routing_service_abc123",
-    "cost": 100,
-    "endpoint": "comfyui-flux-default",
-    "reqnum": "req_789xyz",
-    "url": "http://127.0.0.1:8188/" //this is the base URL of the worker, 'prompt/' is appended to the end
-  }
-}
+<Note>
+  If the API Wrapper detects that you have used a URL as an input image in your workflow, it will automatically download the image and modify the workflow to use the local path.
+</Note>
+
+**Example Request:**
+
+<CodeGroup>
+```python vastai-sdk icon=python
+from vastai import Serverless
+import asyncio
+
+ENDPOINT_NAME="comfyui-json"
+
+async def main():
+    async with Serverless() as client:
+        endpoint = await client.get_endpoint(name=ENDPOINT_NAME)
+
+        # ComfyUI API compatible json workflow
+        workflow = {
+          "3": {
+            "inputs": {
+              "seed": "__RANDOM_INT__",
+              "steps": 20,
+              "cfg": 8,
+              "sampler_name": "euler",
+              "scheduler": "normal",
+              "denoise": 1,
+              "model": ["4", 0],
+              "positive": ["6", 0],
+              "negative": ["7", 0],
+              "latent_image": ["5", 0]
+            },
+            "class_type": "KSampler",
+            "_meta": {
+              "title": "KSampler"
+            }
+          },
+          "4": {
+            "inputs": {
+              "ckpt_name": "v1-5-pruned-emaonly-fp16.safetensors"
+            },
+            "class_type": "CheckpointLoaderSimple",
+            "_meta": {
+              "title": "Load Checkpoint"
+            }
+          },
+          "5": {
+            "inputs": {
+              "width": 512,
+              "height": 512,
+              "batch_size": 1
+            },
+            "class_type": "EmptyLatentImage",
+            "_meta": {
+              "title": "Empty Latent Image"
+            }
+          },
+          "6": {
+            "inputs": {
+              "text": "beautiful scenery nature glass bottle landscape, purple galaxy bottle",
+              "clip": ["4", 1]
+            },
+            "class_type": "CLIPTextEncode",
+            "_meta": {
+              "title": "CLIP Text Encode (Prompt)"
+            }
+          },
+          "7": {
+            "inputs": {
+              "text": "text, watermark",
+              "clip": ["4", 1]
+            },
+            "class_type": "CLIPTextEncode",
+            "_meta": {
+              "title": "CLIP Text Encode (Prompt)"
+            }
+          },
+          "8": {
+            "inputs": {
+              "samples": ["3", 0],
+              "vae": ["4", 2]
+            },
+            "class_type": "VAEDecode",
+            "_meta": {
+              "title": "VAE Decode"
+            }
+          },
+          "9": {
+            "inputs": {
+              "filename_prefix": "ComfyUI",
+              "images": ["8", 0]
+            },
+            "class_type": "SaveImage",
+            "_meta": {
+              "title": "Save Image"
+            }
+          }
+        }
+        
+        payload = {
+          "input": {
+            "request_id": "",
+            "workflow_json": workflow,
+            "s3": {
+              "access_key_id": "",
+              "secret_access_key": "",
+              "endpoint_url": "",
+              "bucket_name": "",
+              "region": ""
+            },
+            "webhook": {
+              "url": "",
+              "extra_params": {
+                "user_id": "12345",
+                "project_id": "abc-def"
+              }
+            }
+          }
+        }
+
+        response = await endpoint.request("/generate/sync", payload)
+
+        # Response contains status, output, and any errors
+        print(response["response"])
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
+</CodeGroup>
+
 
 ### Outputs
 
-- `prompt_id`(string): A unique identifier assigned by the ComfyUI instance for this specific workflow execution or prompt.
-- `number`(int): A sequential number assigned by the ComfyUI instance to this prompt. This number reflects the order in which prompts are received or processed by the worker.
-- `node_errors`(object): An object that contains details about any errors that occurred within specific nodes during the workflow execution.
-- `outputs`(object): An object containing the outputs generated by specific nodes in the ComfyUI workflow. The keys of this object are the string identifiers of the nodes that produced output
+- `id`(string): Unique identifier for the request
+- `status`(string): Request status - `completed`, `failed`, `processing`, `generating`, or `queued`
+- `message`(string): Human-readable status message
+- `comfyui_response`(object): Detailed response from ComfyUI including:
+  - `prompt`: The workflow that was executed
+  - `outputs`: Generated outputs organized by node ID
+  - `status`: Execution status with completion messages and timestamps
+  - `meta`: Metadata about the execution
+  - `execution_details`: Progress updates and timing information
+- `output`(array): Array of output objects, each containing:
+  - `filename`(string): Name of the generated file
+  - `local_path`(string): Path to file on worker
+  - `url`(string): Pre-signed URL for downloading the generated asset (if S3 is configured)
+  - `type`(string): Output type (e.g., "output")
+  - `subfolder`(string): Subfolder within output directory
+  - `node_id`(string): ComfyUI node that produced this output
+  - `output_type`(string): Type of output (e.g., "images")
+- `timings`(object): Timing information for the request
 
-```json JSON icon="js"
-{
-  "prompt_id": "f9e0a3c2-0b7a-4f8e-8c1d-5a7b9e2f3c0a",
-  "number": 7,
-  "node_errors": {},
-  "outputs": {
-    "9": {
-      "images": [
-        {
-          "filename": "ComfyUI_00007_.png",
-          "subfolder": "",
-          "type": "output"
-        }
-      ]
-    }
-  }
-}
-```
+<Warning>
+  Ensure that any models and nodes referenced in your workflow are already installed before sending a request. Use the Provisioning Script or build a custom Docker image to pre-install required models and nodes.
+</Warning>
 
+# Testing Before Deployment
 
+Although this template is designed for serverless deployment, you can test it as an interactive instance first.
 
-## /custom\_workflow/
+To access ComfyUI and the API wrapper:
 
-Allows a client to send a complete, user-defined ComfyUI workflow (in JSON format) to the server for execution. It includes the `payload` and `auth_data` objects, but modified according to the user's design.
+1. Start an interactive instance with this template
+2. Connect via SSH with port forwarding:
+   ```bash
+   ssh -L 18188:localhost:18188 -L 18288:localhost:18288 root@instance-address -p port
+   ```
+3. Access ComfyUI at http://localhost:18188
+4. Access the API Wrapper documentation at http://localhost:18288/docs
 
-The workflow is a direct ComfyUI graph. Here is an example, similar to the SD3 workflow.
-
-```json JSON icon="js"
-{
-  "payload": {
-    "custom_fields": {
-      "steps": 20,
-      "width": 512,
-      "height": 512
-    },
-    "workflow": {
-      "3": {
-        "inputs": {
-          "seed": 156680208700286,
-          "steps": 20,
-          "cfg": 8,
-          "sampler_name": "euler",
-          "scheduler": "normal",
-          "denoise": 1,
-          "model": ["4", 0],
-          "positive": ["6", 0],
-          "negative": ["7", 0],
-          "latent_image": ["5", 0]
-        },
-        "class_type": "KSampler"
-      },
-      "4": {
-        "inputs": {
-          "ckpt_name": "sd3_medium_incl_clips_t5xxlfp16.safetensors"
-        },
-        "class_type": "CheckpointLoaderSimple"
-      },
-      "5": {
-        "inputs": {
-          "width": 512,
-          "height": 512,
-          "batch_size": 1
-        },
-        "class_type": "EmptyLatentImage"
-      },
-      "6": {
-        "inputs": {
-          "text": "a futuristic cityscape at dusk, neon lights, flying vehicles",
-          "clip": ["4", 1]
-        },
-        "class_type": "CLIPTextEncode"
-      },
-      "7": {
-        "inputs": {
-          "text": "blurry, low quality, ugly",
-          "clip": ["4", 1]
-        },
-        "class_type": "CLIPTextEncode"
-      },
-      "8": {
-        "inputs": {
-          "samples": ["3", 0],
-          "vae": ["4", 2]
-        },
-        "class_type": "VAEDecode"
-      },
-      "9": {
-        "inputs": {
-          "filename_prefix": "CustomWorkflowOutput",
-          "images": ["8", 0]
-        },
-        "class_type": "SaveImage"
-      }
-    }
-  },
-  "auth_data": {
-    "signature": "mock_signature_for_custom_workflow_def456",
-    "cost": 150,
-    "endpoint": "comfyui-sd3-custom",
-    "reqnum": "req_101112jkl",
-    "url": "http://127.0.0.1:8188/"
-  }
-}
-```
+The benchmarking process will be visible in the instance logs, but applications won't be available over the public interface without port forwarding.
 
