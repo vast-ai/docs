@@ -1,7 +1,23 @@
 ---
 title: Logs
 description: Learn how to fetch and analyze logs from Vast.ai Serverless endpoints and worker groups. Understand the log levels, how to use cURL to fetch logs, and how to interpret the logs for debugging and performance monitoring.
+"canonical": "/documentation/serverless/logs"
 ---
+
+<script type="application/ld+json" dangerouslySetInnerHTML={{
+  __html: JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "Vast.ai Serverless Logs",
+    "description": "API reference for fetching and analyzing logs from Vast.ai Serverless endpoints and worker groups using /get_endpoint_logs/ and /get_autogroup_logs/ endpoints, including log levels (debug, trace, info0, info1).",
+    "author": {
+      "@type": "Organization",
+      "name": "Vast.ai"
+    },
+    "articleSection": "Serverless Documentation",
+    "keywords": ["logs", "debugging", "endpoints", "worker groups", "serverless", "vast.ai", "monitoring"]
+  })
+}} />
 
 Both Endpoints and Worker Groups keep logs that can be fetched by using the `/get_endpoint_logs/` and `/get_autogroup_logs/` endpoints, respectively.
 
@@ -13,6 +29,20 @@ For both types of groups, there are four levels of logs with decreasing levels o
   Each log level has a fixed size, and once it is full, the log is wiped and overwritten with new log messages. It is good practice to check these regularly while debugging.
 </Warning>
 
+# Using the CLI
+
+You can use the vastai CLI to quickly check endpoint and worker group logs at different log levels.
+
+## Endpoint logs
+```cli CLI Command
+vastai get endpt-logs <endpoint_id> --level (0-3)
+```
+
+## Workergroup logs
+```cli CLI Command
+vastai get wrkgrp-logs <worker_group_id> --level (0-3)
+```
+
 # POST https\://run.vast.ai/get\_endpoint\_logs/
 
 ## Inputs
@@ -21,20 +51,29 @@ For both types of groups, there are four levels of logs with decreasing levels o
   - `id`(int): ID of your endpoint
   - `endpoint`(string): Name of your endpoint
 - `api_key`(string): The Vast API key associated with the account that controls the Endpoint.
+- `tail` (int): The number of bytes from the end of each log file that will be sent in the response.
+  - If the file size is less than or equal to tail, then the whole file will be returned.
+  - A value of -1 will return the whole file.
 
 ```json JSON icon="js"
 {
     "endpoint": "YOUR_ENDPOINT_NAME",
-    "api_key": "YOUR_VAST_API_KEY"
+    "api_key": "YOUR_VAST_API_KEY",
+    "tail": 1000
 }
 ```
 
 ## Outputs
+If tail has a value of 1000
 
-- `info0`: The contents of the `info0` log
-- `info1`: The contents of the `info1` log
-- `trace`: The contents of the `trace` log
-- `debug`: The contents of the `debug` log
+``` json JSON icon="js"
+{
+  "info0": "Last l000 bytes of the info0 log",
+  "info1": "Last l000 bytes of the info0 log",
+  "trace": "Last l000 bytes of the trace log",
+  "debug": "Last l000 bytes of the debug log"
+}
+```
 
 ## Example: Fetching Endpoint Logs with cURL
 
@@ -53,21 +92,30 @@ curl https://run.vast.ai/get_endpoint_logs/ \
 
 - `id`(int): The ID of the Worker Group
 - `api_key`(string): The Vast API key associated with the account that controls the Worker Group.
+- `tail` (int): The number of bytes from the end of each log file that will be sent in the response.
+  - If the file size is less than or equal to tail, then the whole file will be returned.
+  - A value of -1 will return the whole file.
+
 
 ```json JSON icon="js"
 {
     "id": 1001,
-    "api_key": "YOUR_VAST_API_KEY"
+    "api_key": "YOUR_VAST_API_KEY",
+    "tail": 1000
 }
 ```
 
 ## Outputs
+If the value of tail is 1000
 
-- `info0`: The contents of the `info0` log
-- `info1`: The contents of the `info1` log
-- `trace`: The contents of the `trace` log
-- `debug`: The contents of the `debug` log
-
+``` json JSON icon="js"
+{
+  "info0": "Last l000 bytes of the info0 log",
+  "info1": "Last l000 bytes of the info0 log",
+  "trace": "Last l000 bytes of the trace log",
+  "debug": "Last l000 bytes of the debug log"
+}
+```
 ## Example: Fetching Worker Group Logs with cURL
 
 ```bash Bash

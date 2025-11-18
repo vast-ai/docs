@@ -1,7 +1,54 @@
 ---
 title: Getting Started With Serverless
 description: Learn how to get started with Vast.ai Serverless. Understand the prerequisites, setup process, and how to use the serverless engine.
+"canonical": "/documentation/serverless/getting-started-with-serverless"
 ---
+
+<script type="application/ld+json" dangerouslySetInnerHTML={{
+  __html: JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "How to Get Started with Vast.ai Serverless",
+    "description": "A comprehensive tutorial on setting up a vLLM + Qwen3-8B Serverless Engine on Vast.ai, from configuring environment variables to load testing your endpoint.",
+    "step": [
+      {
+        "@type": "HowToStep",
+        "name": "Configure User Environment Variables",
+        "text": "Navigate to the user account settings page at cloud.vast.ai/account and drop down the 'Environment Variables' tab. Add 'HF_TOKEN' in the Key field and your HuggingFace read-access token in the Value field. Click the '+' button and then 'Save Edits'."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Prepare a Template for Workers",
+        "text": "Navigate to the Templates Page at cloud.vast.ai/templates, select the Serverless filter, and click Edit on the 'vLLM + Qwen/Qwen3-8B (Serverless)' template. In the Environment Variables section, set MODEL_NAME to your desired model. Set the template to Private and click Save & Use. Copy the template hash for CLI usage."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Create The Endpoint",
+        "text": "Navigate to the Serverless Page at cloud.vast.ai/serverless and click Create Endpoint. Configure parameters: endpoint_name (the name), cold_mult (multiplier for future load prediction, default 2 for LLMs), min_load (baseline tokens/second, default 100 for LLMs), target_util (percentage of compute resources in-use, default 0.9), max_workers (maximum number of workers), and cold_workers (minimum workers kept ready). Click Create."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Create a Workergroup",
+        "text": "From the Serverless page, click '+ Workergroup' under the Endpoint. Your custom vLLM template should be selected. Enter values: Cold Multiplier = 3, Minimum Load = 1, Target Utilization = 0.9, Workergroup Name = 'Workergroup', and Select Endpoint = 'vLLM-Qwen3-8B'. Click Create. The serverless engine will automatically find offers and create instances."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Wait for First Ready Worker",
+        "text": "Monitor the workers in the Serverless section of the Vast.ai console. Workers will download the Qwen3-8B model and initialize. When a worker finishes benchmarking (Curr. Performance is non-zero) and status becomes 'Ready', the serverless engine is ready to receive requests."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Test the Serverless Engine with Client",
+        "text": "Clone the PyWorker repository from GitHub. Find your Serverless API key using 'vastai show endpoints' command. Optionally install the TLS certificate. Run the client with: 'python3 -m workers.openai.client -k \"$YOUR_USER_API_KEY\" -e \"vLLM-Qwen3-8B\" --model \"Qwen/Qwen3-8B\" --completion' to test completions."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Monitor and Load Test",
+        "text": "Fetch Endpoint logs using cURL to https://run.vast.ai/get_endpoint_logs/ or Workergroup logs to https://run.vast.ai/get_workergroup_logs/. Run load testing with: 'python3 -m workers.openai.test_load -n 100 -rps 1 -k \"$YOUR_USER_API_KEY\" -e \"vLLM-Qwen3-8B\" --model \"Qwen/Qwen3-8B\"' to test with 100 requests at 1 request per second."
+      }
+    ]
+  })
+}} />
 
 <Warning>
   For users not familiar with Vast.ai's Serverless engine, we recommend starting with the [Serverless Architecture documentation](/documentation/serverless/architecture). It will be helpful in understanding how the system operates, processes requests, and manages resources.
@@ -103,9 +150,6 @@ Before we start, there are a few things you will need:
 
         For our simple setup, we can enter the following values:
 
-        - Cold Multiplier = 3
-        - Minimum Load = 1
-        - Target Utilization = 0.9
         - Workergroup Name = 'Workergroup'
         - Select Endpoint = 'vLLM-Qwen3-8B'
 
@@ -120,12 +164,12 @@ Before we start, there are a few things you will need:
         Run the following command to create your Workergroup:
 
         ```sh CLI Command
-        vastai create workergroup --endpoint_name "vLLM-DeepSeek" --template_hash "$TEMPLATE_HASH" --test_workers 5
+        vastai create workergroup --endpoint_name "vLLM-DeepSeek" --template_hash "$TEMPLATE_HASH" --gpu_ram 24
         ```
 
         `endpoint_name`: The name of the Endpoint.
         `template_hash`: The hash code of our custom vLLM (Serverless) template.
-        `test_workers`: The minimum number of workers to create while initializing the Workergroup. This allows the Workergroup to get performance estimates before serving the Endpoint, and also creates workers which are fully loaded and "stopped" (aka "cold").
+        `gpu_ram`: The amount of memory (in GB) that you expect your template to load onto the GPU (i.e. model weights).
 
         <Warning>
           You will need to replace "$TEMPLATE\_HASH" with the template hash copied from step 1.
@@ -170,17 +214,12 @@ We have now successfully created a vLLM + Qwen3-8B Serverless Engine! It is read
 
 # Using the Serverless Engine
 
-To fully understand this section, it is recommended to read the [PyWorker Overview](/documentation/serverless/overview). The overview shows how all the pieces related to the serverless engine work together.
+To make requests to your endpoint, first install the `vastai_sdk` from pip.
+```sh Bash
+pip install vastai_sdk
+```
 
-The Vast vLLM (Serverless) template we used in the last section already has a client (client.py) written for it. To use this client, we must run commands in a terminal, since there is no UI available for this section. The client, along with all other files the GPU worker is cloning during initialization, can be found in the [Vast.ai Github repo](https://github.com/vast-ai/pyworker/tree/main). For this section, simply clone the entire repo using:
-
-&#x20;`git clone https://github.com/vast-ai/pyworker.git`
-
-As the User, we want all the files under 'User' to be in our file system. The GPU workers that the system initializes will have the files and entities under 'GPU Worker'.
-
-<Frame caption="Files and Entities for the user and GPU worker">
-![Files and Entities for the user and GPU worker](/images/getting-started-serverless-8.webp)
-</Frame>
+Make sure you have configured the `VAST_API_KEY` environment variable with your Serverless API key.
 
 ## API Keys
 
@@ -213,155 +252,34 @@ The `show endpoints` command will return a JSON blob like this:
  }
 ```
 
-<Accordion title="Install the TLS certificate \[Optional]">
-  ## Install the TLS certificate \[Optional]
+## Usage
 
-  All of Vast.ai's pre-made Serverless templates use SSL by default. If you want to disable it, you can add `-e USE_SSL=false` to the Docker options in your copy of the template. The Serverless Engine will automatically adjust the instance URL to enable or disable SSL as needed.
+Create a Python script to send a request to your endpoint:
+```python icon="python" Python
+from vastai import Serverless
+import asyncio
 
-  1. Download Vast AI's certificate from [here](https://console.vast.ai/static/jvastai_root.cer).
-  2. In the Python environment where you're running the client script, execute the following command: `python3 -m certifi`
-  3. The command in step 2 will print the path to a file where certificates are stored. Append Vast AI's certificate to that file using the following command: `cat jvastai_root.cer >> PATH/TO/CERT/STORE`
-  4. You may need to run the above command with `sudo` if you are not running Python in a virtual environment.
+async def main():
+    async with Serverless() as client:
+        endpoint = await client.get_endpoint(name="my-endpoint")
 
-  <Note>
-    This process only adds Vast AI's TLS certificate as a trusted certificate for Python clients.&#x20;
-
-    For non-Python clients, you'll need to add the certificate to the trusted certificates for that specific client. If you encounter any issues, feel free to contact us on support chat for assistance.
-  </Note>
-
-</Accordion>
-
-<Steps>
-  <Step title="Running client.py">
-    In client.py, we are first sending a POST request to the [`/route/`](/documentation/serverless/route) endpoint. This sends a request to the serverless engine asking for a ready worker, with a payload that looks like:
-
-    ```javascript Javascript icon="js"
-    route_payload = {
-            "endpoint": "endpoint_name",
-            "api_key":  "your_serverless_api_key",
-            "cost": COST,
-        }
-    ```
-
-    The `cost` input here tells the serverless engine how much workload to expect for this request, and is *not&#x20;*&#x72;elated to credits on a Vast.ai account. The engine will reply with a valid worker address, where client.py then calls the `/v1/completions` endpoint with the authentication data returned by the serverless engine and the user's model input text as the payload.
-
-    ```json JSON
-    {
-        "auth_data": {
-            "cost": 256.0,
-            "endpoint": "endpoint_name",
-            "reqnum": "req_num",
-            "signature": "signature",
-            "url": "worker_address"
-        },
-        "payload": {
-            "input": {
+        payload = {
+            "input" : {
                 "model": "Qwen/Qwen3-8B",
-                "prompt": "The capital of USA is",
-                "temperature": 0.7,
-                "max_tokens": 256,
-                "top_k": 20,
-                "top_p": 0.4, 
-                "stream": false}
+                "prompt" : "Who are you?",
+                "max_tokens" : 100,
+                "temperature" : 0.7
             }
         }
-    }
-    ```
+        
+        response = await endpoint.request("/v1/completions", payload)
+        print(response["response"]["choices"][0]["text"])
 
-    The worker hosting the Qwen3-8B model will return the model results to the client, and print them to the user.&#x20;
+if __name__ == "__main__":
+    asyncio.run(main())
+```
 
-    To quickly run a basic test of the serverless engine with vLLM, navigate to the `pyworker` directory and run:
-
-      ```none CLI Command
-      pip install -r requirements.txt && \
-      python3 -m workers.openai.client -k "$YOUR_USER_API_KEY" -e "vLLM-Qwen3-8B" --model "Qwen/Qwen3-8B" --completion
-      ```
-
-    <Warning>
-      client.py is configured to work with a vast.ai API key, not a Serverless API key. Make sure to set the `API_KEY` variable in your environment, or replace it by pasting in your actual key. You only need to install the requirements.txt file on the first run.
-    </Warning>
-
-    This should result in a "Ready" worker with the Qwen3-8B model printing a Completion Demo to your terminal window. If we enter the same command without --completion, you will see all of the test modes vLLM has. Because we are testing with Qwen3-8B, all test modes will provide a response (not all LLMs are equipped to use tools).
-
-      ```bash CLI Command
-      python3 -m workers.openai.client -k "$YOUR_USER_API_KEY" -e "vLLM-Qwen3-8B" --model "Qwen/Qwen3-8B"
-
-      Please specify exactly one test mode:
-        --completion    : Test completions endpoint
-        --chat          : Test chat completions endpoint (non-streaming)
-        --chat-stream   : Test chat completions endpoint with streaming
-        --tools         : Test function calling with ls tool (non-streaming)
-        --interactive   : Start interactive streaming chat session
-      ```
-  </Step>
-
-  <Step title="Monitoring Groups">
-    There are several endpoints we can use to monitor the status of the serverless engine. To fetch all [Endpoint logs](/documentation/serverless/logs), run the following cURL command:
-
-    ```bash Bash
-    curl https://run.vast.ai/get_endpoint_logs/ \
-    -X POST \
-    -d '{"endpoint" : "vLLM-Qwen3-8B", "api_key" : "$YOUR_SERVERLESS_API_KEY"}' \
-    -H 'Content-Type: application/json'
-    ```
-
-    Similarily, to fetch all [Workergroup logs](/documentation/serverless/logs), execute:
-
-    ```bash Bash
-    curl https://run.vast.ai/get_workergroup_logs/ \
-    -X POST \
-    -d '{"id" : WORKERGROUP_ID, "api_key" : "$YOUR_SERVERLESS_API_KEY"}' \
-    -H 'Content-Type: application/json'
-    ```
-
-    All Endpoints and Workergroups continuously track their performance over time, which is sent to the serverless engine as metrics. To see Workergroup metrics, run the following:
-
-    ```bash Bash
-    curl -X POST "https://console.vast.ai/api/v0/serverless/metrics/" \
-         -H "Content-Type: application/json" \
-         -d '{
-               "start_date": 1749672382.157,
-               "end_date":   1749680792.188,
-               "step":       500,
-               "type":       "autogroup",
-               "metrics": [
-                 "capacity",
-                 "curload",
-                 "nworkers",
-                 "nrdy_workers_",
-                 "reliable",
-                 "reqrate",
-                 "totreqs",
-                 "perf",
-                 "nrdy_soon_workers_",
-                 "model_disk_usage",
-                 "reqs_working"
-               ],
-               "resource_id": '"${workergroup_id}"'
-             }'
-
-    ```
-
-    These metrics are displayed in a Workergroup's UI page.
-  </Step>
-
-  <Step title="Load Testing">
-    In the Github repo that we cloned earlier, there is a load testing script called `workers/openai/test_load.py`. The *-n&#x20;*&#x66;lag indicates the total number of requests to send to the serverless engine, and the *-rps&#x20;*&#x66;lag indicates the rate (requests/second). The script will print out statistics that show metrics like:
-
-    - Total requests currently being generated
-    - Number of successful generations
-    - Number of errors
-    - Total number of workers used during the test
-
-    To run this script, make sure the python packages from `requirements.txt` are installed, and execute the following command:
-
-    ```sh SH
-    python3 -m workers.openai.test_load -n 100 -rps 1 -k "$YOUR_USER_API_KEY" -e "vLLM-Qwen3-8B" --model "Qwen/Qwen3-8B"
-    ```
-  </Step>
-</Steps>
-
-This is everything you need to start, test, and monitor a vLLM + Qwen3-8B Serverless engine! There are other Vast pre-made [serverless templates](/documentation/templates/quickstart), like the ComfyUI Image Generation model, that can be setup in a similar fashion.&#x20;
+This is everything you need to start a vLLM + Qwen3-8B Serverless engine! There are other Vast pre-made [serverless templates](/documentation/templates/quickstart), like the ComfyUI Image Generation model, that can be setup in a similar fashion.&#x20;
 
 
 

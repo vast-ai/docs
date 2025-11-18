@@ -1,7 +1,23 @@
 ---
 title: Worker List
 description: Learn how to use the /get_endpoint_workers/ and /get_autogroup_workers/ endpoints to retrieve a list of GPU instances under an Endpoint and Worker Group. Understand the inputs, outputs, and examples for using the endpoints.
+"canonical": "/documentation/serverless/worker-list"
 ---
+
+<script type="application/ld+json" dangerouslySetInnerHTML={{
+  __html: JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "Vast.ai Serverless Worker List API",
+    "description": "API reference for retrieving GPU instances using /get_endpoint_workers/ and /get_autogroup_workers/ endpoints, including worker metrics (cur_load, cur_perf, disk_usage, reliability, status) and cURL examples.",
+    "author": {
+      "@type": "Organization",
+      "name": "Vast.ai"
+    },
+    "articleSection": "Serverless Documentation",
+    "keywords": ["worker list", "API", "GPU instances", "metrics", "monitoring", "serverless", "vast.ai"]
+  })
+}} />
 
 The `/get_endpoint_workers/` and `/get_autogroup_workers/` endpoints return a list of GPU instances under an Endpoint and \{\{Worker\_Group}}, respectively.&#x20;
 
@@ -26,6 +42,7 @@ The `api_key` could alternatively be provided in the request header as a bearer 
 For each GPU instance in the Endpoint, the following will be returned:
 
 - `cur_load`(float): Current load (as defined by the PyWorker) the GPU instance is receiving per second.
+- `new_load` (float): Amount of load the GPU instance received recently.
 - `cur_load_rolling_avg`(float): Rolling average of `cur_load`.
 - `cur_perf`(float): The most recent or current operational performance level of the instance (as defined by the PyWorker). For example, a text generation model has the units of tokens generated per second.
 - `disk_usage`(float): Storage used by instance (in Gb).
@@ -41,6 +58,7 @@ For each GPU instance in the Endpoint, the following will be returned:
 ```json JSON icon="js"
 {
     "cur_load": 150,
+    "new_load": 50,
     "cur_load_rolling_avg": 50,
     "cur_perf": 80,
     "disk_usage": 30,
@@ -56,6 +74,24 @@ For each GPU instance in the Endpoint, the following will be returned:
 ```
 
 ## Example
+
+### Python
+
+```python
+from vastai import Serverless
+import asyncio
+
+async def main():
+    async with Serverless() as client:
+        endpoint = await client.get_endpoint("test")
+        workers = await endpoint.get_workers()
+        for worker in workers:
+            print(worker)
+
+asyncio.run(main())
+```
+
+### curl
 
 Run the following Bash command in a terminal to receive Endpoint workers.
 
@@ -89,6 +125,7 @@ The `api_key` could alternatively be provided in the request header as a bearer 
 For each GPU instance in the Worker Group, the following will be returned:
 
 - `cur_load`(float): Current load (as defined by the PyWorker) the GPU instance is receiving per second.
+- `new_load` (float): Amount of load the GPU instance received recently.
 - `cur_load_rolling_avg`(float): Rolling average of `cur_load`.
 - `cur_perf`(float): The most recent or current operational performance level of the instance (as defined by the PyWorker). For example, a text generation model has the units of tokens generated per second.
 - `disk_usage`(float): Storage used by instance (in Gb).
@@ -101,9 +138,10 @@ For each GPU instance in the Worker Group, the following will be returned:
 - `reqs_working`(int): Number of active requests currently being processed by the instance.
 - `status`(string): Current status of the worker.
 
-```javascript
+```json JSON icon="js"
 {
     "cur_load": 150,
+    "new_load": 50,
     "cur_load_rolling_avg": 50,
     "cur_perf": 80,
     "disk_usage": 30,
@@ -128,6 +166,3 @@ curl https://run.vast.ai/get_autogroup_workers/ \
 -d '{"id" : 1001, "api_key" : "API_KEY_HERE"}' \
 -H 'Content-Type: application/json'
 ```
-
-
-
