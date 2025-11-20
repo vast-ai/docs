@@ -113,9 +113,13 @@ This searches for:
 Once you've selected an instance ID from the search results (look in the first column), create it with the correct configuration:
 
 ```bash Bash
+# Generate a secure API key
+VLLM_API_KEY="vllm-$(openssl rand -hex 16)"
+
+# Create instance with API key authentication
 vastai create instance <INSTANCE_ID> \
     --image vllm/vllm-openai:nightly \
-    --env '-p 8000:8000' \
+    --env "-p 8000:8000 -e VLLM_API_KEY=$VLLM_API_KEY" \
     --disk 500 \
     --args --model MiniMaxAI/MiniMax-M2 \
            --tensor-parallel-size 4 \
@@ -125,10 +129,15 @@ vastai create instance <INSTANCE_ID> \
 
 **Key parameters explained**:
 - `--image vllm/vllm-openai:nightly` - Must use nightly build for MiniMax-M2 support
+- `--env "-p 8000:8000 -e VLLM_API_KEY=$VLLM_API_KEY"` - Expose port 8000 and set API key for authentication
 - `--disk 500` - 500GB disk space for the ~460GB model
 - `--tensor-parallel-size 4` - Distribute model across 4 GPUs
 - `--trust-remote-code` - Required for custom MiniMax-M2 architecture
 - `--max-model-len 131072` - Context length reduced to fit in GPU memory (from full 196K)
+
+<Note>
+  Save your `VLLM_API_KEY` securely. You'll need to include it in the `Authorization: Bearer <key>` header for all API requests.
+</Note>
 
 <Note>
   The full 196K token context window requires more GPU memory than available on 4x80GB GPUs. Using 131K tokens still provides excellent long-context capabilities.
@@ -188,6 +197,7 @@ curl http://<INSTANCE_IP>:<PORT>/health
 ```bash Bash
 curl -X POST http://<INSTANCE_IP>:<PORT>/v1/chat/completions \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $VLLM_API_KEY" \
   -d '{
     "model": "MiniMaxAI/MiniMax-M2",
     "messages": [
@@ -206,10 +216,10 @@ Using the OpenAI Python SDK:
 ```python icon="python" Python
 from openai import OpenAI
 
-# Initialize client with your Vast.ai instance endpoint
+# Initialize client with API key
 client = OpenAI(
     base_url="http://<INSTANCE_IP>:<PORT>/v1",
-    api_key="not-needed"  # vLLM doesn't require authentication by default
+    api_key="your-vllm-api-key"  # Use the VLLM_API_KEY you set during deployment
 )
 
 # Send a chat completion request
