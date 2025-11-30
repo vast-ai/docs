@@ -19,57 +19,70 @@ description: Learn about the parameters that can be configured for Vast.ai Serve
   })
 }} />
 
-The Vast.ai Serverless system has parameters that allow control over the scaling behavior.&#x20;
+The Vast.ai Serverless engine has parameters that allow control over the scaling behavior.&#x20;
 
 # Endpoint Parameters
 
-## cold\_mult
+## Cold Multiplier
 
-A multiplier applied to your target capacity for longer-term planning (1+ hours). This parameter controls how much extra capacity the serverless engine will plan for in the future compared to immediate needs. For example, if your current target capacity is 100 tokens/sec and cold\_mult is 2.0, the system will plan to have capacity for 200 tokens/sec for longer-term scenarios.
+A multiplier applied to your target capacity for longer-term planning (1+ hours). This parameter controls how much extra capacity the serverless engine will plan for in the future compared to immediate needs. For example, if your current target capacity is 100 tokens/sec and cold\_mult is 2.0, the engine will plan to have capacity for 200 tokens/sec for longer-term scenarios.
 
 This helps ensure your endpoint has sufficient "cold" (stopped but ready) workers available to handle future load spikes without delay. A higher value means more aggressive capacity planning and better preparedness for sudden traffic increases, while a lower value reduces costs from maintaining stopped instances.
 
-If not specified during endpoint creation, the default value is 2.5.
+If not specified during endpoint creation, the default value is 3.
 
-## cold\_workers
+## Minimum Workers
 
-The minimum number of workers that must be kept in a "ready quick" state before the serverless engine is allowed to destroy any workers. A worker is considered "ready quick" if it's either:
-\- Actively serving (status = "idle" with model loaded)
-\- Stopped but ready (status = "stopped" with model loaded)
-
-Cold workers are not shut-down, they are stopped but have the model fully loaded. This means they can start serving requests very quickly (seconds) without having to re-download the model or benchmark the GPU performance.
+The minimum number of workers that must be kept in the endpoint at all times.
 
 If not specified during endpoint creation, the default value is 5.
 
-## max\_workers
+## Max Workers
 
-A hard upper limit on the total number of worker instances (ready, stopped, loading, etc.) that your endpoint can have at any given time.
+A hard upper limit on the total number of workers that the endpoint can have at any given time.
 
-If not specified during endpoint creation, the default value is 20.
+If not specified during endpoint creation, the default value is 16.
 
-## min\_load
+## Minimum Load
 
-A minimum baseline load (measured in tokens/second for LLMs) that the serverless system will assume your Endpoint needs to handle, regardless of actual measured traffic. This acts as a "floor" for load predictions across all time horizons (1 second to 24+ hours), ensuring your endpoint maintains minimum capacity even during periods of zero or very low traffic.
+A minimum baseline load (measured in perf units / second) that the serverless engine will be able to handle, regardless of actual measured traffic. This acts as a "floor" for load predictions across all time horizons (1 second to 24+ hours).
 
-For example, if your min\_load is set to 100 tokens/second, but your endpoint currently has zero traffic, the serverless system will still plan capacity as if you need to handle at least 100 tokens/second. This prevents the endpoint from scaling down to zero capacity and ensures you're always ready for incoming requests.
+For example, if your Minimum Load is set to 100 tokens/second, but your endpoint currently has zero traffic, the serverless engine will still plan capacity as if you need to handle at least 100 tokens/second. This prevents the endpoint from scaling down to zero capacity and ensures you're always ready for incoming requests.
 
-If not specified during endpoint creation, the default value is 10.
+If not specified during endpoint creation, the default value is 1.
 
-## target\_util
+## Minimum Cold Load
 
-The target utilization ratio determines how much spare capacity (headroom) the serverless system maintains. For example, if your predicted load is 900 tokens/second and target\_util is 0.9, the serverless engine will plan for 1000 tokens/second of capacity (900 ÷ 0.9 = 1000), leaving 100 tokens/second (11%) as buffer for traffic spikes.
+The minimum baseline load (measured in perf units/second) that the serverless engine will maintain with loaded workers. While Minimum Load ensures a capacity of
+ "Ready" workers, Minimum Cold Load requires a capacity of workers that have fully loaded the model. 
+
+Workers that count toward this minimum are:
+
+- Actively serving requests (status = "Ready")
+- Stopped but ready to serve (status = "Inactive" with model loaded)
+
+These workers can start serving requests within seconds because they don't need to download the model or benchmark GPU performance. This parameter 
+is particularly useful for maintaining low-latency response times during traffic spikes or after periods of low activity.
+
+If not specified during endpoint creation, the default value is 0.
+
+## Target Utilization
+
+The Target Utilization ratio determines how much spare capacity (headroom) the serverless engine maintains. For example, if your predicted load 
+is 900 tokens/second and target\_util is 0.9, the serverless engine will plan for 1000 tokens/second of capacity (900 ÷ 0.9 = 1000), leaving 100 
+tokens/second (11%) as buffer for traffic spikes.
 
 A lower target\_util means more headroom:
-\- target\_util = 0.9 → 11.1% spare capacity relative to load
-\- target\_util = 0.8 → 25% spare capacity relative to load
-\- target\_util = 0.5 → 100% spare capacity relative to load
-\- target\_util = 0.4 → 150% spare capacity relative to load
+- target\_util = 0.9 → 11.1% spare capacity relative to load
+- target\_util = 0.8 → 25% spare capacity relative to load
+- target\_util = 0.5 → 100% spare capacity relative to load
+- target\_util = 0.4 → 150% spare capacity relative to load
 
 If not specified during endpoint creation, the default value is 0.9.
 
 # Workergroup Parameters
 
-The parameters below are specific to only Workergroups, not Endpoints.
+The parameters below are specific to only Workergroups, not Endpoints. Pre-configured serverless templates from Vast will have these values already set. 
 
 ## gpu\_ram
 
