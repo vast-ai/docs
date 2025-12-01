@@ -1,0 +1,341 @@
+---
+title: MiniMax-M2
+slug: minimax-m2-deployment-vast
+createdAt: Mon Nov 11 2025 20:35:00 GMT+0000 (Coordinated Universal Time)
+updatedAt: Mon Nov 11 2025 20:35:00 GMT+0000 (Coordinated Universal Time)
+---
+
+<script type="application/ld+json" dangerouslySetInnerHTML={{
+  __html: JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "Deploy MiniMax-M2 on Vast.ai",
+    "description": "Learn how to deploy the MiniMax-M2 230B parameter language model on Vast.ai using vLLM for cost-effective, high-performance inference.",
+    "step": [
+      {
+        "@type": "HowToStep",
+        "name": "Set up your Vast.ai account",
+        "text": "Create a Vast.ai account and add credits to get started with GPU instances."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Configure instance requirements",
+        "text": "Select 4x H100 or A100 GPUs with 80GB VRAM each, 500GB disk space, and CUDA 12.4+."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Deploy with vLLM",
+        "text": "Launch instance with vllm/vllm-openai:nightly Docker image and required configuration flags."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Monitor deployment",
+        "text": "Wait approximately 30 minutes for model download and loading, monitoring logs for completion."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Test API endpoint",
+        "text": "Verify deployment by sending test requests to the OpenAI-compatible API endpoint."
+      }
+    ],
+    "author": {
+      "@type": "Organization",
+      "name": "Vast.ai Team"
+    },
+    "datePublished": "2025-11-11",
+    "dateModified": "2025-11-11"
+  })
+}} />
+
+# Running MiniMax-M2 on Vast.ai: A Complete Guide
+
+MiniMax-M2 is a breakthrough 230 billion parameter Mixture of Experts (MoE) language model that activates only 10 billion parameters per inference, making it incredibly fast and cost-effective. This guide shows you how to deploy MiniMax-M2 on Vast.ai using vLLM for production-grade inference at a fraction of cloud API costs.
+
+## Prerequisites
+
+Before getting started, you'll need:
+
+- A Vast.ai account with credits ([Sign up here](https://cloud.vast.ai))
+- Vast.ai CLI installed (`pip install vastai`)
+- Your Vast.ai API key configured
+- Basic familiarity with language models and APIs
+- Optional: Python knowledge for SDK integration
+
+<Note>
+  Get your API key from the [Vast.ai account page](https://cloud.vast.ai/account/) and set it with `vastai set api-key YOUR_API_KEY` or export it as an environment variable.
+</Note>
+
+## Understanding MiniMax-M2
+
+MiniMax-M2 offers unique capabilities:
+
+- **Efficient Architecture**: 230B total parameters, but only 10B active per inference
+- **Interleaved Thinking**: Outputs reasoning in `<think>...</think>` tags for transparent decision-making
+- **Strong Performance**: #1 composite score among open-source models
+- **MIT Licensed**: Fully open-source with no restrictions
+- **Cost-Effective**: Run on Vast.ai at a fraction of cloud API costs
+
+## Hardware Requirements
+
+For optimal performance, MiniMax-M2 requires:
+
+- **GPUs**: 4x H100 (80GB each) or 4x A100 (80GB each)
+- **Disk Space**: 500GB minimum (model is ~460GB)
+- **CUDA Version**: 12.4 or higher (12.6+ recommended for best compatibility)
+- **Docker Image**: `vllm/vllm-openai:nightly` (not `latest`)
+
+<Note>
+  H100 instances are recommended over A100s for better driver compatibility with the nightly vLLM build.
+</Note>
+
+### Production Scaling Considerations
+
+While the 4x H100 configuration provides an excellent starting point for deploying and testing MiniMax-M2 on Vast.ai, production deployments typically require larger GPU configurations to support longer context lengths and higher concurrent request volumes. For production use cases, consider configurations such as 8x H100, 4x H200, or 8x H200, which provide substantially more GPU memory for handling concurrent requests and extended context windows.
+
+## Instance Configuration
+
+### Step 1: Search for Suitable Instances
+
+Use the Vast.ai CLI to find instances that meet the requirements:
+
+```bash Bash
+vastai search offers "gpu_ram >= 80 num_gpus = 4 static_ip=true direct_port_count >= 1 cuda_vers >= 12.4" --order "dph_base"
+```
+
+This searches for:
+- 4 GPUs with at least 80GB VRAM each
+- Static IP address
+- CUDA 12.4 or higher
+- Sorted by price (lowest first)
+
+### Step 2: Create the Instance
+
+Once you've selected an instance ID from the search results (look in the first column), create it with the correct configuration:
+
+```bash Bash
+# Generate a secure API key
+VLLM_API_KEY="vllm-$(openssl rand -hex 16)"
+
+# Create instance with API key authentication
+vastai create instance <INSTANCE_ID> \
+    --image vllm/vllm-openai:nightly \
+    --env "-p 8000:8000 -e VLLM_API_KEY=$VLLM_API_KEY" \
+    --disk 500 \
+    --args --model MiniMaxAI/MiniMax-M2 \
+           --tensor-parallel-size 4 \
+           --trust-remote-code \
+           --max-model-len 131072
+```
+
+**Key parameters explained**:
+- `--image vllm/vllm-openai:nightly` - Must use nightly build for MiniMax-M2 support
+- `--env "-p 8000:8000 -e VLLM_API_KEY=$VLLM_API_KEY"` - Expose port 8000 and set API key for authentication
+- `--disk 500` - 500GB disk space for the ~460GB model
+- `--tensor-parallel-size 4` - Distribute model across 4 GPUs
+- `--trust-remote-code` - Required for custom MiniMax-M2 architecture
+- `--max-model-len 131072` - Context length reduced to fit in GPU memory (from full 196K)
+
+<Note>
+  Save your `VLLM_API_KEY` securely. You'll need to include it in the `Authorization: Bearer <key>` header for all API requests.
+</Note>
+
+<Note>
+  The full 196K token context window requires more GPU memory than available on 4x80GB GPUs. Using 131K tokens still provides excellent long-context capabilities.
+</Note>
+
+## Monitoring Deployment
+
+### Expected Timeline
+
+The deployment process takes approximately 30 minutes:
+
+- **Instance provisioning**: ~1 minute
+- **Model download** (first time): 15-20 minutes
+- **Model loading**: 5-10 minutes
+- **Initialization**: 2-3 minutes
+
+### Check Deployment Status
+
+Monitor the deployment logs:
+
+```bash Bash
+vastai logs <INSTANCE_ID>
+```
+
+Look for these key messages indicating progress:
+- `Resolved architecture: MiniMaxM2ForCausalLM` - Model recognized
+- `Loading safetensors checkpoint shards` - Model downloading/loading
+- `Application startup complete` - Server ready
+
+### Get Your Endpoint
+
+Once deployment completes, get your instance details:
+
+```bash Bash
+vastai show instances <INSTANCE_ID>
+```
+
+Look for the instance IP and external port in the output. Your API endpoint will be:
+```text Text
+http://<INSTANCE_IP>:<EXTERNAL_PORT>/v1
+```
+
+## Using the MiniMax-M2 API
+
+MiniMax-M2 provides an OpenAI-compatible API, making integration straightforward.
+
+### Health Check
+
+First, verify the server is responding:
+
+```bash Bash
+curl http://<INSTANCE_IP>:<PORT>/health
+```
+
+### Chat Completions with cURL
+
+```bash Bash
+curl -X POST http://<INSTANCE_IP>:<PORT>/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $VLLM_API_KEY" \
+  -d '{
+    "model": "MiniMaxAI/MiniMax-M2",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Explain quantum computing in simple terms."}
+    ],
+    "max_tokens": 500,
+    "temperature": 0.7
+  }'
+```
+
+### Python Integration
+
+Using the OpenAI Python SDK:
+
+```python icon="python" Python
+from openai import OpenAI
+
+# Initialize client with API key
+client = OpenAI(
+    base_url="http://<INSTANCE_IP>:<PORT>/v1",
+    api_key="your-vllm-api-key"  # Use the VLLM_API_KEY you set during deployment
+)
+
+# Send a chat completion request
+response = client.chat.completions.create(
+    model="MiniMaxAI/MiniMax-M2",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "What are the benefits of MoE models?"}
+    ],
+    max_tokens=500,
+    temperature=0.7
+)
+
+print(response.choices[0].message.content)
+```
+
+### Streaming Responses
+
+For real-time token streaming:
+
+```python icon="python" Python
+response = client.chat.completions.create(
+    model="MiniMaxAI/MiniMax-M2",
+    messages=[
+        {"role": "user", "content": "Write a short story about AI."}
+    ],
+    max_tokens=500,
+    stream=True
+)
+
+for chunk in response:
+    if chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end="")
+```
+
+## Performance Expectations
+
+Based on actual deployment testing:
+
+| Metric | Value |
+|--------|-------|
+| Model Loading Time | ~29 minutes (first deployment) |
+| Inference Speed | ~7 seconds for 100 tokens |
+| Context Window | 131,072 tokens |
+
+## Troubleshooting
+
+### Error: Model Architecture Not Supported
+
+**Issue**: `Model architectures ['MiniMaxM2ForCausalLM'] are not supported`
+
+**Solution**: You must use `vllm/vllm-openai:nightly` Docker image. The `latest` tag (v0.11.0) does not include MiniMax-M2 support.
+
+### Error: No Space Left on Device
+
+**Issue**: `RuntimeError: Data processing error: IO Error: No space left on device`
+
+**Solution**: Increase disk allocation to at least 500GB. The model requires ~460GB of disk space.
+
+```bash Bash
+vastai create instance <INSTANCE_ID> --disk 500 ...
+```
+
+### Error: KV Cache Memory Insufficient
+
+**Issue**: `ValueError: To serve at least one request with max seq len (196608), 11.62 GiB KV cache is needed`
+
+**Solution**: The full 196K context doesn't fit in 4x80GB GPUs. Use the reduced context length:
+
+```bash Bash
+--max-model-len 131072
+```
+
+### Error: CUDA Driver Incompatibility
+
+**Issue**: `Error 803: system has unsupported display driver / cuda driver combination`
+
+**Solution**: Select instances with newer CUDA drivers (12.6+). H100 instances typically have better compatibility than older A100 instances.
+
+### Server Takes Too Long to Start
+
+The model is large (~460GB) and takes time to load. Expected timeline:
+- First deployment: ~30 minutes total
+- Subsequent deployments (cached): ~5-10 minutes
+
+Monitor logs to track progress. If stuck for over 45 minutes, check for errors in the logs.
+
+## Best Practices
+
+### Cost Optimization
+
+- **Destroy instances when not in use** - Vast.ai charges by the hour
+- **Use interruptible instances** for development/testing if available
+- **Monitor usage** to avoid unnecessary running time
+
+### Resource Management
+
+- **Cache the model** - Once downloaded, the model is cached on the instance disk
+- **Plan for load time** - Factor in 30 minutes for cold starts
+- **Test with small contexts first** - Verify setup before running large inference jobs
+
+### Production Deployment
+
+- **Set up monitoring** - Track instance health and API availability
+- **Implement retry logic** - Handle temporary failures gracefully
+- **Consider multiple instances** - For high availability and load balancing
+
+## Additional Resources
+
+- [MiniMax-M2 Model Card](https://huggingface.co/MiniMaxAI/MiniMax-M2) - Official model documentation
+- [vLLM Documentation](https://docs.vllm.ai/) - vLLM configuration and usage
+- [Vast.ai CLI Guide](/cli/get-started) - Learn more about the Vast.ai CLI
+- [GPU Instance Guide](/documentation/instances/overview) - Understanding Vast.ai instances
+
+## Conclusion
+
+MiniMax-M2 on Vast.ai provides production-grade LLM inference at significantly lower cost than cloud APIs. With 131K token context, interleaved thinking capabilities, and OpenAI-compatible API, it's an excellent choice for developers and teams building LLM-powered applications.
+
+Ready to get started? [Sign up for Vast.ai](https://cloud.vast.ai) and deploy your first MiniMax-M2 instance today.
