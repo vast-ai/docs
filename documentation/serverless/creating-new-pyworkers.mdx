@@ -1,537 +1,799 @@
 ---
-title: Creating New PyWorkers
-description: Learn how to create a new PyWorker for Vast.ai Serverless. Understand the structure of a PyWorker, the required files, and how to implement the server.py module.
-"canonical": "/documentation/serverless/creating-new-pyworkers"
+title: Configuring worker.py PyWorkers
+description: Learn how to implement worker.py for Vast.ai Serverless using the Worker / WorkerConfig interface, including handlers, benchmarks, and log-based readiness.
+"canonical": "/documentation/serverless/worker-py"
 ---
 
 <script type="application/ld+json" dangerouslySetInnerHTML={{
   __html: JSON.stringify({
     "@context": "https://schema.org",
     "@type": "HowTo",
-    "name": "How to Create New PyWorkers for Vast.ai Serverless",
-    "description": "A comprehensive guide to creating custom PyWorkers for Vast.ai Serverless, including understanding the structure, implementing data_types.py, creating endpoint handlers in server.py, and load testing.",
+    "name": "How to Configure worker.py for Vast.ai Serverless",
+    "description": "A practical guide to implementing worker.py using Worker, WorkerConfig, HandlerConfig, BenchmarkConfig, and LogActionConfig for Vast.ai Serverless endpoints.",
     "step": [
       {
         "@type": "HowToStep",
-        "name": "Understand PyWorker Structure",
-        "text": "All PyWorkers have four files: __init__.py (blank file), data_types.py (contains data types representing model API endpoints), server.py (contains endpoint handlers), and test_load.py (script for load testing). All classes follow strict type hinting for error detection."
+        "name": "Prepare your repository",
+        "text": "Create a public Git repository with a worker.py file and a requirements.txt listing your Python dependencies."
       },
       {
         "@type": "HowToStep",
-        "name": "Implement data_types.py",
-        "text": "Define how the PyWorker interacts with the ML model by creating a class that inherits from lib.data_types.ApiPayload. Implement required functions: for_test() (creates payload for load testing), generate_payload_json() (converts ApiPayload to JSON), count_workload() (calculates workload), and from_json_msg() (transforms JSON to AuthData and payload type)."
+        "name": "Point your endpoint at the repo",
+        "text": "In your Serverless configuration, set the PYWORKER_REPO environment variable to the Git repository URL containing worker.py."
       },
       {
         "@type": "HowToStep",
-        "name": "Create EndpointHandler in server.py",
-        "text": "For each ML model API endpoint, implement an EndpointHandler class that inherits from EndpointHandler. Define the endpoint property, payload_cls() method, generate_payload_json() method, make_benchmark_payload() method, and generate_client_response() method to handle incoming requests and format responses."
+        "name": "Define WorkerConfig in worker.py",
+        "text": "Import Worker, WorkerConfig, HandlerConfig, BenchmarkConfig, and LogActionConfig from vastai and construct a WorkerConfig for your model backend."
       },
       {
         "@type": "HowToStep",
-        "name": "Instantiate Backend and Configure Routes",
-        "text": "Create a Backend instance with model_server_url, model_log_file, allow_parallel_requests flag, benchmark_handler, and log_actions. Define additional routes like ping and healthcheck handlers. Create routes array with all endpoint handlers and start the server."
+        "name": "Configure handlers and benchmarks",
+        "text": "Add HandlerConfig entries for each HTTP route, configure workload_calculator, and define a BenchmarkConfig for exactly one handler."
       },
       {
         "@type": "HowToStep",
-        "name": "Implement test_load.py for Load Testing",
-        "text": "Create a load testing script using lib.test_harness.run() with InputData.for_test() and the worker endpoint. Run the script with parameters: -n (total requests), -rps (rate per second), -k (Vast API key), and -e (endpoint name)."
+        "name": "Configure log actions for readiness",
+        "text": "Specify on_load and on_error log prefixes in LogActionConfig so the serverless engine can detect when your model is ready or has failed."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Run Worker in worker.py",
+        "text": "Instantiate Worker with your WorkerConfig and call Worker.run() as the main entrypoint of worker.py."
       }
     ]
   })
 }} />
 
-This guide walks you through the structure of a PyWorker. By the end, you will know all of the pieces of a PyWorker and be able to create your own. &#x20;
+Vast’s **PyWorker** is a Python HTTP proxy that sits between the Vast serverless routing layer and your model server (e.g. vLLM, TGI, ComfyUI). The modern implementation is centered around a single `worker.py` file that constructs a `Worker` from a `WorkerConfig`.
+
+By the end of this document you will understand:
+
+- What a PyWorker does at a high level
+- How `worker.py` is launched in the serverless environment
+- How to configure `WorkerConfig`, `HandlerConfig`, `BenchmarkConfig`, and `LogActionConfig`
+- How request parsing, response generation, workload calculation, and queueing work
+- How to adapt existing “legacy” PyWorkers if you have them
 
 <Note>
-  Vast has pre-made templates with PyWorkers already built-in. Search the [templates section](/documentation/templates/quickstart) first to see if a supported template works for your use case.&#x20;
+  This page assumes you already know how to create a Serverless Endpoint and Worker Group. It focuses only on defining <code>worker.py</code>. See the Serverless Endpoint documentation for how to create endpoints and worker groups.
 </Note>
 
-[This repo](https://github.com/vast-ai/pyworker/tree/main) contains all the components of a PyWorker. Simply for pedagogical purposes, the `workers/hello_world/` PyWorker is created for an LLM server with two API endpoints:
-
-1. `/generate`: generates a LLM response and sends a JSON response
-2. `/generate_stream`: streams a response one token at a time
-
-Both of these endpoints take the same API JSON payload:
-
-```json JSON icon="js"
-{
-    "prompt": String,
-    "max_response_tokens": Number | null
-}
-```
+<Note>
+  Vast publishes pre-made templates with PyWorkers already wired up. Before writing your own <code>worker.py</code>, check the templates in the documentation and control panel; they may already cover your use case.
+</Note>
 
 ***
 
-## Structure
+## How PyWorkers and worker.py fit into Serverless
 
-All PyWorkers have four files:
+On each worker instance:
 
-```text Text
-.
-└── workers
-    └── hello_world
-        ├── __init__.py # blank file
-        ├── data_types.py # contains data types representing model API endpoints
-        ├── server.py # contains endpoint handlers
-        └── test_load.py # script for load testing
+1. The **start-server script** (provided by the template) runs.
+   It is responsible for:
+   - Cloning your repository from `PYWORKER_REPO`
+   - Installing Python dependencies from `requirements.txt`
+   - Starting your **model server** (e.g. vLLM)
+   - Running `python worker.py`
 
+2. `worker.py`:
+   - Builds a `WorkerConfig` describing:
+     - How to reach your model server (`model_server_url`, `model_server_port`, `model_log_file`)
+     - Which **HTTP routes** the worker should handle (`handlers`)
+     - How to detect model readiness and errors (`log_action_config`)
+   - Constructs `Worker(worker_config)`
+   - Calls `Worker.run()`, which:
+     - Creates a backend object
+     - Attaches handlers for each configured route
+     - Starts an HTTP server using `aiohttp`
+
+3. The **serverless engine**:
+   - Watches:
+     - Logs from your model (via `model_log_file` + `LogActionConfig`)
+     - Benchmarks (via `BenchmarkConfig`)
+     - Request workloads and success/error metrics
+   - Uses this information to right-size your **hot** (running) and **cold** (stopped) capacity based on current and predicted **workload**.
+
+***
+
+## What a PyWorker actually does
+
+Conceptually, PyWorker’s responsibilities are:
+
+1. **Ingress proxy**
+   - Receive HTTP requests from the Vast serverless router on routes you define (e.g. `/v1/completions`, `/generate`).
+   - Optionally transform and validate request bodies.
+
+2. **Workload tracking**
+   - For each request, compute a **workload**
+   - Workload is a floating point number chosen by you:
+     - For LLMs, this is typically “number of tokens” (prompt + max output).
+     - For other workloads, it can be “constant 1 per request” or any cost metric that correlates with compute usage.
+
+3. **Forwarding to model server**
+   - Forward the transformed payload to your model server at `model_server_url:model_server_port`.
+   - Handle **FIFO queueing** if your backend cannot process multiple requests in parallel.
+
+4. **Returning responses**
+   - Optionally transform or wrap model responses.
+   - Support both standard JSON responses and streaming (SSE, NDJSON, chunked) responses.
+
+5. **Readiness, failure, and benchmarking**
+   - Watch your model’s log file:
+     - Detect **“model loaded”** lines (`on_load`)
+     - Detect **“model error”** lines (`on_error`)
+   - After a load signal, run benchmarks on one of your routes.
+   - Report effective throughput so the serverless engine can size capacity.
+
+***
+
+## The worker.py structure
+
+A PyWorker is usually a **single file**, `worker.py`, that:
+
+1. Imports the public configuration types:
+
+```python
+from vastai import (
+    Worker,
+    WorkerConfig,
+    HandlerConfig,
+    BenchmarkConfig,
+    LogActionConfig,
+)
 ```
 
-All of the classes follow strict type hinting. It is recommended that you type hint all of your functions. This will allow your IDE or VSCode with `pyright` plugin to find any type errors in your implementation. You can also install `pyright` with `npm install pyright` and run `pyright` in the root of the project to find any type errors.
+2. Defines any helper functions (benchmark payload generators, request parsers, response generators, workload calculators).
 
-### \_\_init\_\_.py
+3. Constructs a `WorkerConfig` and passes it to `Worker`.
 
-The `__init__.py`file is left blank. This tells the Python interpreter to treat the hello\_world directory as a package. This allows us to import modules from within the directory. &#x20;
+4. Runs the worker:
 
-### data\_types.py
+```python
+Worker(worker_config).run()
+```
 
-This file defines how the PyWorker interacts with the ML model, and must adhere to the common framework laid out in `lib/data_types.py`. The file implements the specific request structure and payload handling that will be used in `server.py`.&#x20;
+That’s the entire required structure.
 
-Data handling classes must inherit from `lib.data_types.ApiPayload`. `ApiPayload` is an abstract class that needs several functions defined for it. Below is an example implementation from the hello\_world PyWorker that shows how to use the `ApiPayload` class.&#x20;
+***
 
-```python icon="python" Python
-import dataclasses
+## WorkerConfig: configuring the model backend
+
+`WorkerConfig` tells the PyWorker how to talk to your model server and which routes to expose.
+
+Typical usage:
+
+```python
+from vastai import Worker, WorkerConfig, HandlerConfig, BenchmarkConfig, LogActionConfig
+
+MODEL_SERVER_URL  = "http://127.0.0.1"
+MODEL_SERVER_PORT = 18000
+MODEL_LOG_FILE    = "/var/log/model/server.log"
+
+worker_config = WorkerConfig(
+    # --- Model config ---
+    model_server_url=MODEL_SERVER_URL,
+    model_server_port=MODEL_SERVER_PORT,
+    model_log_file=MODEL_LOG_FILE,
+
+    # --- Route handlers ---
+    handlers=[
+        # HandlerConfig(...) entries – see next section
+    ],
+
+    # --- Log actions ---
+    log_action_config=LogActionConfig(
+        on_load=[
+            "Application startup complete.",
+        ],
+        on_error=[
+            "RuntimeError: Engine",
+            "Traceback (most recent call last):",
+        ],
+        on_info=[
+            '"message":"Download',
+        ],
+    ),
+)
+
+Worker(worker_config).run()
+```
+
+### Required fields
+
+- `model_server_url: str`
+  Base URL where your model server is listening (e.g. `"http://127.0.0.1"`).
+
+- `model_server_port: int`
+  Port of the model server (e.g. `18000`).
+
+- `model_log_file: str`
+  Path to the model’s log file on disk. The PyWorker tails this file to:
+  - Detect when the model has loaded (`on_load`)
+  - Detect unrecoverable errors (`on_error`)
+  - Report informative events (`on_info`)
+
+- `handlers: list[HandlerConfig]`
+  One `HandlerConfig` per HTTP route your PyWorker should expose.
+
+### LogActionConfig: mapping log lines to state changes
+
+`LogActionConfig` is where you teach PyWorker how to interpret log lines from your model server:
+
+```python
+from vastai import LogActionConfig
+
+log_action_config = LogActionConfig(
+    on_load=[
+        # Prefixes that indicate the model is fully loaded and ready
+        "Application startup complete.",
+    ],
+    on_error=[
+        # Prefixes that indicate irrecoverable failures
+        "INFO exited: vllm",
+        "RuntimeError: Engine",
+        "Traceback (most recent call last):",
+    ],
+    on_info=[
+        # Prefixes for useful “informational only” logs
+        '"message":"Download',
+    ],
+)
+```
+
+Key semantics:
+
+- Matching is **prefix-based** and **case-sensitive**:
+  - A log line is considered a match if it **starts with** one of your strings exactly.
+- `on_load`:
+  - On the first match of any `on_load` prefix, the worker knows the model is “loaded” and can begin benchmarking.
+- `on_error`:
+  - On the first match, the worker goes into an **errored** state.
+  - The serverless engine will treat this as a failed worker and trigger a restart.
+- `on_info`:
+  - Used for metrics and observability only; they do not change worker state.
+
+Log file expectations:
+
+- The file at `model_log_file` should contain logs for the **current run** of the worker, not the entire machine lifetime.
+- The template should rotate logs per worker start so the PyWorker is not tailing stale history.
+
+***
+
+## HandlerConfig: configuring routes and per-endpoint behavior
+
+Each `HandlerConfig` describes how a **single HTTP route** behaves:
+
+- Which path it handles (e.g. `/v1/completions`)
+- Whether requests are processed in parallel or serialized
+- How to compute workload from a request
+- How to generate benchmark payloads for this route
+- Optional hooks for parsing requests and generating responses
+- Optional legacy integration with existing `EndpointHandler`/`ApiPayload` classes
+
+A minimal handler:
+
+```python
+from vastai import HandlerConfig
+
+completions_handler = HandlerConfig(
+    route="/v1/completions",
+    allow_parallel_requests=True,
+    max_queue_time=60.0,
+    workload_calculator=lambda payload: float(payload.get("max_tokens", 0)),
+    benchmark_config=BenchmarkConfig(
+        generator=completions_benchmark_generator,
+        runs=16,
+        concurrency=100,
+    ),
+)
+```
+
+### Route and basic queueing
+
+- `route: str`
+  Path to expose on the PyWorker HTTP server. For example:
+  - `/v1/completions`
+  - `/v1/chat/completions`
+  - `/generate`
+
+- `allow_parallel_requests: bool`
+  Controls whether the PyWorker performs **internal queueing**:
+
+  - `False` (default):
+    - PyWorker enforces **strict FIFO queueing** to the model server.
+    - At most **one** in-flight request is sent to the model backend at a time for this handler.
+    - This is appropriate when the model server itself is single-threaded or cannot handle parallel requests.
+
+  - `True`:
+    - PyWorker forwards requests directly and lets the model backend or serverless engine handle parallelism.
+    - Use this for backends that support parallel processing (e.g. vLLM).
+
+- `max_queue_time: float | None`
+  Maximum time (in seconds) a request is allowed to remain queued **inside the PyWorker** before being processed.
+
+  - If a queued request waits longer than `max_queue_time`:
+    - PyWorker responds to the client with **HTTP 429** (Too Many Requests).
+    - The error is recorded in metrics and logs.
+    - The client SDK will automatically retry your request later.
+
+### Workload calculation
+
+- `workload_calculator: Callable[[dict], float] | None`
+
+  Defines how much **workload** (a float) this request represents. This is the key input to autoscaling.
+
+  - Input:
+    - A dict representing the **model payload** (the same dict forwarded to your model server).
+  - Output:
+    - A `float` representing workload; larger means “more expensive.”
+
+  Examples:
+
+  ```python
+  # LLM: approximate cost as max_tokens only
+  workload_calculator=lambda payload: float(payload.get("max_tokens", 0))
+
+  # LLM: prompt tokens + expected output tokens
+  def llm_workload(payload: dict) -> float:
+      prompt = payload.get("prompt", "")
+      max_tokens = payload.get("max_tokens", 0)
+      # Very simple proxy: character-based length
+      prompt_tokens = len(prompt) / 4.0
+      return prompt_tokens + max_tokens
+
+  # Constant cost per request
+  workload_calculator=lambda payload: 100.0
+  ```
+
+  Behavior on errors:
+
+  - If `workload_calculator` raises an exception:
+    - The request fails.
+    - PyWorker logs the error and returns **HTTP 500** to the client.
+
+### Request parsing: request_parser
+
+- `request_parser: Callable[[dict], dict] | None`
+
+  Optional hook to transform the incoming JSON request into the **payload** that will be forwarded to the model backend.
+
+  Key points:
+
+  - Input:
+    - The raw JSON body received by PyWorker (already parsed into a dict).
+  - Output:
+    - A dict representing the model payload.
+    - PyWorker will then use this dict as the internal payload and forward it to your model server as JSON.
+
+  Intended usage patterns:
+
+  - **Simple pass-through (no parser):**
+    - If you do not provide `request_parser`, PyWorker forwards the incoming JSON **as-is** to the model backend.
+    - The same dict is used for workload calculations.
+
+  - **Shape transformation:**
+    - Translate “public API” shape into “backend API” shape:
+      ```python
+      def my_request_parser(json_msg: dict) -> dict:
+          # Client sends: {"prompt": "...", "max_tokens": 128}
+          # Backend expects: {"input_text": "...", "limit": 128}
+          return {
+              "input_text": json_msg["prompt"],
+              "limit": json_msg.get("max_tokens", 0),
+          }
+      ```
+
+  - **Validation and light on-request hooks:**
+    - Validate fields and, if needed, mutate the dict in place:
+      ```python
+      def guarded_parser(json_msg: dict) -> dict:
+          if "prompt" not in json_msg:
+              raise ValueError("prompt is required")
+          json_msg.setdefault("max_tokens", 256)
+          return json_msg
+      ```
+
+  Behavior on errors:
+
+  - Any exception raised in `request_parser`:
+    - Is logged for the instance.
+    - Marks the request as **errored**.
+    - The client receives **HTTP 500**.
+
+### Response handling: response_generator
+
+- `response_generator: Callable[[web.Request, ClientResponse], Awaitable[web.StreamResponse | web.Response]] | None`
+
+  Optional hook to transform the model server response into the final client response.
+
+  - Input:
+    - `client_request`: the original `aiohttp.web.Request` from the client.
+    - `model_response`: the `aiohttp.ClientResponse` from the model server.
+  - Output:
+    - An `aiohttp.web.Response` or `aiohttp.web.StreamResponse`.
+
+  Example: simple JSON pass-through with custom header:
+
+  ```python
+  from aiohttp import web, ClientResponse
+  from typing import Union
+
+  async def custom_response_generator(
+      client_request: web.Request,
+      model_response: ClientResponse,
+  ) -> Union[web.Response, web.StreamResponse]:
+      data = await model_response.read()
+      return web.Response(
+          body=data,
+          status=model_response.status,
+          content_type=model_response.content_type,
+          headers={"X-Worker": "my-custom-pyworker"},
+      )
+  ```
+
+  Behavior:
+
+  - If you define `response_generator`, PyWorker calls it and uses the result directly.
+  - If your `response_generator` raises an exception:
+    - PyWorker logs the error.
+    - The client receives **HTTP 500**.
+
+### Default response behavior (no response_generator)
+
+If you do **not** specify a `response_generator`, PyWorker provides a reasonable default:
+
+- It detects **streaming** responses based on:
+  - `Content-Type` starting with `text/event-stream`
+  - `Content-Type` equal to `application/x-ndjson` or `application/jsonl`
+  - `Content-Type` containing `"stream"` (case-insensitive)
+  - `Transfer-Encoding: chunked`
+
+- If the response is streaming:
+  - PyWorker creates a `web.StreamResponse`.
+  - Copies the appropriate `content_type`.
+  - Streams chunks from the model server to the client as they arrive.
+
+- If the response is not streaming:
+  - PyWorker reads the full body from `model_response`.
+  - Returns a `web.Response` with:
+    - The same status code.
+    - The same `Content-Type`.
+    - All headers except `Content-Type` (which is set directly).
+
+In both paths, PyWorker logs successes and errors and updates internal metrics.
+
+***
+
+## BenchmarkConfig: measuring performance
+
+Benchmarks run once the worker detects a **model load** signal via `on_load`. They are central to how the serverless engine learns the capacity of each worker.
+
+A `BenchmarkConfig` is attached to exactly **one** handler:
+
+```python
+from vastai import BenchmarkConfig
+
+benchmark_config = BenchmarkConfig(
+    # Choose exactly one of dataset OR generator
+    dataset=[
+        {"model": "my-llm", "prompt": "hello world", "max_tokens": 128},
+        {"model": "my-llm", "prompt": "another prompt", "max_tokens": 256},
+    ],
+    # OR
+    # generator=completions_benchmark_generator,
+
+    runs=16,
+    concurrency=100,
+)
+```
+
+Attach it to a handler:
+
+```python
+HandlerConfig(
+    route="/v1/completions",
+    allow_parallel_requests=True,
+    workload_calculator=lambda payload: payload.get("max_tokens", 0),
+    benchmark_config=benchmark_config,
+)
+```
+
+Key semantics:
+
+- You must configure **exactly one** `HandlerConfig` with a `BenchmarkConfig`.
+  - PyWorker enforces that only one handler can be the benchmark handler.
+- Benchmarks start:
+  1. PyWorker sees an `on_load` log line from your model.
+  2. It then runs the benchmark on the handler with `BenchmarkConfig`.
+- The worker becomes **ready** only after the benchmark finishes successfully.
+  - If benchmark runs fail (e.g. errors, timeouts), the worker is treated as errored and will be restarted by the serverless engine.
+
+### Benchmark payloads
+
+You can provide benchmark payloads via:
+
+- `dataset: list[dict]`
+  - A literal list of payloads. PyWorker selects entries (e.g. at random) to send to the model server.
+- `generator: Callable[[], dict]`
+  - A function that returns one payload dict each time it is called.
+
+For clarity and maintainability:
+
+- Pick **one** of `dataset` or `generator` (do not rely on precedence between them).
+- Make benchmark payloads representative of your “typical” requests:
+  - If most traffic is small, do not benchmark only with huge prompts.
+  - If traffic is mixed, choose a representative distribution.
+
+### Runs and concurrency
+
+- `runs: int`
+  Number of benchmark rounds.
+
+- `concurrency: int`
+  Number of concurrent requests per run **if** `allow_parallel_requests=True`.
+
+  - If `allow_parallel_requests=False`:
+    - Effective concurrency is clamped; your backend will process benchmark requests serially despite a larger `concurrency` value.
+
+The serverless engine uses the observed throughput (workload completed per unit time) to estimate capacity. Your chosen **workload function** and these benchmark settings directly influence how it sizes hot and cold capacity.
+
+***
+
+## Autoscaling and workload (conceptual overview)
+
+PyWorker does not expose the full autoscaling algorithm, but conceptually:
+
+- Each request is assigned a **workload** (a float) by your `workload_calculator`.
+- Benchmarks estimate how many units of workload per second a worker can handle on a given handler.
+- At runtime, the serverless engine:
+  - Tracks workload being requested by clients.
+  - Tracks workload being processed by each worker.
+  - Adjusts:
+    - **Hot capacity** (running workers ready to serve)
+    - **Cold capacity** (stopped workers that can be started quickly)
+  - To “right size” capacity to match current and predicted workload.
+
+For LLMs, we recommend:
+
+- Workload ≈ prompt tokens + expected output tokens (or just `max_tokens` as a simpler proxy).
+
+For other workloads, a common approach is:
+
+- Set a constant workload per request (e.g. `100.0`) so effective capacity is “requests per second”.
+
+***
+
+## Example: vLLM-style worker.py
+
+Below is a complete `worker.py` for a vLLM-style model server that exposes:
+
+- `/v1/completions`
+- `/v1/chat/completions`
+
+Both endpoints:
+
+- Treat `max_tokens` as the workload metric.
+- Allow parallel requests.
+- Use a benchmark generator that builds random prompts.
+
+```python
+import os
 import random
-from typing import Dict, Any
 
-from transformers import AutoTokenizer # used to count tokens in a prompt
-import nltk # used to download a list of all words to generate a random prompt and benchmark the LLM model
+import nltk
 
-from lib.data_types import ApiPayload
+from vastai import (
+    Worker,
+    WorkerConfig,
+    HandlerConfig,
+    LogActionConfig,
+    BenchmarkConfig,
+)
 
+# --- Model configuration ------------------------------------------------------
+
+MODEL_SERVER_URL  = "http://127.0.0.1"
+MODEL_SERVER_PORT = 18000
+MODEL_LOG_FILE    = "/var/log/portal/vllm.log"
+
+# vLLM-specific log messages
+MODEL_LOAD_LOG_MSG = [
+    "Application startup complete.",
+]
+
+MODEL_ERROR_LOG_MSGS = [
+    "INFO exited: vllm",
+    "RuntimeError: Engine",
+    "Traceback (most recent call last):",
+]
+
+MODEL_INFO_LOG_MSGS = [
+    '"message":"Download',
+]
+
+# --- Benchmark data generation -----------------------------------------------
+
+# For this example we use NLTK's word list to create random prompts
 nltk.download("words")
 WORD_LIST = nltk.corpus.words.words()
 
-#### you can use any tokenizer that fits your LLM. `openai-gpt` is free to use and is a good fit for most LLMs
-tokenizer = AutoTokenizer.from_pretrained("openai-community/openai-gpt")
+def completions_benchmark_generator() -> dict:
+    """Generate one benchmark payload for the /v1/completions endpoint.
+    This shape should match what your vLLM server expects.
+    """
+    prompt = " ".join(random.choices(WORD_LIST, k=int(250)))
 
-@dataclasses.dataclass
-class InputData(ApiPayload):
-    prompt: str
-    max_response_tokens: int
+    model = os.environ.get("MODEL_NAME")
+    if not model:
+        raise ValueError("MODEL_NAME environment variable not set")
 
-    @classmethod
-    def for_test(cls) -> "ApiPayload":
-        """defines how create a payload for load testing"""
-        prompt = " ".join(random.choices(WORD_LIST, k=int(250)))
-        return cls(prompt=prompt, max_response_tokens=300)
+    return {
+        "model": model,
+        "prompt": prompt,
+        "temperature": 0.7,
+        "max_tokens": 500,
+    }
 
-    def generate_payload_json(self) -> Dict[str, Any]:
-        """defines how to convert an ApiPayload to JSON that will be sent to model API"""
-        return dataclasses.asdict(self)
+# --- Worker configuration -----------------------------------------------------
 
-    def count_workload(self) -> float:
-        """defines how to calculate workload for a payload"""
-        return len(tokenizer.tokenize(self.prompt))
-
-    @classmethod
-    def from_json_msg(cls, json_msg: Dict[str, Any]) -> "InputData":
-        """
-        defines how to transform JSON data to AuthData and payload type,
-        in this case `InputData` defined above represents the data sent to the model API.
-        AuthData is data generated by the serverless system in order to authenticate payloads.
-        In this case, the transformation is simple and 1:1. That is not always the case. See comfyui's PyWorker
-        for more complicated examples
-        """
-        errors = {}
-        for param in inspect.signature(cls).parameters:
-            if param not in json_msg:
-                errors[param] = "missing parameter"
-        if errors:
-            raise JsonDataException(errors)
-        return cls(
-            **{
-                k: v
-                for k, v in json_msg.items()
-                if k in inspect.signature(cls).parameters
-            }
-        )
-
-```
-
-Your specific use case could require additional classes or methods. Reference the TGI worker as another example.
-
-### server.py
-
-For every ML model API endpoint you want to use, you must implement an `EndpointHandler`. This class handles incoming requests, processes them, sends them to the model API server, and finally returns an HTTP response with the model's results. `EndpointHandler` has several abstract functions that must be implemented. Here, we implement the `/generate` endpoint functionality for the PyWorker by creating the `GenerateHandler` class that inherits from `EndpointHandler`.
-
-![EndpointHandler class allows the PyWorker and Model Server to communicate.](https://archbee-image-uploads.s3.amazonaws.com/pNFur-Vy38DOi0g2bo5iM-Xkpobv-ceFYbciTKsmDIK-20250529-195514.png)
-
-```python icon="python" Python
-
-"""
-AuthData is a dataclass that represents Authentication data sent from the serverless system to the client requesting a route.
-When a user requests a route, see Vast's Serverless documentation for how routing and AuthData
-work.
-When a user receives a route for this PyWorker, they'll call PyWorkers API with the following JSON:
-{
-    auth_data: AuthData,
-    payload : InputData # defined above
-}
-"""
-from aiohttp import web
-
-from lib.data_types import EndpointHandler, JsonDataException
-from lib.server import start_server
-from .data_types import InputData
-
-#### This class is the implementer for the '/generate' endpoint of model API
-@dataclasses.dataclass
-class GenerateHandler(EndpointHandler[InputData]):
-
-    @property
-    def endpoint(self) -> str:
-        # the API endpoint
-        return "/generate"
-
-    @classmethod
-    def payload_cls(cls) -> Type[InputData]:
-        """this function should just return ApiPayload subclass used by this handler"""
-        return InputData
-
-    def generate_payload_json(self, payload: InputData) -> Dict[str, Any]:
-        """
-        defines how to convert `InputData` defined above, to
-        JSON data to be sent to the model API. This function too is a simple dataclass -> JSON, but
-        can be more complicated, See comfyui for an example
-        """
-        return dataclasses.asdict(payload)
-
-    def make_benchmark_payload(self) -> InputData:
-        """
-        defines how to generate an InputData for benchmarking. This needs to be defined in only
-        one EndpointHandler, the one passed to the backend as the benchmark handler. Here we use the .for_test()
-        method on InputData. However, in some cases you might need to fine tune your InputData used for
-        benchmarking to closely resemble the average request users call the endpoint with in order to get the best
-        performance
-        """
-        return InputData.for_test()
-
-    async def generate_client_response(
-        self, client_request: web.Request, model_response: ClientResponse
-    ) -> Union[web.Response, web.StreamResponse]:
-        """
-        defines how to convert a model API response to a response to PyWorker client
-        """
-        _ = client_request
-        match model_response.status:
-            case 200:
-                log.debug("SUCCESS")
-                data = await model_response.json()
-                return web.json_response(data=data)
-            case code:
-                log.debug("SENDING RESPONSE: ERROR: unknown code")
-                return web.Response(status=code)
-
-
-```
-
-We also handle `GenerateStreamHandler` for streaming responses. It is identical to `GenerateHandler`, except that this implementation creates a web response:
-
-```python icon="python" Python
-class GenerateStreamHandler(EndpointHandler[InputData]):
-    @property
-    def endpoint(self) -> str:
-        return "/generate_stream"
-
-    @classmethod
-    def payload_cls(cls) -> Type[InputData]:
-        return InputData
-
-    def generate_payload_json(self, payload: InputData) -> Dict[str, Any]:
-        return dataclasses.asdict(payload)
-
-    def make_benchmark_payload(self) -> InputData:
-        return InputData.for_test()
-
-    async def generate_client_response(
-        self, client_request: web.Request, model_response: ClientResponse
-    ) -> Union[web.Response, web.StreamResponse]:
-        match model_response.status:
-            case 200:
-                log.debug("Streaming response...")
-                res = web.StreamResponse()
-                res.content_type = "text/event-stream"
-                await res.prepare(client_request)
-                async for chunk in model_response.content:
-                    await res.write(chunk)
-                await res.write_eof()
-                log.debug("Done streaming response")
-                return res
-            case code:
-                log.debug("SENDING RESPONSE: ERROR: unknown code")
-                return web.Response(status=code)
-
-
-```
-
-You can now instantiate a Backend and use it to handle requests.
-
-```python icon="python" Python
-from lib.backend import Backend, LogAction
-
-#### the url and port of model API
-MODEL_SERVER_URL = "http://0.0.0.0:5001"
-
-
-#### This is the log line that is emitted once the server has started
-MODEL_SERVER_START_LOG_MSG = "server has started"
-MODEL_SERVER_ERROR_LOG_MSGS = [
-    "Exception: corrupted model file"  # message in the logs indicating the unrecoverable error
-]
-
-backend = Backend(
+worker_config = WorkerConfig(
     model_server_url=MODEL_SERVER_URL,
-    # location of model log file
-    model_log_file=os.environ["MODEL_LOG"],
-    # for some model backends that can only handle one request at a time, be sure to set this to False to
-    # let PyWorker handling queueing requests.
-    allow_parallel_requests=True,
-    # give the backend an EndpointHandler instance that is used for benchmarking
-    # number of benchmark run and number of words for a random benchmark run are given
-    benchmark_handler=GenerateHandler(benchmark_runs=3, benchmark_words=256),
-    # defines how to handle specific log messages. See docstring of LogAction for details
-    log_actions=[
-        (LogAction.ModelLoaded, MODEL_SERVER_START_LOG_MSG),
-        (LogAction.Info, '"message":"Download'),
-        *[
-            (LogAction.ModelError, error_msg)
-            for error_msg in MODEL_SERVER_ERROR_LOG_MSGS
-        ],
+    model_server_port=MODEL_SERVER_PORT,
+    model_log_file=MODEL_LOG_FILE,
+
+    handlers=[
+        # /v1/completions: also used as the benchmark handler
+        HandlerConfig(
+            route="/v1/completions",
+
+            # Allow vLLM to schedule parallel requests internally
+            allow_parallel_requests=True,
+
+            # Maximum time a request may sit in any internal queue before being rejected
+            max_queue_time=60.0,
+
+            # Workload: use max_tokens as a simple cost proxy
+            workload_calculator=lambda payload: float(payload.get("max_tokens", 0)),
+
+            benchmark_config=BenchmarkConfig(
+                # Use our generator to produce payloads
+                generator=completions_benchmark_generator,
+                runs=8,
+                concurrency=10,
+            ),
+        ),
+
+        # /v1/chat/completions: similar behavior but no benchmark_config
+        HandlerConfig(
+            route="/v1/chat/completions",
+            allow_parallel_requests=True,
+            max_queue_time=60.0,
+            workload_calculator=lambda payload: float(payload.get("max_tokens", 0)),
+        ),
     ],
+
+    log_action_config=LogActionConfig(
+        on_load=MODEL_LOAD_LOG_MSG,
+        on_error=MODEL_ERROR_LOG_MSGS,
+        on_info=MODEL_INFO_LOG_MSGS,
+    ),
 )
 
-#### this is a simple ping handler for PyWorker
-async def handle_ping(_: web.Request):
-    return web.Response(body="pong")
+# Run the worker synchronously
+Worker(worker_config).run()
 
-#### this is a handler for forwarding a health check to model API
-async def handle_healthcheck(_: web.Request):
-    healthcheck_res = await backend.session.get("/healthcheck")
-    return web.Response(body=healthcheck_res.content, status=healthcheck_res.status)
-
-routes = [
-    web.post("/generate", backend.create_handler(GenerateHandler())),
-    web.post("/generate_stream", backend.create_handler(GenerateStreamHandler())),
-    web.get("/ping", handle_ping),
-    web.get("/healthcheck", handle_healthcheck),
-]
-
-if __name__ == "__main__":
-    # start server, called from start_server.sh
-    start_server(backend, routes)
+# Or run asynchronously if you need to do other Python work:
+# import asyncio
+# asyncio.run(Worker(worker_config).run_async())
 ```
-
-The full module is written in the `server.py` implementation of the hello\_world PyWorker, as shown here:
-
-
-    ```python icon="python" Python
-    """
-    PyWorker works as a man-in-the-middle between the client and model API. It's function is:
-    1. receive request from client, update metrics such as workload of a request, number of pending requests, etc.
-    2a. transform the data and forward the transformed data to model API
-    2b. send updated metrics to autoscaler
-    3. transform response from model API(if needed) and forward the response to client
-
-    PyWorker forward requests to many model API endpoint. each endpoint must have an EndpointHandler. You can also
-    write function to just forward requests that don't generate anything with the model to model API without an
-    EndpointHandler. This is useful for endpoints such as healthchecks. See below for example
-    """
-
-    import os
-    import logging
-    import dataclasses
-    from typing import Dict, Any, Union, Type
-
-    from aiohttp import web, ClientResponse
-
-    from lib.backend import Backend, LogAction
-    from lib.data_types import EndpointHandler
-    from lib.server import start_server
-    from .data_types import InputData
-
-    # the url and port of model API
-    MODEL_SERVER_URL = "http://0.0.0.0:5001"
-
-
-    # This is the log line that is emitted once the server has started
-    MODEL_SERVER_START_LOG_MSG = "infer server has started"
-    MODEL_SERVER_ERROR_LOG_MSGS = [
-        "Exception: corrupted model file"  # message in the logs indicating the unrecoverable error
-    ]
-
-
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(asctime)s[%(levelname)-5s] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-    log = logging.getLogger(__file__)
-
-
-    # This class is the implementer for the '/generate' endpoint of model API
-    @dataclasses.dataclass
-    class GenerateHandler(EndpointHandler[InputData]):
-
-        @property
-        def endpoint(self) -> str:
-            # the API endpoint
-            return "/generate"
-
-        @classmethod
-        def payload_cls(cls) -> Type[InputData]:
-            return InputData
-
-        def generate_payload_json(self, payload: InputData) -> Dict[str, Any]:
-            """
-            defines how to convert `InputData` defined above, to
-            json data to be sent to the model API
-            """
-            return dataclasses.asdict(payload)
-
-        def make_benchmark_payload(self) -> InputData:
-            """
-            defines how to generate an InputData for benchmarking. This needs to be defined in only
-            one EndpointHandler, the one passed to the backend as the benchmark handler
-            """
-            return InputData.for_test()
-
-        async def generate_client_response(
-            self, client_request: web.Request, model_response: ClientResponse
-        ) -> Union[web.Response, web.StreamResponse]:
-            """
-            defines how to convert a model API response to a response to PyWorker client
-            """
-            _ = client_request
-            match model_response.status:
-                case 200:
-                    log.debug("SUCCESS")
-                    data = await model_response.json()
-                    return web.json_response(data=data)
-                case code:
-                    log.debug("SENDING RESPONSE: ERROR: unknown code")
-                    return web.Response(status=code)
-
-
-    # This is the same as GenerateHandler, except that it calls a streaming endpoint of the model API and streams the
-    # response, which itself is streaming, back to the client.
-    # it is nearly identical to handler as above, but it calls a different model API endpoint and it streams the
-    # streaming response from model API to client
-    class GenerateStreamHandler(EndpointHandler[InputData]):
-        @property
-        def endpoint(self) -> str:
-            return "/generate_stream"
-
-        @classmethod
-        def payload_cls(cls) -> Type[InputData]:
-            return InputData
-
-        def generate_payload_json(self, payload: InputData) -> Dict[str, Any]:
-            return dataclasses.asdict(payload)
-
-        def make_benchmark_payload(self) -> InputData:
-            return InputData.for_test()
-
-        async def generate_client_response(
-            self, client_request: web.Request, model_response: ClientResponse
-        ) -> Union[web.Response, web.StreamResponse]:
-            match model_response.status:
-                case 200:
-                    log.debug("Streaming response...")
-                    res = web.StreamResponse()
-                    res.content_type = "text/event-stream"
-                    await res.prepare(client_request)
-                    async for chunk in model_response.content:
-                        await res.write(chunk)
-                    await res.write_eof()
-                    log.debug("Done streaming response")
-                    return res
-                case code:
-                    log.debug("SENDING RESPONSE: ERROR: unknown code")
-                    return web.Response(status=code)
-
-
-    # This is the backend instance of pyworker. Only one must be made which uses EndpointHandlers to process
-    # incoming requests
-    backend = Backend(
-        model_server_url=MODEL_SERVER_URL,
-        model_log_file=os.environ["MODEL_LOG"],
-        allow_parallel_requests=True,
-        # give the backend a handler instance that is used for benchmarking
-        # number of benchmark run and number of words for a random benchmark run are given
-        benchmark_handler=GenerateHandler(benchmark_runs=3, benchmark_words=256),
-        # defines how to handle specific log messages. See docstring of LogAction for details
-        log_actions=[
-            (LogAction.ModelLoaded, MODEL_SERVER_START_LOG_MSG),
-            (LogAction.Info, '"message":"Download'),
-            *[
-                (LogAction.ModelError, error_msg)
-                for error_msg in MODEL_SERVER_ERROR_LOG_MSGS
-            ],
-        ],
-    )
-
-
-    # this is a simple ping handler for pyworker
-    async def handle_ping(_: web.Request):
-        return web.Response(body="pong")
-
-
-    # this is a handler for forwarding a health check to modelAPI
-    async def handle_healthcheck(_: web.Request):
-        healthcheck_res = await backend.session.get("/healthcheck")
-        return web.Response(body=healthcheck_res.content, status=healthcheck_res.status)
-
-
-    routes = [
-        web.post("/generate", backend.create_handler(GenerateHandler())),
-        web.post("/generate_stream", backend.create_handler(GenerateStreamHandler())),
-        web.get("/ping", handle_ping),
-        web.get("/healthcheck", handle_healthcheck),
-    ]
-
-    if __name__ == "__main__":
-        # start the PyWorker server
-        start_server(backend, routes)
-
-    ```
-
-### test\_load.py
-
-Once a Serverless Endpoint is setup with a \{\{Worker\_Group}}, the `test_load` module lets us test the running instances:
-
-```python icon="python" Python
-from lib.test_harness import run
-from .data_types import InputData
-
-WORKER_ENDPOINT = "/generate"
-
-if __name__ == "__main__":
-    run(InputData.for_test(), WORKER_ENDPOINT)
-```
-
-To run the script, provide the following parameters:
-
-- -n is the total number of requests to be send to the Endpoint
-- -rps is the rate (rate per second) at which the requests will be sent
-- -k is your Vast API key. You can define it in your environment or paste it into the command
-- -e is the name of the Serverless Endpoint
-
-You can run the following command from the root of the PyWorker repo:
-
-```sh Text
-python3 workers.hello_world.test_load -n 1000 -rps 0.5 -k "$API_KEY" -e "$ENDPOINT_NAME"
-```
-
-<Warning>
-  Be sure to define "API\_KEY" and "ENDPOINT\_NAME" in your environment before running, or replace these names with their actual values.
-</Warning>
-
-A successful test with n = 10 requests would look like the following. This test used 4 different GPU workers in the Worker Group for the 10 requests it was sent.
-
-![](https://archbee-image-uploads.s3.amazonaws.com/pNFur-Vy38DOi0g2bo5iM-W6jDkmy1YdfcCRnHfYVU_-20250603-002408.png)
 
 ***
 
-These are all the parts of a PyWorker! You will also find a client.py module in the worker folders of the repo. While it is *not* part of the PyWorker, Vast provides it as an example of how a user could interact with their model on the serverless system. The client.py file is not needed for the PyWorker to run on a GPU instance, and is intended to run on your local machine. The PyWorker [Overview](/documentation/serverless/overview) page shows more details.
+## How requests and responses behave end-to-end
 
+Putting the pieces together, a typical request/response flow looks like this:
+
+1. Client calls your Serverless Endpoint on one of your routes, e.g. `POST /v1/completions` with JSON body:
+   ```json
+    {
+        "model": "Qwen/Qwen3-8B",
+        "prompt" : "What is 2 + 2?",
+        "max_tokens" : 128,
+        "temperature" : 0.7
+    }
+   ```
+
+2. The Serverless router forwards this to the appropriate PyWorker instance’s `/v1/completions` route.
+
+3. The `HandlerConfig` for `/v1/completions`:
+   - Optionally runs `request_parser` (if configured) to transform the request.
+   - Runs `workload_calculator` to compute workload.
+   - Either:
+     - Queues the request (FIFO) if `allow_parallel_requests=False`, or
+     - Forwards it immediately to the model backend if `True`.
+
+4. PyWorker sends the request payload (as JSON) to your model server at `model_server_url:model_server_port`.
+
+5. When the model responds:
+   - If you defined `response_generator`, PyWorker calls it and returns its result.
+   - Otherwise, PyWorker:
+     - Detects whether the response is streaming or not.
+     - Either pipes the stream to the client or returns a standard JSON response.
+
+6. Any exceptions in parsing, forwarding, or response handling:
+   - Are logged in the worker’s logs.
+   - Produce an **HTTP 500** response to the client.
+
+***
+
+## Legacy support: existing EndpointHandler / ApiPayload implementations
+
+If you have **existing PyWorkers** implemented using the older pattern (`server.py`, `data_types.py`, `EndpointHandler`, `ApiPayload`), you can still run them under the new `Worker` abstraction by using two escape hatches in `HandlerConfig`:
+
+- `handler_class: Type[EndpointHandler]`
+- `payload_class: Type[ApiPayload]`
+
+Example:
+
+```python
+from vastai import Worker, WorkerConfig, HandlerConfig, LogActionConfig
+from my_legacy_worker.server import GenerateHandler  # Your existing EndpointHandler
+
+worker_config = WorkerConfig(
+    model_server_url="http://127.0.0.1",
+    model_server_port=5001,
+    model_log_file="/var/log/legacy_model.log",
+    handlers=[
+        HandlerConfig(
+            route="/generate",
+            handler_class=GenerateHandler,  # Use your existing handler directly
+        ),
+    ],
+    log_action_config=LogActionConfig(
+        on_load=["infer server has started"],
+        on_error=["Exception: corrupted model file"],
+        on_info=['"message":"Download'],
+    ),
+)
+
+Worker(worker_config).run()
+```
+
+Important notes:
+
+- When `handler_class` is provided:
+  - PyWorker instantiates your `EndpointHandler` directly.
+  - The factory **does not** apply other `HandlerConfig` fields to it.
+  - Queueing, workload calculation, and payload handling are all controlled by your legacy class.
+
+- This mechanism exists primarily for backward compatibility:
+  - It lets you keep old workers running while Vast evolves the SDK.
+  - For new projects, we strongly recommend using the **modern WorkerConfig + HandlerConfig + BenchmarkConfig + LogActionConfig approach** rather than implementing `EndpointHandler` and `ApiPayload` directly.
+
+This keeps the maintenance burden on the Vast SDK rather than on your own internal abstraction layer.
+
+***
+
+## Linking worker.py to your Serverless Endpoint
+
+Finally, to make Vast actually use your `worker.py`:
+
+1. Put `worker.py` and `requirements.txt` at the root of a public Git repository.
+2. In your Serverless template configuration:
+   - Set the environment variable **`PYWORKER_REPO`** to that Git repo URL.
+3. The start-server script on each worker will:
+   - Clone `PYWORKER_REPO`.
+   - Install `requirements.txt`.
+   - Start your model server.
+   - Run `python worker.py`.
+
+Once deployed:
+
+- Your worker instances will:
+  - Tail the model log file.
+  - Wait for `on_load` logs.
+  - Run benchmarks on the configured benchmark handler.
+  - Join the ready pool once benchmarking completes successfully.
+
+At that point, your Serverless Endpoint is fully backed by your custom `worker.py` implementation.
