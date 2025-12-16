@@ -1,0 +1,249 @@
+---
+title: DR-Tulu Research Agent
+slug: dr-tulu-deployment-vast
+createdAt: Sun Dec 15 2025 12:00:00 GMT+0000 (Coordinated Universal Time)
+updatedAt: Sun Dec 15 2025 12:00:00 GMT+0000 (Coordinated Universal Time)
+---
+
+<script type="application/ld+json" dangerouslySetInnerHTML={{
+  __html: JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "Deploy DR-Tulu Research Agent on Vast.ai",
+    "description": "Learn how to deploy AI2's DR-Tulu-8B research agent on Vast.ai with vLLM and MCP backend for autonomous web research capabilities.",
+    "step": [
+      {
+        "@type": "HowToStep",
+        "name": "Set up your Vast.ai account",
+        "text": "Create a Vast.ai account and add credits to get started with GPU instances."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Deploy vLLM server",
+        "text": "Launch a Vast.ai instance with vLLM v0.10.0 serving the DR-Tulu-8B model."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Set up MCP backend locally",
+        "text": "Clone the dr-tulu repository and start the MCP backend with Serper and Jina API keys."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Configure workflow",
+        "text": "Update the workflow YAML to point to your Vast.ai instance endpoint."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Run research queries",
+        "text": "Use interactive chat, batch evaluation, or the Python API to run research queries."
+      }
+    ],
+    "author": {
+      "@type": "Organization",
+      "name": "Vast.ai Team"
+    },
+    "datePublished": "2025-12-15",
+    "dateModified": "2025-12-15"
+  })
+}} />
+
+# Running DR-Tulu on Vast.ai: A Complete Guide
+
+DR-Tulu (Deep Research Tulu) is an open-source research agent developed by AI2 (Allen Institute for AI). Unlike standard LLMs that are fine-tuned separately from their tools, DR-Tulu was trained end-to-end with an MCP server providing web search and page reading capabilities. This means the model learned to use these tools as part of its reasoning process, not as an afterthought. It autonomously plans research strategies, searches the web, and synthesizes information from multiple sources into comprehensive, cited answers.
+
+This guide covers deploying DR-Tulu-8B on Vast.ai with the complete agent stack required for production use.
+
+## Prerequisites
+
+Before getting started, you'll need:
+
+- A Vast.ai account with credits ([Sign up here](https://cloud.vast.ai))
+- Vast.ai CLI installed (`pip install vastai`)
+- Your Vast.ai API key configured
+- API keys for external services (details below)
+
+## Architecture
+
+DR-Tulu requires three components working together:
+
+1. **vLLM Server**: Serves the DR-Tulu-8B model via an OpenAI-compatible API
+2. **MCP Backend**: Provides web search and page reading capabilities via the Model Context Protocol
+3. **dr-agent Library**: Orchestrates the multi-turn interaction between the model and tools
+
+The model generates tool calls in a specific format. The dr-agent library parses these calls, executes them through the MCP backend, and feeds results back to the model. This loop continues until the model produces a final answer.
+
+### External Service Dependencies
+
+DR-Tulu requires API keys for the following services:
+
+| Service | Purpose | Required |
+|---------|---------|----------|
+| [Serper](https://serper.dev/) | Web search | Yes |
+| [Jina](https://jina.ai/reader/) | Page content extraction | Yes |
+| [Semantic Scholar](https://api.semanticscholar.org/) | Academic paper search | Optional |
+
+## Instance Configuration
+
+### Step 1: Search for Suitable Instances
+
+Use the Vast.ai CLI to find instances that meet the requirements:
+
+```bash
+vastai search offers "gpu_ram >= 24 num_gpus = 1 disk_space >= 100 verified=true" --order "dph_base"
+```
+
+This searches for:
+- Single GPU with at least 24GB VRAM
+- 100GB disk space
+- Verified hosts only
+- Sorted by cost (lowest first)
+
+### Step 2: Deploy the vLLM Server
+
+Once you've selected an instance ID from the search results, create it with the correct configuration:
+
+```bash
+vastai create instance <INSTANCE_ID> \
+    --image vllm/vllm-openai:v0.10.0 \
+    --env '-p 8000:8000 --ipc=host' \
+    --disk 100 \
+    --args --model rl-research/DR-Tulu-8B --dtype auto --max-model-len 16384 --port 8000
+```
+
+Use `vllm/vllm-openai:v0.10.0`. The `latest` tag (v0.12.0) has a Triton compilation bug that crashes after model load. Older versions don't support the Qwen3 architecture.
+
+## Setting Up the MCP Backend
+
+The MCP backend provides the tools DR-Tulu needs to search the web and read page content. This deployment runs the MCP backend on your local machine while vLLM runs on Vast.ai. The dr-agent library coordinates between them.
+
+```bash
+# Clone the repository
+git clone https://github.com/rlresearch/dr-tulu.git
+cd dr-tulu/agent
+
+# Install uv if needed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install dependencies (uv sync handles venv creation automatically)
+uv sync
+
+# Configure API keys
+export SERPER_API_KEY=your_serper_key
+export JINA_API_KEY=your_jina_key
+
+# Start the MCP backend
+uv run python -m dr_agent.mcp_backend.main --port 8001
+```
+
+Update the workflow configuration to point to your Vast.ai instance:
+
+```yaml
+# workflows/auto_search_sft.yaml
+search_agent_base_url: "http://<VAST_IP>:<PORT>/v1"
+search_agent_model_name: "rl-research/DR-Tulu-8B"
+search_agent_tokenizer_name: "Qwen/Qwen3-8B"
+search_agent_api_key: "dummy-key"
+search_agent_max_tokens: 16000
+search_agent_temperature: 1.0
+search_agent_max_tool_calls: 10
+```
+
+## Using DR-Tulu
+
+### Interactive Chat
+
+For interactive use, launch the chat interface:
+
+```bash
+cd dr-tulu/agent
+uv run python scripts/launch_chat.py \
+    -c workflows/auto_search_sft.yaml \
+    --skip-checks \
+    --mcp-port 8001
+```
+
+The `--skip-checks` flag prevents the launcher from trying to start a local vLLM server (since it's on Vast.ai). The `--mcp-port 8001` must match the port used when starting the MCP backend. Type your questions and the agent will search the web, read pages, and synthesize an answer with citations.
+
+### Batch Evaluation
+
+Run DR-Tulu against built-in evaluation datasets:
+
+```bash
+cd dr-tulu/agent
+uv run python workflows/auto_search_sft.py generate-dataset simpleqa \
+    --num-examples 2 \
+    --config workflows/auto_search_sft.yaml \
+    --output results.jsonl
+```
+
+Available datasets: `simpleqa`, `healthbench`, `deep_research_bench`, `research_qa`, `genetic_diseases`, `2wiki`, `webwalker`
+
+Example output (results.jsonl):
+
+```json
+{
+  "problem": "Who received the IEEE Frank Rosenblatt Award in 2010?",
+  "final_response": "Michio Sugeno"
+}
+```
+
+### Python API
+
+Call DR-Tulu directly from your code:
+
+```python
+import asyncio
+import sys
+sys.path.insert(0, "dr-tulu/agent")
+
+from workflows.auto_search_sft import AutoReasonSearchWorkflow
+
+async def research(question: str) -> dict:
+    workflow = AutoReasonSearchWorkflow(
+        configuration="dr-tulu/agent/workflows/auto_search_sft.yaml"
+    )
+    result = await workflow(
+        problem=question,
+        dataset_name="simpleqa",
+        verbose=False,
+    )
+    ft = result.get("full_traces")
+    return {
+        "answer": result["final_response"],
+        "tool_calls": result.get("total_tool_calls"),
+        "tokens": getattr(ft, "total_tokens", 0) if ft else 0,
+    }
+
+result = asyncio.run(research("Who invented the transistor?"))
+print("Answer:", result["answer"])
+print("Tool calls:", result["tool_calls"])
+print("Tokens:", result["tokens"])
+```
+
+Output:
+
+```
+Answer: John Bardeen, Walter H. Brattain, and William B. Shockley
+
+Tool calls: 4
+Tokens: 6241
+```
+
+## Additional Resources
+
+- [DR-Tulu Blog Post](https://allenai.org/blog/dr-tulu) - Overview and research methodology
+- [Model Weights](https://huggingface.co/rl-research/DR-Tulu-8B) - Hugging Face model card
+- [Source Code](https://github.com/rlresearch/dr-tulu) - dr-agent library and evaluation code
+- [Research Paper](https://arxiv.org/abs/2511.19399) - Technical details and benchmark results
+
+## Cleanup
+
+When you're done, destroy the Vast.ai instance:
+
+```bash
+vastai destroy instance <INSTANCE_ID>
+```
+
+## Conclusion
+
+DR-Tulu represents a shift in how research agents are built. By training the model alongside its MCP tools rather than bolting them on afterward, AI2 created an 8B model with strong research capabilities. The split architecture—vLLM on Vast.ai for inference, MCP locally for tool execution—gives you the GPU power needed for the model while keeping API keys and tool orchestration on your own machine. This guide provides a working proof-of-concept ready for integration into your agentic workflow applications.
