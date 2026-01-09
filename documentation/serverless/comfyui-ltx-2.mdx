@@ -1,0 +1,1470 @@
+---
+title: ComfyUI LTX-2
+description: Learn how to use ComfyUI with LTX-2 on Vast.ai Serverless for text-to-video generation.
+"canonical": "/documentation/serverless/comfyui-ltx-2"
+---
+
+<script type="application/ld+json" dangerouslySetInnerHTML={{
+  __html: JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "ComfyUI LTX-2 with Vast.ai Serverless",
+    "description": "Complete guide to using ComfyUI with LTX-2 on Vast.ai Serverless for text-to-video generation workflows, covering template setup, S3 storage configuration, benchmarking, workflow submission via /generate/sync endpoint, and testing.",
+    "author": {
+      "@type": "Organization",
+      "name": "Vast.ai"
+    },
+    "articleSection": "Serverless Documentation",
+    "keywords": ["ComfyUI", "LTX-2", "video generation", "text-to-video", "t2v", "serverless", "API", "vast.ai", "workflow", "benchmarking", "S3 storage", "PyWorker", "generate endpoint"]
+  })
+}} />
+
+The [ComfyUI Serverless LTX-2 template](https://cloud.vast.ai/?ref_id=62897&creator_id=62897&name=LTX-2%20(Serverless)) allows you to send text-to-video generation requests to ComfyUI and have generated video assets automatically uploaded to S3-compatible storage. The template returns pre-signed URLs in response to requests, along with detailed process updates emitted by ComfyUI during generation.
+
+# Template Components
+
+The ComfyUI LTX-2 template includes:
+
+**In the Docker Image:**
+- ComfyUI
+- ComfyUI API Wrapper
+- Stable Diffusion 1.5 (for benchmarking)
+
+**Downloaded on first boot:**
+- PyWorker (comfyui-json worker)
+- Provisioning Script for custom configuration
+  - Adds cron job to remove older output files (older than 24 hours) if available disk space is less than 512MB
+  - Adds benchmarking workflow file
+  - Downloads LTX-2 models:
+    - `checkpoints/ltx-2-19b-dev-fp8.safetensors`
+    - `checkpoints/ltx-2-19b-distilled.safetensors`
+    - `diffusion_models/lotus-depth-d-v1-1.safetensors`
+    - `vae/vae-ft-mse-840000-ema-pruned.safetensors`
+    - `text_encoders/gemma_3_12B_it.safetensors`
+    - `latent_upscale_models/ltx-2-spatial-upscaler-x2-1.0.safetensors`
+    - `loras/ltx-2-19b-distilled-lora-384.safetensors`
+    - `loras/ltx-2-19b-lora-camera-control-dolly-left.safetensors`
+    - `loras/ltx-2-19b-ic-lora-depth-control.safetensors`
+
+<Note>
+  Before using this template, familiarize yourself with the [Serverless Documentation](/documentation/serverless/overview) and [Getting Started With Serverless](/documentation/serverless/getting-started-with-serverless) guide. Learn more about LTX-2 at [Hugging Face](https://huggingface.co/Lightricks/LTX-2).
+</Note>
+
+# Environment Variables
+
+## Required for S3 Storage
+
+The API wrapper manages asset uploads to S3-compatible storage. Configure these variables in your [Account Settings](https://cloud.vast.ai/settings/):
+
+- `S3_ACCESS_KEY_ID`(string): Access key ID for S3-compatible storage
+- `S3_SECRET_ACCESS_KEY`(string): Secret access key for S3-compatible storage
+- `S3_BUCKET_NAME`(string): Bucket name for S3-compatible storage
+- `S3_ENDPOINT_URL`(string): Endpoint URL for S3-compatible storage
+- `S3_REGION`(string): Optional region for S3-compatible storage
+
+<Note>
+  These S3 values can be overridden on a per-request basis in the request payload.
+</Note>
+
+## Optional Configuration
+
+- `WEBHOOK_URL`(string): Optional webhook to call after generation completion or failure
+- `PYWORKER_REPO`(string): Custom PyWorker git repository URL (default: https://github.com/vast-ai/pyworker)
+- `PYWORKER_REF`(string): Git reference to checkout from PyWorker repository
+
+<Warning>
+  Store sensitive information like API keys in the 'Environment Variables' section of your [Account Settings](https://cloud.vast.ai/settings/). These will be available in all instances you create.
+</Warning>
+
+# Worker Startup Process
+
+When a worker is first started with this template, the following will happen:
+
+1. Docker image is downloaded if not already cached on the host machine
+2. Worker (Docker container) is created on the host machine
+3. Template on-start script is executed:
+   - Docker image entrypoint is executed
+   - Download and run provisioning script (remotely stored Bash script)
+   - Start supervisord (ComfyUI & API wrapper process manager)
+   - Current version of [Vast PyWorker](https://github.com/vast-ai/pyworker) bootstrapping script is downloaded and executed
+   - ComfyUI and API Wrapper become available
+4. PyWorker begins benchmarking
+5. Benchmarking completes and worker score is sent to the serverless system
+
+When this process completes, the worker enters either the 'Ready' (hot) or 'Inactive' (cold) state.
+
+**Worker States:**
+- **Ready (hot)**: Worker is fully initialized and immediately available to process requests. You pay for idle time.
+- **Inactive (cold)**: Worker is shut down to save costs. You pay only for storage.
+
+# Benchmarking
+
+An LTX-2 video generation benchmark runs when each worker initializes to validate GPU performance and identify underperforming machines. The benchmark file is downloaded on first start and stored in the pyworker directory at `workers/comfyui-json/misc/benchmark.json`. The workflow is static but a random seed will be generated for each benchmarking run.
+
+**Performance expectations:**
+- Benchmark duration should remain consistent across identical GPU models
+- Significant variation (>20%) may indicate thermal, power, or configuration issues
+
+## Understanding Worker Scores
+
+The benchmarking system calculates a performance score for each worker that determines how requests are distributed:
+
+**How scoring works:**
+- Each benchmark is assigned a baseline complexity score of `100` (representing 100% of the work)
+- If a worker completes the benchmark in 100 seconds, it receives a score of `1.0` (it processes 1% of the work per second)
+- If a worker completes the same benchmark in 50 seconds, it receives a score of `2.0` (twice as fast)
+- If a worker completes the same benchmark in 200 seconds, it receives a score of `0.5` (half as fast)
+
+**How this affects your endpoint:**
+- Faster workers (higher scores) receive more requests proportionally
+- To serve 1 request per second on average with score-1.0 workers, you need 100 workers
+- With score-2.0 workers, you only need 50 workers for the same throughput
+- The system automatically balances load based on these scores
+
+<Note>
+  If you choose to use your own worker code, it's recommended to implement a custom benchmark that closely matches the video generation workflows you intend to process.
+</Note>
+
+# Endpoints
+
+The ComfyUI LTX-2 template provides endpoints for executing workflows and generating videos. After obtaining a worker address from the `/route/` endpoint (see [route documentation](/documentation/serverless/route)), you can send requests to the following endpoints.
+
+## /generate/sync
+
+The primary endpoint for submitting ComfyUI workflows. This endpoint accepts complete, user-defined ComfyUI workflows in JSON format and processes them synchronously.
+
+### Request Structure
+
+
+### Input
+
+`payload`:
+
+- `input`:
+  - `request_id`(string): Optional unique identifier for tracking the request
+  - `workflow_json`(object): Complete ComfyUI workflow graph in JSON format
+  - `s3`(object): Optional S3 configuration override
+    - `access_key_id`(string)
+    - `secret_access_key`(string)
+    - `endpoint_url`(string)
+    - `bucket_name`(string)
+    - `region`(string)
+  - `webhook`(object): Optional webhook configuration
+    - `url`(string): Webhook URL to call after generation
+    - `extra_params`(object): Additional parameters to include in webhook payload
+
+<Note>
+  The string `"__RANDOM_INT__"` in your workflow will be replaced with a random integer prior to posting the workflow to ComfyUI, allowing for varied outputs without manually specifying different seeds.
+</Note>
+
+**Example Request:**
+
+<CodeGroup>
+```python vastai-sdk icon=python
+from vastai import Serverless
+import asyncio
+
+ENDPOINT_NAME="comfyui-json"
+
+async def main():
+    async with Serverless() as client:
+        endpoint = await client.get_endpoint(name=ENDPOINT_NAME)
+
+        # ComfyUI API compatible json workflow for LTX-2
+        workflow = {
+            "75": {
+                "inputs": {
+                "filename_prefix": "video/LTX-2",
+                "format": "mp4",
+                "codec": "auto",
+                "video": [
+                    "92:97",
+                    0
+                ]
+                },
+                "class_type": "SaveVideo",
+                "_meta": {
+                "title": "Save Video"
+                }
+            },
+            "92:9": {
+                "inputs": {
+                "steps": 20,
+                "max_shift": 2.05,
+                "base_shift": 0.95,
+                "stretch": True,
+                "terminal": 0.1,
+                "latent": [
+                    "92:56",
+                    0
+                ]
+                },
+                "class_type": "LTXVScheduler",
+                "_meta": {
+                "title": "LTXVScheduler"
+                }
+            },
+            "92:60": {
+                "inputs": {
+                "text_encoder": "gemma_3_12B_it.safetensors",
+                "ckpt_name": "ltx-2-19b-dev-fp8.safetensors",
+                "device": "default"
+                },
+                "class_type": "LTXAVTextEncoderLoader",
+                "_meta": {
+                "title": "LTXV Audio Text Encoder Loader"
+                }
+            },
+            "92:73": {
+                "inputs": {
+                "sigmas": "0.909375, 0.725, 0.421875, 0.0"
+                },
+                "class_type": "ManualSigmas",
+                "_meta": {
+                "title": "ManualSigmas"
+                }
+            },
+            "92:76": {
+                "inputs": {
+                "model_name": "ltx-2-spatial-upscaler-x2-1.0.safetensors"
+                },
+                "class_type": "LatentUpscaleModelLoader",
+                "_meta": {
+                "title": "Load Latent Upscale Model"
+                }
+            },
+            "92:81": {
+                "inputs": {
+                "positive": [
+                    "92:22",
+                    0
+                ],
+                "negative": [
+                    "92:22",
+                    1
+                ],
+                "latent": [
+                    "92:80",
+                    0
+                ]
+                },
+                "class_type": "LTXVCropGuides",
+                "_meta": {
+                "title": "LTXVCropGuides"
+                }
+            },
+            "92:82": {
+                "inputs": {
+                "cfg": 1,
+                "model": [
+                    "92:68",
+                    0
+                ],
+                "positive": [
+                    "92:81",
+                    0
+                ],
+                "negative": [
+                    "92:81",
+                    1
+                ]
+                },
+                "class_type": "CFGGuider",
+                "_meta": {
+                "title": "CFGGuider"
+                }
+            },
+            "92:90": {
+                "inputs": {
+                "upscale_method": "lanczos",
+                "scale_by": 0.5,
+                "image": [
+                    "92:89",
+                    0
+                ]
+                },
+                "class_type": "ImageScaleBy",
+                "_meta": {
+                "title": "Upscale Image By"
+                }
+            },
+            "92:91": {
+                "inputs": {
+                "image": [
+                    "92:90",
+                    0
+                ]
+                },
+                "class_type": "GetImageSize",
+                "_meta": {
+                "title": "Get Image Size"
+                }
+            },
+            "92:51": {
+                "inputs": {
+                "frames_number": [
+                    "92:62",
+                    0
+                ],
+                "frame_rate": [
+                    "92:99",
+                    0
+                ],
+                "batch_size": 1,
+                "audio_vae": [
+                    "92:48",
+                    0
+                ]
+                },
+                "class_type": "LTXVEmptyLatentAudio",
+                "_meta": {
+                "title": "LTXV Empty Latent Audio"
+                }
+            },
+            "92:22": {
+                "inputs": {
+                "frame_rate": [
+                    "92:102",
+                    0
+                ],
+                "positive": [
+                    "92:3",
+                    0
+                ],
+                "negative": [
+                    "92:4",
+                    0
+                ]
+                },
+                "class_type": "LTXVConditioning",
+                "_meta": {
+                "title": "LTXVConditioning"
+                }
+            },
+            "92:43": {
+                "inputs": {
+                "width": [
+                    "92:91",
+                    0
+                ],
+                "height": [
+                    "92:91",
+                    1
+                ],
+                "length": [
+                    "92:62",
+                    0
+                ],
+                "batch_size": 1
+                },
+                "class_type": "EmptyLTXVLatentVideo",
+                "_meta": {
+                "title": "EmptyLTXVLatentVideo"
+                }
+            },
+            "92:56": {
+                "inputs": {
+                "video_latent": [
+                    "92:43",
+                    0
+                ],
+                "audio_latent": [
+                    "92:51",
+                    0
+                ]
+                },
+                "class_type": "LTXVConcatAVLatent",
+                "_meta": {
+                "title": "LTXVConcatAVLatent"
+                }
+            },
+            "92:4": {
+                "inputs": {
+                "text": "blurry, low quality, still frame, frames, watermark, overlay, titles, has blurbox, has subtitles",
+                "clip": [
+                    "92:60",
+                    0
+                ]
+                },
+                "class_type": "CLIPTextEncode",
+                "_meta": {
+                "title": "CLIP Text Encode (Prompt)"
+                }
+            },
+            "92:89": {
+                "inputs": {
+                "width": 1280,
+                "height": 720,
+                "batch_size": 1,
+                "color": 0
+                },
+                "class_type": "EmptyImage",
+                "_meta": {
+                "title": "EmptyImage"
+                }
+            },
+            "92:62": {
+                "inputs": {
+                "value": 121
+                },
+                "class_type": "PrimitiveInt",
+                "_meta": {
+                "title": "Length"
+                }
+            },
+            "92:41": {
+                "inputs": {
+                "noise": [
+                    "92:11",
+                    0
+                ],
+                "guider": [
+                    "92:47",
+                    0
+                ],
+                "sampler": [
+                    "92:8",
+                    0
+                ],
+                "sigmas": [
+                    "92:9",
+                    0
+                ],
+                "latent_image": [
+                    "92:56",
+                    0
+                ]
+                },
+                "class_type": "SamplerCustomAdvanced",
+                "_meta": {
+                "title": "SamplerCustomAdvanced"
+                }
+            },
+            "92:67": {
+                "inputs": {
+                "noise_seed": 0
+                },
+                "class_type": "RandomNoise",
+                "_meta": {
+                "title": "RandomNoise"
+                }
+            },
+            "92:11": {
+                "inputs": {
+                "noise_seed": "__RANDOM_INT__"
+                },
+                "class_type": "RandomNoise",
+                "_meta": {
+                "title": "RandomNoise"
+                }
+            },
+            "92:80": {
+                "inputs": {
+                "av_latent": [
+                    "92:41",
+                    0
+                ]
+                },
+                "class_type": "LTXVSeparateAVLatent",
+                "_meta": {
+                "title": "LTXVSeparateAVLatent"
+                }
+            },
+            "92:83": {
+                "inputs": {
+                "video_latent": [
+                    "92:84",
+                    0
+                ],
+                "audio_latent": [
+                    "92:80",
+                    1
+                ]
+                },
+                "class_type": "LTXVConcatAVLatent",
+                "_meta": {
+                "title": "LTXVConcatAVLatent"
+                }
+            },
+            "92:84": {
+                "inputs": {
+                "samples": [
+                    "92:81",
+                    2
+                ],
+                "upscale_model": [
+                    "92:76",
+                    0
+                ],
+                "vae": [
+                    "92:1",
+                    2
+                ]
+                },
+                "class_type": "LTXVLatentUpsampler",
+                "_meta": {
+                "title": "spatial"
+                }
+            },
+            "92:70": {
+                "inputs": {
+                "noise": [
+                    "92:67",
+                    0
+                ],
+                "guider": [
+                    "92:82",
+                    0
+                ],
+                "sampler": [
+                    "92:66",
+                    0
+                ],
+                "sigmas": [
+                    "92:73",
+                    0
+                ],
+                "latent_image": [
+                    "92:83",
+                    0
+                ]
+                },
+                "class_type": "SamplerCustomAdvanced",
+                "_meta": {
+                "title": "SamplerCustomAdvanced"
+                }
+            },
+            "92:3": {
+                "inputs": {
+                "text": "A close-up of a cheerful girl puppet with curly auburn yarn hair and wide button eyes, holding a small red umbrella above her head. Rain falls gently around her. She looks upward and begins to sing with joy in English: \"It's raining, it's raining, I love it when its raining.\" Her fabric mouth opening and closing to a melodic tune. Her hands grip the umbrella handle as she sways slightly from side to side in rhythm. The camera holds steady as the rain sparkles against the soft lighting. Her eyes blink occasionally as she sings.",
+                "clip": [
+                    "92:60",
+                    0
+                ]
+                },
+                "class_type": "CLIPTextEncode",
+                "_meta": {
+                "title": "CLIP Text Encode (Prompt)"
+                }
+            },
+            "92:97": {
+                "inputs": {
+                "fps": [
+                    "92:102",
+                    0
+                ],
+                "images": [
+                    "92:98",
+                    0
+                ],
+                "audio": [
+                    "92:96",
+                    0
+                ]
+                },
+                "class_type": "CreateVideo",
+                "_meta": {
+                "title": "Create Video"
+                }
+            },
+            "92:48": {
+                "inputs": {
+                "ckpt_name": "ltx-2-19b-dev-fp8.safetensors"
+                },
+                "class_type": "LTXVAudioVAELoader",
+                "_meta": {
+                "title": "LTXV Audio VAE Loader"
+                }
+            },
+            "92:94": {
+                "inputs": {
+                "av_latent": [
+                    "92:70",
+                    1
+                ]
+                },
+                "class_type": "LTXVSeparateAVLatent",
+                "_meta": {
+                "title": "LTXVSeparateAVLatent"
+                }
+            },
+            "92:98": {
+                "inputs": {
+                "tile_size": 512,
+                "overlap": 64,
+                "temporal_size": 4096,
+                "temporal_overlap": 8,
+                "samples": [
+                    "92:94",
+                    0
+                ],
+                "vae": [
+                    "92:1",
+                    2
+                ]
+                },
+                "class_type": "VAEDecodeTiled",
+                "_meta": {
+                "title": "VAE Decode (Tiled)"
+                }
+            },
+            "92:96": {
+                "inputs": {
+                "samples": [
+                    "92:94",
+                    1
+                ],
+                "audio_vae": [
+                    "92:48",
+                    0
+                ]
+                },
+                "class_type": "LTXVAudioVAEDecode",
+                "_meta": {
+                "title": "LTXV Audio VAE Decode"
+                }
+            },
+            "92:47": {
+                "inputs": {
+                "cfg": 4,
+                "model": [
+                    "92:1",
+                    0
+                ],
+                "positive": [
+                    "92:22",
+                    0
+                ],
+                "negative": [
+                    "92:22",
+                    1
+                ]
+                },
+                "class_type": "CFGGuider",
+                "_meta": {
+                "title": "CFGGuider"
+                }
+            },
+            "92:102": {
+                "inputs": {
+                "value": 24
+                },
+                "class_type": "PrimitiveFloat",
+                "_meta": {
+                "title": "Frame Rate(float)"
+                }
+            },
+            "92:99": {
+                "inputs": {
+                "value": 24
+                },
+                "class_type": "PrimitiveInt",
+                "_meta": {
+                "title": "Frame Rate(int)"
+                }
+            },
+            "92:68": {
+                "inputs": {
+                "lora_name": "ltx-2-19b-distilled-lora-384.safetensors",
+                "strength_model": 1,
+                "model": [
+                    "92:1",
+                    0
+                ]
+                },
+                "class_type": "LoraLoaderModelOnly",
+                "_meta": {
+                "title": "LoraLoaderModelOnly"
+                }
+            },
+            "92:8": {
+                "inputs": {
+                "sampler_name": "euler_ancestral"
+                },
+                "class_type": "KSamplerSelect",
+                "_meta": {
+                "title": "KSamplerSelect"
+                }
+            },
+            "92:66": {
+                "inputs": {
+                "sampler_name": "euler_ancestral"
+                },
+                "class_type": "KSamplerSelect",
+                "_meta": {
+                "title": "KSamplerSelect"
+                }
+            },
+            "92:1": {
+                "inputs": {
+                "ckpt_name": "ltx-2-19b-dev-fp8.safetensors"
+                },
+                "class_type": "CheckpointLoaderSimple",
+                "_meta": {
+                "title": "Load Checkpoint"
+                }
+            }
+        }
+
+        payload = {
+          "input": {
+            "request_id": "",
+            "workflow_json": workflow,
+            "s3": {
+              "access_key_id": "",
+              "secret_access_key": "",
+              "endpoint_url": "",
+              "bucket_name": "",
+              "region": ""
+            },
+            "webhook": {
+              "url": "",
+              "extra_params": {
+                "user_id": "12345",
+                "project_id": "abc-def"
+              }
+            }
+          }
+        }
+
+        response = await endpoint.request("/generate/sync", payload)
+
+        # Response contains status, output, and any errors
+        print(response["response"])
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+</CodeGroup>
+
+
+### Outputs
+
+- `id`(string): Unique identifier for the request
+- `status`(string): Request status - `completed`, `failed`, `processing`, `generating`, or `queued`
+- `message`(string): Human-readable status message
+- `comfyui_response`(object): Detailed response from ComfyUI including:
+  - `prompt`: The workflow that was executed
+  - `outputs`: Generated outputs organized by node ID
+  - `status`: Execution status with completion messages and timestamps
+  - `meta`: Metadata about the execution
+  - `execution_details`: Progress updates and timing information with detailed progress_updates array showing generation progress
+- `output`(array): Array of output objects, each containing:
+  - `filename`(string): Name of the generated file (e.g., "ComfyUI_00003_.mp4")
+  - `local_path`(string): Path to file on worker
+  - `url`(string): Pre-signed URL for downloading the generated video asset (if S3 is configured)
+  - `type`(string): Output type (e.g., "output")
+  - `subfolder`(string): Subfolder within output directory (e.g., "video")
+  - `node_id`(string): ComfyUI node that produced this output
+  - `output_type`(string): Type of output (e.g., "images")
+- `timings`(object): Timing information for the request
+
+**Example Response:**
+
+```json JSON icon="js"
+{
+  "id": "c57323a9-e375-4bd3-b99a-f6a3d148d05e",
+  "message": "Processing complete.",
+  "status": "completed",
+  "comfyui_response": {
+    "77232812-a04d-446f-834e-d4ce4d64752a": {
+      "prompt": [
+        0,
+        "77232812-a04d-446f-834e-d4ce4d64752a",
+        {
+          "75": {
+            "inputs": {
+              "filename_prefix": "video/LTX-2",
+              "format": "mp4",
+              "codec": "auto",
+              "video": [
+                "92:97",
+                0
+              ]
+            },
+            "class_type": "SaveVideo",
+            "_meta": {
+              "title": "Save Video"
+            }
+          },
+          "92:9": {
+            "inputs": {
+              "steps": 20,
+              "max_shift": 2.05,
+              "base_shift": 0.95,
+              "stretch": true,
+              "terminal": 0.1,
+              "latent": [
+                "92:56",
+                0
+              ]
+            },
+            "class_type": "LTXVScheduler",
+            "_meta": {
+              "title": "LTXVScheduler"
+            }
+          },
+          "92:60": {
+            "inputs": {
+              "text_encoder": "gemma_3_12B_it.safetensors",
+              "ckpt_name": "ltx-2-19b-dev-fp8.safetensors",
+              "device": "default"
+            },
+            "class_type": "LTXAVTextEncoderLoader",
+            "_meta": {
+              "title": "LTXV Audio Text Encoder Loader"
+            }
+          },
+          "92:73": {
+            "inputs": {
+              "sigmas": "0.909375, 0.725, 0.421875, 0.0"
+            },
+            "class_type": "ManualSigmas",
+            "_meta": {
+              "title": "ManualSigmas"
+            }
+          },
+          "92:76": {
+            "inputs": {
+              "model_name": "ltx-2-spatial-upscaler-x2-1.0.safetensors"
+            },
+            "class_type": "LatentUpscaleModelLoader",
+            "_meta": {
+              "title": "Load Latent Upscale Model"
+            }
+          },
+          "92:81": {
+            "inputs": {
+              "positive": [
+                "92:22",
+                0
+              ],
+              "negative": [
+                "92:22",
+                1
+              ],
+              "latent": [
+                "92:80",
+                0
+              ]
+            },
+            "class_type": "LTXVCropGuides",
+            "_meta": {
+              "title": "LTXVCropGuides"
+            }
+          },
+          "92:82": {
+            "inputs": {
+              "cfg": 1,
+              "model": [
+                "92:68",
+                0
+              ],
+              "positive": [
+                "92:81",
+                0
+              ],
+              "negative": [
+                "92:81",
+                1
+              ]
+            },
+            "class_type": "CFGGuider",
+            "_meta": {
+              "title": "CFGGuider"
+            }
+          },
+          "92:90": {
+            "inputs": {
+              "upscale_method": "lanczos",
+              "scale_by": 0.5,
+              "image": [
+                "92:89",
+                0
+              ]
+            },
+            "class_type": "ImageScaleBy",
+            "_meta": {
+              "title": "Upscale Image By"
+            }
+          },
+          "92:91": {
+            "inputs": {
+              "image": [
+                "92:90",
+                0
+              ]
+            },
+            "class_type": "GetImageSize",
+            "_meta": {
+              "title": "Get Image Size"
+            }
+          },
+          "92:51": {
+            "inputs": {
+              "frames_number": [
+                "92:62",
+                0
+              ],
+              "frame_rate": [
+                "92:99",
+                0
+              ],
+              "batch_size": 1,
+              "audio_vae": [
+                "92:48",
+                0
+              ]
+            },
+            "class_type": "LTXVEmptyLatentAudio",
+            "_meta": {
+              "title": "LTXV Empty Latent Audio"
+            }
+          },
+          "92:22": {
+            "inputs": {
+              "frame_rate": [
+                "92:102",
+                0
+              ],
+              "positive": [
+                "92:3",
+                0
+              ],
+              "negative": [
+                "92:4",
+                0
+              ]
+            },
+            "class_type": "LTXVConditioning",
+            "_meta": {
+              "title": "LTXVConditioning"
+            }
+          },
+          "92:43": {
+            "inputs": {
+              "width": [
+                "92:91",
+                0
+              ],
+              "height": [
+                "92:91",
+                1
+              ],
+              "length": [
+                "92:62",
+                0
+              ],
+              "batch_size": 1
+            },
+            "class_type": "EmptyLTXVLatentVideo",
+            "_meta": {
+              "title": "EmptyLTXVLatentVideo"
+            }
+          },
+          "92:56": {
+            "inputs": {
+              "video_latent": [
+                "92:43",
+                0
+              ],
+              "audio_latent": [
+                "92:51",
+                0
+              ]
+            },
+            "class_type": "LTXVConcatAVLatent",
+            "_meta": {
+              "title": "LTXVConcatAVLatent"
+            }
+          },
+          "92:4": {
+            "inputs": {
+              "text": "blurry, low quality, still frame, frames, watermark, overlay, titles, has blurbox, has subtitles",
+              "clip": [
+                "92:60",
+                0
+              ]
+            },
+            "class_type": "CLIPTextEncode",
+            "_meta": {
+              "title": "CLIP Text Encode (Prompt)"
+            }
+          },
+          "92:89": {
+            "inputs": {
+              "width": 1280,
+              "height": 720,
+              "batch_size": 1,
+              "color": 0
+            },
+            "class_type": "EmptyImage",
+            "_meta": {
+              "title": "EmptyImage"
+            }
+          },
+          "92:62": {
+            "inputs": {
+              "value": 121
+            },
+            "class_type": "PrimitiveInt",
+            "_meta": {
+              "title": "Length"
+            }
+          },
+          "92:41": {
+            "inputs": {
+              "noise": [
+                "92:11",
+                0
+              ],
+              "guider": [
+                "92:47",
+                0
+              ],
+              "sampler": [
+                "92:8",
+                0
+              ],
+              "sigmas": [
+                "92:9",
+                0
+              ],
+              "latent_image": [
+                "92:56",
+                0
+              ]
+            },
+            "class_type": "SamplerCustomAdvanced",
+            "_meta": {
+              "title": "SamplerCustomAdvanced"
+            }
+          },
+          "92:67": {
+            "inputs": {
+              "noise_seed": 0
+            },
+            "class_type": "RandomNoise",
+            "_meta": {
+              "title": "RandomNoise"
+            }
+          },
+          "92:11": {
+            "inputs": {
+              "noise_seed": 10
+            },
+            "class_type": "RandomNoise",
+            "_meta": {
+              "title": "RandomNoise"
+            }
+          },
+          "92:80": {
+            "inputs": {
+              "av_latent": [
+                "92:41",
+                0
+              ]
+            },
+            "class_type": "LTXVSeparateAVLatent",
+            "_meta": {
+              "title": "LTXVSeparateAVLatent"
+            }
+          },
+          "92:83": {
+            "inputs": {
+              "video_latent": [
+                "92:84",
+                0
+              ],
+              "audio_latent": [
+                "92:80",
+                1
+              ]
+            },
+            "class_type": "LTXVConcatAVLatent",
+            "_meta": {
+              "title": "LTXVConcatAVLatent"
+            }
+          },
+          "92:84": {
+            "inputs": {
+              "samples": [
+                "92:81",
+                2
+              ],
+              "upscale_model": [
+                "92:76",
+                0
+              ],
+              "vae": [
+                "92:1",
+                2
+              ]
+            },
+            "class_type": "LTXVLatentUpsampler",
+            "_meta": {
+              "title": "spatial"
+            }
+          },
+          "92:70": {
+            "inputs": {
+              "noise": [
+                "92:67",
+                0
+              ],
+              "guider": [
+                "92:82",
+                0
+              ],
+              "sampler": [
+                "92:66",
+                0
+              ],
+              "sigmas": [
+                "92:73",
+                0
+              ],
+              "latent_image": [
+                "92:83",
+                0
+              ]
+            },
+            "class_type": "SamplerCustomAdvanced",
+            "_meta": {
+              "title": "SamplerCustomAdvanced"
+            }
+          },
+          "92:3": {
+            "inputs": {
+              "text": "A close-up of a cheerful girl puppet with curly auburn yarn hair and wide button eyes, holding a small red umbrella above her head. Rain falls gently around her. She looks upward and begins to sing with joy in English: \"It's raining, it's raining, I love it when its raining.\" Her fabric mouth opening and closing to a melodic tune. Her hands grip the umbrella handle as she sways slightly from side to side in rhythm. The camera holds steady as the rain sparkles against the soft lighting. Her eyes blink occasionally as she sings.",
+              "clip": [
+                "92:60",
+                0
+              ]
+            },
+            "class_type": "CLIPTextEncode",
+            "_meta": {
+              "title": "CLIP Text Encode (Prompt)"
+            }
+          },
+          "92:97": {
+            "inputs": {
+              "fps": [
+                "92:102",
+                0
+              ],
+              "images": [
+                "92:98",
+                0
+              ],
+              "audio": [
+                "92:96",
+                0
+              ]
+            },
+            "class_type": "CreateVideo",
+            "_meta": {
+              "title": "Create Video"
+            }
+          },
+          "92:48": {
+            "inputs": {
+              "ckpt_name": "ltx-2-19b-dev-fp8.safetensors"
+            },
+            "class_type": "LTXVAudioVAELoader",
+            "_meta": {
+              "title": "LTXV Audio VAE Loader"
+            }
+          },
+          "92:94": {
+            "inputs": {
+              "av_latent": [
+                "92:70",
+                1
+              ]
+            },
+            "class_type": "LTXVSeparateAVLatent",
+            "_meta": {
+              "title": "LTXVSeparateAVLatent"
+            }
+          },
+          "92:98": {
+            "inputs": {
+              "tile_size": 512,
+              "overlap": 64,
+              "temporal_size": 4096,
+              "temporal_overlap": 8,
+              "samples": [
+                "92:94",
+                0
+              ],
+              "vae": [
+                "92:1",
+                2
+              ]
+            },
+            "class_type": "VAEDecodeTiled",
+            "_meta": {
+              "title": "VAE Decode (Tiled)"
+            }
+          },
+          "92:96": {
+            "inputs": {
+              "samples": [
+                "92:94",
+                1
+              ],
+              "audio_vae": [
+                "92:48",
+                0
+              ]
+            },
+            "class_type": "LTXVAudioVAEDecode",
+            "_meta": {
+              "title": "LTXV Audio VAE Decode"
+            }
+          },
+          "92:47": {
+            "inputs": {
+              "cfg": 4,
+              "model": [
+                "92:1",
+                0
+              ],
+              "positive": [
+                "92:22",
+                0
+              ],
+              "negative": [
+                "92:22",
+                1
+              ]
+            },
+            "class_type": "CFGGuider",
+            "_meta": {
+              "title": "CFGGuider"
+            }
+          },
+          "92:102": {
+            "inputs": {
+              "value": 24
+            },
+            "class_type": "PrimitiveFloat",
+            "_meta": {
+              "title": "Frame Rate(float)"
+            }
+          },
+          "92:99": {
+            "inputs": {
+              "value": 24
+            },
+            "class_type": "PrimitiveInt",
+            "_meta": {
+              "title": "Frame Rate(int)"
+            }
+          },
+          "92:68": {
+            "inputs": {
+              "lora_name": "ltx-2-19b-distilled-lora-384.safetensors",
+              "strength_model": 1,
+              "model": [
+                "92:1",
+                0
+              ]
+            },
+            "class_type": "LoraLoaderModelOnly",
+            "_meta": {
+              "title": "LoraLoaderModelOnly"
+            }
+          },
+          "92:8": {
+            "inputs": {
+              "sampler_name": "euler_ancestral"
+            },
+            "class_type": "KSamplerSelect",
+            "_meta": {
+              "title": "KSamplerSelect"
+            }
+          },
+          "92:66": {
+            "inputs": {
+              "sampler_name": "euler_ancestral"
+            },
+            "class_type": "KSamplerSelect",
+            "_meta": {
+              "title": "KSamplerSelect"
+            }
+          },
+          "92:1": {
+            "inputs": {
+              "ckpt_name": "ltx-2-19b-dev-fp8.safetensors"
+            },
+            "class_type": "CheckpointLoaderSimple",
+            "_meta": {
+              "title": "Load Checkpoint"
+            }
+          }
+        },
+        {
+          "client_id": "worker_1_1767958754.813125",
+          "create_time": 1767958869454
+        },
+        [
+          "75"
+        ]
+      ],
+      "outputs": {
+        "75": {
+          "images": [
+            {
+              "filename": "LTX-2_00001_.mp4",
+              "subfolder": "video",
+              "type": "output"
+            }
+          ],
+          "animated": [
+            true
+          ]
+        }
+      },
+      "status": {
+        "status_str": "success",
+        "completed": true,
+        "messages": [
+          [
+            "execution_start",
+            {
+              "prompt_id": "77232812-a04d-446f-834e-d4ce4d64752a",
+              "timestamp": 1767958869456
+            }
+          ],
+          [
+            "execution_cached",
+            {
+              "nodes": [],
+              "prompt_id": "77232812-a04d-446f-834e-d4ce4d64752a",
+              "timestamp": 1767958869470
+            }
+          ],
+          [
+            "execution_success",
+            {
+              "prompt_id": "77232812-a04d-446f-834e-d4ce4d64752a",
+              "timestamp": 1767958954406
+            }
+          ]
+        ]
+      },
+      "meta": {
+        "75": {
+          "node_id": "75",
+          "display_node": "75",
+          "parent_node": null,
+          "real_node_id": "75"
+        }
+      }
+    },
+    "execution_details": {
+      "prompt_id": "77232812-a04d-446f-834e-d4ce4d64752a",
+      "nodes_executed": [
+        "92:99",
+        "92:62",
+        "92:51",
+        "92:89",
+        "92:90",
+        "92:91",
+        "92:43",
+        "92:56",
+        "92:9",
+        "92:8",
+        "92:60",
+        "92:4",
+        "92:3",
+        "92:22",
+        "92:1",
+        "92:47",
+        "92:11",
+        "92:41",
+        "92:80",
+        "92:76",
+        "92:81",
+        "92:84",
+        "92:83",
+        "92:73",
+        "92:68",
+        "92:82",
+        "92:67",
+        "92:70",
+        "92:94",
+        "92:96",
+        "92:98",
+        "92:97",
+        "75"
+      ],
+      "progress_updates": [
+        {
+          "time": 20.165000000037253,
+          "value": 1,
+          "max": 20,
+          "percentage": 5
+        },
+        {
+          "time": 21.048000000417233,
+          "value": 2,
+          "max": 20,
+          "percentage": 10
+        },
+        ...
+        {
+          "time": 62.243999999947846,
+          "value": 2,
+          "max": 3,
+          "percentage": 66.66666666666666
+        },
+        {
+          "time": 65.53500000014901,
+          "value": 3,
+          "max": 3,
+          "percentage": 100
+        }
+      ],
+      "completed": true,
+      "error": null
+    }
+  },
+  "output": [
+    {
+      "filename": "LTX-2_00001_.mp4",
+      "local_path": "/workspace/ComfyUI/output/c57323a9-e375-4bd3-b99a-f6a3d148d05e/LTX-2_00001_.mp4",
+      "type": "output",
+      "subfolder": "video",
+      "node_id": "75",
+      "output_type": "images",
+      "url": "https://s3.us-east-005.backblazeb2.com/comfyui-wrapper/c57323a9-e375-4bd3-b99a-f6a3d148d05e/LTX-2_00001_.mp4?AWSAccessKeyId=0054083f7a253e80000000007&Signature=4LoPvdsCP5mIyfGfhIn0wltjkpM%3D&Expires=1768563755"
+    }
+  ],
+  "timings": {}
+}
+```
+
+<Warning>
+  Ensure that the LTX-2 models and any required custom nodes are already installed before sending a request. This template pre-installs all necessary LTX-2 models during first boot.
+</Warning>
+
+# Testing Before Deployment
+
+Although this template is designed for serverless deployment, you can test it as an interactive instance first.
+
+To access ComfyUI and the API wrapper:
+
+1. Start an interactive instance with this template
+2. Connect via SSH with port forwarding:
+   ```bash
+   ssh -L 18188:localhost:18188 -L 18288:localhost:18288 root@instance-address -p port
+   ```
+3. Access ComfyUI at http://localhost:18188
+4. Access the API Wrapper documentation at http://localhost:18288/docs
+
+The benchmarking process will be visible in the instance logs, but applications won't be available over the public interface without port forwarding.
+
+Learn more about LTX-2 at [Hugging Face](https://huggingface.co/Lightricks/LTX-2).
