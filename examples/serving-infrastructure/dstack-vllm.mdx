@@ -1,0 +1,284 @@
+---
+title: dstack + vLLM
+slug: dstack-vllm-deployment-vast
+createdAt: Thu Dec 19 2025 16:00:00 GMT+0000 (Coordinated Universal Time)
+updatedAt: Thu Dec 19 2025 16:00:00 GMT+0000 (Coordinated Universal Time)
+---
+
+# Deploy LLMs with dstack and vLLM on Vast.ai
+
+[dstack](https://dstack.ai) is an open-source GPU orchestration platform that simplifies deploying AI workloads across cloud providers. This guide shows you how to use dstack with Vast.ai as the backend to deploy language models using vLLM, with automated provisioning and cost controls.
+
+## Why Use dstack with Vast.ai?
+
+- **Simplified Deployment**: Define your model configuration in YAML, and dstack handles instance provisioning
+- **Cost Controls**: Set maximum hourly price limits and dstack finds the best available instances
+- **OpenAI-Compatible API**: vLLM provides a standard API that works with existing tools and SDKs
+- **Automatic Proxy**: dstack proxies requests to your service, handling authentication automatically
+
+## Prerequisites
+
+- A Vast.ai account with credits ([Sign up here](https://cloud.vast.ai))
+- Your Vast.ai API key (from [Account Settings](https://cloud.vast.ai/account/))
+- Python 3.11 (dstack has compatibility issues with Python 3.14)
+
+## Hardware Requirements
+
+This guide uses Qwen3-30B-A3B as an example. It's a Mixture-of-Experts model with 30.5B total parameters.
+
+- **VRAM Required**: ~57GB for model weights + KV cache
+- **Recommended GPU**: H100 80GB or A100 80GB
+
+> Always check the model card on Hugging Face for VRAM requirements before deploying. A rough estimate: model parameters × 2 bytes for BF16 precision.
+
+## Setup
+
+### Step 1: Create Virtual Environment and Install dstack
+
+```bash
+python3.11 -m venv dstack-venv
+./dstack-venv/bin/pip install "dstack[all]" -U
+```
+
+### Step 2: Configure dstack Server
+
+Create the server configuration directory and file:
+
+```bash
+mkdir -p ~/.dstack/server
+```
+
+Create `~/.dstack/server/config.yml`:
+
+```yaml
+projects:
+  - name: main
+    backends:
+      - type: vastai
+        creds:
+          type: api_key
+          api_key: YOUR_VASTAI_API_KEY
+```
+
+Replace `YOUR_VASTAI_API_KEY` with your actual Vast.ai API key.
+
+### Step 3: Start dstack Server
+
+```bash
+./dstack-venv/bin/dstack server
+```
+
+You'll see output like:
+
+```
+╭━━┳━━┳━┳╮╭┳━━┳━╮
+┃━━┫┃━┫╭┫╰╯┃┃━┫╭╯
+┣━━┃┃━┫┃╰╮╭┫┃━┫┃
+╰━━┻━━┻╯╱╰╯╰━━┻╯
+
+INFO     Applying ~/.dstack/server/config.yml...
+INFO     Configured the main project in ~/.dstack/config.yml
+INFO     The admin token is YOUR_ADMIN_TOKEN
+INFO     The dstack server 0.19.40 is running at http://127.0.0.1:3000
+```
+
+> Save the admin token from the output. You'll need it for CLI access and API authentication.
+
+### Step 4: Configure CLI Access
+
+In a new terminal, configure the CLI to connect to your dstack server:
+
+```bash
+./dstack-venv/bin/dstack project add \
+  --name main \
+  --url http://127.0.0.1:3000 \
+  --token YOUR_ADMIN_TOKEN
+```
+
+## Deploy a Model Service
+
+### Step 1: Create Service Configuration
+
+Create `serve-qwen.dstack.yml`:
+
+```yaml
+type: service
+name: qwen3-service
+python: "3.11"
+
+commands:
+  - pip install vllm
+  - vllm serve Qwen/Qwen3-30B-A3B --port 8000
+
+port: 8000
+model: Qwen/Qwen3-30B-A3B
+
+resources:
+  gpu: 80GB
+
+max_price: 2.50
+```
+
+**Key parameters:**
+- `type: service` - Creates a long-running service with HTTP endpoint
+- `python: "3.11"` - Uses Python 3.11 for compatibility
+- `commands` - Install vLLM and start the model server
+- `port: 8000` - The port vLLM serves on
+- `resources.gpu: 80GB` - Minimum GPU memory required
+- `max_price: 2.50` - Maximum hourly cost in USD
+
+### Step 2: Deploy the Service
+
+```bash
+./dstack-venv/bin/dstack apply -f serve-qwen.dstack.yml -y
+```
+
+dstack will search for available instances and show you the options:
+
+```
+ Project          main
+ User             admin
+ Configuration    serve-qwen.dstack.yml
+ Type             service
+ Resources        cpu=2.. mem=8GB.. disk=100GB.. gpu:80GB:1..
+ Max price        $2.5
+
+ #  BACKEND           RESOURCES                        INSTANCE TYPE  PRICE
+ 1  vastai (us-)      cpu=26 mem=113GB disk=100GB      28860909       $1.19
+                      H100:80GB:1
+ Shown 3 of 16 offers, $2.26778max
+
+ NAME           BACKEND       GPU          PRICE    STATUS        SUBMITTED
+ qwen3-service  vastai (us-)  H100:80GB:1  $1.1889  provisioning  now
+```
+
+### Step 3: Monitor Deployment
+
+Check deployment status:
+
+```bash
+./dstack-venv/bin/dstack ps
+```
+
+View deployment logs:
+
+```bash
+./dstack-venv/bin/dstack logs qwen3-service
+```
+
+When ready, you'll see in the logs:
+
+```
+(APIServer pid=122) INFO:     Application startup complete.
+```
+
+## Using the API
+
+dstack automatically proxies requests to your service through the dstack server.
+
+### Chat Completions with cURL
+
+```bash
+curl http://127.0.0.1:3000/proxy/services/main/qwen3-service/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_ADMIN_TOKEN' \
+  -d '{
+    "model": "Qwen/Qwen3-30B-A3B",
+    "messages": [{"role": "user", "content": "What is machine learning?"}],
+    "max_tokens": 100
+  }'
+```
+
+### Python Integration
+
+Using the OpenAI Python SDK:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://127.0.0.1:3000/proxy/services/main/qwen3-service/v1",
+    api_key="YOUR_ADMIN_TOKEN"
+)
+
+response = client.chat.completions.create(
+    model="Qwen/Qwen3-30B-A3B",
+    messages=[{"role": "user", "content": "What is machine learning?"}],
+    max_tokens=100
+)
+
+print(response.choices[0].message.content)
+```
+
+### Streaming Responses
+
+```python
+response = client.chat.completions.create(
+    model="Qwen/Qwen3-30B-A3B",
+    messages=[{"role": "user", "content": "Explain transformers in AI"}],
+    max_tokens=500,
+    stream=True
+)
+
+for chunk in response:
+    if chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end="")
+```
+
+## Cost Management
+
+The `max_price` setting in your configuration caps your hourly cost. dstack will only provision instances at or below this price.
+
+## Managing Services
+
+### Stop a Service
+
+```bash
+./dstack-venv/bin/dstack stop qwen3-service
+```
+
+This terminates the Vast.ai instance, stopping billing.
+
+### Useful Commands
+
+| Command | Description |
+|---------|-------------|
+| `dstack ps` | List running services |
+| `dstack logs <name>` | View service logs |
+| `dstack stop <name>` | Stop a service |
+| `dstack apply -f <file> -y` | Deploy without confirmation |
+
+## Deploying Other Models
+
+To deploy a different model, modify the configuration file:
+
+```yaml
+type: service
+name: llama-service
+python: "3.11"
+
+commands:
+  - pip install vllm
+  - vllm serve meta-llama/Llama-3.1-8B-Instruct --port 8000
+
+port: 8000
+model: meta-llama/Llama-3.1-8B-Instruct
+
+resources:
+  gpu: 24GB
+
+max_price: 0.50
+```
+
+Remember to:
+1. Check the model's VRAM requirements on Hugging Face
+2. Set appropriate GPU memory in `resources.gpu`
+3. Adjust `max_price` based on GPU tier needed
+
+## Additional Resources
+
+- [dstack Documentation](https://dstack.ai/docs/)
+- [dstack CLI Reference](https://dstack.ai/docs/reference/cli/)
+- [vLLM Documentation](https://docs.vllm.ai/)
+- [Vast.ai Console](https://cloud.vast.ai/)
+- [Qwen3-30B-A3B Model Card](https://huggingface.co/Qwen/Qwen3-30B-A3B)
