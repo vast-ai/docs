@@ -1,0 +1,474 @@
+---
+title: GLiNER2
+slug: gliner2-named-entity-recognition
+createdAt: Thu Jan 02 2025 12:00:00 GMT+0000 (Coordinated Universal Time)
+updatedAt: Thu Jan 02 2025 12:00:00 GMT+0000 (Coordinated Universal Time)
+---
+
+<script type="application/ld+json" dangerouslySetInnerHTML={{
+  __html: JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "Running GLiNER2 on Vast.ai: Named Entity Recognition Guide",
+    "description": "Step-by-step guide to deploying GLiNER2 for GPU-accelerated Named Entity Recognition on Vast.ai",
+    "image": "https://docs.vast.ai/images/gliner2-logo.webp",
+    "totalTime": "PT15M",
+    "supply": [
+      {
+        "@type": "HowToSupply",
+        "name": "Vast.ai Account"
+      },
+      {
+        "@type": "HowToSupply",
+        "name": "GPU Instance"
+      },
+      {
+        "@type": "HowToSupply",
+        "name": "GLiNER2 Docker Image"
+      }
+    ],
+    "tool": [
+      {
+        "@type": "HowToTool",
+        "name": "Vast.ai CLI"
+      },
+      {
+        "@type": "HowToTool",
+        "name": "Docker"
+      }
+    ],
+    "step": [
+      {
+        "@type": "HowToStep",
+        "name": "Find GPU Instance",
+        "text": "Search for available GPU instances with sufficient memory",
+        "url": "https://docs.vast.ai/examples/ner/gliner2#step-1-find-a-gpu-instance"
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Deploy Image",
+        "text": "Create instance with pre-built GLiNER2 Docker image",
+        "url": "https://docs.vast.ai/examples/ner/gliner2#step-2-deploy-the-image"
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Test API",
+        "text": "Extract entities using the REST API",
+        "url": "https://docs.vast.ai/examples/ner/gliner2#step-4-test-the-api"
+      }
+    ],
+    "author": {
+      "@type": "Organization",
+      "name": "Vast.ai Team"
+    },
+    "datePublished": "2025-01-02",
+    "dateModified": "2025-01-02"
+  })
+}} />
+
+# Running GLiNER2 on Vast.ai
+
+## Why GLiNER2?
+
+Named Entity Recognition (NER) extracts structured data from text—people, companies, dates, etc. Traditional NER models only recognize entity types they were trained on. LLMs can extract anything but are slow and expensive.
+
+GLiNER2 embeds both text and entity labels into the same vector space, scoring text spans against each label. This lets you define custom entity types at inference time—no retraining needed. It also handles text classification, structured extraction, and relation extraction, all in a 205M parameter model that runs on CPU or GPU.
+
+## What This Guide Covers
+
+- **[Quick Start](#quick-start-using-the-pre-built-image)** - Deploy our pre-built Docker image in minutes
+- **[Full Tutorial](#tutorial-creating-docker-images-for-vastai)** - Learn how to create your own Docker images for Vast.ai
+
+## Prerequisites
+
+Before getting started, you'll need:
+
+- A Vast.ai account with credits ([Sign up here](https://cloud.vast.ai))
+- Vast.ai CLI installed (`pip install vastai`)
+- Docker installed locally (for building custom images)
+
+> **Note:** Get your API key from the [Vast.ai account page](https://cloud.vast.ai/account/) and set it with `vastai set api-key <your-vast-api-key>`.
+
+## Quick Start: Using the Pre-built Image
+
+The fastest way to deploy GLiNER2 is with our pre-built Docker image.
+
+### Step 1: Find a GPU Instance
+
+```bash
+vastai search offers "gpu_ram >= 8 num_gpus = 1 reliability > 0.95 direct_port_count >= 1" \
+    --order "dph_base" --limit 10
+```
+
+### Step 2: Deploy the Image
+
+```bash
+vastai create instance <OFFER_ID> \
+    --image vastai/gliner2-server:latest \
+    --disk 30 \
+    --env "GLINER_API_KEY=gliner-api-key" \
+    --onstart-cmd "python /app/server.py" \
+    --direct
+```
+
+> **Note:** Vast.ai overrides Docker's `CMD` and `ENTRYPOINT`, so you must use `--onstart-cmd` to start the server.
+
+### Step 3: Get Your Endpoint
+
+```bash
+vastai show instance <INSTANCE_ID>
+```
+
+Wait for status to show "running", then note the public IP and port mapping for port 8000. Your endpoint will be `http://<IP>:<PORT>`.
+
+### Step 4: Test the API
+
+```bash
+# Health check
+curl http://<IP>:<PORT>/health
+
+# Extract entities
+curl -X POST http://<IP>:<PORT>/extract \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer gliner-api-key" \
+  -d '{
+    "text": "Apple CEO Tim Cook announced iPhone 15 in Cupertino for $999.",
+    "labels": ["person", "company", "product", "location", "price"],
+    "threshold": 0.3
+  }'
+```
+
+---
+
+## Tutorial: Creating Docker Images for Vast.ai
+
+Want to build your own Docker images for Vast.ai? This section walks you through the process using GLiNER2 as an example.
+
+### Understanding Vast.ai's Docker Behavior
+
+Vast.ai handles Docker containers differently than standard Docker:
+
+1. **CMD and ENTRYPOINT are overridden** - Vast.ai replaces your container's entrypoint with its own initialization scripts that set up SSH, Jupyter, and other services.
+
+2. **Use `--onstart-cmd` instead** - To run your application, pass the startup command via `--onstart-cmd` when creating the instance.
+
+3. **Environment variables** - Pass environment variables using the `--env` flag.
+
+This means your Dockerfile should still include `CMD` for local testing, but users deploying to Vast.ai will need to specify `--onstart-cmd`.
+
+### Project Structure
+
+Create a new directory with these files:
+
+```
+gliner2-server/
+├── Dockerfile
+├── requirements.txt
+└── server.py
+```
+
+### Step 1: Create requirements.txt
+
+```
+gliner2>=1.0.2
+fastapi>=0.100.0
+uvicorn>=0.23.0
+pydantic>=2.0.0
+```
+
+### Step 2: Create the FastAPI Server
+
+```python Python
+"""
+GLiNER2 FastAPI Server - REST API for entity extraction
+"""
+
+import os
+import time
+from typing import Dict, List, Optional
+
+import torch
+import uvicorn
+from fastapi import Depends, FastAPI, HTTPException, Security
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from gliner2 import GLiNER2
+from pydantic import BaseModel
+
+# Configuration
+MODEL_NAME = os.environ.get("GLINER_MODEL", "fastino/gliner2-base-v1")
+API_KEY = os.environ.get("GLINER_API_KEY")
+
+app = FastAPI(
+    title="GLiNER2 API",
+    description="GPU-accelerated Named Entity Recognition",
+    version="1.0.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+security = HTTPBearer()
+
+if not API_KEY:
+    print("WARNING: GLINER_API_KEY not set. API will accept any token.")
+
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Security(security)):
+    """Verify the Bearer token"""
+    if API_KEY and credentials.credentials != API_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return True
+
+
+# Global model state
+model = None
+device = None
+
+
+class ExtractRequest(BaseModel):
+    text: str
+    labels: List[str]
+    threshold: Optional[float] = 0.3
+
+
+class ExtractResponse(BaseModel):
+    entities: Dict[str, List[str]]
+    inference_time: float
+    device: str
+
+
+class HealthResponse(BaseModel):
+    status: str
+    model: str
+    device: str
+    gpu_available: bool
+    gpu_name: Optional[str] = None
+
+
+@app.on_event("startup")
+async def load_model():
+    """Load GLiNER2 model on startup"""
+    global model, device
+
+    print(f"Loading GLiNER2 model: {MODEL_NAME}")
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    print(f"Using device: {device}")
+
+    model = GLiNER2.from_pretrained(MODEL_NAME)
+    model = model.to(device)
+    model.eval()
+
+    print(f"Model loaded on {device}")
+    if torch.cuda.is_available():
+        gpu_name = torch.cuda.get_device_name(0)
+        gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1e9
+        print(f"GPU: {gpu_name} ({gpu_memory:.1f} GB)")
+
+
+@app.get("/health", response_model=HealthResponse)
+async def health():
+    """Health check endpoint"""
+    gpu_name = None
+    if torch.cuda.is_available():
+        gpu_name = torch.cuda.get_device_name(0)
+
+    return HealthResponse(
+        status="running",
+        model=MODEL_NAME,
+        device=device,
+        gpu_available=torch.cuda.is_available(),
+        gpu_name=gpu_name,
+    )
+
+
+@app.post("/extract", response_model=ExtractResponse)
+async def extract_entities(
+    request: ExtractRequest,
+    authorized: bool = Depends(verify_token),
+):
+    """Extract entities from text"""
+    start_time = time.time()
+    result = model.extract_entities(
+        request.text,
+        request.labels,
+        threshold=request.threshold,
+    )
+    inference_time = time.time() - start_time
+
+    return ExtractResponse(
+        entities=result.get("entities", {}),
+        inference_time=inference_time,
+        device=device,
+    )
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+```
+
+### Step 3: Create the Dockerfile
+
+```dockerfile
+# GLiNER2 Vast.ai Template
+FROM pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copy server code
+COPY server.py .
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Run server
+# Note: Vast.ai overrides CMD, use --onstart-cmd "python /app/server.py" when deploying
+CMD ["python", "server.py"]
+```
+
+**Key points:**
+- Use a PyTorch base image with CUDA support
+- Install dependencies in a separate layer for caching
+- Include a health check for monitoring
+- Add a comment reminding users about `--onstart-cmd`
+
+### Step 4: Build and Test Locally
+
+```bash
+# Build the image
+docker build -t gliner2-server .
+
+# Run locally with GPU
+docker run --gpus all -p 8000:8000 gliner2-server
+
+# Test the health endpoint
+curl http://localhost:8000/health
+```
+
+### Step 5: Publish and Deploy to Vast.ai
+
+Publish your image to a container registry (Docker Hub, GitHub Container Registry, etc.), then deploy it:
+
+```bash
+vastai create instance <OFFER_ID> \
+    --image your-registry/gliner2-server:latest \
+    --disk 30 \
+    --env "GLINER_API_KEY=gliner-api-key" \
+    --onstart-cmd "python /app/server.py" \
+    --direct
+```
+
+---
+
+## API Reference
+
+### GET /health
+
+Returns server status and GPU information.
+
+**Response:**
+```json
+{
+  "status": "running",
+  "model": "fastino/gliner2-base-v1",
+  "device": "cuda:0",
+  "gpu_available": true,
+  "gpu_name": "NVIDIA GeForce RTX 3060"
+}
+```
+
+### POST /extract
+
+Extract entities from text.
+
+**Headers:**
+- `Authorization: Bearer gliner-api-key` (required)
+
+**Request:**
+```json
+{
+  "text": "Apple CEO Tim Cook announced iPhone 15 in Cupertino for $999.",
+  "labels": ["person", "company", "product", "location", "price"],
+  "threshold": 0.3
+}
+```
+
+**Response:**
+```json
+{
+  "entities": {
+    "person": ["Tim Cook"],
+    "company": ["Apple"],
+    "product": ["iPhone 15"],
+    "location": ["Cupertino"],
+    "price": ["$999"]
+  },
+  "inference_time": 0.123,
+  "device": "cuda:0"
+}
+```
+
+---
+
+## Python Client Example
+
+```python Python
+import requests
+
+API_URL = "http://<IP>:<PORT>"
+
+def extract_entities(text, labels, threshold=0.3):
+    response = requests.post(
+        f"{API_URL}/extract",
+        headers={"Authorization": "Bearer gliner-api-key"},
+        json={"text": text, "labels": labels, "threshold": threshold}
+    )
+    response.raise_for_status()
+    return response.json()
+
+result = extract_entities(
+    text="Elon Musk announced Tesla's new factory in Berlin.",
+    labels=["person", "company", "location"]
+)
+print(result["entities"])
+# {'person': ['Elon Musk'], 'company': ['Tesla'], 'location': ['Berlin']}
+```
+
+---
+
+## Cleanup
+
+Don't forget to destroy your instance when done:
+
+```bash
+vastai destroy instance <INSTANCE_ID>
+```
+
+---
+
+## Additional Resources
+
+- [GLiNER2 GitHub Repository](https://github.com/fastino-ai/GLiNER2)
+- [GLiNER2 Models on Hugging Face](https://huggingface.co/collections/fastino/gliner2)
+- [Vast.ai CLI Guide](/cli/get-started)
+- [Create Your Own Template](/use-cases/create-your-own-template)
+
+## Conclusion
+
+You've learned how to deploy GLiNER2 on Vast.ai using our pre-built image, and how to create your own Docker images that work with Vast.ai's container system. The key takeaway: always use `--onstart-cmd` to start your application since Vast.ai overrides Docker's CMD and ENTRYPOINT.
+
+Ready to get started? [Sign up for Vast.ai](https://cloud.vast.ai) and deploy your first GLiNER2 instance today.
