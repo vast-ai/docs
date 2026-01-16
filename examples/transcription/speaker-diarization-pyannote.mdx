@@ -1,0 +1,245 @@
+---
+title: Speaker Diarization with Pyannote
+slug: speaker-diarization-pyannote
+createdAt: Wed Jan 15 2026 12:00:00 GMT+0000 (Coordinated Universal Time)
+updatedAt: Wed Jan 15 2026 12:00:00 GMT+0000 (Coordinated Universal Time)
+---
+
+# Speaker Diarization with Pyannote on Vast.ai
+
+Speaker diarization partitions an audio stream into segments according to speaker identity—identifying "who spoke when" in multi-speaker recordings like meetings, podcasts, or interviews.
+
+This guide walks through using [PyAnnote Audio](https://github.com/pyannote/pyannote-audio) for speaker diarization on Vast.ai.
+
+## Prerequisites
+
+- A Vast.ai account with credits
+- A Hugging Face account with access tokens
+- Accept the model terms at:
+  - https://huggingface.co/pyannote/speaker-diarization-3.1
+  - https://huggingface.co/pyannote/segmentation-3.0
+
+## When to Use Diarization
+
+Speaker diarization answers "who spoke when"—it doesn't transcribe what was said. Use diarization when you need to:
+
+- Attribute transcribed text to specific speakers
+- Analyze speaking patterns (talk time, interruptions, turn-taking)
+- Split multi-speaker audio into per-speaker segments for downstream processing
+
+For full transcription with speaker labels, combine diarization with a speech-to-text model like Whisper: run diarization first to get speaker timestamps, then transcribe each segment.
+
+## Hardware Requirements
+
+Pyannote's speaker diarization model is efficient and runs on modest hardware:
+
+- **GPU**: RTX 3060, 4060, or similar
+- **VRAM**: 6-8GB
+- **System RAM**: 8-16GB
+- **Storage**: 10GB minimum
+- **CUDA**: 11.0+
+- **Python**: 3.8+
+
+## Setting Up the Instance
+
+1. Go to [Vast.ai Templates](https://cloud.vast.ai/templates/)
+2. Select the `PyTorch (CuDNN Runtime)` template
+3. Filter for an instance with:
+   - 1 GPU
+   - 6-8GB VRAM
+   - 8-16GB system RAM
+   - 10GB storage
+4. Rent the instance
+5. Install the [Vast TLS certificate](/documentation/instances/connect/jupyter#installing-the-tls-certificate) in your browser
+6. Open Jupyter from [your instances](https://cloud.vast.ai/instances/)
+
+## Creating a Notebook
+
+1. In JupyterLab, click **File → New → Notebook**
+2. Select the Python 3 kernel
+3. Run the following cells in your notebook
+
+## Installing Dependencies
+
+Install the required Python packages:
+
+```bash
+pip install pyannote.audio pydub librosa datasets
+```
+
+Install FFmpeg for audio processing:
+
+```bash
+apt-get update && apt-get install -y ffmpeg
+```
+
+## Downloading Test Data
+
+This example uses a sample from the AMI Meeting Corpus dataset:
+
+```python
+from datasets import load_dataset
+import os
+import soundfile as sf
+
+os.makedirs("ami_samples", exist_ok=True)
+
+dataset = load_dataset("diarizers-community/ami", "ihm", split="train", streaming=True)
+
+samples = list(dataset.take(1))
+
+for i, sample in enumerate(samples):
+    audio = sample["audio"]
+    audio_array = audio["array"]
+    sampling_rate = audio["sampling_rate"]
+    duration = len(audio_array) / sampling_rate
+
+    output_path = f"ami_samples/sample_{i}.wav"
+    sf.write(output_path, audio_array, sampling_rate)
+
+    print(f"Saved {output_path} - Duration: {duration:.2f} seconds")
+```
+
+## Running Speaker Diarization
+
+### Initialize the Pipeline
+
+Load the pretrained diarization model and move it to GPU for faster processing:
+
+```python
+import torch
+from pyannote.audio import Pipeline
+
+HF_TOKEN = "your-huggingface-token"
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+pipeline = Pipeline.from_pretrained(
+    "pyannote/speaker-diarization-3.1",
+    use_auth_token=HF_TOKEN
+)
+pipeline = pipeline.to(device)
+```
+
+### Process Audio
+
+Run diarization on an audio file. The pipeline returns timestamped speaker segments:
+
+```python
+audio_file = "./ami_samples/sample_0.wav"
+print(f"Processing {audio_file} on {device}")
+output = pipeline(audio_file)
+
+print("Voice activity segments:")
+for segment, _, speaker in output.itertracks(yield_label=True):
+    print(f"{segment.start:.2f} --> {segment.end:.2f} ({segment.duration:.2f}s) Speaker: {speaker}")
+```
+
+Example output:
+
+```
+Processing ./ami_samples/sample_0.wav on cuda
+Voice activity segments:
+18.36 --> 18.42 (0.07s) Speaker: SPEAKER_03
+23.01 --> 25.63 (2.62s) Speaker: SPEAKER_03
+27.08 --> 27.64 (0.56s) Speaker: SPEAKER_05
+```
+
+## Analyzing Results
+
+### Calculate Speaking Time per Speaker
+
+```python
+for speaker in output.labels():
+    speaking_time = output.label_duration(speaker)
+    print(f"Speaker {speaker}: {speaking_time:.2f}s")
+```
+
+Example output:
+
+```
+Speaker SPEAKER_00: 558.98s
+Speaker SPEAKER_01: 18.98s
+Speaker SPEAKER_03: 469.68s
+Speaker SPEAKER_04: 698.02s
+```
+
+### Detect Overlapping Speech
+
+```python
+overlap = output.get_overlap()
+print(f"Overlapping speech regions: {overlap}")
+```
+
+### Filter by Speaker
+
+```python
+speaker = "SPEAKER_00"
+speaker_turns = output.label_timeline(speaker)
+print(f"Speaker {speaker} speaks at:")
+for turn in speaker_turns:
+    print(turn)
+```
+
+## Extracting Speaker Segments
+
+This utility function splits the original audio into separate files for each speaker segment, useful for downstream processing like transcription:
+
+```python
+import shutil
+from pydub import AudioSegment
+
+def split_audio_by_segments(audio_path, diarization_output, output_dir="output_segments"):
+    """
+    Split an audio file into multiple files based on diarization output.
+
+    Parameters:
+        audio_path: Path to the input audio file
+        diarization_output: Pyannote diarization Annotation object
+        output_dir: Directory to save the output segments
+    """
+    if os.path.exists(output_dir):
+        shutil.rmtree(output_dir)
+    os.makedirs(output_dir, exist_ok=True)
+
+    audio = AudioSegment.from_file(audio_path)
+
+    for i, (segment, _, speaker) in enumerate(diarization_output.itertracks(yield_label=True)):
+        start_ms = int(segment.start * 1000)
+        end_ms = int(segment.end * 1000)
+        segment_audio = audio[start_ms:end_ms]
+
+        filename = os.path.basename(audio_path)
+        name, ext = os.path.splitext(filename)
+        output_path = os.path.join(
+            output_dir,
+            f"{name}_segment_{i+1:04d}_{start_ms:08d}ms-{end_ms:08d}ms_{speaker}{ext}"
+        )
+
+        segment_audio.export(output_path, format=ext.replace('.', ''))
+        print(f"Saved: {output_path}")
+
+split_audio_by_segments(audio_file, output)
+```
+
+## Playing Audio Segments
+
+Verify results in Jupyter:
+
+```python
+import librosa
+from IPython.display import Audio, display
+
+def play_audio(file_path, sr=None):
+    y, sr = librosa.load(file_path, sr=sr)
+    display(Audio(data=y, rate=sr))
+
+# Play a segment
+play_audio("output_segments/sample_0_segment_0001_00018360ms-00018420ms_SPEAKER_03.wav")
+```
+
+## Additional Resources
+
+- [PyAnnote Audio Documentation](https://github.com/pyannote/pyannote-audio)
+- [AMI Meeting Corpus](https://groups.inf.ed.ac.uk/ami/corpus/)
+- [Vast.ai CLI Guide](/cli/get-started)
