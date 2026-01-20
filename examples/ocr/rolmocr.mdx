@@ -1,0 +1,194 @@
+---
+title: Running RolmOCR
+slug: running-rolmocr
+createdAt: Wed Jan 15 2026 12:00:00 GMT+0000 (Coordinated Universal Time)
+updatedAt: Wed Jan 15 2026 12:00:00 GMT+0000 (Coordinated Universal Time)
+---
+
+# Running RolmOCR on Vast.ai
+
+[RolmOCR](https://huggingface.co/reducto/RolmOCR) from Reducto is an open-source document OCR model built on Qwen2.5-VL-7B. Unlike traditional OCR tools like Tesseract that rely on character-level pattern matching, RolmOCR uses vision-language understanding to interpret documents semantically. This means it handles rotated text, complex layouts, and mixed content without manual preprocessing, and can extract structured data directly rather than just raw text.
+
+This guide demonstrates extracting structured pricing data from invoice images.
+
+## Prerequisites
+
+- Vast.ai account with credits
+- Vast.ai CLI installed (`pip install vastai`)
+
+## Hardware Requirements
+
+- **GPU RAM**: 16GB minimum, 60GB recommended for larger documents and wider context
+- **Disk**: 80GB
+- **Static IP**: Required for stable endpoint
+
+## Setting Up the CLI
+
+```bash
+pip install vastai
+vastai set api-key YOUR_API_KEY
+```
+
+## Finding an Instance
+
+```bash
+vastai search offers 'compute_cap >= 750 geolocation = US gpu_ram >= 60 num_gpus = 1 static_ip = true direct_port_count >= 1 verified = true disk_space >= 80 rentable = true'
+```
+
+## Deploying the Instance
+
+First, generate a secure API key to protect your endpoint:
+
+```bash
+VLLM_API_KEY=$(openssl rand -hex 32)
+echo "Save this API key: $VLLM_API_KEY"
+```
+
+Deploy with vLLM using the v1 engine (required for RolmOCR):
+
+```bash
+INSTANCE_ID=<your-instance-id>
+vastai create instance $INSTANCE_ID \
+    --image vllm/vllm-openai:latest \
+    --env "-p 8000:8000 -e VLLM_USE_V1=1 -e VLLM_API_KEY=$VLLM_API_KEY" \
+    --disk 80 \
+    --args --model reducto/RolmOCR
+```
+
+## Installing Client Dependencies
+
+```bash
+pip install --upgrade openai datasets pydantic
+```
+
+## Loading Sample Data
+
+For this example, we'll use a public invoice dataset from Hugging Face. Streaming mode avoids downloading the entire dataset:
+
+```python
+from datasets import load_dataset
+
+streamed_dataset = load_dataset(
+    "katanaml-org/invoices-donut-data-v1",
+    split="train",
+    streaming=True
+)
+subset = list(streamed_dataset.take(3))
+```
+
+## Encoding Images
+
+The API expects base64-encoded images. This helper function also resizes images to reduce payload size and improve processing speed:
+
+```python
+import base64
+import io
+from PIL import Image
+
+def encode_pil_image(pil_image):
+    max_size = 1024
+    ratio = min(max_size / pil_image.width, max_size / pil_image.height)
+    new_size = (int(pil_image.width * ratio), int(pil_image.height * ratio))
+    resized_image = pil_image.resize(new_size, Image.Resampling.LANCZOS)
+
+    img_byte_arr = io.BytesIO()
+    resized_image.save(img_byte_arr, format='JPEG', quality=85)
+    return base64.b64encode(img_byte_arr.getvalue()).decode("utf-8")
+```
+
+## Defining the Output Schema
+
+Define a Pydantic model for the expected output. vLLM uses this schema with guided decoding—constraining the model's token generation to only produce valid JSON matching your structure. This eliminates malformed responses and post-processing validation, which is critical for OCR pipelines where you need reliable field extraction:
+
+```python
+from pydantic import BaseModel
+
+class Invoice(BaseModel):
+    invoice_number: str
+    invoice_amount: str
+
+json_schema = Invoice.model_json_schema()
+```
+
+## Calling the API
+
+Create the OpenAI client and a function to extract invoice data. The `guided_json` parameter passes your schema to vLLM's constrained decoding engine, guaranteeing the response will be parseable JSON with exactly the fields you defined:
+
+```python
+from openai import OpenAI
+
+VAST_IP_ADDRESS = "your-ip"
+VAST_PORT = "your-port"
+VLLM_API_KEY = "your-api-key"
+
+client = OpenAI(
+    api_key=VLLM_API_KEY,
+    base_url=f"http://{VAST_IP_ADDRESS}:{VAST_PORT}/v1"
+)
+
+def ocr_invoice(img_base64):
+    response = client.chat.completions.create(
+        model="reducto/RolmOCR",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{img_base64}"},
+                    },
+                    {
+                        "type": "text",
+                        "text": "Return the invoice number and total amount as JSON: {invoice_number: str, invoice_amount: str}",
+                    },
+                ],
+            }
+        ],
+        extra_body={"guided_json": json_schema},
+        temperature=0.2,
+        max_tokens=500
+    )
+    return response.choices[0].message.content
+```
+
+## Processing Invoices
+
+Loop through the sample invoices and compare extracted values against the ground truth labels:
+
+```python
+import json
+
+for sample in subset:
+    img_base64 = encode_pil_image(sample['image'])
+    result = json.loads(ocr_invoice(img_base64))
+
+    ground_truth = json.loads(sample["ground_truth"])
+    expected = {
+        "invoice_number": ground_truth["gt_parse"]["header"]["invoice_no"],
+        "invoice_amount": ground_truth["gt_parse"]["summary"]["total_gross_worth"]
+    }
+
+    print(f"Expected: {expected}")
+    print(f"Extracted: {result}")
+```
+
+Example output:
+
+```
+Expected: {'invoice_number': '40378170', 'invoice_amount': '$8,25'}
+Extracted: {'invoice_number': '40378170', 'invoice_amount': '$8.25'}
+
+Expected: {'invoice_number': '61356291', 'invoice_amount': '$ 212,09'}
+Extracted: {'invoice_number': '61356291', 'invoice_amount': '$212.09'}
+
+Expected: {'invoice_number': '49565075', 'invoice_amount': '$96,73'}
+Extracted: {'invoice_number': '49565075', 'invoice_amount': '$96,73'}
+```
+
+The model accurately extracts invoice data with minor formatting differences (comma vs decimal point) that can be normalized downstream.
+
+## Additional Resources
+
+- [RolmOCR Model Card](https://huggingface.co/reducto/RolmOCR)
+- [vLLM Documentation](https://docs.vllm.ai/)
+- [Vast.ai CLI Guide](/cli/get-started)

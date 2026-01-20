@@ -1,0 +1,215 @@
+---
+title: Serving Rerankers with vLLM
+slug: serving-rerankers-vllm
+createdAt: Wed Jan 15 2026 12:00:00 GMT+0000 (Coordinated Universal Time)
+updatedAt: Wed Jan 15 2026 12:00:00 GMT+0000 (Coordinated Universal Time)
+---
+
+# Serving Rerankers on Vast.ai with vLLM
+
+Rerankers determine relevance between text pairs—matching search queries to documents, evaluating LLM outputs, or finding similar content. They perform detailed comparisons that capture nuanced relationships simple methods miss.
+
+This guide covers deploying the `BAAI/bge-reranker-base` model on Vast.ai using vLLM, with both OpenAI and Cohere-compatible APIs.
+
+## When to Use Rerankers
+
+Embedding models with cosine similarity are fast and cheap—they encode text once and compare vectors. But they compress meaning into fixed-size vectors, losing nuance. Rerankers process query-document pairs together through a cross-encoder, capturing subtle relationships embeddings miss.
+
+| Approach | Speed | Accuracy | Best For |
+|----------|-------|----------|----------|
+| Embeddings + cosine | Fast | Good | Initial retrieval, large candidate sets |
+| Reranker | Slower | Better | Final ranking, top-k refinement |
+
+The common pattern: use embeddings to retrieve a larger candidate set quickly, then rerank the top results for final ordering.
+
+## Prerequisites
+
+- Vast.ai account with credits
+- Vast.ai CLI installed (`pip install vastai`)
+
+## Hardware Requirements
+
+The `BAAI/bge-reranker-base` model (~278M parameters) has modest requirements:
+
+- **GPU RAM**: 16GB (8GB may work for lower throughput)
+- **GPU**: Single GPU, Turing architecture or newer
+- **Network**: Static IP and at least one direct port
+
+## Setting Up the CLI
+
+Install and configure the Vast.ai CLI:
+
+```bash
+pip install vastai
+vastai set api-key YOUR_API_KEY
+```
+
+## Finding an Instance
+
+Search for suitable instances:
+
+```bash
+vastai search offers 'compute_cap >= 750 gpu_ram >= 16 num_gpus = 1 static_ip = true direct_port_count >= 1 verified = true rentable = true'
+```
+
+## Deploying the Server
+
+First, generate a secure API key to protect your endpoint:
+
+```bash
+VLLM_API_KEY=$(openssl rand -hex 32)
+echo "Save this API key: $VLLM_API_KEY"
+```
+
+Create the instance with vLLM serving the reranker model:
+
+```bash
+INSTANCE_ID=<your-instance-id>
+
+vastai create instance $INSTANCE_ID \
+    --image vllm/vllm-openai:latest \
+    --env "-p 8000:8000 -e VLLM_API_KEY=$VLLM_API_KEY" \
+    --disk 40 \
+    --args --model BAAI/bge-reranker-base
+```
+
+## Verifying the Deployment
+
+1. Go to [Instances](https://cloud.vast.ai/instances/) in the Vast.ai console
+2. Wait for the image and model to download
+3. Find your instance's IP and external port from "Open Ports" (format: `XX.XX.XXX.XX:YYYY -> 8000/tcp`)
+
+Test the endpoint:
+
+```bash
+VAST_IP_ADDRESS="your-ip"
+VAST_PORT="your-port"
+VLLM_API_KEY="your-api-key"
+
+curl -X POST http://$VAST_IP_ADDRESS:$VAST_PORT/rerank \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $VLLM_API_KEY" \
+    -d '{
+    "model": "BAAI/bge-reranker-base",
+    "query": "What is deep learning?",
+    "documents": ["Deep learning is a type of machine learning"]
+    }'
+```
+
+## Using the Reranker
+
+vLLM provides two API endpoints:
+
+| Endpoint | API Style | Use Case |
+|----------|-----------|----------|
+| `/score` | OpenAI | Raw scores for custom ranking logic |
+| `/rerank` | Cohere | Pre-sorted results for quick integration |
+
+### OpenAI-Compatible Endpoint (/score)
+
+The `/score` endpoint returns raw relevance scores for each query-document pair. This gives you full control over ranking logic:
+
+```python
+import requests
+
+IP_ADDRESS = "your-ip"
+PORT = "your-port"
+VLLM_API_KEY = "your-api-key"
+
+def openai_score(query, documents):
+    base_url = f"http://{IP_ADDRESS}:{PORT}"
+    headers = {"Authorization": f"Bearer {VLLM_API_KEY}"}
+
+    request = {
+        "model": "BAAI/bge-reranker-base",
+        "text_1": query,
+        "text_2": documents
+    }
+
+    response = requests.post(f"{base_url}/score", json=request, headers=headers)
+
+    if response.status_code == 200:
+        data = response.json()
+        scores = [(doc, item["score"]) for doc, item in zip(documents, data["data"])]
+        scores.sort(key=lambda x: x[1], reverse=True)
+
+        for text, score in scores:
+            print(f"Score: {score:.6f} | {text[:60]}...")
+```
+
+Example usage:
+
+```python
+query = "What is Deep Learning?"
+documents = [
+    "Deep learning is a subset of machine learning that uses neural networks with many layers",
+    "The weather is nice today",
+    "Deep learning enables computers to learn from large amounts of data",
+    "I like pizza"
+]
+openai_score(query, documents)
+```
+
+Output:
+
+```
+Score: 0.999512 | Deep learning is a subset of machine learning...
+Score: 0.176270 | Deep learning enables computers to learn from...
+Score: 0.000037 | The weather is nice today...
+Score: 0.000037 | I like pizza...
+```
+
+### Cohere-Compatible Endpoint (/rerank)
+
+The `/rerank` endpoint is Cohere-compatible, returning pre-sorted results. This is useful if you're migrating from Cohere or want sorted results without manual sorting.
+
+Install the Cohere client:
+
+```bash
+pip install --upgrade cohere
+```
+
+```python
+import cohere
+
+IP_ADDRESS = "your-ip"
+PORT = "your-port"
+VLLM_API_KEY = "your-api-key"
+
+def cohere_rerank(query, documents):
+    base_url = f"http://{IP_ADDRESS}:{PORT}"
+    co = cohere.ClientV2(VLLM_API_KEY, base_url=base_url)
+
+    result = co.rerank(
+        model="BAAI/bge-reranker-base",
+        query=query,
+        documents=documents
+    )
+
+    for doc in result.results:
+        print(f"Score: {doc.relevance_score:.6f} | {doc.document.text[:60]}...")
+```
+
+The Cohere endpoint returns pre-sorted results and handles batching automatically.
+
+## Score Interpretation
+
+| Score Range | Meaning |
+|-------------|---------|
+| ~1.0 | Highly relevant, direct match |
+| 0.1 - 0.5 | Moderately relevant |
+| 0.01 - 0.1 | Tangentially related |
+| < 0.001 | Irrelevant |
+
+## Use Cases
+
+- **RAG Systems**: Filter retrieved context before sending to LLM
+- **Semantic Search**: Rerank initial retrieval results
+- **Duplicate Detection**: Identify semantically similar content
+- **Content Recommendation**: Match user queries to content
+
+## Additional Resources
+
+- [vLLM Documentation](https://docs.vllm.ai/)
+- [BGE Reranker Model Card](https://huggingface.co/BAAI/bge-reranker-base)
+- [Vast.ai CLI Guide](/cli/get-started)
