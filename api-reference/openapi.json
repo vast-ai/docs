@@ -7844,7 +7844,7 @@
     "/api/v0/bundles/": {
       "post": {
         "summary": "search offers",
-        "description": "Search for available GPU machine offers with advanced filtering and sorting.\n\nEach filter parameter (such as `verified`, `gpu_name`, `num_gpus`, etc.) should be an object specifying the operator and value you want to match.\n\n**Filter operators:**\n\n| Operator | Meaning                | Example                        |\n|:---------|:-----------------------|:-------------------------------|\n| `eq`     | Equal to               | `{ \"eq\": true }`               |\n| `neq`    | Not equal to           | `{ \"neq\": false }`             |\n| `gt`     | Greater than           | `{ \"gt\": 0.99 }`               |\n| `lt`     | Less than              | `{ \"lt\": 10000 }`              |\n| `gte`    | Greater than or equal  | `{ \"gte\": 4 }`                 |\n| `lte`    | Less than or equal     | `{ \"lte\": 8 }`                 |\n| `in`     | Value is in a list     | `{ \"in\": [\"RTX_3090\", \"RTX_4090\"] }` |\n| `nin`    | Value is not in a list | `{ \"nin\": [\"TW\", \"SE\"] }`      |\n\nCLI Usage: `vastai search offers 'reliability > 0.99 num_gpus>=4' --order=dph_total`",
+        "description": "Search for available GPU machine offers with advanced filtering and sorting.\n\nEach filter parameter (such as `verified`, `gpu_name`, `num_gpus`, etc.) should be an object specifying the operator and value you want to match.\n\n**Filter operators:**\n\n| Operator | Meaning                | Example                        |\n|:---------|:-----------------------|:-------------------------------|\n| `eq`     | Equal to               | `{ \"eq\": true }`               |\n| `neq`    | Not equal to           | `{ \"neq\": false }`             |\n| `gt`     | Greater than           | `{ \"gt\": 0.99 }`               |\n| `lt`     | Less than              | `{ \"lt\": 10000 }`              |\n| `gte`    | Greater than or equal  | `{ \"gte\": 4 }`                 |\n| `lte`    | Less than or equal     | `{ \"lte\": 8 }`                 |\n| `in`     | Value is in a list     | `{ \"in\": [\"RTX_3090\", \"RTX_4090\"] }` |\n| `notin`  | Value is not in a list | `{ \"notin\": [\"TW\", \"SE\"] }`    |\n\nCLI Usage: `vastai search offers 'reliability > 0.99 num_gpus>=4' --order=dph_total`",
         "requestBody": {
           "required": true,
           "content": {
@@ -7929,6 +7929,14 @@
                     "type": "object",
                     "description": "DLPerf per dollar per hour"
                   },
+                  "dph_total": {
+                    "type": "object",
+                    "description": "Total $/hour rental cost"
+                  },
+                  "flops_per_dphtotal": {
+                    "type": "object",
+                    "description": "TFLOPs per $/hour"
+                  },
                   "geolocation": {
                     "type": "object",
                     "description": "Machine location (two letter country code)"
@@ -7953,21 +7961,37 @@
                     "type": "object",
                     "description": "Upload bandwidth (MB/s)"
                   },
+                  "inet_down_cost": {
+                    "type": "object",
+                    "description": "Download bandwidth cost ($/GB)"
+                  },
+                  "inet_up_cost": {
+                    "type": "object",
+                    "description": "Upload bandwidth cost ($/GB)"
+                  },
                   "driver_version": {
                     "type": "object",
-                    "description": "NVIDIA driver version in the format \"XXX.XX.XX"
+                    "description": "NVIDIA driver version in the format \"XXX.XX.XX\""
                   },
                   "compute_cap": {
                     "type": "object",
-                    "description": "CUDA compute capability x 100. Use 650 for compute capability 6.5 or 700 for 7.0.\u201d"
+                    "description": "CUDA compute capability x 100. Use 650 for compute capability 6.5 or 700 for 7.0."
                   },
                   "cpu_arch": {
                     "type": "object",
                     "description": "Host machine CPU architecture (Default is amd64)"
                   },
+                  "has_avx": {
+                    "type": "object",
+                    "description": "CPU supports AVX instruction set"
+                  },
                   "cpu_cores": {
                     "type": "object",
                     "description": "Number of virtual CPUs"
+                  },
+                  "cpu_cores_effective": {
+                    "type": "object",
+                    "description": "Effective vCPU count for the offer"
                   },
                   "cpu_ghz": {
                     "type": "object",
@@ -7981,9 +8005,17 @@
                     "type": "object",
                     "description": "Show only datacenter offers"
                   },
+                  "external": {
+                    "type": "object",
+                    "description": "Show external offers in addition to datacenter offers"
+                  },
                   "disk_bw": {
                     "type": "object",
                     "description": "Disk read bandwidth in MB/s"
+                  },
+                  "disk_space": {
+                    "type": "object",
+                    "description": "Disk storage space in GB"
                   },
                   "bw_nvlink": {
                     "type": "object",
@@ -8009,13 +8041,37 @@
                     "type": "object",
                     "description": "Fraction of the total GPU resources being offered"
                   },
+                  "gpu_display_active": {
+                    "type": "object",
+                    "description": "Whether the GPU has an attached display"
+                  },
                   "direct_port_count": {
                     "type": "object",
                     "description": "Number of direct ports"
                   },
+                  "host_id": {
+                    "type": "object",
+                    "description": "Host user ID"
+                  },
+                  "id": {
+                    "type": "object",
+                    "description": "Offer ID"
+                  },
+                  "min_bid": {
+                    "type": "object",
+                    "description": "Minimum bid price ($/hour)"
+                  },
+                  "mobo_name": {
+                    "type": "object",
+                    "description": "Motherboard name"
+                  },
                   "pci_gen": {
                     "type": "object",
                     "description": "PCIe generation"
+                  },
+                  "pcie_bw": {
+                    "type": "object",
+                    "description": "PCIe bandwidth (CPU to GPU)"
                   },
                   "storage_cost": {
                     "type": "object",
@@ -8032,6 +8088,18 @@
                   "os_version": {
                     "type": "object",
                     "description": "Host machine Ubuntu OS version"
+                  },
+                  "ubuntu_version": {
+                    "type": "object",
+                    "description": "Host machine Ubuntu OS version (alias for os_version)"
+                  },
+                  "verification": {
+                    "type": "object",
+                    "description": "Machine verification status string (verified, deverified, unverified)"
+                  },
+                  "vms_enabled": {
+                    "type": "object",
+                    "description": "Whether the machine is a VM instance"
                   },
                   "order": {
                     "type": "array",
