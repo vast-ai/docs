@@ -1,128 +1,126 @@
 ---
-title: Serverless Parameters
-description: Learn about the parameters that can be configured for Vast.ai Serverless endpoints and worker groups.
-"canonical": "/documentation/serverless/serverless-parameters"
+title: Endpoint Parameters
+description: Learn about the parameters that control your scaling and best practices for setting them.
+"canonical": "/documentation/serverless/endpoint-scaling-parameters"
 ---
 
 <script type="application/ld+json" dangerouslySetInnerHTML={{
   __html: JSON.stringify({
     "@context": "https://schema.org",
-    "@type": "TechArticle",
-    "headline": "Vast.ai Serverless Parameters Reference",
-    "description": "Complete reference for Vast.ai Serverless parameters including endpoint parameters (cold_mult, cold_workers, max_workers, min_load, target_util) and workergroup parameters (gpu_ram, launch_args, search_params, template_hash, template_id, test_workers).",
-    "author": {
-      "@type": "Organization",
-      "name": "Vast.ai"
-    },
-    "articleSection": "Serverless Documentation",
-    "keywords": ["parameters", "configuration", "endpoints", "workergroups", "scaling", "serverless", "vast.ai"]
+    "@type": "HowTo",
+    "name": "How to Configure Vast.ai Serverless Endpoint Scaling",
+    "description": "Learn how endpoint-level parameters control scaling behavior in Vast Serverless and best practices for configuring them.",
+    "step": [
+      {
+        "@type": "HowToStep",
+        "name": "Set Maximum Capacity",
+        "text": "Configure max_workers to define a hard upper limit on the total number of workers (active and inactive) that an endpoint can scale to."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Configure Baseline and Minimum Load",
+        "text": "Use min_load to ensure a minimum number of active workers are always available. Start with min_load = 1, then update it based on benchmark performance and required parallelism."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Control Inactive Worker Capacity",
+        "text": "Use min_workers, cold_mult, and min_cold_load to control how many inactive workers the serverless engine maintains to handle demand spikes efficiently."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Reserve Headroom with Target Utilization",
+        "text": "Configure target_util to control how much spare capacity is reserved to absorb short-term traffic spikes before recruiting or activating additional workers."
+      }
+    ]
   })
 }} />
 
-The Vast.ai Serverless engine has parameters that allow control over the scaling behavior.&#x20;
+Vast Serverless offers unmatched control over endpoint scaling behavior. The following parameters control the serverless engine and are configured at the endpoint level. Below is an explanation of what these values control and guidance on how to set them.
 
-# Endpoint Parameters
+## Max Workers (`max_workers`)
 
-## Cold Multiplier
+A hard upper limit on the total number of workers (active and inactive) that the endpoint can have at any given time.
 
-A multiplier applied to your target capacity for longer-term planning (1+ hours). This parameter controls how much extra capacity the serverless engine will plan for in the future compared to immediate needs. For example, if your current target capacity is 100 tokens/sec and cold\_mult is 2.0, the engine will plan to have capacity for 200 tokens/sec for longer-term scenarios.
+If not specified during endpoint creation, the default value is `16`.
 
-This helps ensure your endpoint has sufficient "cold" (stopped but ready) workers available to handle future load spikes without delay. A higher value means more aggressive capacity planning and better preparedness for sudden traffic increases, while a lower value reduces costs from maintaining stopped instances.
+## Minimum Load (`min_load`)
 
-If not specified during endpoint creation, the default value is 3.
+Vast Serverless utilizes a concept of **load** as a metric of work that is performed by a worker, measured in performance (“perf”) per second. This is an internally computed value derived from benchmark tests and is normalized across different work types (tokens for LLMs, images for image generation, etc.). It is used to make scaling and capacity decisions.
 
-## Minimum Workers
+During endpoint configuration, `min_load` is used to set the target minimum number of active workers for the endpoint. This value can be edited on a live endpoint, and the serverless engine will work to match the new target.
 
-The minimum number of workers that must be kept in the endpoint at all times.
+### Best practice for setting `min_load`
 
-If not specified during endpoint creation, the default value is 5.
+- Start with `min_load = 1` (the default), which guarantees at least one active worker
+- Run the benchmark test to determine measured performance
+- Update `min_load` using the following formula:
 
-## Max Workers
-
-A hard upper limit on the total number of workers that the endpoint can have at any given time.
-
-If not specified during endpoint creation, the default value is 16.
-
-## Minimum Load
-
-A minimum baseline load (measured in perf units / second) that the serverless engine will be able to handle, regardless of actual measured traffic. This acts as a "floor" for load predictions across all time horizons (1 second to 24+ hours).
-
-For example, if your Minimum Load is set to 100 tokens/second, but your endpoint currently has zero traffic, the serverless engine will still plan capacity as if you need to handle at least 100 tokens/second. This prevents the endpoint from scaling down to zero capacity and ensures you're always ready for incoming requests.
-
-If not specified during endpoint creation, the default value is 1.
-
-## Minimum Cold Load
-
-The minimum baseline load (measured in perf units/second) that the serverless engine will maintain with loaded workers. While Minimum Load ensures a capacity of
- "Ready" workers, Minimum Cold Load requires a capacity of workers that have fully loaded the model. 
-
-Workers that count toward this minimum are:
-
-- Actively serving requests (status = "Ready")
-- Stopped but ready to serve (status = "Inactive" with model loaded)
-
-These workers can start serving requests within seconds because they don't need to download the model or benchmark GPU performance. This parameter 
-is particularly useful for maintaining low-latency response times during traffic spikes or after periods of low activity.
-
-If not specified during endpoint creation, the default value is 0.
-
-## Target Utilization
-
-The Target Utilization ratio determines how much spare capacity (headroom) the serverless engine maintains. For example, if your predicted load 
-is 900 tokens/second and target\_util is 0.9, the serverless engine will plan for 1000 tokens/second of capacity (900 ÷ 0.9 = 1000), leaving 100 
-tokens/second (11%) as buffer for traffic spikes.
-
-A lower target\_util means more headroom:
-- target\_util = 0.9 → 11.1% spare capacity relative to load
-- target\_util = 0.8 → 25% spare capacity relative to load
-- target\_util = 0.5 → 100% spare capacity relative to load
-- target\_util = 0.4 → 150% spare capacity relative to load
-
-If not specified during endpoint creation, the default value is 0.9.
-
-# Workergroup Parameters
-
-The parameters below are specific to only Workergroups, not Endpoints. Pre-configured serverless templates from Vast will have these values already set. 
-
-## gpu\_ram
-
-The amount of GPU memory (VRAM) in gigabytes that your model or workload requires to run. This parameter tells the serverless engine how much GPU memory your model needs.
-
-If not specified during workergroup creation, the default value is 24.
-
-## launch\_args
-
-A command-line style string containing additional parameters for instance creation that will be parsed and applied when the serverless engine creates new workers. This allows you to customize instance configuration beyond what's specified in templates.
-
-There is no default value for launch\_args.
-
-## search\_params
-
-A query string, list, or dictionary that specifies the hardware and performance criteria for filtering GPU offers in the vast.ai marketplace. It uses a simple query syntax to define requirements for the machines that your Workergroup will consider when searching for workers to create.
-
-Example:
-
-```python icon="python" Python
-{"verified": {"eq": true}, "rentable": {"eq": true}, "rented": {"eq": false}}
+```
+measured_performance × minimum_parallel_requests
 ```
 
-There is no default value for search\_params. To see all available search filters, see the CLI docs [here](https://docs.vast.ai/cli/commands).
+## Setting Minimum Inactive Workers
 
-## template\_hash
+Because Vast Serverless can utilize multiple hardware types to achieve optimal cost efficiency, there are multiple methods for controlling the minimum number of inactive workers maintained by the serverless engine.
 
-A unique hexadecimal identifier that references a pre-configured template containing all the configuration needed to create instances. Templates are comprehensive specifications that include the Docker image, environment variables, onstart scripts, resource requirements, and other deployment settings.
+For most applications, setting `min_workers` is sufficient—especially when endpoints target a single GPU type.
 
-There is no default value for template\_hash.
+For more advanced scaling behavior, `cold_mult` and `min_cold_load` provide finer-grained control. The serverless engine will maintain the **largest** inactive capacity specified by these three controls.
 
-## template\_id
+## Minimum Inactive Workers (`min_workers`)
 
-A numeric (integer) identifier that uniquely references a template in the Vast.ai database. This is an alternative way to reference the same template that `template_hash` points to, but using the template's database primary key instead of its hash string.
+The minimum number of inactive workers (workers with the model loaded but not actively serving requests) that the serverless engine will maintain.
 
-There is no default value for template\_id.
+If not specified during endpoint creation, the default value is `5`.
 
+## Cold Multiplier (`cold_mult`)
 
+While `min_workers` is fixed regardless of traffic patterns, `cold_mult` defines inactive capacity as a multiplier of the current active workload.
 
+### Example
 
+For an active load of `100` and `cold_mult = 2`:
 
+```
+100 (active load) × 2 (cold_mult) = 200 total capacity
+200 − 100 = 100 inactive load
+```
 
+If the active load increases to `150` with `cold_mult = 2`, the serverless engine will attempt to maintain `150` inactive load.
 
+If not specified during endpoint creation, the default value is `3`.
+
+## Minimum Cold Load (`min_cold_load`)
+
+`min_cold_load` sets the total capacity target directly, independent of `cold_mult`.
+
+### Example
+
+For an active load of `100` and `min_cold_load = 300`:
+
+```
+300 − 100 = 200 inactive load
+```
+
+If active load increases to `150` with the same `min_cold_load`, inactive capacity becomes `150`.
+
+If not specified during endpoint creation, the default value is `0`.
+
+## Target Utilization (`target_util`)
+
+Target Utilization defines the ratio of active capacity to anticipated load and determines how much spare capacity (headroom) is reserved to handle short-term traffic spikes.
+
+For example, if anticipated load is `900 tokens/sec` and `target_util = 0.9`, the serverless engine will maintain:
+
+```
+900 ÷ 0.9 = 1000 tokens/sec capacity
+```
+
+### Spare capacity examples
+
+- `target_util = 0.9` → 11.1% spare capacity
+- `target_util = 0.8` → 25% spare capacity
+- `target_util = 0.5` → 100% spare capacity
+- `target_util = 0.4` → 150% spare capacity
+
+If not specified during endpoint creation, the default value is `0.9`.
