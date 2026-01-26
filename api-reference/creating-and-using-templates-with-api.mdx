@@ -1,0 +1,747 @@
+---
+title: Creating and Using Templates with API
+sidebarTitle: Templates
+createdAt: Sun Jan 26 2026 10:00:00 GMT+0000 (Coordinated Universal Time)
+updatedAt: Sun Jan 26 2026 16:00:00 GMT+0000 (Coordinated Universal Time)
+---
+
+<script type="application/ld+json" dangerouslySetInnerHTML={{
+  __html: JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "How to Create and Use Templates with the Vast.ai API",
+    "description": "A comprehensive guide to creating, managing, and using templates programmatically with the Vast.ai API, including precedence rules and examples.",
+    "step": [
+      {
+        "@type": "HowToStep",
+        "name": "Understand Templates",
+        "text": "Learn what templates are in API terms: configuration bundles that store default settings for instance creation including image, environment variables, and launch configuration."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Create a Template",
+        "text": "Use POST /api/v0/template/ to create a new template with your desired configuration including name, image, env vars, and other settings."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Launch Instance from Template",
+        "text": "Use PUT /api/v0/asks/{id}/ with template_hash_id to create an instance using your template as the base configuration."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Override Template Values",
+        "text": "Pass additional parameters in your instance creation request to override template defaults. Scalar fields replace template values, while env values are concatenated."
+      }
+    ]
+  })
+}} />
+
+## Introduction
+
+A **template** in the Vast.ai API is a configuration bundle that stores default settings for instance creation. Instead of specifying every parameter each time you create an instance, you can reference a template by its `hash_id` and optionally override specific values.
+
+Templates are useful for:
+- **Standardization**: Ensure all team members launch instances with consistent configurations
+- **Convenience**: Avoid repeating the same parameters across multiple API calls
+- **Sharing**: Share configurations via template hash ID
+
+For information about managing templates in the web interface, see [Templates Introduction](/documentation/templates/introduction).
+
+## Template Fields Reference
+
+When creating a template, the following fields can be configured:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | **Required**. Human-readable name for the template |
+| `image` | string | **Required**. Docker image path (e.g., `vastai/pytorch`) |
+| `tag` | string | Docker image tag. Defaults to `latest` |
+| `desc` | string | Description of the template |
+| `readme` | string | Longer documentation/readme content |
+| `env` | string | Environment variables and port mappings in Docker flag format (e.g., `"-e VAR=val -p 8000:8000"`) |
+| `onstart` | string | Shell commands to run when instance starts |
+| `runtype` | string | Launch mode: `ssh`, `jupyter`, or `args`. Defaults to `args` |
+| `args_str` | string | Arguments string passed to the container entrypoint |
+| `ssh_direct` | boolean | Enable direct SSH connection (recommended with `runtype: "ssh"`) |
+| `use_ssh` | boolean | Enable SSH access |
+| `jup_direct` | boolean | Enable direct Jupyter connection |
+| `jupyter_dir` | string | Directory to launch Jupyter from |
+| `use_jupyter_lab` | boolean | Use JupyterLab instead of Jupyter Notebook |
+| `docker_login_repo` | string | Private Docker registry URL |
+| `docker_login_user` | string | Username for private registry |
+| `docker_login_pass` | string | Access token for private registry |
+| `href` | string | Link to Docker Hub or image documentation |
+| `repo` | string | Repository identifier (e.g., `library/ubuntu`) |
+| `extra_filters` | object | Default machine search filters (e.g., `{"cuda_max_good": {"gte": 12.6}}`) |
+| `recommended_disk_space` | number | Recommended disk space in GB (default: 8) |
+| `private` | boolean | Whether the template is private |
+| `volume_info` | object | UI hint for volume configuration (not used for actual instance creation) |
+
+## Template Identifiers
+
+Templates have two primary identifiers:
+
+| Identifier | Type | Description |
+|------------|------|-------------|
+| `id` | integer | Numeric identifier. Used for deleting templates |
+| `hash_id` | string | Content-based hash. Used for creating instances and editing templates |
+
+**Usage by operation:**
+- **Create instance**: Use `template_hash_id`
+- **Edit template**: Use `hash_id` (via PUT)
+- **Delete template**: Use numeric `id`
+
+## Precedence Rules
+
+When you create an instance with both a template and additional parameters, the following precedence rules apply:
+
+| Field Type | Behavior |
+|------------|----------|
+| **Scalar fields** (image, disk, runtype, etc.) | Request value **overrides** template value |
+| **`env`** (string) | **Merged**. Template values retained, request values appended. Conflicting keys use request value |
+| **`extra_filters`** (dict) | **Merged** by key. Request values win on conflicts |
+
+### Example: Environment Variables
+
+The `env` field uses Docker flag format as a string. When you provide `env` in your request, it is merged with the template's `env` - existing values are retained and new values are appended.
+
+**Template configuration:**
+```json
+{
+  "env": "-e MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-8B -e MAX_TOKENS=4096"
+}
+```
+
+**Instance creation request:**
+```json
+{
+  "template_hash_id": "4e17788f74f075dd9aab7d0d4427968f",
+  "env": "-e MODEL_ID=mistralai/Mistral-7B-v0.1 -e HF_TOKEN=hf_xxx"
+}
+```
+
+**Resulting instance environment:**
+- `MODEL_ID=mistralai/Mistral-7B-v0.1` (request overrides template)
+- `MAX_TOKENS=4096` (retained from template)
+- `HF_TOKEN=hf_xxx` (added from request)
+
+## Cookbook Examples
+
+### Search for Templates
+
+Search for templates using `select_filters` with comparison operators.
+
+**Query Syntax:**
+
+```
+select_filters = { "field": { "op": value } }
+```
+
+**Operators:** `eq`, `neq`, `lt`, `lte`, `gt`, `gte`, `in`, `notin`
+
+**Available Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `creator_id` | int | ID of creator |
+| `created_at` | float | Time of initial template creation (UTC epoch) |
+| `count_created` | int | Number of instances created (popularity) |
+| `default_tag` | string | Image default tag |
+| `docker_login_repo` | string | Image docker repository |
+| `id` | int | Template unique ID |
+| `image` | string | Image used for template |
+| `jup_direct` | bool | Supports jupyter direct |
+| `hash_id` | string | Unique hash ID of template |
+| `name` | string | Displayable name |
+| `recent_create_date` | float | Last time of instance creation (UTC epoch) |
+| `recommended_disk_space` | float | Min disk space required |
+| `recommended` | bool | Is template on recommended list |
+| `ssh_direct` | bool | Supports SSH direct |
+| `tag` | string | Image tag |
+| `use_ssh` | bool | Supports SSH (direct or proxy) |
+
+<CodeGroup>
+
+```bash curl
+# Search for recommended templates with SSH support
+curl -G "https://console.vast.ai/api/v0/template/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  --data-urlencode 'select_filters={"use_ssh":{"eq":true},"recommended":{"eq":true}}'
+
+# Search for popular templates (more than 100 instances created)
+curl -G "https://console.vast.ai/api/v0/template/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  --data-urlencode 'select_filters={"count_created":{"gt":100}}'
+```
+
+```python Python
+import requests
+import json
+
+api_key = "your_api_key"
+
+# Search for recommended templates with SSH support
+select_filters = {
+    "use_ssh": {"eq": True},
+    "recommended": {"eq": True}
+}
+
+response = requests.get(
+    "https://console.vast.ai/api/v0/template/",
+    headers={"Authorization": f"Bearer {api_key}"},
+    params={"select_filters": json.dumps(select_filters)}
+)
+
+result = response.json()
+for template in result.get("templates", []):
+    print(f"Hash ID: {template['hash_id']}, Name: {template['name']}")
+
+# Search for popular templates by specific creators
+select_filters = {
+    "count_created": {"gt": 100},
+    "creator_id": {"in": [38382, 48982]}
+}
+
+response = requests.get(
+    "https://console.vast.ai/api/v0/template/",
+    headers={"Authorization": f"Bearer {api_key}"},
+    params={"select_filters": json.dumps(select_filters)}
+)
+```
+
+</CodeGroup>
+
+### Create a New Template
+
+Create a reusable template. This example shows a recommended configuration with SSH direct access.
+
+<CodeGroup>
+
+```bash curl
+curl -X POST "https://console.vast.ai/api/v0/template/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Example Template",
+    "desc": "Template for running vLLM inference server",
+    "image": "vllm/vllm-openai",
+    "tag": "latest",
+    "env": "-e MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-8B -p 8000:8000",
+    "onstart": "echo \"Starting vLLM server\"; vllm serve $MODEL_ID",
+    "runtype": "ssh",
+    "ssh_direct": true,
+    "use_ssh": true,
+    "recommended_disk_space": 50,
+    "private": true
+  }'
+```
+
+```python Python
+import requests
+
+api_key = "your_api_key"
+
+response = requests.post(
+    "https://console.vast.ai/api/v0/template/",
+    headers={
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    },
+    json={
+        "name": "Example Template",
+        "desc": "Template for running vLLM inference server",
+        "image": "vllm/vllm-openai",
+        "tag": "latest",
+        "env": "-e MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-8B -p 8000:8000",
+        "onstart": 'echo "Starting vLLM server"; vllm serve $MODEL_ID',
+        "runtype": "ssh",
+        "ssh_direct": True,
+        "use_ssh": True,
+        "recommended_disk_space": 50,
+        "private": True
+    }
+)
+
+result = response.json()
+print(f"Template ID: {result['template']['id']}")
+print(f"Hash ID: {result['template']['hash_id']}")
+```
+
+</CodeGroup>
+
+### Full Template Example
+
+Here's a complete template creation request with all common fields:
+
+```json
+{
+  "name": "Example Template",
+  "desc": "Description of what this template does",
+  "readme": "Longer documentation\nwith multiple lines",
+  "image": "library/ubuntu",
+  "tag": "22.04",
+  "repo": "library/ubuntu",
+  "href": "https://hub.docker.com/r/library/ubuntu/",
+  "env": "-e ENV1=val1 -p 8000:8000",
+  "onstart": "echo \"hello\"",
+  "args_str": "",
+  "runtype": "ssh",
+  "ssh_direct": true,
+  "use_ssh": true,
+  "jup_direct": true,
+  "jupyter_dir": null,
+  "use_jupyter_lab": false,
+  "docker_login_repo": "",
+  "docker_login_user": "",
+  "docker_login_pass": "",
+  "extra_filters": {"cuda_max_good": {"gte": 12.6}},
+  "recommended_disk_space": 8,
+  "private": true,
+  "volume_info": null
+}
+```
+
+### Edit a Template
+
+Edit an existing template using its `hash_id`. You only need to include the fields you want to change - unchanged fields retain their existing values.
+
+<CodeGroup>
+
+```bash curl
+curl -X PUT "https://console.vast.ai/api/v0/template/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "hash_id": "5915f1dc1ce881defb572015eb9d8178",
+    "desc": "Updated description",
+    "recommended_disk_space": 16
+  }'
+```
+
+```python Python
+import requests
+
+api_key = "your_api_key"
+
+# Edit template - only include fields you want to change
+response = requests.put(
+    "https://console.vast.ai/api/v0/template/",
+    headers={
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    },
+    json={
+        "hash_id": "5915f1dc1ce881defb572015eb9d8178",
+        "desc": "Updated description",
+        "recommended_disk_space": 16
+    }
+)
+
+result = response.json()
+print(f"Updated template: {result['template']['hash_id']}")
+```
+
+</CodeGroup>
+
+<Note>
+The `hash_id` will change after editing since it is derived from the template content.
+</Note>
+
+### Delete a Template
+
+Delete a template by passing its numeric `id` (not `hash_id`) in the request body.
+
+<CodeGroup>
+
+```bash curl
+curl -X DELETE "https://console.vast.ai/api/v0/template/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"template_id": 334548}'
+```
+
+```python Python
+import requests
+
+api_key = "your_api_key"
+
+response = requests.delete(
+    "https://console.vast.ai/api/v0/template/",
+    headers={
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    },
+    json={"template_id": 334548}  # Numeric ID, not hash_id
+)
+
+result = response.json()
+print(f"Deleted: {result.get('success')}")
+```
+
+</CodeGroup>
+
+### Create Instance from Template
+
+Launch an instance using a template. No need to specify `image` as the template provides it.
+
+<CodeGroup>
+
+```bash curl
+curl -X PUT "https://console.vast.ai/api/v0/asks/12345678/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "template_hash_id": "4e17788f74f075dd9aab7d0d4427968f"
+  }'
+```
+
+```python Python
+import requests
+
+api_key = "your_api_key"
+offer_id = 12345678
+
+response = requests.put(
+    f"https://console.vast.ai/api/v0/asks/{offer_id}/",
+    headers={
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    },
+    json={
+        "template_hash_id": "4e17788f74f075dd9aab7d0d4427968f"
+    }
+)
+
+result = response.json()
+print(f"Instance ID: {result.get('new_contract')}")
+```
+
+</CodeGroup>
+
+### Create Instance with Image Override
+
+Use a template but specify a different Docker image.
+
+<CodeGroup>
+
+```bash curl
+curl -X PUT "https://console.vast.ai/api/v0/asks/12345678/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "template_hash_id": "4e17788f74f075dd9aab7d0d4427968f",
+    "image": "library/ubuntu:22.04"
+  }'
+```
+
+```python Python
+import requests
+
+api_key = "your_api_key"
+offer_id = 12345678
+
+response = requests.put(
+    f"https://console.vast.ai/api/v0/asks/{offer_id}/",
+    headers={
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    },
+    json={
+        "template_hash_id": "4e17788f74f075dd9aab7d0d4427968f",
+        "image": "nvidia/cuda:12.1-devel-ubuntu22.04"
+    }
+)
+
+result = response.json()
+print(f"Instance ID: {result.get('new_contract')}")
+```
+
+</CodeGroup>
+
+### Override Environment Variables
+
+Replace template environment variables with new values.
+
+<CodeGroup>
+
+```bash curl
+curl -X PUT "https://console.vast.ai/api/v0/asks/12345678/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "template_hash_id": "4e17788f74f075dd9aab7d0d4427968f",
+    "env": "-e MODEL_ID=mistralai/Mistral-7B-Instruct-v0.2 -e HF_TOKEN=hf_xxxYourTokenHere -p 8000:8000"
+  }'
+```
+
+```python Python
+import requests
+
+api_key = "your_api_key"
+offer_id = 12345678
+
+response = requests.put(
+    f"https://console.vast.ai/api/v0/asks/{offer_id}/",
+    headers={
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    },
+    json={
+        "template_hash_id": "4e17788f74f075dd9aab7d0d4427968f",
+        "env": "-e MODEL_ID=mistralai/Mistral-7B-Instruct-v0.2 -e HF_TOKEN=hf_xxxYourTokenHere -p 8000:8000"
+    }
+)
+
+result = response.json()
+print(f"Instance ID: {result.get('new_contract')}")
+```
+
+</CodeGroup>
+
+### Create Instance with Volume
+
+Attach a volume when creating an instance. You can either link an existing volume or create a new one.
+
+<Note>
+The `volume_info` field stored in templates is a UI hint only. To actually attach a volume, you must include `volume_info` in the instance creation request.
+</Note>
+
+**Link an existing volume:**
+
+<CodeGroup>
+
+```bash curl
+curl -X PUT "https://console.vast.ai/api/v0/asks/12345678/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "template_hash_id": "4e17788f74f075dd9aab7d0d4427968f",
+    "volume_info": {
+      "create_new": false,
+      "volume_id": 12345,
+      "mount_path": "/workspace"
+    }
+  }'
+```
+
+```python Python
+import requests
+
+api_key = "your_api_key"
+offer_id = 12345678
+
+# Link an existing volume (get volume_id from "vastai show volumes")
+response = requests.put(
+    f"https://console.vast.ai/api/v0/asks/{offer_id}/",
+    headers={
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    },
+    json={
+        "template_hash_id": "4e17788f74f075dd9aab7d0d4427968f",
+        "volume_info": {
+            "create_new": False,
+            "volume_id": 12345,  # Existing volume ID
+            "mount_path": "/workspace"
+        }
+    }
+)
+```
+
+</CodeGroup>
+
+**Create a new volume:**
+
+<CodeGroup>
+
+```bash curl
+curl -X PUT "https://console.vast.ai/api/v0/asks/12345678/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "template_hash_id": "4e17788f74f075dd9aab7d0d4427968f",
+    "volume_info": {
+      "create_new": true,
+      "volume_id": 28908979,
+      "size": 10,
+      "mount_path": "/workspace"
+    }
+  }'
+```
+
+```python Python
+import requests
+
+api_key = "your_api_key"
+offer_id = 12345678
+
+# Create a new volume (get volume_id from "vastai search volumes")
+response = requests.put(
+    f"https://console.vast.ai/api/v0/asks/{offer_id}/",
+    headers={
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    },
+    json={
+        "template_hash_id": "4e17788f74f075dd9aab7d0d4427968f",
+        "volume_info": {
+            "create_new": True,
+            "volume_id": 28908979,  # Volume offer ID from search
+            "size": 10,  # Size in GB
+            "mount_path": "/workspace"
+        }
+    }
+)
+```
+
+</CodeGroup>
+
+**CLI equivalent:**
+```bash
+# Link existing volume
+vastai create instance 12345678 --template_hash abc123 --link-volume 12345 --mount-path /workspace
+
+# Create new volume
+vastai create instance 12345678 --template_hash abc123 --create-volume 28908979 --volume-size 10 --mount-path /workspace
+```
+
+## CLI Reference
+
+The Vast.ai CLI provides commands for template management:
+
+| Command | Description |
+|---------|-------------|
+| `vastai create template --name <name> --image <image> [options]` | Create a new template |
+| `vastai search templates [filters]` | Search for templates |
+| `vastai update template <hash_id> [options]` | Update a template (uses `hash_id`) |
+| `vastai delete template --template-id <id>` | Delete a template (uses numeric `id`) |
+
+**Create template options:**
+- `--name NAME` - Template name
+- `--image IMAGE` - Docker image
+- `--image_tag TAG` - Image tag
+- `--env ENV` - Docker options (env vars and ports)
+- `--ssh` - Launch as SSH instance
+- `--jupyter` - Launch as Jupyter instance
+- `--direct` - Use direct connections
+- `--onstart-cmd CMD` - Onstart script
+- `--disk_space GB` - Disk space in GB
+- `--desc DESC` - Description
+- `--readme README` - Readme content
+- `--public` - Make template public
+
+<Note>
+The CLI `update template` command takes `hash_id` as its argument, while `delete template` uses the numeric `id`.
+</Note>
+
+## Runtype and Connection Options
+
+The `runtype` field controls the launch mode of your instance:
+
+| Runtype | Description |
+|---------|-------------|
+| `args` | Default. Container runs with arguments from `args_str` |
+| `ssh` | SSH access enabled. **Recommended** with `ssh_direct: true` |
+| `jupyter` | Jupyter notebook/lab access |
+
+**Recommendation**: Use `runtype: "ssh"` with `ssh_direct: true` and `use_ssh: true` for reliable SSH access to your instances.
+
+The `args_str` field is used when `runtype` is `args` to pass arguments to the container entrypoint:
+
+```json
+{
+  "runtype": "args",
+  "args_str": "--model deepseek-ai/DeepSeek-R1-Distill-Llama-8B --port 8000"
+}
+```
+
+## Common Pitfalls
+
+<AccordionGroup>
+  <Accordion title="I'm getting an error using template_id for instance creation">
+    Instance creation requires `template_hash_id`, not `template_id`. The numeric `id` is only used for deleting templates. Use the `hash_id` returned when you create or search for templates:
+    ```json
+    {
+      "template_hash_id": "4e17788f74f075dd9aab7d0d4427968f"
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="I passed template + image and got the wrong image">
+    When you specify both `template_hash_id` and `image`, the **request's image overrides** the template's image. If you want to use the template's image, omit the `image` field from your request.
+  </Accordion>
+
+  <Accordion title="My environment variable didn't apply">
+    The `env` field is a string using Docker flag format, not a JSON object. If your variable isn't appearing:
+    - Use the format: `"-e VAR1=value1 -e VAR2=value2"`
+    - Include port mappings with `-p`: `"-e VAR=val -p 8000:8000"`
+    - Request `env` is merged with template `env` - existing keys are overwritten, new keys are appended
+  </Accordion>
+
+  <Accordion title="Ports aren't open on my instance">
+    Port mappings are specified in the `env` string using Docker's `-p` flag:
+    ```json
+    {
+      "env": "-p 8000:8000 -p 8080:8080"
+    }
+    ```
+    For SSH access, use `runtype: "ssh"` with `ssh_direct: true`.
+  </Accordion>
+
+  <Accordion title="Volume didn't mount">
+    Volume mounting uses the `volume_info` structure in the instance creation request. Note that `volume_info` in templates is just a UI hint and doesn't affect instance creation.
+
+    **To link an existing volume:**
+    ```json
+    {
+      "volume_info": {
+        "create_new": false,
+        "volume_id": 12345,
+        "mount_path": "/workspace"
+      }
+    }
+    ```
+
+    **To create a new volume:**
+    ```json
+    {
+      "volume_info": {
+        "create_new": true,
+        "volume_id": 28908979,
+        "size": 10,
+        "mount_path": "/workspace"
+      }
+    }
+    ```
+
+    Where:
+    - `volume_id` is either an existing volume ID (from `show volumes`) or a volume offer ID (from `search volumes`)
+    - `size` is only used when `create_new` is true
+    - `mount_path` is where the volume mounts inside the container
+  </Accordion>
+
+  <Accordion title="Template search returns no results">
+    Template search uses `select_filters` with comparison operators, not free-text search:
+    - Use the correct filter syntax: `{"field": {"op": value}}`
+    - Valid operators: `eq`, `neq`, `lt`, `lte`, `gt`, `gte`, `in`, `notin`
+    - Verify your API key has `user_read` permissions
+    - Check available fields in the search documentation above
+  </Accordion>
+</AccordionGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Templates Introduction" href="/documentation/templates/introduction" icon="layer-group">
+    Web interface guide for templates
+  </Card>
+  <Card title="Create Instance API" href="/api-reference/instances/create-instance" icon="server">
+    Full API reference for instance creation
+  </Card>
+  <Card title="CLI Commands" href="/cli/commands" icon="terminal">
+    Command-line interface for templates
+  </Card>
+  <Card title="Search Offers API" href="/api-reference/search/search-offers" icon="magnifying-glass">
+    Find available machines to rent
+  </Card>
+</CardGroup>
