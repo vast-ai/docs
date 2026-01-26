@@ -1,0 +1,340 @@
+---
+title: SGLang Router
+slug: sglang-router-vast
+createdAt: Thu Jan 23 2026 16:00:00 GMT+0000 (Coordinated Universal Time)
+updatedAt: Thu Jan 23 2026 16:00:00 GMT+0000 (Coordinated Universal Time)
+---
+
+# Running SGLang Router on Vast.ai
+
+When serving LLMs in production, a single GPU instance quickly becomes a bottleneck. Requests queue up during traffic spikes, latency increases, and scaling requires expensive hardware upgrades. [SGLang Router](https://github.com/sgl-project/sglang) solves this by distributing requests across multiple workers running the same model on separate GPUs. Instead of vertical scaling (buying bigger GPUs), you scale horizontally by adding more workers.
+
+What makes SGLang Router particularly effective is its cache-aware routing policy. Traditional load balancers distribute requests randomly or round-robin, which fragments the KV cache across workers. SGLang Router maintains a prefix tree of cached prompts and routes similar requests to the same worker, maximizing cache reuse and reducing latency. This means you get better performance from the same hardware compared to naive load balancing.
+
+This guide walks through deploying Llama 3.1 8B on two Vast.ai GPU instances with SGLang, setting up the router to distribute requests between them, and testing inference through the OpenAI-compatible API. You'll see how to configure different routing policies, scale to additional workers, and monitor request distribution across the system.
+
+## What This Guide Covers
+
+- Deploy SGLang workers on Vast.ai GPU instances
+- Set up SGLang Router for load balancing
+- Test the deployment with curl and Python
+- Configure different models and routing policies
+
+## Why Vast.ai
+
+This deployment requires multiple GPU instances with direct port access for the SGLang API endpoints. Vast.ai provides on-demand GPU rentals with per-minute billing and static IPs, allowing you to deploy workers as needed without long-term commitments. The marketplace model offers access to a variety of GPU types at competitive spot pricing.
+
+## Hardware Requirements
+
+- **GPU VRAM**: 24GB minimum per worker (Llama 3.1 8B requires ~14GB for model weights in BF16 precision, plus overhead for KV cache and batch processing)
+- **Disk Space**: 100GB per instance (SGLang Docker image is ~15GB, model weights are ~15GB, plus workspace)
+- **Compute Capability**: 7.0+ (Volta architecture or newer for optimal performance)
+- **Direct Port Access**: Required for exposing the SGLang API endpoint
+
+This guide was tested with:
+- 2x RTX 4090 (24GB each)
+- SGLang Router: v0.3.2
+- Model: meta-llama/Llama-3.1-8B-Instruct
+
+## Prerequisites
+
+- Vast.ai account and API key ([Sign up here](https://vast.ai))
+- HuggingFace token for model access
+- Python 3.10+
+
+**Install dependencies:**
+```bash
+pip install vastai openai
+```
+
+**Configure credentials:**
+```bash
+export VAST_API_KEY="your-api-key"
+export HF_TOKEN="your-hf-token"
+vastai set api-key $VAST_API_KEY
+```
+
+## Step 1: Find GPU Instances
+
+Search for available GPUs that meet the model's requirements:
+
+```bash
+vastai search offers "gpu_ram >= 24 compute_cap >= 70 direct_port_count >= 1 rentable=true" --order dph_total --limit 10
+```
+
+**What this searches for:**
+- `gpu_ram >= 24`: At least 24GB VRAM (required for Llama 8B)
+- `compute_cap >= 70`: Volta architecture or newer (ensures compatibility)
+- `direct_port_count >= 1`: At least one direct port for API access
+- `rentable=true`: Instance is available to rent
+- `--order dph_total`: Sort by price (dollars per hour, cheapest first)
+
+**What you'll see:**
+
+The command returns a table of available GPUs. Look for the **ID** column (usually the leftmost column) - these are your offer IDs. The table also shows:
+- GPU model (RTX 4090, A5000, etc.)
+- `dph_total`: Price per hour in dollars
+- `gpu_ram`: VRAM available
+- Reliability scores
+
+Choose two offers with low `dph_total` (price) and high reliability scores. Write down the two offer IDs - you'll need them in the next step.
+
+## Step 2: Deploy SGLang Workers
+
+Create two worker instances running the same model. This allows the router to distribute requests across multiple GPUs.
+
+Replace `<OFFER_ID_1>` and `<OFFER_ID_2>` with the IDs from Step 1:
+
+```bash
+vastai create instance <OFFER_ID_1> \
+    --image lmsysorg/sglang:latest \
+    --env "-p 8000:8000 -e HF_TOKEN=$HF_TOKEN" \
+    --disk 100 \
+    --onstart-cmd "python -m sglang.launch_server --model meta-llama/Llama-3.1-8B-Instruct --host 0.0.0.0 --port 8000"
+
+vastai create instance <OFFER_ID_2> \
+    --image lmsysorg/sglang:latest \
+    --env "-p 8000:8000 -e HF_TOKEN=$HF_TOKEN" \
+    --disk 100 \
+    --onstart-cmd "python -m sglang.launch_server --model meta-llama/Llama-3.1-8B-Instruct --host 0.0.0.0 --port 8000"
+```
+
+**What these flags mean:**
+- `--image lmsysorg/sglang:latest`: Official SGLang Docker image (~15GB)
+- `--env "-p 8000:8000 -e HF_TOKEN=$HF_TOKEN"`: Expose port 8000 and pass HuggingFace token
+- `--disk 100`: Allocate 100GB disk space (needed for model weights ~15GB + image ~15GB)
+- `--onstart-cmd`: Command to run when instance starts - launches SGLang server
+
+**What you'll see:**
+
+Each command returns output with `"success": true` and an instance ID number. Example:
+```json
+{
+  "success": true,
+  "new_contract": 12345678
+}
+```
+
+Save these instance IDs - you'll need them for cleanup later.
+
+## Step 3: Wait for Instances to Start
+
+The instances need 5-10 minutes to initialize. During this time:
+1. SGLang Docker image is downloaded (~15GB)
+2. Model weights are downloaded from HuggingFace (~15GB for Llama 8B)
+3. Model is loaded into GPU memory
+
+Check instance status:
+
+```bash
+vastai show instances
+```
+
+**What you'll see:**
+
+A table showing your instances with their status. The `Status` column will progress through:
+- `loading` - Instance is initializing
+- `running` - Instance is ready
+
+Wait until both instances show `running` status.
+
+**Verify SGLang is ready** by checking logs:
+
+```bash
+vastai logs <INSTANCE_ID> --tail 30
+```
+
+Look for this line in the output:
+```
+The server is fired up and ready to roll!
+```
+
+This confirms SGLang has loaded the model and is ready to serve requests.
+
+## Step 4: Get Worker Endpoints
+
+Now you need to find the public URLs for your workers.
+
+**Option 1: Web Console (Easiest)**
+
+1. Navigate to [https://cloud.vast.ai/instances/](https://cloud.vast.ai/instances/)
+2. Find your instances in the list
+3. Click the IP address button for each instance
+4. Note the public IP and port mapping for port 8000
+
+**What the port mapping looks like:**
+
+You'll see something like: `8000:45678`
+
+This means:
+- `8000` is the container port (internal)
+- `45678` is the host port (external - use this one!)
+
+Your worker endpoint is: `http://<PUBLIC_IP>:<HOST_PORT>`
+
+**Option 2: CLI**
+
+```bash
+vastai show instance <INSTANCE_ID> --raw | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+ip = d.get('public_ipaddr')
+port = d.get('ports', {}).get('8000/tcp', [{}])[0].get('HostPort')
+print(f'http://{ip}:{port}')
+"
+```
+
+**Important:** Container port 8000 is mapped to a random host port by Vast.ai. Always use the mapped host port from the console or CLI, not port 8000.
+
+## Step 5: Start SGLang Router
+
+Install and start the router locally. The router will run on your machine and distribute requests to the remote Vast.ai workers.
+
+```bash
+# Create virtual environment and install router
+uv venv .venv && source .venv/bin/activate
+uv pip install sglang-router
+
+# Start router with both worker endpoints
+python -m sglang_router.launch_router \
+    --host 0.0.0.0 \
+    --port 30000 \
+    --worker-urls http://<WORKER1_IP>:<WORKER1_PORT> http://<WORKER2_IP>:<WORKER2_PORT> \
+    --policy round_robin
+```
+
+Replace `<WORKER1_IP>:<WORKER1_PORT>` and `<WORKER2_IP>:<WORKER2_PORT>` with the actual endpoints from Step 4.
+
+**What you'll see:**
+
+The router will start and display logs indicating it has detected the workers. Look for messages about:
+- Router starting on port 30000
+- Workers being registered
+- Health checks passing
+
+The router is now running at `http://localhost:30000` and will distribute requests across your two workers using round-robin policy.
+
+## Step 6: Test the Deployment
+
+### Test with curl
+
+Send a test request to verify everything is working:
+
+```bash
+curl http://localhost:30000/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -d '{
+        "model": "meta-llama/Llama-3.1-8B-Instruct",
+        "messages": [{"role": "user", "content": "Hello!"}]
+    }'
+```
+
+**What you'll see:**
+
+A JSON response with the model's completion:
+
+```json
+{
+  "id": "cmpl-...",
+  "object": "chat.completion",
+  "created": 1234567890,
+  "model": "meta-llama/Llama-3.1-8B-Instruct",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Hello! How can I help you today?"
+      },
+      "finish_reason": "stop"
+    }
+  ]
+}
+```
+
+### Test with Python
+
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:30000/v1", api_key="not-needed")
+response = client.chat.completions.create(
+    model="meta-llama/Llama-3.1-8B-Instruct",
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+print(response.choices[0].message.content)
+```
+
+**What you'll see:**
+
+The model's response printed to your console:
+```
+Hello! How can I help you today?
+```
+
+The router automatically distributes requests between your two workers. Send multiple requests to see load balancing in action - the router's logs will show which worker handled each request.
+
+---
+
+## Configuration Options
+
+### Load Balancing Policies
+
+**Round Robin (`--policy round_robin`):**
+Distributes requests evenly across workers in circular order. Simple and predictable. Good for testing and uniform workloads.
+
+**Cache-Aware (`--policy cache_aware`):**
+Routes requests to workers likely to have relevant KV cache entries. Improves throughput by maximizing cache reuse. Recommended for production deployments with repeated or similar queries.
+
+**Power of Two (`--policy power_of_two`):**
+Selects two random workers and routes to the one with lower load. Better load distribution than round-robin under variable workload conditions.
+
+### Scaling to More Workers
+
+Add more workers by deploying additional Vast.ai instances (repeat Step 2) and restarting the router with all worker URLs:
+
+```bash
+python -m sglang_router.launch_router \
+    --host 0.0.0.0 \
+    --port 30000 \
+    --worker-urls http://<WORKER1_IP>:<PORT> http://<WORKER2_IP>:<PORT> http://<WORKER3_IP>:<PORT> http://<WORKER4_IP>:<PORT> \
+    --policy cache_aware
+```
+
+This allows you to scale inference capacity on-demand without downtime for your application.
+
+---
+
+## Cleanup
+
+When finished, destroy your Vast.ai instances to stop charges:
+
+```bash
+vastai destroy instance <INSTANCE_ID_1>
+vastai destroy instance <INSTANCE_ID_2>
+```
+
+Use the instance IDs from Step 2.
+
+---
+
+## Next Steps
+
+- **Try different models**: Deploy Qwen 2.5 or Mistral models by changing the `--model` parameter
+- **Scale horizontally**: Add a third or fourth worker to increase throughput
+- **Use cache-aware policy**: Switch to `--policy cache_aware` for production deployments with repeated queries
+- **Add monitoring**: Track worker health and request distribution through the router's logs
+
+## Additional Resources
+
+- [SGLang GitHub Repository](https://github.com/sgl-project/sglang) - Official SGLang project with documentation and examples
+- [Llama 3.1 Model Card](https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct) - Meta's Llama 3.1 8B Instruct on HuggingFace
+- [Vast.ai CLI Documentation](https://vast.ai/docs/cli/commands) - Complete reference for Vast.ai CLI commands
+
+---
+
+## Conclusion
+
+SGLang Router on Vast.ai provides scalable LLM inference through load balancing across multiple GPU instances. The combination of SGLang's efficient serving and Vast.ai's on-demand GPU marketplace enables systems that scale horizontally with OpenAI-compatible APIs.
+
+Ready to deploy? [Sign up for Vast.ai](https://vast.ai) and start your first load-balanced inference cluster.
