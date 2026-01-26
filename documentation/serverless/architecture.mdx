@@ -1,6 +1,6 @@
 ---
-title: Architecture
-description: Understand the architecture of Vast.ai Serverless, including the Serverless System, GPU Instances, and User (Client Application). Learn how the system works, how to use the routing process, and how to create Worker Groups.
+title: Overview
+description: Learn how Vast Serverless operates and understand its major components.
 "canonical": "/documentation/serverless/architecture"
 ---
 
@@ -9,61 +9,87 @@ description: Understand the architecture of Vast.ai Serverless, including the Se
     "@context": "https://schema.org",
     "@type": "TechArticle",
     "headline": "Vast.ai Serverless Architecture",
-    "description": "Understanding the architecture of Vast.ai Serverless including the serverless system, GPU instances, endpoints and worker groups, system architecture, and the two-step routing process.",
+    "description": "An overview of how Vast.ai Serverless operates, its major components, and how endpoint- and workergroup-level configuration drives scaling behavior.",
     "author": {
       "@type": "Organization",
       "name": "Vast.ai"
     },
     "articleSection": "Serverless Documentation",
-    "keywords": ["serverless", "architecture", "endpoints", "worker groups", "routing", "GPU instances", "vast.ai", "PyWorker"]
+    "keywords": ["serverless", "architecture", "endpoints", "workergroups", "workers", "scaling", "sdk", "vast.ai", "PyWorker"]
   })
 }} />
 
-The Vast.ai Serverless solution manages groups of GPU instances to efficiently serve applications, automatically scaling up or down based on load metrics defined by the Vast PyWorker. It streamlines instance management, performance measurement, and error handling.
-
-## Endpoints and Worker Groups
-
-The Serverless system needs to be configured at two levels:
-
-- **Endpoints:** The highest level clustering of instances for the Serverless system, consisting of a named endpoint string, a collection of Worker groups, and hyperparameters.
-- **Worker Groups**: A lower level organization that lives within an Endpoint. It consists of a [template](/documentation/instances/templates) (with extra filters for search), a set of GPU instances (workers) created from that template, and hyperparameters. Multiple Worker Groups can exist within an Endpoint.
-
-Having two-level scaling provides several benefits:
-
-1. **Comparing Performance Metrics Across Hardware**: Suppose you want to run the same templates on different hardware to compare performance metrics. You can create several groups, each configured to run on specific hardware. By leaving this setup running for a period of time, you can review the metrics and select
-   the most suitable hardware for your users' needs.
-2. **Smooth Rollout of a New Model**: If you're using TGI to handle LLM inference with LLama3 and want to transition to LLama4, you can do so gradually. For a smooth rollout where only 10% of user requests are handled by LLama4, you can create a new Worker Group under the existing Endpoint. Let it run for a while,
-   review the metrics, and then fully switch to LLama4 when ready.
-3. **Handling Diverse Workloads with Multiple Models**: You can create an Endpoint to manage LLM inference using TGI. Within this group, you can set up multiple
-   Worker Groups, each using a different LLM to serve requests. This approach is beneficial when you need a few resource-intensive models to handle most requests, while smaller, more cost-effective models manage overflow during workload spikes.
-
-It's important to note that having multiple Worker Groups within a single Endpoint is not always necessary. For most users, a single Worker Group within an Endpoint provides an optimal setup.
-
-You can create Worker Groups using our [Serverless-Compatible Templates](/documentation/serverless/text-generation-inference-tgi), which are customized versions of popular templates on Vast, designed to be used on the serverless system.
-
-## System Architecture
-
-The system architecture for an application using Vast.ai Serverless includes the following components:
-
-- **Serverless System**&#x20;
-- **GPU Instances**&#x20;
-- **User (Client Application)**
+The Vast.ai Serverless architecture is a **multi-component system** that manages GPU-backed workers to efficiently serve applications. It automatically scales up or down based on **endpoint parameters**, **workergroup parameters**, and **measured load** reported by workers.
 
 <Frame caption="Serverless Architecture">
 ![Serverless Architecture](/images/serverless-architecture.webp)
 </Frame>
 
-### Example Workflow&#x20;
+## Primary Components
 
-1. A client initiates a request to the Serverless system by invoking the `https://run.vast.ai/route/` endpoint.
-2. The Serverless system returns a suitable worker address. In the example above, this would be `ip_address_2` since that GPU instance is 'Ready'.
-3. The client calls the GPU instance's specific API endpoint, passing the authentication info returned by `/route/` along with payload parameters.
-4. The PyWorker on the GPU instance receives the payload and forwards it to the ML model. After model inference, the PyWorker receives the results.
-5. The PyWorker sends the model results back to the client.
-6. Independently and concurrently, each PyWorker in the Endpoint sends its operational metrics to the Serverless system, which it uses to make scaling decisions.
+### Endpoints
 
-### Two-Step Routing Process
+An **Endpoint** is the highest-level construct in Vast Serverless. Endpoints are configured with [**endpoint-level parameters**](./serverless-parameters) that control scaling behavior, capacity limits, and utilization targets.
 
-This 2-step routing process is used for security and flexibility. By having the client send payloads directly to the GPU instances, your payload information is never stored on Vast servers.
+An endpoint consists of:
 
-The `/route/` endpoint signs its messages with a public key available at `https://run.vast.ai/pubkey/`, allowing the GPU worker to validate requests and prevent unauthorized usage.
+- A named endpoint identifier
+- One or more Workergroups
+- Endpoint parameters such as `max_workers`, `min_load`, `min_workers`, `cold_mult`, `min_cold_load`, and `target_util`
+
+Users typically create one endpoint per **function** (for example, text generation or image generation) and per **environment** (production, staging, development).
+
+### Workergroups
+
+A **Workergroup** defines how workers are recruited and created. Workergroups are configured with [**workergroup-level parameters**](./workergroup-parameters) and are responsible for selecting which GPU offers are eligible for worker creation.
+
+Each Workergroup includes:
+
+- A serverless-compatible template (referenced by `template_id` or `template_hash`)
+- Hardware and marketplace filters defined via `search_params`
+- Optional instance configuration overrides via `launch_args`
+- Hardware requirements such as `gpu_ram`
+- A set of GPU instances (workers) created from the template
+
+Multiple Workergroups can exist within a single Endpoint, each with different configurations. This enables advanced use cases such as hardware comparison, gradual model rollout, or mixed-model serving. For many applications, a single Workergroup is sufficient.
+
+### Workers
+
+**Workers** are individual GPU instances created and managed by the Serverless engine. Each worker runs a [**PyWorker**](./overview), a Python web server that loads the machine learning model and serves requests.
+
+Workers can exist in active or inactive states and are responsible for:
+
+- Receiving and processing inference requests
+- Reporting performance metrics (load, utilization, benchmark results)
+- Participating in automated scaling and routing decisions
+
+### Serverless Engine
+
+The **Serverless Engine** is the decision-making service that manages workers across all endpoints and workergroups. Using configuration parameters and real-time metrics, it determines when to:
+
+- Recruit new workers
+- Activate inactive workers
+- Release or destroy workers
+
+The engine continuously evaluates cost-performance tradeoffs using automated performance testing and measured load.
+
+### SDK
+
+The [**Serverless SDK**](./SDKoverview) is the primary interface for interacting with Vast Serverless. It is a Python `pip` package that abstracts low-level details and manages:
+
+- Authentication
+- Routing requests to appropriate workers
+- Request queuing, retries, and error handling
+- Asynchronous request management
+- Worker status and lifecycle information
+
+While CLI and API access are available, the SDK is the recommended method for most applications.
+
+## Example Workflow
+
+1. The client application sends a request using the Serverless SDK.
+2. The Serverless system routes the request and returns a suitable worker address based on current load and capacity.
+3. The client sends the request directly to the selected worker’s API endpoint, including the required authentication data.
+4. The PyWorker running on the GPU instance forwards the request to the machine learning model and performs inference.
+5. The inference result is returned to the client.
+6. Independently and continuously, each PyWorker reports operational and performance metrics back to the Serverless Engine, which uses this data to make ongoing scaling decisions.
