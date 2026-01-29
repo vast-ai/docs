@@ -1,0 +1,55 @@
+---
+title: "Rate Limits and Errors"
+---
+
+This page describes how Vast.ai public API errors and rate limits work, along with practical retry guidance.
+
+## Error Responses
+
+Error responses vary slightly by endpoint. The most common error response shape is:
+
+```json
+{
+  "success": false,
+  "error": "invalid_args",
+  "msg": "Human-readable description of the problem."
+}
+```
+
+Some endpoints omit the boolean `success`.
+Some omit `error` and return only `msg` or `message`.
+
+## Rate Limits
+
+### How rate limits are applied
+
+Vast.ai applies rate limits **per endpoint** and **per identity**. This is enforced as a minimum interval between requests for a given endpoint and identity.
+
+The identity is determined by: bearer token + session user + `api_key` query param + client IP.
+
+Some endpoints also use **method-specific** limits (GET vs POST) and/or **max-calls-per-period** limits for short bursts.
+
+
+### Rate limit response behavior
+
+When you hit a rate limit, you will receive **HTTP 429**. The response body is often plain text (in certain cases JSON with `success`/`error`/`msg` like above) with one of the following messages:
+
+```
+API requests too frequent
+```
+
+or
+
+```
+API requests too frequent: endpoint threshold=...
+```
+
+The API does not currently set standard rate-limit headers (for example `Retry-After`), so clients should apply their own backoff strategy.
+
+### How to reduce rate limit errors
+
+- **Batch requests** where supported, rather than calling many single-item endpoints.
+- **Reduce polling**: use longer polling intervals, or cache results client-side.
+- **Spread traffic** over time: avoid bursts; use a queue or scheduler.
+
+If you need higher limits for legitimate production usage, contact support with the endpoint(s), your expected call rate, and your account details.
