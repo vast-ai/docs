@@ -1336,6 +1336,75 @@ options:
 
 ```
 
+Deprecated: use `vastai show invoices-v1` for the current invoices API (date range required, pagination supported).
+
+Date formats:
+  `--start_date` and `--end_date` accept most human-readable formats. If you do not include a timezone,
+  dates are parsed in your local timezone. The CLI converts them to UTC epoch seconds before calling the API.
+
+Examples:
+    # Show invoice items for January 2026
+    vastai show invoices --start_date 2026-01-01 --end_date 2026-01-31
+
+    # Same range using UTC epoch seconds
+    vastai show invoices --start_date 1767225600 --end_date 1769903999
+
+    # Credits only, with a single-ended range
+    vastai show invoices --only_credits --start_date 2026-01-01
+
+## show invoices-v1
+
+Get billing (invoices/charges) history reports with advanced filtering and pagination
+
+```text Text
+usage: vastai show invoices-v1 [OPTIONS]
+
+options:
+  -h, --help            show this help message and exit
+  -i, --invoices        Show invoices instead of charges
+  -it, --invoice-type type [type ...]
+                        Filter which types of invoices to show: {transfers, stripe, bitpay, coinbase, crypto.com, reserved, payout_paypal, payout_wise}
+  -c, --charges         Show charges instead of invoices
+  -ct, --charge-type type [type ...]
+                        Filter which types of charges to show: {i|instance, v|volume, s|serverless}
+  -s, --start-date START_DATE
+                        Start date (YYYY-MM-DD or timestamp)
+  -e, --end-date END_DATE
+                        End date (YYYY-MM-DD or timestamp)
+  -l, --limit LIMIT     Number of results per page (default: 20, max: 100)
+  -t, --next-token NEXT_TOKEN
+                        Pagination token for next page
+  -f, --format {table,tree}
+                        Output format for charges (default: table)
+  -v, --verbose         Include full Instance Charge details and Invoice Metadata (tree view only)
+  --latest-first        Sort by latest first
+  --url URL             server REST api url
+  --retry RETRY         retry limit
+  --raw                 output machine-readable json
+  --explain             output verbose explanation of mapping of CLI calls to
+                        HTTPS API endpoints
+  --api-key API_KEY     api key. defaults to using the one stored in
+                        ~/.vast_api_key
+
+```
+
+Date handling:
+  `--start-date` and `--end-date` accept `YYYY-MM-DD` (interpreted as UTC) or Unix epoch seconds.
+  If both are omitted, the CLI defaults to a 7-day window ending now. Use epoch seconds for exact time-of-day filtering.
+
+Examples:
+    # Show the first 20 invoices from the last 7 days (default window)
+    vastai show invoices-v1 --invoices
+
+    # Show invoices for January 2026
+    vastai show invoices-v1 -i --start-date 2026-01-01 --end-date 2026-01-31
+
+    # Show the first 50 volume+serverless charges with full details
+    vastai show invoices-v1 -c -ct v s -s 2026-01-01 -e 2026-01-05 --format tree --verbose -l 50
+
+    # Fetch the next page of invoices
+    vastai show invoices-v1 --invoices --limit 50 --next-token eyJ2YWx1ZXMiOiB7ImlkIjog....
+
 ## show ipaddrs
 
 Display user's history of ip addresses
