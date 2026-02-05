@@ -1,0 +1,314 @@
+---
+title: Budget-Friendly Overnight Ralph Loop
+slug: overnight-ralph-loop-vast
+createdAt: Wed Feb 05 2026 00:00:00 GMT+0000 (Coordinated Universal Time)
+updatedAt: Wed Feb 05 2026 00:00:00 GMT+0000 (Coordinated Universal Time)
+---
+
+<script type="application/ld+json" dangerouslySetInnerHTML={{
+  __html: JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "Run Budget-Friendly Overnight Ralph Loop on Vast.ai",
+    "description": "Deploy an autonomous coding agent that implements projects from a PRD while you sleep, for under $20 per night.",
+    "step": [
+      {
+        "@type": "HowToStep",
+        "name": "Install dependencies",
+        "text": "Install Vast.ai CLI, Aider, and clone the Ralph repository."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Deploy the model",
+        "text": "Create a 4x RTX 4090 instance with Qwen3-Coder-Next-FP8 using SGLang."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Get your endpoint",
+        "text": "Retrieve the public IP and port for your deployed model."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Configure Aider",
+        "text": "Set environment variables to point Aider at your Vast endpoint."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Run Ralph",
+        "text": "Execute the Ralph loop with your PRD to autonomously implement user stories."
+      }
+    ],
+    "author": {
+      "@type": "Organization",
+      "name": "Vast.ai Team"
+    },
+    "datePublished": "2026-02-05",
+    "dateModified": "2026-02-05"
+  })
+}} />
+
+# Budget-Friendly Overnight Ralph Loop on Vast
+
+Run autonomous coding agents overnight for under $20, waking up to a completed project with passing tests.
+
+## Overview
+
+Ralph is an agentic loop that implements a project from a PRD. It picks a user story, writes the code, runs tests, and moves to the next story — repeating until everything passes. By running on Vast.ai with an open-source model, you get autonomous development without API costs.
+
+In this guide, we'll start with a simple calculator example to see Ralph in action. Once that works, you can scale up to complex projects that run overnight.
+
+## Model: Qwen3-Coder-Next-FP8
+
+| Attribute | Value |
+|-----------|-------|
+| Model | `Qwen/Qwen3-Coder-Next-FP8` |
+| Size | 80B params (3B active, MoE), ~80GB in FP8 |
+| GPUs | 4x RTX 4090 (96GB total) |
+| Cost | ~$1.50/hr |
+| Image | `lmsysorg/sglang:latest` (v0.5.8+) |
+| CUDA | 12.9+ |
+
+**Why Qwen3-Coder-Next?**
+- Trained specifically for agentic coding tools (aider, Claude Code, Cline, etc.)
+- 256K context length
+
+## Prerequisites
+
+- Vast.ai account with API key ([Sign up here](https://vast.ai))
+
+## Setup
+
+```bash Bash
+# Install Vast CLI
+pip install --upgrade vastai
+vastai set api-key <your-api-key>
+
+# Install Aider
+pip install aider-chat
+
+# Clone Ralph
+git clone https://github.com/snarktank/ralph.git
+cd ralph
+```
+
+## Step 1: Deploy Qwen3-Coder-Next on Vast
+
+Find a 4x RTX 4090 instance with CUDA 12.9+:
+
+```bash Bash
+vastai search offers 'gpu_name=RTX_4090 num_gpus=4 dph<2.5 reliability>0.98 inet_down>1000 cuda_vers>=12.9' -o 'dph'
+```
+
+Generate an API key and deploy (replace `<OFFER_ID>` with an ID from the first column):
+
+```bash Bash
+# Generate API key for your endpoint
+API_KEY=$(openssl rand -hex 16)
+echo "Your API Key: $API_KEY"
+
+# Deploy with SGLang
+vastai create instance <OFFER_ID> \
+    --image lmsysorg/sglang:latest \
+    --env '-p 8000:8000' \
+    --disk 200 \
+    --onstart-cmd "python3 -m sglang.launch_server \
+        --model-path Qwen/Qwen3-Coder-Next-FP8 \
+        --host 0.0.0.0 \
+        --port 8000 \
+        --tp-size 4 \
+        --context-length 32768 \
+        --mem-fraction-static 0.85 \
+        --api-key $API_KEY"
+```
+
+## Step 2: Get Your Endpoint
+
+Wait 5-10 minutes for the model to download and load, then get your endpoint:
+
+```bash Bash
+vastai show instance <INSTANCE_ID> --raw | jq -r '"\(.public_ipaddr):\(.ports["8000/tcp"][0].HostPort)"'
+# Output: <IP>:<PORT>
+```
+
+Verify it's ready:
+
+```bash Bash
+curl -H "Authorization: Bearer $API_KEY" http://<IP>:<PORT>/health
+```
+
+## Step 3: Configure Aider for Vast
+
+Set environment variables to point Aider at your Vast endpoint:
+
+```bash Bash
+export OPENAI_API_BASE="http://<IP>:<PORT>/v1"
+export OPENAI_API_KEY="<your-api-key>"
+```
+
+## Step 4: Verify Aider Connectivity
+
+Test that Aider can reach your Vast endpoint:
+
+```bash Bash
+aider --model openai/Qwen/Qwen3-Coder-Next-FP8 --no-git --yes --no-show-model-warnings --message "Say hello"
+```
+
+You should see Aider respond. If you get connection errors, verify the endpoint URL and that the model finished loading (check `vastai logs <INSTANCE_ID>`).
+
+## Step 5: Update Ralph for Qwen3-Coder-Next
+
+In `ralph.sh`, update the aider model name in the aider tool section:
+
+```bash Bash
+OUTPUT=$(aider --model openai/Qwen/Qwen3-Coder-Next-FP8 \
+  --yes --no-git --no-show-model-warnings --no-browser \
+  --file "$SCRIPT_DIR/prd.json" \
+  --message "$PROMPT_CONTENT" 2>&1) || true
+```
+
+## Step 6: Run Ralph
+
+Create a `prd.json` that defines what you want Ralph to build:
+
+```json JSON
+{
+  "project": "Calculator",
+  "branchName": "ralph/calculator",
+  "description": "Create a Python calculator module with basic arithmetic functions",
+  "testCommand": "python -m pytest test_calculator.py -v",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Create add function",
+      "description": "Create calculator.py with an add function.",
+      "acceptanceCriteria": [
+        "add(2, 3) returns 5",
+        "add(-1, 1) returns 0"
+      ],
+      "priority": 1,
+      "passes": false
+    },
+    {
+      "id": "US-002",
+      "title": "Create multiply function",
+      "description": "Add a multiply function to calculator.py.",
+      "acceptanceCriteria": [
+        "multiply(2, 3) returns 6",
+        "multiply(-1, 5) returns -5",
+        "multiply(0, 100) returns 0"
+      ],
+      "priority": 2,
+      "passes": false
+    },
+    {
+      "id": "US-003",
+      "title": "Create divide function",
+      "description": "Add a divide function with zero handling.",
+      "acceptanceCriteria": [
+        "divide(10, 2) returns 5",
+        "divide(-6, 3) returns -2",
+        "divide(1, 0) raises ZeroDivisionError"
+      ],
+      "priority": 3,
+      "passes": false
+    }
+  ]
+}
+```
+
+Run Ralph:
+
+```bash Bash
+OPENAI_API_BASE="http://<IP>:<PORT>/v1" \
+OPENAI_API_KEY="<your-api-key>" \
+./ralph.sh --tool aider 5
+```
+
+Ralph creates `calculator.py` and `test_calculator.py` from scratch, implementing each user story and running tests until they pass.
+
+**Example output (`calculator.py`):**
+
+```python Python
+def add(a, b):
+    return a + b
+
+def multiply(a, b):
+    return a * b
+
+def divide(a, b):
+    if b == 0:
+        raise ZeroDivisionError("Cannot divide by zero")
+    return a / b
+```
+
+**Example output (`test_calculator.py`):**
+
+```python Python
+import pytest
+from calculator import add, multiply, divide
+
+def test_add():
+    assert add(2, 3) == 5
+    assert add(-1, 1) == 0
+
+def test_multiply():
+    assert multiply(2, 3) == 6
+    assert multiply(-1, 5) == -5
+    assert multiply(0, 100) == 0
+
+def test_divide():
+    assert divide(10, 2) == 5
+    assert divide(-6, 3) == -2
+    with pytest.raises(ZeroDivisionError):
+        divide(1, 0)
+```
+
+## Cleanup
+
+Destroy the instance when done:
+
+```bash Bash
+vastai destroy instance <INSTANCE_ID>
+```
+
+## Next Steps: Overnight Ralph Loop
+
+**Project ideas for overnight runs:**
+- Full CLI application with subcommands, config files, and help system
+- REST API with authentication, validation, and multiple resource types
+- Web scraper with multiple site adapters, rate limiting, and data export
+- Complete test suite for an existing codebase (one test file per module)
+- Database migration system with schema versioning and rollback
+
+To run Ralph unattended overnight:
+
+```bash Bash
+# Run in background with nohup, increase iterations
+nohup bash -c 'OPENAI_API_BASE="http://<IP>:<PORT>/v1" OPENAI_API_KEY="<your-api-key>" ./ralph.sh --tool aider 500' > ralph.log 2>&1 &
+
+# Check progress
+tail -f ralph.log
+
+# Check generated files
+ls -la *.py
+
+# Run tests manually
+python -m pytest test_*.py -v
+```
+
+**Cost estimate:** At ~$1.50/hr, an 8-12 hour overnight run costs $12-18.
+
+**Tips:**
+- Use `tmux` or `screen` instead of `nohup` if you want to reattach later
+- Monitor with `vastai show instance <ID>` to ensure the instance stays running
+- Check `progress.txt` for Ralph's learnings across iterations
+- Commit your `prd.json` before starting so you can reset if needed
+
+## Resources
+
+- [Ralph GitHub](https://github.com/snarktank/ralph)
+- [Aider](https://github.com/paul-gauthier/aider)
+- [Ralph Explained (ghuntley.com)](https://ghuntley.com/ralph/)
+- [SGLang](https://github.com/sgl-project/sglang)
+- [Vast.ai CLI Docs](https://vast.ai/docs/cli/commands)
+- [Qwen3-Coder-Next on HuggingFace](https://huggingface.co/Qwen/Qwen3-Coder-Next-FP8)
