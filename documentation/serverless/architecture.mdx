@@ -1,5 +1,5 @@
 ---
-title: Overview
+title: Architecture Overview
 description: Learn how Vast Serverless operates and understand its major components.
 "canonical": "/documentation/serverless/architecture"
 ---
@@ -37,11 +37,11 @@ An endpoint consists of:
 - One or more Workergroups
 - Endpoint parameters such as `max_workers`, `min_load`, `min_workers`, `cold_mult`, `min_cold_load`, and `target_util`
 
-Users typically create one endpoint per **function** (for example, text generation or image generation) and per **environment** (production, staging, development).
+Users typically create one endpoint per **use case** (for example, text generation or image generation) and per **environment** (production, staging, development). Each endpoint acts as a router and load balances requests across its pool of managed workers based on worker queue time.
 
 ### Workergroups
 
-A **Workergroup** defines how workers are recruited and created. Workergroups are configured with [**workergroup-level parameters**](./workergroup-parameters) and are responsible for selecting which GPU offers are eligible for worker creation.
+A **Workergroup** defines what code runs on the endpoint (via the template), as well as how workers are recruited and created. Workergroups are configured with [**workergroup-level parameters**](./workergroup-parameters) and are responsible for selecting which GPU offers are eligible for worker creation.
 
 Each Workergroup includes:
 
@@ -55,17 +55,17 @@ Multiple Workergroups can exist within a single Endpoint, each with different co
 
 ### Workers
 
-**Workers** are individual GPU instances created and managed by the Serverless engine. Each worker runs a [**PyWorker**](./overview), a Python web server that loads the machine learning model and serves requests.
+**Workers** are individual GPU instances created and managed by the Serverless engine. Each worker runs a [**PyWorker**](./overview), a Python web server that monitors the inference server's readiness, proxies incoming requests, and coordinates with the autoscaler.
 
 Workers can exist in active or inactive states and are responsible for:
 
 - Receiving and processing inference requests
 - Reporting performance metrics (load, utilization, benchmark results)
-- Participating in automated scaling and routing decisions
+- Informing automated scaling and routing decisions
 
 ### Serverless Engine
 
-The **Serverless Engine** is the decision-making service that manages workers across all endpoints and workergroups. Using configuration parameters and real-time metrics, it determines when to:
+The **Serverless Engine** is the decision-making service that routes incoming requests and manages workers across all endpoints and workergroups. Using configuration parameters and real-time metrics, it determines when to:
 
 - Recruit new workers
 - Activate inactive workers
@@ -78,7 +78,6 @@ The engine continuously evaluates cost-performance tradeoffs using automated per
 The [**Serverless SDK**](./SDKoverview) is the primary interface for interacting with Vast Serverless. It is a Python `pip` package that abstracts low-level details and manages:
 
 - Authentication
-- Routing requests to appropriate workers
 - Request queuing, retries, and error handling
 - Asynchronous request management
 - Worker status and lifecycle information
@@ -91,5 +90,5 @@ While CLI and API access are available, the SDK is the recommended method for mo
 2. The Serverless system routes the request and returns a suitable worker address based on current load and capacity.
 3. The client sends the request directly to the selected worker’s API endpoint, including the required authentication data.
 4. The PyWorker running on the GPU instance forwards the request to the machine learning model and performs inference.
-5. The inference result is returned to the client.
+5. The inference result is returned to the client application.
 6. Independently and continuously, each PyWorker reports operational and performance metrics back to the Serverless Engine, which uses this data to make ongoing scaling decisions.
