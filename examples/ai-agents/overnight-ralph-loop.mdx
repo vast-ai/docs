@@ -154,16 +154,38 @@ aider --model openai/Qwen/Qwen3-Coder-Next-FP8 --no-git --yes --no-show-model-wa
 
 You should see Aider respond. If you get connection errors, verify the endpoint URL and that the model finished loading (check `vastai logs <INSTANCE_ID>`).
 
-## Step 5: Update Ralph for Qwen3-Coder-Next
+## Step 5: Add Aider Support to Ralph
 
-In `ralph.sh`, update the aider model name in the aider tool section:
+Ralph doesn't include aider as a tool out of the box. You need to make two edits to `ralph.sh`:
+
+**Edit 1: Add `aider` to the tool validation.** Find the line that validates the `--tool` argument:
 
 ```bash Bash
-OUTPUT=$(aider --model openai/Qwen/Qwen3-Coder-Next-FP8 \
-  --yes --no-git --no-show-model-warnings --no-browser \
-  --file "$SCRIPT_DIR/prd.json" \
-  --message "$PROMPT_CONTENT" 2>&1) || true
+if [[ "$TOOL" != "amp" && "$TOOL" != "claude" ]]; then
+  echo "Error: Invalid tool '$TOOL'. Must be 'amp' or 'claude'."
 ```
+
+Add `aider` as a valid option:
+
+```bash Bash
+if [[ "$TOOL" != "amp" && "$TOOL" != "claude" && "$TOOL" != "aider" ]]; then
+  echo "Error: Invalid tool '$TOOL'. Must be 'amp', 'claude', or 'aider'."
+```
+
+**Edit 2: Add the aider tool block.** Find the `elif` chain that runs each tool (look for the `claude` block). After the last `elif` block and before the closing `fi`, add:
+
+```bash Bash
+  elif [[ "$TOOL" == "aider" ]]; then
+    # Aider: use --message flag for non-interactive mode
+    PROMPT_CONTENT=$(cat "$SCRIPT_DIR/prompt.md")
+    OUTPUT=$(aider --model openai/Qwen/Qwen3-Coder-Next-FP8 \
+      --yes --no-git --no-show-model-warnings --no-browser \
+      --file "$SCRIPT_DIR/prd.json" \
+      --message "$PROMPT_CONTENT" 2>&1) || true
+    echo "$OUTPUT"
+```
+
+This tells aider to use the Vast-hosted Qwen3-Coder-Next model (via the `OPENAI_API_BASE` env var you set in Step 3), load the PRD file for context, and run non-interactively with the Ralph prompt.
 
 ## Step 6: Run Ralph
 
