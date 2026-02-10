@@ -74,16 +74,19 @@ In this guide, we'll start with a simple calculator example to see Ralph in acti
 ## Prerequisites
 
 - Vast.ai account with API key ([Sign up here](https://vast.ai))
+- Python 3.10 or later
+- `git`, `jq`, `curl`, `openssl`
 
 ## Setup
 
 ```bash Bash
-# Install Vast CLI
-pip install --upgrade vastai
-vastai set api-key <your-api-key>
+# Create a virtual environment
+python3 -m venv ralph-env
+source ralph-env/bin/activate
 
-# Install Aider
-pip install aider-chat
+# Install Vast CLI and Aider
+pip install --upgrade vastai aider-chat pytest
+vastai set api-key <your-api-key>
 
 # Clone Ralph
 git clone https://github.com/snarktank/ralph.git
@@ -101,9 +104,10 @@ vastai search offers 'gpu_name=RTX_4090 num_gpus=4 dph<2.5 reliability>0.98 inet
 Generate an API key and deploy (replace `<OFFER_ID>` with an ID from the first column):
 
 ```bash Bash
-# Generate API key for your endpoint
+# Generate and save API key for your endpoint
 API_KEY=$(openssl rand -hex 16)
-echo "Your API Key: $API_KEY"
+echo "$API_KEY" > .vast_model_api_key
+echo "Your API Key: $API_KEY (saved to .vast_model_api_key)"
 
 # Deploy with SGLang
 vastai create instance <OFFER_ID> \
@@ -122,17 +126,17 @@ vastai create instance <OFFER_ID> \
 
 ## Step 2: Get Your Endpoint
 
-Wait 5-10 minutes for the model to download and load, then get your endpoint:
+Wait 10-15 minutes for the model weights (~80GB) to download and load. You can monitor progress with `vastai logs <INSTANCE_ID>` — look for "The server is fired up and ready to roll!" Then get your endpoint:
 
 ```bash Bash
 vastai show instance <INSTANCE_ID> --raw | jq -r '"\(.public_ipaddr):\(.ports["8000/tcp"][0].HostPort)"'
 # Output: <IP>:<PORT>
 ```
 
-Verify it's ready:
+Verify it's ready (SGLang returns HTTP 200 with an empty body — that's normal):
 
 ```bash Bash
-curl -H "Authorization: Bearer $API_KEY" http://<IP>:<PORT>/health
+curl -w '\nHTTP Status: %{http_code}\n' -H "Authorization: Bearer $API_KEY" http://<IP>:<PORT>/health
 ```
 
 ## Step 3: Configure Aider for Vast
@@ -189,7 +193,7 @@ This tells aider to use the Vast-hosted Qwen3-Coder-Next model (via the `OPENAI_
 
 ## Step 6: Run Ralph
 
-Create a `prd.json` that defines what you want Ralph to build:
+Create a `prd.json` that defines what you want Ralph to build. Note that `testCommand` is informational — the agent reads it from the PRD to know how to run tests, but `ralph.sh` itself doesn't execute it.
 
 ```json JSON
 {
