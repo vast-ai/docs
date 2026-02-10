@@ -1,5 +1,5 @@
 ---
-title: Budget-Friendly Overnight Autonomous Ralph Loop
+title: Budget-Friendly Alternative to Claude Code - Overnight Ralph Loop Guide
 slug: overnight-ralph-loop-vast
 createdAt: Wed Feb 05 2026 00:00:00 GMT+0000 (Coordinated Universal Time)
 updatedAt: Wed Feb 05 2026 00:00:00 GMT+0000 (Coordinated Universal Time)
@@ -86,7 +86,7 @@ source ralph-env/bin/activate
 
 # Install Vast CLI and Aider
 pip install --upgrade vastai aider-chat pytest
-vastai set api-key <your-api-key>
+vastai set api-key <your-vast-api-key>
 
 # Clone Ralph
 git clone https://github.com/snarktank/ralph.git
@@ -98,16 +98,16 @@ cd ralph
 Find a 4x RTX 4090 instance with CUDA 12.9+:
 
 ```bash Bash
-vastai search offers 'gpu_name=RTX_4090 num_gpus=4 dph<2.5 reliability>0.98 inet_down>1000 cuda_vers>=12.9' -o 'dph'
+vastai search offers 'gpu_name=RTX_4090 num_gpus=4 dph<2.5 reliability>0.98 inet_down>1000 cuda_vers>=12.9 direct_port_count>=1' -o 'dph'
 ```
 
-Generate an API key and deploy (replace `<OFFER_ID>` with an ID from the first column):
+Generate a bearer token for the inference endpoint and deploy (replace `<OFFER_ID>` with an ID from the first column):
 
 ```bash Bash
-# Generate and save API key for your endpoint
-API_KEY=$(openssl rand -hex 16)
-echo "$API_KEY" > .vast_model_api_key
-echo "Your API Key: $API_KEY (saved to .vast_model_api_key)"
+# Generate a bearer token for your inference endpoint
+MODEL_API_KEY=$(openssl rand -hex 16)
+echo "$MODEL_API_KEY" > .vast_model_api_key
+echo "Endpoint bearer token: $MODEL_API_KEY (saved to .vast_model_api_key)"
 
 # Deploy with SGLang
 vastai create instance <OFFER_ID> \
@@ -121,8 +121,15 @@ vastai create instance <OFFER_ID> \
         --tp-size 4 \
         --context-length 32768 \
         --mem-fraction-static 0.85 \
-        --api-key $API_KEY"
+        --api-key $MODEL_API_KEY"
 ```
+
+<Note>
+This guide uses three different keys:
+- **Vast account API key** — authenticates the Vast CLI (`vastai set api-key`)
+- **Endpoint bearer token** (`MODEL_API_KEY`) — secures your SGLang inference endpoint
+- **Client SDK key** (`OPENAI_API_KEY`) — set to the same value as the endpoint bearer token so Aider's OpenAI-compatible client can authenticate
+</Note>
 
 ## Step 2: Get Your Endpoint
 
@@ -136,16 +143,16 @@ vastai show instance <INSTANCE_ID> --raw | jq -r '"\(.public_ipaddr):\(.ports["8
 Verify it's ready (SGLang returns HTTP 200 with an empty body — that's normal):
 
 ```bash Bash
-curl -w '\nHTTP Status: %{http_code}\n' -H "Authorization: Bearer $API_KEY" http://<IP>:<PORT>/health
+curl -w '\nHTTP Status: %{http_code}\n' -H "Authorization: Bearer $MODEL_API_KEY" http://<IP>:<PORT>/health
 ```
 
 ## Step 3: Configure Aider for Vast
 
-Set environment variables to point Aider at your Vast endpoint:
+Set environment variables to point Aider at your Vast endpoint. `OPENAI_API_KEY` must be set to the same endpoint bearer token you generated in Step 1:
 
 ```bash Bash
 export OPENAI_API_BASE="http://<IP>:<PORT>/v1"
-export OPENAI_API_KEY="<your-api-key>"
+export OPENAI_API_KEY="$MODEL_API_KEY"
 ```
 
 ## Step 4: Verify Aider Connectivity
@@ -153,7 +160,7 @@ export OPENAI_API_KEY="<your-api-key>"
 Test that Aider can reach your Vast endpoint:
 
 ```bash Bash
-aider --model openai/Qwen/Qwen3-Coder-Next-FP8 --no-git --yes --no-show-model-warnings --message "Say hello"
+aider --model openai/Qwen/Qwen3-Coder-Next-FP8 --no-git --yes-always --no-show-model-warnings --message "Say hello"
 ```
 
 You should see Aider respond. If you get connection errors, verify the endpoint URL and that the model finished loading (check `vastai logs <INSTANCE_ID>`).
@@ -183,7 +190,7 @@ if [[ "$TOOL" != "amp" && "$TOOL" != "claude" && "$TOOL" != "aider" ]]; then
     # Aider: use --message flag for non-interactive mode
     PROMPT_CONTENT=$(cat "$SCRIPT_DIR/prompt.md")
     OUTPUT=$(aider --model openai/Qwen/Qwen3-Coder-Next-FP8 \
-      --yes --no-git --no-show-model-warnings --no-browser \
+      --yes-always --no-git --no-show-model-warnings --no-browser \
       --file "$SCRIPT_DIR/prd.json" \
       --message "$PROMPT_CONTENT" 2>&1) || true
     echo "$OUTPUT"
@@ -245,7 +252,7 @@ Run Ralph:
 
 ```bash Bash
 OPENAI_API_BASE="http://<IP>:<PORT>/v1" \
-OPENAI_API_KEY="<your-api-key>" \
+OPENAI_API_KEY="$MODEL_API_KEY" \
 ./ralph.sh --tool aider 5
 ```
 
@@ -309,7 +316,7 @@ To run Ralph unattended overnight:
 
 ```bash Bash
 # Run in background with nohup, increase iterations
-nohup bash -c 'OPENAI_API_BASE="http://<IP>:<PORT>/v1" OPENAI_API_KEY="<your-api-key>" ./ralph.sh --tool aider 500' > ralph.log 2>&1 &
+nohup bash -c 'OPENAI_API_BASE="http://<IP>:<PORT>/v1" OPENAI_API_KEY="$MODEL_API_KEY" ./ralph.sh --tool aider 500' > ralph.log 2>&1 &
 
 # Check progress
 tail -f ralph.log
@@ -328,6 +335,7 @@ python -m pytest test_*.py -v
 - Monitor with `vastai show instance <ID>` to ensure the instance stays running
 - Check `progress.txt` for Ralph's learnings across iterations
 - Commit your `prd.json` before starting so you can reset if needed
+- **Remember to `vastai destroy instance <INSTANCE_ID>` when the run finishes** — instances bill by the hour even when idle
 
 ## Resources
 
