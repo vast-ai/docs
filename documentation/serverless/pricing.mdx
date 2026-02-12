@@ -1,6 +1,6 @@
 ---
 title: Pricing
-description: Learn how Vast.ai Serverless pricing works - GPU recruitment, endpoint suspension, and stopping.
+description: Learn how Vast.ai Serverless pricing works and when resources are billed
 "canonical": "/documentation/serverless/pricing"
 ---
 
@@ -19,47 +19,28 @@ description: Learn how Vast.ai Serverless pricing works - GPU recruitment, endpo
   })
 }} />
 
-Vast.ai Serverless offers pay-as-you-go pricing for all workloads at the same rates as Vast.ai's non-Serverless GPU instances. Each instance accrues cost on a per second basis.
-This guide explains how pricing works.
+Unlike other providers, Vast Serverless offers pay-per-second pricing for all workloads at the same price as Vast.ai’s non-Serverless GPU instances.
 
-## GPU Recruitment
+As a Serverless endpoint takes requests, it will automatically scale its number of workers up or down depending on the incoming and forecasted demand. When scaling up, the engine recruits from the Vast.ai GPU marketplace to find the best price-performance worker available. Once identified, its cost is added to the running sum of all GPU instances running on your Serverless instance. As demand reduces, the engine will remove the GPU with the worst price-performance first.
 
-As the Serverless engine takes requests, it will automatically scale its number of workers up or down depending on the incoming and forecasted demand. When scaling up, 
-the engine searches over the Vast.ai marketplace for GPU instances that offer the best performance / price ratio. Once determined, the GPU instance(s) is recruited into 
-the Serverless engine, and its cost ($/hr) is added to the running sum of all GPU instances running on your Serverless engine.&#x20;
+## Billing for Workers
 
-As the request demand falls off, the engine will remove GPU instance(s) and your credit account immediatley stops being charged for those corresponding instance(s).
+The following table breaks down the specific charges based on worker state:
 
-Visit the [Billing Help](/documentation/reference/billing#ugwiY) page to see details on GPU instance costs.
+| State    | Description       | GPU compute | Storage | Bandwidth (in/out) |
+|----------|-------------------|-------------|---------|--------------------|
+| Ready    | An active worker  | Billed      | Billed  | Billed             |
+| Loading  | Model is loading  | Billed      | Billed  | Billed             |
+| Creating | Worker recruiting | Not billed  | Billed  | Billed             |
+| Inactive | A cold worker     | Not billed  | Billed  | Billed             |
 
-## Suspending an Endpoint
+## Billing for Endpoints
 
-When an Endpoint is **suspended**:
-- The Serverless Engine will no longer manage the GPU instances contained within the Endpoint.
-- GPU instances in this Endpoint will still be able to receive requests.&#x20;
+The following table breaks down the specific charges based on endpoint state:
 
-## Stopping an Endpoint
-
-**Stopping** an Endpoint will:
-- Cause the Serverless Engine to no longer manage the GPU instances contained within the Endpoint.
-- Put all existing GPU instances into the Inactive state.
-
-An **Inactive** GPU instance will:
-- Not receive any work. 
-- Not charge GPU compute costs.
-- Charge the user's account for **storage** and **bandwidth**.&#x20;
-
-
-
-## Billing by Instance State
-
-The specific charges depend on the instance's state:
-
-| State    | GPU compute | Storage | Bandwidth in | Bandwidth out |
-|----------|-------------|---------|--------------|---------------|
-| Ready    | Billed      | Billed  | Billed       | Billed        |
-| Loading  | Billed      | Billed  | Billed       | Billed        |
-| Creating | Not billed  | Billed  | Billed       | Billed        |
-| Inactive | Not billed  | Billed  | Billed       | Billed        |
-
-GPU compute refers to the per-second GPU rental charges. See the [Billing Help](/documentation/reference/billing#ugwiY) page for rate details.
+| State     | Description                                                                                | Billing Description |
+|-----------|--------------------------------------------------------------------------------------------|-------------|
+| Active    | - Engine is actively managing worker recruitment and release <br /> - Workers are active   | All workers billed at their relevant states      |
+| Suspended | - Engine is NOT managing worker recruitment and release <br /> - Workers are active.       | Workers are billed based on their state at time of suspension. <br /> Any workers that are currently being created or are loading, will complete to a ready state (and be billed as such).      |
+| Stopped   | - Engine is NOT managing worker recruitment and release <br /> - Workers are all inactive  | All workers are changed to and are billed in the inactive state  |
+| Destroyed | - Engine is NOT managing worker recruitment and released <br /> - All workers are destroyed| All billing stops  |
