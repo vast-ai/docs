@@ -1,0 +1,212 @@
+---
+title: GLM-4.7-Flash
+slug: glm-47-flash-deployment-vast
+createdAt: Thu Jan 23 2026 16:00:00 GMT+0000 (Coordinated Universal Time)
+updatedAt: Thu Jan 23 2026 16:00:00 GMT+0000 (Coordinated Universal Time)
+---
+
+# Deploying GLM-4.7-Flash on Vast.ai
+
+[GLM-4.7-Flash](https://huggingface.co/zai-org/GLM-4.7-Flash) is a 30B-parameter Mixture of Experts model from Zhipu AI that activates 3B parameters per token. Despite being roughly the same active parameter count as Qwen3-30B-A3B, GLM-4.7-Flash has a fundamentally different attention architecture: it uses 20 key-value heads with a 256-dimensional value head (compared to Qwen3's 4 KV heads with 128-dimensional values). This means its KV cache consumes approximately 10x more memory per token of context, making hardware selection critical for long-context deployments.
+
+This guide covers deploying GLM-4.7-Flash on Vast.ai using SGLang with 4x RTX 3090 GPUs.
+
+## Why the High Memory Requirement
+
+GLM-4.7-Flash uses Multi-Head Attention (MHA) rather than the Grouped Query Attention (GQA) common in recent MoE models. This architectural choice affects KV cache size directly:
+
+| Parameter | GLM-4.7-Flash | Qwen3-30B-A3B |
+|-----------|---------------|---------------|
+| num_hidden_layers | 47 | 48 |
+| num_attention_heads | 20 | 32 |
+| **num_key_value_heads** | **20** | **4** |
+| hidden_size | 2048 | 2048 |
+| **v_head_dim** | **256** | 128 |
+
+**KV cache per token:**
+- GLM-4.7-Flash: `2 x 47 x 20 x 256 x 2 bytes` = ~962 KB/token
+- Qwen3-30B-A3B: `2 x 48 x 4 x 128 x 2 bytes` = ~96 KB/token
+
+This means for 200k context, the KV cache alone requires ~188 GB. Combined with ~60 GB for model weights, full context deployment needs 250+ GB VRAM.
+
+## What We're Deploying
+
+This guide uses the following configuration:
+
+- **GPUs**: 4x RTX 3090 (96 GB total VRAM)
+- **Context Length**: 8,192 tokens
+- **Disk**: 200 GB
+- **CUDA**: 12.2–12.6
+- **Docker image**: `lmsysorg/sglang:dev-pr-17247` — must use this image; the `latest` tag lacks MLA support for GLM-4.7-Flash
+
+## Prerequisites
+
+- A [Vast.ai](https://cloud.vast.ai) account with credits
+- Vast.ai CLI installed (`pip install vastai`)
+- Your Vast.ai API key configured (`vastai set api-key YOUR_API_KEY`)
+
+## Step 1: Find an Instance
+
+Search for 4x RTX 3090 instances:
+
+```bash
+vastai search offers "gpu_name=RTX_3090 num_gpus=4 direct_port_count>=1 cuda_vers>=12.2 cuda_vers<=12.6" --order dph_base --limit 10
+```
+
+**What these filters mean:**
+- `gpu_name=RTX_3090`: Target GPU type
+- `num_gpus=4`: Four GPUs for tensor parallelism
+- `direct_port_count>=1`: At least one direct port for API access
+- `cuda_vers>=12.2 cuda_vers<=12.6`: CUDA version range that avoids driver issues
+
+## Step 2: Deploy the Model
+
+Generate an API key to secure your endpoint:
+
+```bash
+openssl rand -hex 32
+```
+
+Save the output and set it as an environment variable:
+
+```bash
+GLM_API_KEY="<your-generated-key>"
+```
+
+Create an instance with SGLang serving GLM-4.7-Flash. Replace `<OFFER_ID>` with the ID from Step 1:
+
+```bash
+vastai create instance <OFFER_ID> \
+    --image lmsysorg/sglang:dev-pr-17247 \
+    --env "-p 8000:8000" \
+    --disk 200 \
+    --onstart-cmd "python3 -m sglang.launch_server \
+        --model-path zai-org/GLM-4.7-Flash \
+        --host 0.0.0.0 \
+        --port 8000 \
+        --tp-size 4 \
+        --context-length 8192 \
+        --trust-remote-code \
+        --dtype float16 \
+        --mem-fraction-static 0.85 \
+        --api-key $GLM_API_KEY"
+```
+
+**Key parameters:**
+- `--tp-size 4`: Distribute model across all 4 GPUs using tensor parallelism
+- `--context-length 8192`: Maximum sequence length (increase if you have more VRAM)
+- `--dtype float16`: Required for RTX 3090 which does not natively support bfloat16. Use `--dtype bfloat16` on A100/H100
+- `--mem-fraction-static 0.85`: Allocate 85% of GPU memory for model and KV cache
+- `--trust-remote-code`: Required for the GLM-4.7-Flash architecture
+- `--api-key`: Secures the endpoint with bearer token authentication
+
+<Note>
+  For longer context, use GPUs with more VRAM (like A100 or H100) and increase `--context-length`. A100/H100 also support `--dtype bfloat16`.
+</Note>
+
+## Step 3: Monitor Startup
+
+The model is ~60 GB and takes 8–10 minutes to download on first deployment. Monitor progress with:
+
+```bash
+vastai logs <INSTANCE_ID>
+```
+
+Look for these messages indicating progress:
+- `Loading model weights` — Download and loading in progress
+- `The server is fired up and ready to roll!` — Server is ready to accept requests
+
+Get your instance IP and port once it's running:
+
+```bash
+vastai show instance <INSTANCE_ID>
+```
+
+## Step 4: Send Requests
+
+### Using curl
+
+```bash
+# Health check
+curl http://<INSTANCE_IP>:<PORT>/health
+
+# List models
+curl http://<INSTANCE_IP>:<PORT>/v1/models \
+  -H "Authorization: Bearer $GLM_API_KEY"
+
+# Chat completion
+curl http://<INSTANCE_IP>:<PORT>/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $GLM_API_KEY" \
+  -d '{
+    "model": "zai-org/GLM-4.7-Flash",
+    "messages": [{"role": "user", "content": "Write a haiku about GPU computing"}],
+    "max_tokens": 100
+  }'
+```
+
+**Example response:**
+
+```json
+{
+  "choices": [{
+    "message": {
+      "role": "assistant",
+      "content": "Parallel threads,\nCalculated at once,\nRise from the shadows."
+    },
+    "finish_reason": "stop"
+  }],
+  "usage": {"prompt_tokens": 12, "completion_tokens": 73}
+}
+```
+
+### Using OpenAI SDK
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://<INSTANCE_IP>:<PORT>/v1",
+    api_key="<GLM_API_KEY>"
+)
+
+response = client.chat.completions.create(
+    model="zai-org/GLM-4.7-Flash",
+    messages=[{"role": "user", "content": "Write a haiku about GPU computing"}],
+    max_tokens=100
+)
+
+print(response.choices[0].message.content)
+```
+
+**Example output:**
+
+```
+Parallel threads,
+Calculated at once,
+Rise from the shadows.
+```
+
+## Cleanup
+
+Destroy your instance when finished to stop charges:
+
+```bash
+vastai destroy instance <INSTANCE_ID>
+```
+
+## Conclusion
+
+GLM-4.7-Flash offers strong reasoning and coding capabilities in a 3B active parameter footprint. The trade-off is its attention architecture—using 20 KV heads instead of 4 means you need more VRAM per token of context than similarly-sized MoE models. For applications that need 8k context windows, 4x RTX 3090 provides a low-cost deployment option. For longer context requirements, scaling to A100 or H100 instances allows you to increase `--context-length` proportionally with available VRAM.
+
+## Next Steps
+
+- **Increase context**: Use GPUs with more VRAM (like A100 or H100) to serve longer context windows
+- **Add load balancing**: Use [SGLang Router](/examples/serving-infrastructure/sglang-router-vast) to distribute requests across multiple instances
+
+## Additional Resources
+
+- [GLM-4.7-Flash Model Card](https://huggingface.co/zai-org/GLM-4.7-Flash) — Model weights and architecture details
+- [SGLang Documentation](https://sgl-project.github.io/) — SGLang server configuration and features
+- [SGLang Docker Images](https://hub.docker.com/r/lmsysorg/sglang/tags) — Available Docker tags including dev builds
+- [Vast.ai CLI Guide](/cli/get-started) — Complete CLI reference for managing instances
