@@ -5,16 +5,16 @@ sidebarTitle: "Hello World"
 
 The Vast.ai REST API gives you programmatic control over GPU instances — useful for automation, CI/CD pipelines, or building your own tooling on top of Vast.
 
-This guide walks through the complete instance lifecycle: authenticate, search for a GPU, rent it, wait for it to boot, and clean up. By the end you'll understand the core API calls needed to manage instances without touching the web console.
+This guide walks through the complete instance lifecycle: authenticate, search for a GPU, rent it, wait for it to boot, connect to it, and clean up. By the end you'll understand the core API calls needed to manage instances without touching the web console.
 
 ## Prerequisites
 
-- A Vast.ai account with credit
+- A Vast.ai account with credit (~$0.01–0.05, depending on test instance run time)
 - `curl` installed
 
 ## 1. Get Your API Key
 
-Generate an API key from the Vast.ai console at [cloud.vast.ai](https://cloud.vast.ai/). Copy the key — you'll need it for every API call.
+Generate an API key from the [Keys page](https://cloud.vast.ai/cli/keys/) by clicking **+New**. Copy the key — you'll need it for your API calls, and you'll only see it once.
 
 Export it as an environment variable:
 
@@ -39,12 +39,12 @@ curl -s -H "Authorization: Bearer $VAST_API_KEY" \
 ```
 
 <Note>
-If you get a `401` or `403`, double-check your API key.
+If you get a `401` or `403`, double-check your API key. If you already have instances, you'll see them listed here.
 </Note>
 
 ## 3. Search for GPUs
 
-Find available machines using the bundles endpoint. This query returns the 3 cheapest on-demand RTX 4090s (sorted by total $/hr, including storage):
+Find available machines using the bundles endpoint. This query returns the top 5 on-demand RTX 4090s sorted by deep learning performance benchmarked per dollar:
 
 ```bash
 curl -s -H "Authorization: Bearer $VAST_API_KEY" \
@@ -55,14 +55,14 @@ curl -s -H "Authorization: Bearer $VAST_API_KEY" \
     "gpu_name": {"eq": "RTX 4090"},
     "num_gpus": {"eq": 1},
     "direct_port_count": {"gte": 1},
-    "order": [["dph_total", "asc"]],
+    "order": [["dlperf_per_dphtotal", "desc"]],
     "type": "on-demand",
-    "limit": 3
+    "limit": 5
   }' \
   "https://console.vast.ai/api/v0/bundles/"
 ```
 
-Here's what each parameter does:
+Each parameter in the query above controls a different filter:
 
 | Parameter | Value | Meaning |
 |-----------|-------|---------|
@@ -71,19 +71,19 @@ Here's what each parameter does:
 | `gpu_name` | `{"eq": "RTX 4090"}` | Filter to a specific GPU model |
 | `num_gpus` | `{"eq": 1}` | Exactly 1 GPU per instance |
 | `direct_port_count` | `{"gte": 1}` | At least 1 directly accessible port (needed for SSH) |
-| `order` | `[["dph_total", "asc"]]` | Sort by total cost per hour, cheapest first |
+| `order` | `[["dlperf_per_dphtotal", "desc"]]` | Sort by deep learning performance per dollar, best value first |
 | `type` | `"on-demand"` | On-demand pricing (vs. interruptible spot/bid) |
-| `limit` | `3` | Return at most 3 results |
+| `limit` | `5` | Return at most 5 results |
 
-The response contains an `offers` array. Note the `id` of the offer you want — you'll use it in the next step.
+The response contains an `offers` array. Note the `id` of the offer you want — you'll use it in the next step. If no offers are returned, try relaxing your filters (e.g. a different GPU model or removing `direct_port_count`).
 
 <Tip>
-All filters use operator objects like `{"eq": true}` or `{"gte": 1}`. The sort field must be `"order": [["field", "direction"]]` (array of arrays).
+See the [Search Offers](/api-reference/search/search-offers) reference for the full list of filter parameters and operators.
 </Tip>
 
 ## 4. Create an Instance
 
-Rent the machine by sending a PUT request with your Docker image and disk size. Replace `OFFER_ID` with the `id` from step 3.
+Rent the machine by sending a PUT request with your Docker image and disk size. Replace `OFFER_ID` with the `id` from step 3. `disk` is in GB and specifies the size of the disk on your new instance.
 
 ```bash
 curl -s -H "Authorization: Bearer $VAST_API_KEY" \
@@ -105,7 +105,7 @@ curl -s -H "Authorization: Bearer $VAST_API_KEY" \
 }
 ```
 
-Save the `new_contract` value — this is your instance ID. The response also includes an `instance_api_key` for programmatic access to the instance.
+Save the `new_contract` value — this is your instance ID. The `instance_api_key` is a restricted key injected into the container as `CONTAINER_API_KEY` — it can only start, stop, or destroy that specific instance.
 
 ## 5. Wait Until Ready
 
@@ -136,15 +136,31 @@ The `actual_status` field progresses through these states:
 | `"loading"` | Docker image is downloading |
 | `"running"` | Ready to use |
 
-Poll every 10 seconds. Boot time is typically 1–5 minutes depending on the Docker image size.
+Poll every 10 seconds. Boot time is typically 1–5 minutes depending on the Docker image size. You can also use the `onstart` script to send a callback when the instance is ready, instead of polling.
 
-Once `actual_status` is `"running"`, you can connect via SSH using the `ssh_host` and `ssh_port` from the response.
+Once `actual_status` is `"running"`, you're ready to connect.
 
-## 6. Clean Up
+## 6. Connect via SSH
+
+Use the `ssh_host` and `ssh_port` from the status response to connect directly to your new instance:
+
+```bash
+ssh root@SSH_HOST -p SSH_PORT
+```
+
+## 7. Clean Up
 
 When you're done, destroy the instance to stop all billing.
 
-To pause an instance temporarily instead of destroying it, you can **stop** it. Stopping halts compute billing but disk storage charges continue.
+Alternatively, to pause an instance temporarily instead of destroying it, you can **stop** it. Stopping halts compute billing but disk storage charges continue.
+
+**Destroy** (removes everything):
+
+```bash
+curl -s -H "Authorization: Bearer $VAST_API_KEY" \
+  -X DELETE \
+  "https://console.vast.ai/api/v0/instances/INSTANCE_ID/"
+```
 
 **Stop** (pauses compute, disk charges continue):
 
@@ -156,19 +172,11 @@ curl -s -H "Authorization: Bearer $VAST_API_KEY" \
   "https://console.vast.ai/api/v0/instances/INSTANCE_ID/"
 ```
 
-**Destroy** (removes everything):
-
-```bash
-curl -s -H "Authorization: Bearer $VAST_API_KEY" \
-  -X DELETE \
-  "https://console.vast.ai/api/v0/instances/INSTANCE_ID/"
-```
-
 Both return `{"success": true}`.
 
 ## Next Steps
 
 You've now completed the full instance lifecycle through the API: authentication, search, creation, polling, and teardown. From here:
 
-- **Connect via SSH** — Once an instance is running, use the `ssh_host` and `ssh_port` from the status response to SSH in. See the [SSH guide](/documentation/instances/connect/ssh) for setup.
+- **SSH setup** — See the [SSH guide](/documentation/instances/connect/ssh) for key configuration and advanced connection options.
 - **Use templates** — Avoid repeating image and config parameters on every create call. The [Templates API guide](/api-reference/creating-and-using-templates-with-api) covers creating, sharing, and launching from templates.
