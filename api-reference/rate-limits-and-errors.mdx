@@ -2,7 +2,7 @@
 title: "Rate Limits and Errors"
 ---
 
-This page describes how Vast.ai public API errors and rate limits work, along with practical retry guidance.
+This page describes how Vast.ai API errors and rate limits currently work, with practical retry guidance.
 
 ## Error Responses
 
@@ -21,18 +21,34 @@ Some omit `error` and return only `msg` or `message`.
 
 ## Rate Limits
 
-### How rate limits are applied
+### How rate limits work
 
-Vast.ai applies rate limits **per endpoint** and **per identity**. This is enforced as a minimum interval between requests for a given endpoint and identity.
+Vast.ai enforces rate limits at multiple levels to ensure fair platform usage:
 
-The identity is determined by: bearer token + session user + `api_key` query param + client IP.
+1. **Infrastructure level (per IP)**: protects against high-volume traffic before it reaches the API.
+2. **Account level (per API key)**: a shared request budget across all endpoints for your account.
+3. **Endpoint level (per endpoint and method)**: individual limits for each API endpoint and HTTP method.
 
-Some endpoints also use **method-specific** limits (GET vs POST) and/or **max-calls-per-period** limits for short bursts.
+### Identity and scope
 
+- Rate limits are tracked per API key. If no key is provided, your client IP is used instead.
+- Each endpoint and HTTP method combination (e.g., `GET /api/v0/instances/` vs `PUT /api/v0/instances/{id}/`) has its own limit.
+- Some endpoints enforce a minimum interval between requests; others use a burst-style limit (max requests in a time window).
 
-### Rate limit response behavior
+### Response headers
 
-When you hit a rate limit, you will receive **HTTP 429**. The response body is often plain text (in certain cases JSON with `success`/`error`/`msg` like above) with one of the following messages:
+For responses where rate-limiting logic is evaluated, the API includes:
+
+- `X-RateLimit-Limit`
+- `X-RateLimit-Remaining`
+- `X-RateLimit-Reset`
+- `Retry-After` (on `429` responses)
+
+If multiple rate-limit layers apply, headers represent the **most restrictive** active constraint.
+
+### 429 response behavior
+
+When you hit a rate limit, you receive **HTTP 429**. The response body is often plain text (and in some cases JSON) with messages such as:
 
 ```
 API requests too frequent
@@ -44,12 +60,60 @@ or
 API requests too frequent: endpoint threshold=...
 ```
 
-The API does not currently set standard rate-limit headers (for example `Retry-After`), so clients should apply their own backoff strategy.
+### Probabilistic output model
+
+The limiter itself is deterministic per request timeline, but if request arrivals are modeled as a random process (Poisson rate `r` requests/second), a useful approximation for threshold-style limits is:
+
+`P(429) = 1 - exp(-r * T)`
+
+Where `T` is the threshold in seconds.
+
+![Modeled probability of rate-limit responses by request rate and threshold](/images/api-rate-limit-probabilistic-output.svg)
+
+<Note>
+This graph is a statistical model to help plan client-side pacing. Actual outcomes depend on real request timing, burst shape, and which limit layer binds first.
+</Note>
+
+### Chart data used
+
+The exact plotted data points are available here:
+
+- [api-rate-limit-probabilistic-output-data.csv](/images/api-rate-limit-probabilistic-output-data.csv)
+
+CSV details:
+
+- Request-rate domain: `0.000` to `5.000` requests/second
+- Step size: `0.025` requests/second
+- Rows: 201 points (plus header)
+- Curves: `T = 0.5s`, `1s`, `2s`, `5s`
+
+Representative points from the plotted data:
+
+| Request rate `r` (req/s) | `P(429)` at `T=0.5s` | `P(429)` at `T=1s` | `P(429)` at `T=2s` | `P(429)` at `T=5s` |
+| ---: | ---: | ---: | ---: | ---: |
+| 0.0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| 0.5 | 0.2212 | 0.3935 | 0.6321 | 0.9179 |
+| 1.0 | 0.3935 | 0.6321 | 0.8647 | 0.9933 |
+| 1.5 | 0.5276 | 0.7769 | 0.9502 | 0.9994 |
+| 2.0 | 0.6321 | 0.8647 | 0.9817 | 1.0000 |
+| 2.5 | 0.7135 | 0.9179 | 0.9933 | 1.0000 |
+| 3.0 | 0.7769 | 0.9502 | 0.9975 | 1.0000 |
+| 3.5 | 0.8262 | 0.9698 | 0.9991 | 1.0000 |
+| 4.0 | 0.8647 | 0.9817 | 0.9997 | 1.0000 |
+| 4.5 | 0.8946 | 0.9889 | 0.9999 | 1.0000 |
+| 5.0 | 0.9179 | 0.9933 | 1.0000 | 1.0000 |
+
+### Endpoint/method limit data
+
+Per-endpoint rate limit data is documented here:
+
+- [Rate Limits by Endpoint and Method](/api-reference/rate-limit-endpoint-method-data)
 
 ### How to reduce rate limit errors
 
 - **Batch requests** where supported, rather than calling many single-item endpoints.
 - **Reduce polling**: use longer polling intervals, or cache results client-side.
 - **Spread traffic** over time: avoid bursts; use a queue or scheduler.
+- **Honor headers**: use `Retry-After` and `X-RateLimit-Reset` to pace retries.
 
 If you need higher limits for legitimate production usage, contact support with the endpoint(s), your expected call rate, and your account details.
