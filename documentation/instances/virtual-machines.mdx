@@ -1,0 +1,83 @@
+---
+title: Virtual Machines
+description: Learn how Vast.ai virtual machines (VMs) provide full Linux instances with init manager support, process tracing, and nested containerization for advanced workloads.
+"canonical": "/documentation/instances/virtual-machines"
+---
+
+<script type="application/ld+json" dangerouslySetInnerHTML={{
+  __html: JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "Vast.ai Virtual Machines Guide",
+    "description": "Guide to using Vast.ai virtual machines (VMs) for full Linux instances with init manager support, process tracing, and nested containerization.",
+    "author": {
+      "@type": "Organization",
+      "name": "Vast.ai"
+    },
+    "articleSection": "Instances Documentation",
+    "keywords": ["virtual machines", "VMs", "systemd", "Docker in Docker", "Kubernetes", "GPU", "vast.ai"]
+  })
+}} />
+
+Vast.ai offers full virtual machines (VMs) in addition to [Docker-based instances](/documentation/instances/docker-environment). VMs provide a complete Linux environment, making them ideal for workloads that require init managers, nested containerization, or process tracing.
+
+## Feature Comparison
+
+VMs offer capabilities not available in Docker-based instances:
+
+- **Init manager support** (e.g., `systemd`) — required for running Docker, Kubernetes, Snap, or other containerization tools inside your instance
+- **Process tracing** (`ptrace`) support
+
+However, VMs come with some trade-offs:
+
+- Slower creation and boot times
+- Higher disk overhead
+- Smaller selection of available machines
+- Fewer preconfigured templates
+- Only SSH launch mode is currently supported
+
+## Creating a VM
+
+<Warning>
+Make sure you have added your SSH keys to your [Account page](https://cloud.vast.ai/account/) before creating a VM. SSH keys cannot be edited on running VMs, and SSH is currently the only supported connection method.
+</Warning>
+
+Use one of the templates below to get started. These templates automatically filter for VM-capable machines and will launch a VM when you rent:
+
+| Template | Description | Provides | Use Cases |
+|---|---|---|---|
+| [Ubuntu 22.04 VM](https://cloud.vast.ai/?ref_id=62897&creator_id=62897&name=Ubuntu%2022.04%20VM) | Ubuntu 22.04 server with CLI access | CUDA, Docker | Docker Compose applications, CUDA performance profiling |
+| [Ubuntu Desktop (VM)](https://cloud.vast.ai/?ref_id=62897&creator_id=62897&name=Ubuntu%20Desktop%20(VM)) | Ubuntu desktop with a graphical environment | CUDA, Docker | GUI applications, visual development workflows |
+
+<Note>
+Environment variables in VMs are written to `/etc/environment`.
+</Note>
+
+## Customizing VM Templates
+
+VM images are packaged as Docker images from the `docker.io/vastai/kvm` repository. All VM templates must use one of these images, specified with the fully qualified name (e.g., `docker.io/vastai/kvm:ubuntu_terminal`).
+
+<Tip>
+Add `vms_enabled=true` to the **Extra Filters** field of the template to filter for machines that support VMs.
+</Tip>
+
+### Docker Options
+
+VM templates support the following flags in the **Docker options** field, which behave the same as in Docker-based instances:
+
+| Option | Example | Description |
+|---|---|---|
+| **Environment variables** | `-e JUPYTER_DIR=/ -e TEST=OK` | Written to `/etc/environment` inside the VM |
+| **Ports** | `-p 8081:8081 -p 8082:8082/udp` | Expose additional ports |
+
+For more details on these options, see [Docker Environment](/documentation/instances/docker-environment).
+
+### Launch Modes
+
+Currently only **SSH** is supported. See the [SSH guide](/documentation/instances/connect/ssh) for connection details.
+
+## Differences from Docker-Based Instances
+
+- **Data copy**: The cloud copy utility for VMs only supports migrating the entire VM — individual folder copies are not available.
+- **Copy scope**: Copy is only supported between two VMs, not between VMs and external cloud storage providers.
+- **Copy command**: Use `vastai vm copy $SRC $DEST` to invoke the VM copy utility.
