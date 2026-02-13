@@ -99,8 +99,8 @@ Vast is a GPU marketplace. Hosts sell GPU resources on the marketplace. Hosts ar
 
 - Setup: installing Ubuntu, creating disk partitions, installing NVIDIA drivers, opening network ports on the router and installing the Vast hosting software.
 - Testing and troubleshooting all issues that can arise, such as driver conflicts, errors, bad GPUs, and bad network ports. **Vast does not offer support for getting your machine working.** Connect your Vast host account to our Discord to access our [host-only discord channels](https://discord.gg/hSuEbSQ4X8) to chat or seek help from other hosts on the platform.
-- Managing the listings and GPU offers for rentals, including setting pricing and end dates for the offers
-- Planning for maintenance so that no client jobs are affected
+- Managing your offers, including pricing and offer end dates
+- Planning maintenance so that no active rental contracts are disrupted
 
 ## Account setup and hosting agreement
 
@@ -118,50 +118,79 @@ Common issues to check:
 - Make sure to read the section on IOMMU if you have an AMD EPYC system.
 - Make sure to disable auto-updates so that your machine doesn't drop a client job to update a driver.
 
-Once you are ready to list your machine, come back to this guide to understand pricing and listing the rental contract.
+Once you are ready to list your machine, come back to this guide to understand pricing and the rental contract lifecycle.
 
 ## General concepts
 
-Clients have high expectations coming from AWS or GCP. As a host, plan to offer 100% uptime for your machine during the contracted period. Expect that the GPU is going to be used at close to max capacity for the rental period. Ensure that your Internet, power source and heat dissipation systems are all functioning and that you have thought through how hosting will affect each one of those items.
+Clients have high expectations coming from AWS or GCP. As a host, plan to offer 100% uptime for your machine during the rental period. Expect that the GPU is going to be used at close to max capacity for the rental period. Ensure that your Internet, power source and heat dissipation systems are all functioning and that you have thought through how hosting will affect each one of those items.
 
-## Listings and Contracts
+## Offers and Rental Contracts
 
-Hosts can create machine _listings_ (offers) through the CLI command list machine or the machine control panel GUI on the host machines page.
+Hosts can create offers (sometimes called listings) through the CLI command list machine or the machine control panel GUI on the host machines page.
 
-The main listing parameters include:
+The main offer parameters include:
 
 - the pricing for GPUs,internet,storage
 - the discount schedule param which determines the price difference between [on-demand](/documentation/instances/rental-types) and [reserved](/documentation/instances/rental-types) instances
 - the min bid price for [interruptible](/documentation/instances/rental-types) instances
 - the min_gpu param controlling 'slicing' (explained below)
-- the end/expiration date which determines how long the listing lasts
+- the offer end date, which determines how long the offer accepts new rental contracts
 
-The listing offer is good until the end date. When a client creates an instance on your machine, this creates a _contract_ from your listing.
+The offer accepts new rentals until the offer end date. When a client rents an instance on your machine, a rental contract is created from your offer. If your machine has multiple GPUs and you've set min_gpu to allow slicing, multiple clients can rent from the same offer, each creating their own independent rental contract.
 
-Once you list and get rental contracts, it is very important to honor the terms of the contract until the end date.
+Once clients rent your machine, it is very important to honor the terms of each rental contract until its rental end date.
+
+<Frame>
+  ![Offer, rental contract, and instance lifecycle diagram](/images/offer-contract-lifecycle.png)
+</Frame>
 
 ## The Rental Contract
 
-By listing your machine or compute services, you are offering up a rental contract to potential clients.
+By listing your machine, you create an offer visible to potential clients. A rental contract is created each time a client accepts your offer by renting an instance. The rental contract locks in all of the offer's terms at the time of rental — including pricing, the rental end date, and hardware specs — and those terms cannot be changed afterward. Each rental contract is independent — you may have multiple active rental contracts from different clients on the same machine, each with its own rental end date and pricing.
 
-Once a client accepts this listing, you and the client have entered into a rental agreement - a contract.
+As the host, you are _committing_ to provide the services as advertised in your offer:
 
-As the provider you are _promising_ to provide the services as advertized in your listing:
-
-- the provider must provide the hardware/services according to all the advertized specs
+- the host must provide the hardware/services according to all the advertised specs
 - the hardware can not be used for any other purposes
 - the client's data must be isolated and protected according to the data protection policy
-- the advertized services must be provided up until the end date (contract expiration)
+- the advertised services must be provided until each rental contract's rental end date
 
 For full details, see the [hosting agreement](https://cloud.vast.ai/host/agreement) and [Service Level Agreement](https://cloud.vast.ai/host/SLA_default).
 
-### Expiration date (end date)
+### Offer End Date
 
-The expiration date can be set in the hosting interface by clicking on the date field under expiration and selecting a date for when the listing contract will expire. The CLI command to 'list machine' includes a field for end date, which is the same date.
+The offer end date is your commitment to how long you will keep the machine online and fully functional. The pricing you set is the rate you'll be paid for that commitment. Together, these form the terms of your offer.
 
-Make sure to set an end date **before** listing your machine, or else the listing will not expire.
+You can set the offer end date in the hosting interface by clicking on the date field under expiration, or via the `end date` field in the CLI `list machine` command. Make sure to set an offer end date **before** listing your machine, or the offer will remain open indefinitely.
 
-The "client end date" is the date of the longest client contract on a given machine.
+#### How the offer becomes a rental contract
+
+When a client rents an instance from your offer, all of the offer's terms at that moment — the offer end date, the pricing, and the hardware specs — are locked into a **rental contract**. The offer end date becomes the contract's **rental end date** (shown in the UI as "client end date"), and the pricing becomes the contract's rate. Once created, a rental contract's terms cannot be changed — not by modifying the offer, not by unlisting the machine, and not by any other host action.
+
+#### Can I change the offer?
+
+Yes, but changes only affect future rental contracts. Existing rental contracts keep their original terms:
+
+- **Changing the price** does not change the rate on any existing rental contract
+- **Shortening** the offer end date limits the commitment window for new clients, but does not shorten any existing rental end date
+- **Extending** the offer end date allows new clients to rent for a longer period
+- **Unlisting** the machine prevents new rental contracts entirely, but existing ones continue at their original pricing and rental end dates
+
+You can also unlist and relist with entirely new terms (new price, new offer end date). New rental contracts will be created at the new terms, while old rental contracts continue at their original terms. This means a single machine may have active rental contracts at different prices and different rental end dates.
+
+The latest rental end date across all active rental contracts on a machine is shown in the UI. You must keep the machine available until this date.
+
+#### Example: Multiple rental contracts from different offers
+
+You list a 4×A100 machine at \$2.00/GPU/hr with an offer end date of March 31.
+
+On January 5, Client A rents 2 GPUs. A rental contract is created at \$2.00/GPU/hr with a rental end date of March 31.
+
+On January 20, you decide to raise the price. You unlist the current offer and relist at \$2.50/GPU/hr with a new offer end date of June 30.
+
+On February 1, Client B rents the other 2 GPUs from the new offer. A rental contract is created at \$2.50/GPU/hr with a rental end date of June 30.
+
+You now have two active rental contracts on the same machine at different prices and different rental end dates. Client A's contract stays at \$2.00 through March 31. Client B's contract stays at \$2.50 through June 30. You must keep the machine online and fully functional through June 30 to honor both contracts. The UI shows June 30 as the latest rental end date on this machine.
 
 ### Min GPU
 
@@ -191,19 +220,19 @@ This discount is not static, but rather scales over time that the user rents the
 
 As a host, you can set this number yourself to 0 if you wish to opt out of this feature.
 
-## Volume Contracts
+## Volume Offers
 
-In addition to GPU contracts, hosts can now offer volume contracts on machines. This is a contract for storage space, and can be priced separately from GPU contracts. The space allocated for storage contracts is in the same pool of space as that for GPU contracts, meaning that space will not be subtracted from available offers unless it is in use.  When a client rents a volume listing, they rent a subset of the total space set for the listing, up to the total amount.
+In addition to GPU offers, hosts can create volume offers on machines. A volume offer is an offer for storage space, and can be priced separately from GPU offers. The space allocated for volume offers is in the same pool of space as that for GPU offers, meaning that space will not be subtracted from available offers unless it is in use.  When a client rents a volume offer, they rent a subset of the total space set for the offer, up to the total amount.
 
 ### Storage Usage
 
-Allocated storage (that is, storage in use by client contracts) is subtracted from the total storage available on a machine, and split up proportionally among the machines GPUs in remaining ask contracts.
+Allocated storage (that is, storage in use by client rental contracts) is subtracted from the total storage available on a machine, and split up proportionally among the machine's GPUs in remaining GPU offers.
 
-For example, on a machine with 1000Gb of disk available and 2 GPUs, a host can create a volume listing of up to 1000 Gb. 
+For example, on a machine with 1000Gb of disk available and 2 GPUs, a host can create a volume offer of up to 1000 Gb. 
 
-If they create a volume listing of 500 Gb, and it is not rented, the machine will be available for rent with 2 offers of 1xGPU 500Gb and 1 offer of 2xGPU 1000Gb. 
+If they create a volume offer of 500 Gb, and it is not rented, the machine will be available for rent with 2 offers of 1xGPU 500Gb and 1 offer of 2xGPU 1000Gb. 
 
-If 200 Gb of the volume contract are rented, the GPU offers will reduce to 2 1xGPU 400Gb offers and 1 2xGPU 800Gb offer. The volume contract will still remain, as there is still available space, and update to offer 300Gb. 
+If 200 Gb of the volume offer are rented, the GPU offers will reduce to 2 1xGPU 400Gb offers and 1 2xGPU 800Gb offer. The volume offer will still remain, as there is still available space, and update to offer 300Gb. 
 
 Similarly, if stored instances on the machine are taking up 800Gb, the volume offer will reduce to 200Gb.
 
@@ -211,7 +240,7 @@ If stored instances are only taking up 400 Gb, the volume offer will not update,
 
 ### Listing Volumes
 
-By default, volume offers will be listed with contract listings at the same disk price for half of the available space on the machine. Only rented space will impact the amount of space available for contract offers, not the space in the listing itself. You can control the amount of space listed with the -v CLI option, and the price of the space with the -z option.
+By default, volume offers will be listed with GPU offers at the same disk price for half of the available space on the machine. Only rented space will impact the amount of space available for GPU offers, not the space in the offer itself. You can control the amount of space listed with the -v CLI option, and the price of the space with the -z option.
 
 Space is listed in Gigabytes, and price in \$/Gb/Month.
 
@@ -219,23 +248,23 @@ Space is listed in Gigabytes, and price in \$/Gb/Month.
 vastai list machine <machine_id> -v <space> -z <price> -g .5 -e "12/23/2027" -r 0 -m 1
 ```
 
-You can also directly list available space for volume contracts by running the `vastai list volume` command.
+You can also directly create a volume offer by running the `vastai list volume` command.
 
 ```text Text
 vastai list volume <machine_id> -s <space> -p <price>
 ```
 
 <Warning>
-  Volume offer end dates **must** align with normal contract offer end dates.  Setting an end date on a volume will not update if there is an existing contract offer. Setting a contract offer end date will update volume offer end dates.
+  Volume offer end dates **must** align with GPU offer end dates.  Setting an end date on a volume will not update if there is an existing GPU offer. Setting a GPU offer end date will update volume offer end dates.
 </Warning>
 
-Volume contracts will be unlisted when the machine is unlisted. They can additionally be unlisted with the command:
+Volume offers will be unlisted when the machine is unlisted. They can additionally be unlisted with the command:
 
 ```text Text
 vastai unlist volume <volume_id>
 ```
 
-### Out of sync Contracts
+### Out of Sync Rental Contracts
 
 When a client deletes a volume, the space is automatically freed on the machine. If the machine is offline at this time, there is a job that runs hourly to free the space. If for some reason this is not working, or if you want to free the space automatically, you can run the command
 
@@ -243,13 +272,13 @@ When a client deletes a volume, the space is automatically freed on the machine.
 vastai cleanup machine <machine_id>
 ```
 
-This will automatically remove expired/deleted contracts from the machine, and available storage will update on offers.
+This will automatically remove expired/deleted rental contracts from the machine, and available storage will update on offers.
 
-## Extending contracts
+## Extending Rental Contracts
 
-To extend the current contracts for all clients on a given machine, change the expiration date to a later time with the same or lower pricing.
+To extend the current rental contracts for all clients on a given machine, change the offer end date to a later time with the same or lower pricing.
 
-If you have raised the pricing, you cannot extend the current contract.
+If you have raised the pricing, you cannot extend the current rental contracts.
 
 ## Testing your own machine
 
@@ -287,9 +316,11 @@ You can then look at your [instance tab](https://cloud.vast.ai/instances/) to ma
 
 ## Maintenance
 
-The proper way to perform maintenance on your machine is to wait until all active contracts have expired or the machine is vacant.
+The proper way to perform maintenance on your machine is to wait until all active rental contracts have ended or the machine has no running instances.
 
-Unlisting will prevent new contracts from starting on the machine. However if you have a current client rental, you could set the end date to the client end date to allow for other clients to create instances on that machine that expire at the same date. Once the end date is reached, you can then unlist the machine and then perform maintenance.
+Unlisting the offer will prevent new rental contracts from being created, but does not affect existing ones. However if you have active rental contracts, you could set the offer end date to match the latest rental end date, allowing new clients to rent instances that end at the same date. Once the end date is reached, you can then unlist the machine and then perform maintenance.
+
+Remember that a single machine may have multiple active rental contracts from different clients, each with its own rental end date. All rental contracts must be honored — you cannot take the machine offline until every active rental contract has ended.
 
 For unplanned or unscheduled maintenance, use the CLI and the schedule maint command. That will notify the client that you **have** to take the machine down and that they should save their work. You can specify a date and duration.
 
@@ -335,9 +366,9 @@ For help with machine setup, specific questions about hardware, and for errors o
 
 You won't be able to see it on the GUI right away, but you can search using the [CLI](/documentation/instances/managing-instances).
 
-### Can I send a message to a customer using my machine letting them know that I fixed an issue that they were having?
+### Can I send a message to a client using my machine letting them know that I fixed an issue that they were having?
 
-No, there is not an established process for hosts to message customers on Vast.
+No, there is not an established process for hosts to message clients on Vast.
 
 ### I fear I will decrease my reliability from restarting my machine and potentially lose my verification.
 
