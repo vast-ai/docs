@@ -1,0 +1,250 @@
+---
+title: Docker Execution Environment
+sidebarTitle: Docker Execution Environment
+description: "Learn how Vast.ai Docker instances handle resource allocation, environment variables, networking, ports, and CLI usage."
+"canonical": "/documentation/instances/docker-environment"
+---
+
+<script type="application/ld+json" dangerouslySetInnerHTML={{
+  __html: JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "Complete Guide to Running Docker Containers on Vast.ai",
+    "description": "Comprehensive technical guide to running Docker instances on Vast.ai including resource allocation, environment variables, networking, port configuration, and using the CLI from inside containers.",
+    "author": {
+      "@type": "Organization",
+      "name": "Vast.ai"
+    },
+    "articleSection": "Docker Container Documentation",
+    "keywords": ["Docker", "Docker Execution Environment", "container", "GPU", "CUDA", "environment variables", "networking", "vast.ai"]
+  })
+}} />
+
+Vast.ai instances run as Linux Docker containers. Your [template](/documentation/templates/introduction) (or CLI command) controls most of the parameters to the underlying `docker create` call, while resource constraints are configured automatically by the platform.
+
+## Resource Allocation
+
+Vast.ai automatically configures resource allocation for your instance based on your GPU allocation.
+
+### GPU
+
+Each running instance has access to one or more GPUs. GPUs are exclusive resources — they are never shared between multiple users at the same time. Each instance has exclusive access to its assigned GPUs while running. Stopped instances have no GPU reservation.
+
+### CPU
+
+Each instance is allocated baseline CPU power proportional to its fraction of attached GPUs out of the total machine capacity. For example, a 1-GPU instance on a 4-GPU machine gets 25% of CPU baseline.
+
+<Note>
+Instances can burst above their CPU allocation while there are extra CPU cycles available, but during contention only the baseline is reserved.
+</Note>
+
+### RAM
+
+System RAM is allocated similarly to CPU — each instance gets a fraction proportional to its share of attached GPUs.
+
+<Warning>
+Instances can temporarily use additional RAM above their allocation when free RAM is available, but doing so risks having processes killed by the OOM (Out of Memory) killer when free system RAM becomes scarce. Keep your RAM usage within your allocated baseline to avoid unexpected process termination.
+</Warning>
+
+### Disk
+
+Each instance has a disk storage allocation reserved at creation time. **This allocation is static and cannot be changed after creation**, so make sure to size your disk correctly when you create your instance.
+
+### Shared Memory
+
+Shared memory resources (such as `/dev/shm`, controlled by the `shm-size` parameter) are assigned automatically in proportion to your GPU fraction via the underlying cgroup resource configuration.
+
+## Launch Modes
+
+Vast.ai supports three launch modes: **Entrypoint**, **SSH**, and **Jupyter**. For full details, see [Connection Methods](/documentation/instances/connect/overview).
+
+The SSH and Jupyter launch modes inject setup scripts into your existing Docker image, which means your image's original entrypoint is replaced. If your Docker image uses an entrypoint script, you'll typically want to copy that entrypoint command into your **onstart** script.
+
+<Tip>
+If you run into obscure loading errors with SSH or Jupyter launch modes on a custom image, try the simpler Entrypoint launch mode and set up SSH or Jupyter yourself.
+</Tip>
+
+## Docker Create Options
+
+You can set three types of `docker create` / `docker run` options in the GUI and CLI:
+
+| Option | Example | Description |
+|---|---|---|
+| **Environment variables** | `-e JUPYTER_DIR=/ -e TEST=OK` | Set environment variables inside the container |
+| **Hostname** | `-h billybob` | Set the container hostname |
+| **Ports** | `-p 8081:8081 -p 8082:8082/udp` | Expose additional ports |
+
+## Environment Variables
+
+Use the `-e` flag in the docker options to set environment variables. For example, to set `TZ` to UTC and `TASKID` to "TEST":
+
+```bash
+-e TZ=UTC -e TASKID="TEST"
+```
+
+Any environment variables you set are visible to your onstart script (or your entrypoint in Entrypoint launch mode).
+
+<Warning>
+When using SSH or Jupyter launch modes, your custom environment variables are **not** visible inside SSH/tmux/Jupyter sessions by default. To make them accessible, export them to `/etc/environment` from your onstart script.  
+
+This is handled automatically in the entrypoint of images published by Vast.ai
+</Warning>
+
+To export all environment variables containing an underscore:
+
+```bash
+env | grep _ >> /etc/environment;
+```
+
+Or to export all environment variables:
+
+```bash
+env >> /etc/environment;
+```
+
+### User Account Variables
+
+You can set environment variables in your [Account Settings](https://cloud.vast.ai/account/) that will automatically be injected into every container you launch.
+
+### UI Control Variables
+
+These special environment variables control elements in the Vast.ai interface:
+
+| Variable | Purpose | Example |
+|---|---|---|
+| `OPEN_BUTTON_PORT` | Maps the **Open** button to a specific internal port | `-e OPEN_BUTTON_PORT=7860` |
+| `JUPYTER_PORT` | Maps the **Jupyter** button to a specific internal port | `-e JUPYTER_PORT=8081` |
+| `JUPYTER_TOKEN` | Sets the token used by the **Jupyter** button | `-e JUPYTER_TOKEN=mytoken` |
+| `DATA_DIRECTORY` | Default source/destination directory for data copy operations | `-e DATA_DIRECTORY=/data` |
+
+### Predefined Variables
+
+Vast.ai automatically sets these environment variables in every instance:
+
+| Variable | Description |
+|---|---|
+| `CONTAINER_API_KEY` | Per-instance API key for CLI commands from inside the container |
+| `CONTAINER_ID` | The unique ID of your instance |
+| `DATA_DIRECTORY` | Default location for data copy operations |
+| `GPU_COUNT` | Number of GPU devices available |
+| `PUBLIC_IPADDR` | The instance's public IP address (see note below) |
+| `SSH_PUBLIC_KEY` | Your SSH public key from your account page |
+| `PYTORCH_VERSION` | The PyTorch version (if applicable) |
+| `JUPYTER_TOKEN` | The Jupyter access token |
+| `JUPYTER_SERVER_ROOT` | Root directory for Jupyter (cannot navigate above this) |
+| `JUPYTER_SERVER_URL` | Configured Jupyter server URL (usually `https://0.0.0.0:8080/`) |
+| `VAST_CONTAINERLABEL` | Unique name/ID of your instance |
+
+<Note>
+`PUBLIC_IPADDR` is set at instance startup and is **not** automatically updated if the instance's IP address changes. If your instance has a dynamic IP, you can fetch the current address programmatically using the per-instance API key:
+
+```bash
+vastai show instance $CONTAINER_ID --api-key $CONTAINER_API_KEY
+```
+</Note>
+
+### Port Variables
+
+For each port mapping, the system creates a corresponding environment variable:
+
+| Variable | Description |
+|---|---|
+| `VAST_TCP_PORT_22` | External public TCP port mapped to internal port 22 (SSH) |
+| `VAST_TCP_PORT_8080` | External public TCP port mapped to internal port 8080 (Jupyter) |
+| `VAST_TCP_PORT_X` | External public TCP port mapped to internal port X |
+| `VAST_UDP_PORT_X` | External public UDP port mapped to internal port X |
+
+You can also use ports 70000 and above for identity port mappings — see [Identity Ports](#identity-ports) below.
+
+## Networking
+
+Vast.ai Docker instances have full internet access but generally do not have unique IP addresses. Instances can have public open ports, but because IP addresses are shared across machines and instances, external ports are assigned somewhat randomly.
+
+Each instance gets a fraction of a public IP address based on a subset of ports. Each open internal port (such as 22 or 8080) is mapped to a **random** external port on the machine's shared public IP address.
+
+For detailed networking information, see [Networking & Ports](/documentation/instances/connect/networking).
+
+### Custom Ports
+
+<Note>
+There is a limit of 64 total open ports per instance.
+</Note>
+
+Any `EXPOSE` commands in your Docker image are automatically mapped to port requests. You can also open custom ports using `-p` arguments in the docker options:
+
+```bash
+-p 8081:8081 -p 8082:8082/udp
+```
+
+These are in addition to ports exposed through `EXPOSE` commands and the default ports (22 for SSH, 8080 for Jupyter).
+
+After the instance has loaded, find your mapped ports by opening the **IP Port Info** pop-up from the instance panel. The format is `PUBLIC_IP -> INTERNAL_PORT`:
+
+```text
+65.130.162.74:33526 -> 8081/tcp
+```
+
+In this case, `65.130.162.74:33526` provides access to anything running on port 8081 inside the instance.
+
+### Testing Ports
+
+You can quickly verify your port mapping by starting a minimal web server inside the instance:
+
+```bash
+python -m http.server 8081
+```
+
+Then access the corresponding external address in your browser — you should see a file directory listing.
+
+### Identity Ports
+
+If you need the external and internal ports to match (for example, `32001:32001`), use an out-of-range port above 70000:
+
+```bash
+-p 70000:70000 -p 70001:70001
+```
+
+These requests map to random external ports with matching internal ports. Find the resulting port with the corresponding environment variable: `$VAST_TCP_PORT_70000`.
+
+## Using the CLI from Inside an Instance
+
+Each instance comes with a per-instance API key stored in the `CONTAINER_API_KEY` environment variable, allowing you to run CLI commands from within the container.
+
+If the Vast.ai CLI isn't already installed, install it with pip:
+
+```bash
+pip install vastai
+```
+
+Test it by starting the instance (a no-op since it's already running):
+
+```bash
+vastai start instance $CONTAINER_ID
+```
+
+If the API key isn't automatically configured, specify it explicitly:
+
+```bash
+vastai start instance $CONTAINER_ID --api-key $CONTAINER_API_KEY
+```
+
+You can also stop or destroy the instance from within:
+
+```bash
+vastai stop instance $CONTAINER_ID
+vastai destroy instance $CONTAINER_ID
+```
+
+<Note>
+If `$CONTAINER_ID` or `$CONTAINER_API_KEY` is not defined, check your environment variables with the `env` command. If you're in an SSH session and the predefined variables are missing, you may need to export them to `/etc/environment` — see the [Environment Variables](#environment-variables) section above.
+</Note>
+
+If the instance API key is missing for any reason, you can regenerate it:
+
+```bash
+cat ~/.ssh/authorized_keys | md5sum | awk '{print $1}' > ssh_key_hv
+echo -n $VAST_CONTAINERLABEL | md5sum | awk '{print $1}' > instance_id_hv
+head -c -1 -q ssh_key_hv instance_id_hv > ~/.vast_api_key
+```
+
+After regeneration, CLI commands should work without passing the key explicitly.
