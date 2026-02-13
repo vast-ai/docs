@@ -23,17 +23,43 @@ Some omit `error` and return only `msg` or `message`.
 
 ### How rate limits work
 
-Vast.ai enforces rate limits at multiple levels to ensure fair platform usage:
+Vast.ai enforces rate limits using a **token bucket** model at multiple levels:
 
 1. **Infrastructure level (per IP)**: protects against high-volume traffic before it reaches the API.
-2. **Account level (per API key)**: a shared request budget across all endpoints for your account.
-3. **Endpoint level (per endpoint and method)**: individual limits for each API endpoint and HTTP method.
+2. **Account level (per API key)**: a global token bucket shared across all endpoints for your account, enforced via Redis.
+3. **Endpoint level (per endpoint and method)**: an independent token bucket for each API endpoint and HTTP method combination.
+
+### Token bucket model
+
+Each rate limit is defined by a token bucket with these parameters:
+
+- **`max_tokens`** (capacity): the maximum number of tokens the bucket can hold. This is your burst allowance — how many requests you can make in rapid succession before being throttled.
+- **`token_refresh_rate`** (tokens/sec): how quickly tokens refill. A rate of `2.0` means you regain 2 tokens per second.
+- **`penalty_tokens`**: extra tokens deducted when a request is rejected (429). This pushes the bucket into "debt," requiring additional recovery time before the next request is accepted.
+
+**How it works:**
+
+1. Each request consumes **1 token** from the bucket.
+2. Tokens refill continuously at the configured `token_refresh_rate`, up to `max_tokens`.
+3. If fewer than 1 token is available, the request is rejected with **HTTP 429**.
+4. On rejection, `penalty_tokens` (if configured) push the bucket into negative balance, extending the cooldown period.
+
+For example, an endpoint configured with `max_tokens=5` and `token_refresh_rate=1.0` allows a burst of 5 rapid requests, then sustains 1 request/second thereafter.
+
+### Two-tier enforcement
+
+Rate limits are enforced at two tiers that work together:
+
+- **Local (in-process)**: each API server process maintains its own token buckets. This handles per-endpoint limits with zero network overhead.
+- **Global (Redis)**: a shared token bucket across all server processes, enforced via a Redis lease mechanism. Local processes lease tokens from Redis in small batches to minimize round-trips while maintaining a consistent global budget.
+
+The response headers always reflect the **most restrictive** constraint between the two tiers.
 
 ### Identity and scope
 
 - Rate limits are tracked per API key. If no key is provided, your client IP is used instead.
-- Each endpoint and HTTP method combination (e.g., `GET /api/v0/instances/` vs `PUT /api/v0/instances/{id}/`) has its own limit.
-- Some endpoints enforce a minimum interval between requests; others use a burst-style limit (max requests in a time window).
+- Each endpoint and HTTP method combination (e.g., `GET /api/v0/instances/` vs `PUT /api/v0/instances/{id}/`) has its own independent token bucket.
+- Rate limit policies are configurable per endpoint, per permission group, or globally via a wildcard.
 
 ### Response headers
 
@@ -48,30 +74,42 @@ If multiple rate-limit layers apply, headers represent the **most restrictive** 
 
 ### 429 response behavior
 
-When you hit a rate limit, you receive **HTTP 429**. The response body is often plain text (and in some cases JSON) with messages such as:
+When you hit a rate limit, you receive **HTTP 429** with a JSON body:
 
-```
-API requests too frequent
+```json
+{
+  "error": "HTTPTooManyRequests",
+  "msg": "API requests too frequent",
+  "retry_after": 3,
+  "limit": 5,
+  "remaining": 0
+}
 ```
 
-or
+- **`retry_after`**: seconds to wait before retrying (matches the `Retry-After` header).
+- **`limit`**: the bucket's `max_tokens` capacity.
+- **`remaining`**: tokens remaining (always `0` on a 429).
 
-```
-API requests too frequent: endpoint threshold=...
-```
+If `penalty_tokens` are configured for the endpoint, repeated 429 responses will increase `retry_after` as the bucket accrues debt.
 
 ### Probabilistic output model
 
-The limiter itself is deterministic per request timeline, but if request arrivals are modeled as a random process (Poisson rate `r` requests/second), a useful approximation for threshold-style limits is:
+The token bucket limiter is deterministic per request timeline, but if request arrivals are modeled as a random process (Poisson rate `r` requests/second), a useful approximation is:
 
-`P(429) = 1 - exp(-r * T)`
+**Single-token bucket** (`max_tokens=1`, refresh rate `R` tokens/sec):
 
-Where `T` is the threshold in seconds.
+`P(429) = 1 - exp(-r / R)`
+
+This is equivalent to the threshold model where `T = 1/R`.
+
+**Burst-capable bucket** (`max_tokens=B`, refresh rate `R` tokens/sec):
+
+For sustained traffic at rate `r > R`, the probability of rejection approaches 1 after the initial burst of `B` tokens is consumed. For `r <= R`, the bucket stays full and `P(429) ≈ 0`.
 
 ![Modeled probability of rate-limit responses by request rate and threshold](/images/api-rate-limit-probabilistic-output.svg)
 
 <Note>
-This graph is a statistical model to help plan client-side pacing. Actual outcomes depend on real request timing, burst shape, and which limit layer binds first.
+This graph models single-token buckets (the most common configuration). For burst-capable buckets, the initial burst absorbs spikes before the sustained rate takes effect. Actual outcomes depend on real request timing, burst shape, penalty debt, and which limit tier (local or global) binds first.
 </Note>
 
 ### Chart data used
@@ -85,11 +123,11 @@ CSV details:
 - Request-rate domain: `0.000` to `5.000` requests/second
 - Step size: `0.025` requests/second
 - Rows: 201 points (plus header)
-- Curves: `T = 0.5s`, `1s`, `2s`, `5s`
+- Curves: `R = 2.0` (`T=0.5s`), `R = 1.0` (`T=1s`), `R = 0.5` (`T=2s`), `R = 0.2` (`T=5s`)
 
 Representative points from the plotted data:
 
-| Request rate `r` (req/s) | `P(429)` at `T=0.5s` | `P(429)` at `T=1s` | `P(429)` at `T=2s` | `P(429)` at `T=5s` |
+| Request rate `r` (req/s) | `P(429)` at `R=2.0` | `P(429)` at `R=1.0` | `P(429)` at `R=0.5` | `P(429)` at `R=0.2` |
 | ---: | ---: | ---: | ---: | ---: |
 | 0.0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
 | 0.5 | 0.2212 | 0.3935 | 0.6321 | 0.9179 |
