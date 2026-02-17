@@ -2,7 +2,7 @@
 title: "Rate Limits and Errors"
 ---
 
-This page describes how Vast.ai public API errors and rate limits work, along with practical retry guidance.
+This page describes how Vast.ai API errors and rate limits currently work, with practical retry guidance.
 
 ## Error Responses
 
@@ -21,35 +21,137 @@ Some omit `error` and return only `msg` or `message`.
 
 ## Rate Limits
 
-### How rate limits are applied
+### How rate limits work
 
-Vast.ai applies rate limits **per endpoint** and **per identity**. This is enforced as a minimum interval between requests for a given endpoint and identity.
+Vast.ai enforces rate limits using a **token bucket** model at multiple levels:
 
-The identity is determined by: bearer token + session user + `api_key` query param + client IP.
+1. **Infrastructure level (per IP)**: protects against high-volume traffic before it reaches the API.
+2. **Account level (per API key)**: a global token bucket shared across all endpoints for your account, enforced via Redis.
+3. **Endpoint level (per endpoint and method)**: an independent token bucket for each API endpoint and HTTP method combination.
 
-Some endpoints also use **method-specific** limits (GET vs POST) and/or **max-calls-per-period** limits for short bursts.
+### Token bucket model
 
+Each rate limit is defined by a token bucket with these parameters:
 
-### Rate limit response behavior
+- **`max_tokens`** (capacity): the maximum number of tokens the bucket can hold. This is your burst allowance — how many requests you can make in rapid succession before being throttled.
+- **`token_refresh_rate`** (tokens/sec): how quickly tokens refill. A rate of `2.0` means you regain 2 tokens per second.
+- **`penalty_tokens`**: extra tokens deducted when a request is rejected (429). This pushes the bucket into "debt," requiring additional recovery time before the next request is accepted.
 
-When you hit a rate limit, you will receive **HTTP 429**. The response body is often plain text (in certain cases JSON with `success`/`error`/`msg` like above) with one of the following messages:
+**How it works:**
 
+1. Each request consumes **1 token** from the bucket.
+2. Tokens refill continuously at the configured `token_refresh_rate`, up to `max_tokens`.
+3. If fewer than 1 token is available, the request is rejected with **HTTP 429**.
+4. On rejection, `penalty_tokens` (if configured) push the bucket into negative balance, extending the cooldown period.
+
+For example, an endpoint configured with `max_tokens=5` and `token_refresh_rate=1.0` allows a burst of 5 rapid requests, then sustains 1 request/second thereafter.
+
+### Two-tier enforcement
+
+Rate limits are enforced at two tiers that work together:
+
+- **Local (in-process)**: each API server process maintains its own token buckets. This handles per-endpoint limits with zero network overhead.
+- **Global (Redis)**: a shared token bucket across all server processes, enforced via a Redis lease mechanism. Local processes lease tokens from Redis in small batches to minimize round-trips while maintaining a consistent global budget.
+
+The response headers always reflect the **most restrictive** constraint between the two tiers.
+
+### Identity and scope
+
+- Rate limits are tracked per API key. If no key is provided, your client IP is used instead.
+- Each endpoint and HTTP method combination (e.g., `GET /api/v0/instances/` vs `PUT /api/v0/instances/{id}/`) has its own independent token bucket.
+- Rate limit policies are configurable per endpoint, per permission group, or globally via a wildcard.
+
+### Response headers
+
+For responses where rate-limiting logic is evaluated, the API includes:
+
+- `X-RateLimit-Limit`
+- `X-RateLimit-Remaining`
+- `X-RateLimit-Reset`
+- `Retry-After` (on `429` responses)
+
+If multiple rate-limit layers apply, headers represent the **most restrictive** active constraint.
+
+### 429 response behavior
+
+When you hit a rate limit, you receive **HTTP 429** with a JSON body:
+
+```json
+{
+  "error": "HTTPTooManyRequests",
+  "msg": "API requests too frequent",
+  "retry_after": 3,
+  "limit": 5,
+  "remaining": 0
+}
 ```
-API requests too frequent
-```
 
-or
+- **`retry_after`**: seconds to wait before retrying (matches the `Retry-After` header).
+- **`limit`**: the bucket's `max_tokens` capacity.
+- **`remaining`**: tokens remaining (always `0` on a 429).
 
-```
-API requests too frequent: endpoint threshold=...
-```
+If `penalty_tokens` are configured for the endpoint, repeated 429 responses will increase `retry_after` as the bucket accrues debt.
 
-The API does not currently set standard rate-limit headers (for example `Retry-After`), so clients should apply their own backoff strategy.
+### Probabilistic output model
+
+The token bucket limiter is deterministic per request timeline, but if request arrivals are modeled as a random process (Poisson rate `r` requests/second), a useful approximation is:
+
+**Single-token bucket** (`max_tokens=1`, refresh rate `R` tokens/sec):
+
+`P(429) = 1 - exp(-r / R)`
+
+This is equivalent to the threshold model where `T = 1/R`.
+
+**Burst-capable bucket** (`max_tokens=B`, refresh rate `R` tokens/sec):
+
+For sustained traffic at rate `r > R`, the probability of rejection approaches 1 after the initial burst of `B` tokens is consumed. For `r <= R`, the bucket stays full and `P(429) ≈ 0`.
+
+![Modeled probability of rate-limit responses by request rate and threshold](/images/api-rate-limit-probabilistic-output.svg)
+
+<Note>
+This graph models single-token buckets (the most common configuration). For burst-capable buckets, the initial burst absorbs spikes before the sustained rate takes effect. Actual outcomes depend on real request timing, burst shape, penalty debt, and which limit tier (local or global) binds first.
+</Note>
+
+### Chart data used
+
+The exact plotted data points are available here:
+
+- [api-rate-limit-probabilistic-output-data.csv](/images/api-rate-limit-probabilistic-output-data.csv)
+
+CSV details:
+
+- Request-rate domain: `0.000` to `5.000` requests/second
+- Step size: `0.025` requests/second
+- Rows: 201 points (plus header)
+- Curves: `R = 2.0` (`T=0.5s`), `R = 1.0` (`T=1s`), `R = 0.5` (`T=2s`), `R = 0.2` (`T=5s`)
+
+Representative points from the plotted data:
+
+| Request rate `r` (req/s) | `P(429)` at `R=2.0` | `P(429)` at `R=1.0` | `P(429)` at `R=0.5` | `P(429)` at `R=0.2` |
+| ---: | ---: | ---: | ---: | ---: |
+| 0.0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| 0.5 | 0.2212 | 0.3935 | 0.6321 | 0.9179 |
+| 1.0 | 0.3935 | 0.6321 | 0.8647 | 0.9933 |
+| 1.5 | 0.5276 | 0.7769 | 0.9502 | 0.9994 |
+| 2.0 | 0.6321 | 0.8647 | 0.9817 | 1.0000 |
+| 2.5 | 0.7135 | 0.9179 | 0.9933 | 1.0000 |
+| 3.0 | 0.7769 | 0.9502 | 0.9975 | 1.0000 |
+| 3.5 | 0.8262 | 0.9698 | 0.9991 | 1.0000 |
+| 4.0 | 0.8647 | 0.9817 | 0.9997 | 1.0000 |
+| 4.5 | 0.8946 | 0.9889 | 0.9999 | 1.0000 |
+| 5.0 | 0.9179 | 0.9933 | 1.0000 | 1.0000 |
+
+### Endpoint/method limit data
+
+Per-endpoint rate limit data is documented here:
+
+- [Rate Limits by Endpoint and Method](/api-reference/rate-limit-endpoint-method-data)
 
 ### How to reduce rate limit errors
 
 - **Batch requests** where supported, rather than calling many single-item endpoints.
 - **Reduce polling**: use longer polling intervals, or cache results client-side.
 - **Spread traffic** over time: avoid bursts; use a queue or scheduler.
+- **Honor headers**: use `Retry-After` and `X-RateLimit-Reset` to pace retries.
 
 If you need higher limits for legitimate production usage, contact support with the endpoint(s), your expected call rate, and your account details.

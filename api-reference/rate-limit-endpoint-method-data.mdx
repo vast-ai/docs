@@ -1,0 +1,41 @@
+---
+title: "Rate Limits by Endpoint and Method"
+---
+
+Vast.ai enforces rate limits per endpoint and method using a **token bucket** model. These limits apply per API key (or per IP if no key is provided).
+
+Each endpoint has an independent token bucket defined by:
+
+- **Max tokens** (burst capacity): how many requests you can make in rapid succession.
+- **Refresh rate** (tokens/sec): how quickly tokens refill — this is your sustained request rate.
+- **Penalty tokens**: extra tokens deducted on a 429 rejection, extending recovery time.
+
+<Note>
+These values reflect current defaults and may change. Always check the `Retry-After` and `X-RateLimit-Reset` response headers for the most accurate pacing.
+</Note>
+
+## Example rate limits
+
+The table below shows representative limits across common endpoint categories:
+
+| Endpoint | Method | Max Tokens | Refresh Rate (tok/s) | Sustained Req/min | Penalty Tokens |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `/api/v0/instances/` | `GET` | 1 | 0.50 | 30 | 0 |
+| `/api/v0/instances/{id}/` | `PUT` | 1 | 1.00 | 60 | 0 |
+| `/api/v0/instances/{id}/` | `DELETE` | 1 | 0.33 | 20 | 0 |
+| `/api/v0/machines/` | `GET` | 1 | 0.40 | 24 | 0 |
+| `/api/v0/volumes/` | `GET` | 1 | 0.50 | 30 | 0 |
+| `/api/v0/template/` | `GET` | 1 | 0.53 | 31 | 0 |
+| `/api/v0/ssh/` | `GET` | 1 | 1.00 | 60 | 0 |
+| `/api/v0/invoices` | `GET` | 1 | 0.33 | 20 | 0 |
+| `/api/v0/secrets/` | `GET` | 1 | 0.20 | 12 | 0 |
+| `/api/v0/workergroups/` | `GET` | 1 | 0.50 | 30 | 0 |
+
+**Reading the table:**
+
+- **Max Tokens = 1** means no burst allowance — each request must wait for a token to refill. This is the most common configuration.
+- **Refresh Rate** is the inverse of the old threshold value (e.g., a 2s threshold becomes `0.50` tokens/sec).
+- **Sustained Req/min** is `refresh_rate * 60` — the maximum throughput if you pace requests evenly.
+- **Penalty Tokens = 0** means no extra cost on rejection. When configured, penalties push the bucket into debt, increasing `Retry-After` on subsequent 429s.
+
+Write-heavy operations (create, update, delete) generally have stricter limits than read operations. If you need higher limits for production usage, contact support with your account details and expected call rates.
