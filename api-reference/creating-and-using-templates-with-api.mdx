@@ -61,15 +61,15 @@ When creating a template, the following fields can be configured:
 | `env` | string | Environment variables and port mappings in Docker flag format (e.g., `"-e VAR=val -p 8000:8000"`) |
 | `onstart` | string | Shell commands to run when instance starts |
 | `runtype` | string | Launch mode: `ssh`, `jupyter`, or `args`. Defaults to `args` |
-| `args_str` | string | Arguments string passed to the container entrypoint |
+| `args_str` | string | Replaces the image's Docker `CMD`. If the image defines an `ENTRYPOINT`, this is passed as arguments to it |
 | `ssh_direct` | boolean | Enable direct SSH connection (recommended with `runtype: "ssh"`) |
 | `use_ssh` | boolean | Enable SSH access |
 | `jup_direct` | boolean | Enable direct Jupyter connection |
 | `jupyter_dir` | string | Directory to launch Jupyter from |
 | `use_jupyter_lab` | boolean | Use JupyterLab instead of Jupyter Notebook |
-| `docker_login_repo` | string | Private Docker registry URL |
-| `docker_login_user` | string | Username for private registry |
-| `docker_login_pass` | string | Access token for private registry |
+| `docker_login_repo` | string | **Required** (use `""` if not needed). Private Docker registry URL |
+| `docker_login_user` | string | **Required** (use `""` if not needed). Username for private registry |
+| `docker_login_pass` | string | **Required** (use `""` if not needed). Access token for private registry |
 | `href` | string | Link to Docker Hub or image documentation |
 | `repo` | string | Repository identifier (e.g., `library/ubuntu`) |
 | `extra_filters` | object | Default machine search filters (e.g., `{"cuda_max_good": {"gte": 12.6}}`) |
@@ -98,25 +98,32 @@ When you create an instance with both a template and additional parameters, the 
 | Field Type | Behavior |
 |------------|----------|
 | **Scalar fields** (image, disk, runtype, etc.) | Request value **overrides** template value |
-| **`env`** (string) | **Merged**. Template values retained, request values appended. Conflicting keys use request value |
+| **`env`** (dict) | **Merged**. Template values retained, request values added. Conflicting keys use request value |
 | **`extra_filters`** (dict) | **Merged** by key. Request values win on conflicts |
 
 ### Example: Environment Variables
 
-The `env` field uses Docker flag format as a string. When you provide `env` in your request, it is merged with the template's `env` - existing values are retained and new values are appended.
+When creating an instance, the `env` field is passed as a JSON object (dict). When you provide `env` in your request, it is merged with the template's `env` — existing values are retained and new values are added.
 
-**Template configuration:**
+<Note>
+Templates store `env` as a Docker flag string (e.g., `"-e VAR=val -p 8000:8000"`), but instance creation uses a dict format. The API handles the conversion automatically when merging.
+</Note>
+
+**Template configuration** (string format):
 ```json
 {
   "env": "-e MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-8B -e MAX_TOKENS=4096"
 }
 ```
 
-**Instance creation request:**
+**Instance creation request** (dict format):
 ```json
 {
   "template_hash_id": "4e17788f74f075dd9aab7d0d4427968f",
-  "env": "-e MODEL_ID=mistralai/Mistral-7B-v0.1 -e HF_TOKEN=hf_xxx"
+  "env": {
+    "MODEL_ID": "mistralai/Mistral-7B-v0.1",
+    "HF_TOKEN": "hf_xxx"
+  }
 }
 ```
 
@@ -231,6 +238,9 @@ curl -X POST "https://console.vast.ai/api/v0/template/" \
     "runtype": "ssh",
     "ssh_direct": true,
     "use_ssh": true,
+    "docker_login_repo": "",
+    "docker_login_user": "",
+    "docker_login_pass": "",
     "recommended_disk_space": 50,
     "private": true
   }'
@@ -257,6 +267,9 @@ response = requests.post(
         "runtype": "ssh",
         "ssh_direct": True,
         "use_ssh": True,
+        "docker_login_repo": "",
+        "docker_login_user": "",
+        "docker_login_pass": "",
         "recommended_disk_space": 50,
         "private": True
     }
@@ -460,7 +473,7 @@ print(f"Instance ID: {result.get('new_contract')}")
 
 ### Override Environment Variables
 
-Replace template environment variables with new values.
+Override template environment variables with new values. Instance creation uses the dict format for `env`.
 
 <CodeGroup>
 
@@ -470,7 +483,7 @@ curl -X PUT "https://console.vast.ai/api/v0/asks/12345678/" \
   -H "Content-Type: application/json" \
   -d '{
     "template_hash_id": "4e17788f74f075dd9aab7d0d4427968f",
-    "env": "-e MODEL_ID=mistralai/Mistral-7B-Instruct-v0.2 -e HF_TOKEN=hf_xxxYourTokenHere -p 8000:8000"
+    "env": {"MODEL_ID": "mistralai/Mistral-7B-Instruct-v0.2", "HF_TOKEN": "hf_xxxYourTokenHere", "-p 8000:8000": "1"}
   }'
 ```
 
@@ -488,7 +501,11 @@ response = requests.put(
     },
     json={
         "template_hash_id": "4e17788f74f075dd9aab7d0d4427968f",
-        "env": "-e MODEL_ID=mistralai/Mistral-7B-Instruct-v0.2 -e HF_TOKEN=hf_xxxYourTokenHere -p 8000:8000"
+        "env": {
+            "MODEL_ID": "mistralai/Mistral-7B-Instruct-v0.2",
+            "HF_TOKEN": "hf_xxxYourTokenHere",
+            "-p 8000:8000": "1"
+        }
     }
 )
 
@@ -640,13 +657,13 @@ The `runtype` field controls the launch mode of your instance:
 
 | Runtype | Description |
 |---------|-------------|
-| `args` | Default. Container runs with arguments from `args_str` |
+| `args` | Default. `args_str` replaces the image's `CMD` and is passed to its `ENTRYPOINT` if one is defined |
 | `ssh` | SSH access enabled. **Recommended** with `ssh_direct: true` |
 | `jupyter` | Jupyter notebook/lab access |
 
 **Recommendation**: Use `runtype: "ssh"` with `ssh_direct: true` and `use_ssh: true` for reliable SSH access to your instances.
 
-The `args_str` field is used when `runtype` is `args` to pass arguments to the container entrypoint:
+The `args_str` field is used when `runtype` is `args`. It replaces the image's Docker `CMD` — if the image defines an `ENTRYPOINT`, `args_str` is passed as arguments to it. If the image has no `ENTRYPOINT` (only `CMD`), `args_str` replaces the command entirely.
 
 ```json
 {
@@ -672,17 +689,21 @@ The `args_str` field is used when `runtype` is `args` to pass arguments to the c
   </Accordion>
 
   <Accordion title="My environment variable didn't apply">
-    The `env` field is a string using Docker flag format, not a JSON object. If your variable isn't appearing:
-    - Use the format: `"-e VAR1=value1 -e VAR2=value2"`
-    - Include port mappings with `-p`: `"-e VAR=val -p 8000:8000"`
-    - Request `env` is merged with template `env` - existing keys are overwritten, new keys are appended
+    Template creation and instance creation use **different formats** for the `env` field:
+    - **Templates**: Docker flag string format — `"-e VAR1=value1 -e VAR2=value2 -p 8000:8000"`
+    - **Instance creation**: Dict format — `{"VAR1": "value1", "VAR2": "value2", "-p 8000:8000": "1"}`
+
+    When creating an instance with a template, the request `env` (dict) is merged with the template `env` — existing keys are overwritten, new keys are added.
   </Accordion>
 
   <Accordion title="Ports aren't open on my instance">
-    Port mappings are specified in the `env` string using Docker's `-p` flag:
+    When creating instances, port mappings are specified in the `env` dict using the `-p` syntax as keys:
     ```json
     {
-      "env": "-p 8000:8000 -p 8080:8080"
+      "env": {
+        "-p 8000:8000": "1",
+        "-p 8080:8080": "1"
+      }
     }
     ```
     For SSH access, use `runtype: "ssh"` with `ssh_direct: true`.
