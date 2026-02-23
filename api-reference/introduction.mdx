@@ -3,6 +3,10 @@ title: "API Hello World"
 sidebarTitle: "Hello World"
 ---
 
+<Warning>
+**The raw REST API is intended for advanced users only.** These endpoints offer maximum flexibility but require you to manage all aspects of integration yourself. Most users will have a significantly better experience using the [CLI](/cli/get-started) or the [Python SDK](/sdk/python/quickstart), which handle these details for you. **If you are not sure whether you need direct API access, you almost certainly don't** — start with the CLI or SDK instead.
+</Warning>
+
 The Vast.ai REST API gives you programmatic control over GPU instances — useful for automation, CI/CD pipelines, or building your own tooling on top of Vast.
 
 This guide walks through the complete instance lifecycle: authenticate, search for a GPU, rent it, wait for it to boot, connect to it, and clean up. By the end you'll understand the core API calls needed to manage instances without touching the web console.
@@ -11,6 +15,7 @@ This guide walks through the complete instance lifecycle: authenticate, search f
 
 - A Vast.ai account with credit (~$0.01–0.05, depending on test instance run time)
 - `curl` installed
+- `python3` with the `requests` library (for the Python examples)
 
 ## 1. Get Your API Key
 
@@ -26,10 +31,24 @@ export VAST_API_KEY="your-api-key-here"
 
 Confirm your key works by listing your current instances. If you have none, this returns an empty list.
 
-```bash
+<CodeGroup>
+```bash cURL
 curl -s -H "Authorization: Bearer $VAST_API_KEY" \
   "https://console.vast.ai/api/v0/instances/"
 ```
+
+```python Python
+import os
+import requests
+
+VAST_API_KEY = os.environ["VAST_API_KEY"]
+BASE_URL = "https://console.vast.ai/api/v0"
+headers = {"Authorization": f"Bearer {VAST_API_KEY}"}
+
+resp = requests.get(f"{BASE_URL}/instances/", headers=headers)
+print(resp.json())
+```
+</CodeGroup>
 
 ```json
 {
@@ -46,7 +65,8 @@ If you get a `401` or `403`, double-check your API key. If you already have inst
 
 Find available machines using the bundles endpoint. This query returns the top 5 on-demand RTX 4090s sorted by deep learning performance benchmarked per dollar:
 
-```bash
+<CodeGroup>
+```bash cURL
 curl -s -H "Authorization: Bearer $VAST_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -61,6 +81,25 @@ curl -s -H "Authorization: Bearer $VAST_API_KEY" \
   }' \
   "https://console.vast.ai/api/v0/bundles/"
 ```
+
+```python Python
+search_params = {
+    "verified": {"eq": True},
+    "rentable": {"eq": True},
+    "gpu_name": {"eq": "RTX 4090"},
+    "num_gpus": {"eq": 1},
+    "direct_port_count": {"gte": 1},
+    "order": [["dlperf_per_dphtotal", "desc"]],
+    "type": "on-demand",
+    "limit": 5,
+}
+
+resp = requests.post(f"{BASE_URL}/bundles/", headers=headers, json=search_params)
+offers = resp.json()["offers"]
+for offer in offers:
+    print(f"ID: {offer['id']}  GPU: {offer['gpu_name']}  $/hr: {offer['dph_total']}")
+```
+</CodeGroup>
 
 Each parameter in the query above controls a different filter:
 
@@ -85,7 +124,8 @@ See the [Search Offers](/api-reference/search/search-offers) reference for the f
 
 Rent the machine by sending a PUT request with your Docker image and disk size. Replace `OFFER_ID` with the `id` from step 3. `disk` is in GB and specifies the size of the disk on your new instance.
 
-```bash
+<CodeGroup>
+```bash cURL
 curl -s -H "Authorization: Bearer $VAST_API_KEY" \
   -H "Content-Type: application/json" \
   -X PUT \
@@ -96,6 +136,23 @@ curl -s -H "Authorization: Bearer $VAST_API_KEY" \
   }' \
   "https://console.vast.ai/api/v0/asks/OFFER_ID/"
 ```
+
+```python Python
+offer_id = offers[0]["id"]  # from step 3
+
+create_params = {
+    "image": "pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime",
+    "disk": 20,
+    "onstart": "echo hello && nvidia-smi",
+}
+
+resp = requests.put(
+    f"{BASE_URL}/asks/{offer_id}/", headers=headers, json=create_params
+)
+result = resp.json()
+print(result)
+```
+</CodeGroup>
 
 ```json
 {
@@ -111,10 +168,33 @@ Save the `new_contract` value — this is your instance ID. The `instance_api_ke
 
 The instance needs time to pull the Docker image and boot. Poll the status endpoint until `actual_status` is `"running"`. Replace `INSTANCE_ID` with the `new_contract` value from step 4.
 
-```bash
+<CodeGroup>
+```bash cURL
 curl -s -H "Authorization: Bearer $VAST_API_KEY" \
   "https://console.vast.ai/api/v0/instances/INSTANCE_ID/"
 ```
+
+```python Python
+import time
+
+instance_id = result["new_contract"]
+
+while True:
+    resp = requests.get(f"{BASE_URL}/instances/{instance_id}/", headers=headers)
+    instance = resp.json()["instances"]
+    if instance is None:
+        print("Status: provisioning")
+        time.sleep(10)
+        continue
+    status = instance.get("actual_status")
+    print(f"Status: {status}")
+    if status == "running":
+        break
+    time.sleep(10)
+
+print(f"SSH: ssh -p {instance['ssh_port']} root@{instance['ssh_host']}")
+```
+</CodeGroup>
 
 Example response:
 
@@ -156,21 +236,39 @@ Alternatively, to pause an instance temporarily instead of destroying it, you ca
 
 **Destroy** (removes everything):
 
-```bash
+<CodeGroup>
+```bash cURL
 curl -s -H "Authorization: Bearer $VAST_API_KEY" \
   -X DELETE \
   "https://console.vast.ai/api/v0/instances/INSTANCE_ID/"
 ```
 
+```python Python
+resp = requests.delete(f"{BASE_URL}/instances/{instance_id}/", headers=headers)
+print(resp.json())
+```
+</CodeGroup>
+
 **Stop** (pauses compute, disk charges continue):
 
-```bash
+<CodeGroup>
+```bash cURL
 curl -s -H "Authorization: Bearer $VAST_API_KEY" \
   -H "Content-Type: application/json" \
   -X PUT \
   -d '{"state": "stopped"}' \
   "https://console.vast.ai/api/v0/instances/INSTANCE_ID/"
 ```
+
+```python Python
+resp = requests.put(
+    f"{BASE_URL}/instances/{instance_id}/",
+    headers=headers,
+    json={"state": "stopped"},
+)
+print(resp.json())
+```
+</CodeGroup>
 
 Both return `{"success": true}`.
 
