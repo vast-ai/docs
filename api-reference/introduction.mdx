@@ -7,9 +7,9 @@ sidebarTitle: "Hello World"
 **The raw REST API is intended for advanced users only.** These endpoints offer maximum flexibility but require you to manage all aspects of integration yourself. Most users will have a significantly better experience using the [CLI](/cli/get-started) or the [Python SDK](/sdk/python/quickstart), which handle these details for you. **If you are not sure whether you need direct API access, you almost certainly don't** — start with the CLI or SDK instead.
 </Warning>
 
-The Vast.ai REST API gives you programmatic control over GPU instances — useful for automation, CI/CD pipelines, or building your own tooling on top of Vast.
+The Vast.ai REST API gives you programmatic access to the entire platform — authentication, account management, billing, GPU search, instance lifecycle, templates, volumes, serverless endpoints, and team administration. Anything you can do in the web console, you can automate through the API.
 
-This guide walks through the complete instance lifecycle: authenticate, search for a GPU, rent it, wait for it to boot, connect to it, and clean up. By the end you'll understand the core API calls needed to manage instances without touching the web console.
+This guide walks through the core workflow: authenticate, search for a GPU, rent it, wait for it to boot, connect to it, and clean up. By the end you'll understand the API calls needed to manage instances without touching the web console.
 
 ## Prerequisites
 
@@ -27,14 +27,18 @@ Export it as an environment variable:
 export VAST_API_KEY="your-api-key-here"
 ```
 
+<Tip>
+The console creates a full-access key by default. You can also create scoped API keys with limited permissions via `POST /api/v0/auth/apikeys/` — useful for CI/CD or shared tooling where you want to restrict access to read-only or instance-only operations. See the [Create API Key](/api-reference/accounts/create-api-key) endpoint for details.
+</Tip>
+
 ## 2. Verify Authentication
 
-Confirm your key works by listing your current instances. If you have none, this returns an empty list.
+Confirm your key works by fetching your account info. This returns your user ID, email, balance, and SSH key — a quick way to verify what your key grants access to.
 
 <CodeGroup>
 ```bash cURL
 curl -s -H "Authorization: Bearer $VAST_API_KEY" \
-  "https://console.vast.ai/api/v0/instances/"
+  "https://console.vast.ai/api/v0/users/current/"
 ```
 
 ```python Python
@@ -45,20 +49,24 @@ VAST_API_KEY = os.environ["VAST_API_KEY"]
 BASE_URL = "https://console.vast.ai/api/v0"
 headers = {"Authorization": f"Bearer {VAST_API_KEY}"}
 
-resp = requests.get(f"{BASE_URL}/instances/", headers=headers)
+resp = requests.get(f"{BASE_URL}/users/current/", headers=headers)
 print(resp.json())
 ```
 </CodeGroup>
 
 ```json
 {
-  "instances_found": 0,
-  "instances": []
+  "id": 123456,
+  "email": "you@example.com",
+  "credit": 25.00,
+  "ssh_key": "ssh-rsa AAAAB3..."
 }
 ```
 
+The `credit` field shows your available credit, and `ssh_key` is the public key that will be injected into new instances.
+
 <Note>
-If you get a `401` or `403`, double-check your API key. If you already have instances, you'll see them listed here.
+If you get a `401` or `403`, double-check your API key.
 </Note>
 
 ## 3. Search for GPUs
@@ -122,7 +130,27 @@ See the [Search Offers](/api-reference/search/search-offers) reference for the f
 
 ## 4. Create an Instance
 
-Rent the machine by sending a PUT request with your Docker image and disk size. Replace `OFFER_ID` with the `id` from step 3. `disk` is in GB and specifies the size of the disk on your new instance.
+Rent the machine by sending a PUT request to the asks endpoint. Replace `OFFER_ID` with the `id` from step 3.
+
+The simplest approach is to create from a **template**, which bundles your image, startup commands, and launch settings into a reusable configuration:
+
+```bash
+curl -s -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -X PUT \
+  -d '{
+    "template_hash_id": "YOUR_TEMPLATE_HASH",
+    "disk": 20,
+    "runtype": "ssh_direct"
+  }' \
+  "https://console.vast.ai/api/v0/asks/OFFER_ID/"
+```
+
+<Tip>
+A template packages your Docker image, environment variables, and startup script so you don't repeat them on every create call. See the [Templates API guide](/api-reference/creating-and-using-templates-with-api) for creating and managing templates.
+</Tip>
+
+If you don't have a template yet, you can specify the image and startup commands directly:
 
 <CodeGroup>
 ```bash cURL
@@ -132,7 +160,8 @@ curl -s -H "Authorization: Bearer $VAST_API_KEY" \
   -d '{
     "image": "pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime",
     "disk": 20,
-    "onstart": "echo hello && nvidia-smi"
+    "onstart": "echo hello && nvidia-smi",
+    "runtype": "ssh_direct"
   }' \
   "https://console.vast.ai/api/v0/asks/OFFER_ID/"
 ```
@@ -144,6 +173,7 @@ create_params = {
     "image": "pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime",
     "disk": 20,
     "onstart": "echo hello && nvidia-smi",
+    "runtype": "ssh_direct",
 }
 
 resp = requests.put(
@@ -162,7 +192,11 @@ print(result)
 }
 ```
 
-Save the `new_contract` value — this is your instance ID. The `instance_api_key` is a restricted key injected into the container as `CONTAINER_API_KEY` — it can only start, stop, or destroy that specific instance.
+Save the `new_contract` value — this is your instance ID. The `instance_api_key` provides scoped access for that specific instance (e.g., querying `GET /api/v0/instances/{id}/` without your main API key).
+
+<Note>
+Setting `"runtype": "ssh_direct"` gives you a direct SSH connection to the machine, which has lower latency than the default proxy SSH. Recommended for interactive work.
+</Note>
 
 ## 5. Wait Until Ready
 
@@ -218,7 +252,9 @@ The `actual_status` field progresses through these states:
 
 Poll every 10 seconds. Boot time is typically 1–5 minutes depending on the Docker image size. You can also use the `onstart` script to send a callback when the instance is ready, instead of polling.
 
-Once `actual_status` is `"running"`, you're ready to connect.
+This endpoint returns extensive instance details (hardware specs, pricing, networking, utilization metrics, and more). See the [Show Instance](/api-reference/instances/show-instance) endpoint for the full field reference.
+
+Once `actual_status` is `"running"`, you're ready to connect. Since we set `runtype` to `ssh_direct` in step 4, this is a direct connection to the machine.
 
 ## 6. Connect via SSH
 
