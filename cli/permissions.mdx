@@ -1,0 +1,222 @@
+---
+title: "CLI Permissions"
+sidebarTitle: "Permissions"
+---
+
+Every API key has a set of permissions that control which endpoints it can access. This page covers permission categories, how to build scoped keys, and how to manage team roles through the CLI.
+
+For an overview of API key creation and setup, see [Authentication](/cli/authentication).
+
+## Permission Categories
+
+Permissions are organized into categories. When you create a scoped API key, you include only the categories the key needs:
+
+| Category | Controls |
+|----------|----------|
+| `instance_read` | Viewing instances, logs, SSH keys, volumes, deposits |
+| `instance_write` | Creating, managing, and destroying instances and volumes |
+| `user_read` | Viewing account info, API keys, SSH keys, environment variables, templates |
+| `user_write` | Creating/modifying API keys, SSH keys, environment variables, templates, teams |
+| `billing_read` | Viewing invoices and earnings |
+| `billing_write` | Transferring credit |
+| `machine_read` | Viewing machines and reports (hosts) |
+| `machine_write` | Managing machines, maintenance, listing/unlisting (hosts) |
+| `misc` | Search offers, benchmarks, network volumes, serverless endpoints |
+| `team_read` | Viewing team members and roles |
+| `team_write` | Inviting/removing team members, managing roles |
+
+For the complete mapping of which specific endpoints each category controls, see [Permissions (API)](/api-reference/permissions#endpoint-reference-by-category).
+
+## Creating Scoped Keys
+
+Define permissions as a JSON file. The top-level key is always `"api"`, containing the categories you want to grant:
+
+```json
+{
+    "api": {
+        "misc": {},
+        "user_read": {},
+        "instance_read": {},
+        "instance_write": {}
+    }
+}
+```
+
+Save this as `perms.json`, then pass it to the CLI:
+
+```bash
+vastai create api-key --name "ci-deploy-key" --permission_file perms.json
+```
+
+## Constraints
+
+Constraints narrow a permission category to specific parameter values. This lets you create keys that can only operate on certain resources.
+
+### Constrain by Exact ID
+
+This permissions file allows reading logs for instance 1227 only:
+
+```json
+{
+    "api": {
+        "instance_read": {
+            "api.instance.request_logs": {
+                "constraints": {
+                    "id": {
+                        "eq": 1227
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+### Constrain by Range
+
+You can combine `gte` (greater than or equal) and `lte` (less than or equal) operators to define a range:
+
+```json
+{
+    "api": {
+        "instance_read": {
+            "api.instance.request_logs": {
+                "constraints": {
+                    "id": {
+                        "gte": 1,
+                        "lte": 100
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+Available constraint operators: `eq`, `gte`, `lte`.
+
+<Warning>
+Keys with constraints must be created through the CLI or API. The web console only creates full-access keys.
+</Warning>
+
+## Managing Team Roles
+
+Team roles use the same permission model as API keys. You define permissions in a JSON file and pass it to the team role commands.
+
+### Create a Role
+
+```bash
+vastai create team-role --name "developer" --permissions perms.json
+```
+
+### View Roles
+
+List all roles for your team:
+
+```bash
+vastai show team-roles
+```
+
+View a specific role by name:
+
+```bash
+vastai show team-role developer
+```
+
+### Update a Role
+
+```bash
+vastai update team-role 5 --name "senior-dev" --permissions updated-perms.json
+```
+
+### Remove a Role
+
+```bash
+vastai remove team-role developer
+```
+
+### Invite a Team Member
+
+Assign a role when inviting a new member:
+
+```bash
+vastai invite member --email teammate@example.com --role developer
+```
+
+### View Team Members
+
+```bash
+vastai show members
+```
+
+## Examples
+
+### Read-Only Key
+
+A key that can view instances and account info but cannot create, modify, or destroy anything:
+
+```json
+{
+    "api": {
+        "instance_read": {},
+        "user_read": {}
+    }
+}
+```
+
+```bash
+vastai create api-key --name "monitoring" --permission_file readonly.json
+```
+
+### Instance Management Without Billing
+
+A key that can create and manage instances but has no access to billing or credit transfers:
+
+```json
+{
+    "api": {
+        "misc": {},
+        "user_read": {},
+        "instance_read": {},
+        "instance_write": {}
+    }
+}
+```
+
+```bash
+vastai create api-key --name "ci-deploy" --permission_file deploy.json
+```
+
+### Constrained Key for a Specific Instance
+
+A key that can only manage a single instance (view, reboot, destroy) and nothing else:
+
+```json
+{
+    "api": {
+        "instance_read": {
+            "api.instance.show": {
+                "constraints": {
+                    "id": { "eq": 1227 }
+                }
+            }
+        },
+        "instance_write": {
+            "api.instance.destroy": {
+                "constraints": {
+                    "id": { "eq": 1227 }
+                }
+            },
+            "api.instance.reboot": {
+                "constraints": {
+                    "id": { "eq": 1227 }
+                }
+            }
+        }
+    }
+}
+```
+
+```bash
+vastai create api-key --name "instance-1227-only" --permission_file constrained.json
+```

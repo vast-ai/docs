@@ -1,0 +1,112 @@
+---
+title: "SDK Rate Limits and Errors"
+sidebarTitle: "Rate Limits"
+---
+
+The Vast.ai Python SDK automatically retries rate-limited requests. You do not need to implement your own retry logic -- both the `VastAI` client and the serverless client handle retries with exponential backoff out of the box.
+
+This page covers the error format, how rate limits work, and how to configure retry behavior for each client. For the full details on rate limit mechanics, see the [API Rate Limits and Errors](/api-reference/rate-limits-and-errors) page.
+
+## Error Responses
+
+The underlying API error shape is:
+
+```json
+{
+  "success": false,
+  "error": "invalid_args",
+  "msg": "Human-readable description of the problem."
+}
+```
+
+Some endpoints omit `success` or `error` and return only `msg` or `message`.
+
+The `VastAI` client returns the error as a dictionary when `raw=True` is set, or prints the message otherwise. The serverless client raises an exception after exhausting all retries.
+
+## How Rate Limits Work
+
+Vast.ai applies rate limits **per endpoint** and **per identity**. The identity is determined by your bearer token, session user, `api_key` parameter, and client IP.
+
+Some endpoints also enforce **method-specific** limits (GET vs POST) and **max-calls-per-period** limits for short bursts.
+
+For the full breakdown, see [How rate limits are applied](/api-reference/rate-limits-and-errors#how-rate-limits-are-applied).
+
+## Rate Limit Response
+
+When you hit a rate limit, the API returns **HTTP 429** with a message like:
+
+```
+API requests too frequent
+```
+
+or
+
+```
+API requests too frequent: endpoint threshold=...
+```
+
+The API does not return a `Retry-After` header. The SDK handles this automatically using its built-in retry logic.
+
+## Built-in Retry Behavior
+
+The SDK includes two clients with different retry strategies.
+
+### VastAI Client
+
+The main `VastAI` client retries on rate limit responses:
+
+- **Retried status codes:** 429 only
+- **Default retries:** 3
+- **Backoff strategy:** starts at 0.15 seconds, multiplied by 1.5x after each attempt
+- **Retry delays:** ~0.15s, ~0.225s, ~0.34s
+
+```python
+from vastai_sdk import VastAI
+
+# Uses default retry behavior (3 retries)
+vast = VastAI(api_key="your-api-key")
+vast.search_offers(query="gpu_name=RTX_4090 rentable=true")
+```
+
+### Serverless Client
+
+The serverless client has a broader retry scope, covering transient server errors in addition to rate limits:
+
+- **Retried status codes:** 408 (timeout), 429 (rate limit), and 5xx (server errors)
+- **Default retries:** 5
+- **Backoff strategy:** exponential with jitter -- `min(2^attempt + random(0, 1), 5.0)` seconds
+- **Max delay:** 5 seconds per retry
+
+The jitter (random 0--1 second addition) prevents multiple clients from retrying in lockstep, which reduces the chance of repeated collisions.
+
+<Note>
+The serverless client retries on a wider range of errors than the `VastAI` client. Server errors (5xx) and timeouts (408) are retried automatically -- you do not need to handle these yourself.
+</Note>
+
+## Configuring Retries
+
+### VastAI Client
+
+Pass the `retry` parameter to the constructor to change the number of retry attempts:
+
+```python
+from vastai_sdk import VastAI
+
+# Increase to 6 retries for a batch script
+vast = VastAI(api_key="your-api-key", retry=6)
+
+# Disable retries entirely
+vast = VastAI(api_key="your-api-key", retry=0)
+```
+
+The retry count applies to all requests made through that client instance.
+
+### Serverless Client
+
+The serverless client defaults to 5 retries. The retry count is configured internally per request through the `_make_request()` method's `retries` parameter.
+
+## Reducing Rate Limit Errors
+
+If you are consistently hitting rate limits, the best approach is to reduce the volume and frequency of your requests. See [How to reduce rate limit errors](/api-reference/rate-limits-and-errors#how-to-reduce-rate-limit-errors) for practical strategies including batching, reduced polling, and traffic spreading.
+
+If you need higher limits for production usage, contact support with the endpoint(s), your expected call rate, and your account details.

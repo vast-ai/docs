@@ -1,0 +1,84 @@
+---
+title: "CLI Rate Limits and Errors"
+sidebarTitle: "Rate Limits"
+---
+
+The Vast.ai CLI automatically retries rate-limited requests. You do not need to implement your own retry logic -- the CLI handles HTTP 429 responses with exponential backoff out of the box.
+
+This page covers the error format, how rate limits work, and how to configure the CLI's built-in retry behavior. For the full details on rate limit mechanics, see the [API Rate Limits and Errors](/api-reference/rate-limits-and-errors) page.
+
+## Error Responses
+
+When a CLI command fails, it prints the error message from the API and exits with a non-zero status code. The underlying API error shape is:
+
+```json
+{
+  "success": false,
+  "error": "invalid_args",
+  "msg": "Human-readable description of the problem."
+}
+```
+
+Some endpoints omit `success` or `error` and return only `msg` or `message`. The CLI surfaces whatever message the API returns.
+
+## How Rate Limits Work
+
+Vast.ai applies rate limits **per endpoint** and **per identity**. The identity is determined by your bearer token, session user, `api_key` parameter, and client IP.
+
+Some endpoints also enforce **method-specific** limits (GET vs POST) and **max-calls-per-period** limits for short bursts.
+
+For the full breakdown, see [How rate limits are applied](/api-reference/rate-limits-and-errors#how-rate-limits-are-applied).
+
+## Rate Limit Response
+
+When you hit a rate limit, the API returns **HTTP 429** with a message like:
+
+```
+API requests too frequent
+```
+
+or
+
+```
+API requests too frequent: endpoint threshold=...
+```
+
+The API does not return a `Retry-After` header. The CLI handles this automatically using its built-in retry logic.
+
+## Built-in Retry Behavior
+
+When the CLI receives an HTTP 429 response, it automatically retries the request using exponential backoff:
+
+- **Retried status codes:** 429 only
+- **Default retries:** 3
+- **Backoff strategy:** starts at 0.15 seconds, multiplied by 1.5x after each attempt
+- **Retry delays:** ~0.15s, ~0.225s, ~0.34s
+
+For most usage, the defaults handle transient rate limits without any intervention.
+
+<Tip>
+The CLI only retries on 429 (rate limit). Other HTTP errors (4xx, 5xx) are reported immediately.
+</Tip>
+
+## Configuring Retries
+
+Use the `--retry` flag on any command to change the number of retry attempts:
+
+```bash
+# Use default 3 retries
+vastai search offers 'gpu_name=RTX_4090 rentable=true'
+
+# Increase to 6 retries for a batch script
+vastai search offers 'gpu_name=RTX_4090 rentable=true' --retry 6
+
+# Disable retries entirely
+vastai search offers 'gpu_name=RTX_4090 rentable=true' --retry 0
+```
+
+Increasing the retry count is useful for scripts that make many API calls in sequence, where occasional rate limiting is expected.
+
+## Reducing Rate Limit Errors
+
+If you are consistently hitting rate limits, the best approach is to reduce the volume and frequency of your requests. See [How to reduce rate limit errors](/api-reference/rate-limits-and-errors#how-to-reduce-rate-limit-errors) for practical strategies including batching, reduced polling, and traffic spreading.
+
+If you need higher limits for production usage, contact support with the endpoint(s), your expected call rate, and your account details.
