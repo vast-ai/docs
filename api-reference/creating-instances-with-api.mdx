@@ -1,0 +1,805 @@
+---
+title: Creating Instances with the API
+sidebarTitle: Instances
+createdAt: Sun Feb 23 2026 10:00:00 GMT+0000 (Coordinated Universal Time)
+updatedAt: Sun Feb 23 2026 16:00:00 GMT+0000 (Coordinated Universal Time)
+---
+
+<script type="application/ld+json" dangerouslySetInnerHTML={{
+  __html: JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "How to Create Instances with the Vast.ai API",
+    "description": "A comprehensive guide to creating GPU instances programmatically with the Vast.ai API, covering both template-based and direct configuration approaches.",
+    "step": [
+      {
+        "@type": "HowToStep",
+        "name": "Find an Offer",
+        "text": "Use the search offers endpoint to discover available GPU machines matching your requirements."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Create an Instance Directly",
+        "text": "Use PUT /api/v0/asks/{id}/ with image and configuration parameters to launch an instance without a template."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Create an Instance from a Template",
+        "text": "Use PUT /api/v0/asks/{id}/ with template_hash_id to create an instance using a pre-configured template, optionally overriding specific values."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Manage Your Instance",
+        "text": "Check instance status, connect via SSH or Jupyter, and manage the instance lifecycle through the API."
+      }
+    ]
+  })
+}} />
+
+## Introduction
+
+Instance creation on Vast.ai follows a two-step process: first **find an offer** (an available machine), then **accept that offer** to create an instance. You can configure instances in two ways:
+
+- **Directly**: Pass all configuration (image, environment variables, launch mode, etc.) in the instance creation request
+- **From a template**: Reference a pre-configured template by its `hash_id`, optionally overriding specific values
+
+Both approaches use the same endpoint: `PUT /api/v0/asks/{offer_id}/`.
+
+For information about creating and managing templates, see [Creating and Using Templates with API](/api-reference/creating-and-using-templates-with-api).
+
+## Instance Creation Fields Reference
+
+When creating an instance, the following fields can be configured:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `image` | string | Yes* | Docker image path (e.g., `vllm/vllm-openai`). *Optional when using a template |
+| `template_hash_id` | string | No | Template hash ID to use as base configuration |
+| `label` | string | No | Custom name for the instance |
+| `disk` | number | No | Local disk partition size in GB (default: 8) |
+| `runtype` | string | No | Launch mode. SSH/Jupyter runtypes replace the image entrypoint with Vast's entrypoint; `args` preserves it. See [Runtype and Connection Options](#runtype-and-connection-options) |
+| `target_state` | string | No | Initial state: `running` (default) or `stopped` |
+| `price` | number | No | Bid price in $/hour (for interruptible instances only) |
+| `env` | object | No | Environment variables and port mappings as a JSON object (e.g., `{"VAR": "val", "-p 8000:8000": "1"}`) |
+| `onstart` | string | No | Shell commands to run after Vast's entrypoint initializes. Used with SSH/Jupyter runtypes to start your application |
+| `args_str` | string | No | Replaces the image's Docker `CMD`. If the image defines an `ENTRYPOINT`, `args_str` is passed as arguments to it. Only used with `runtype: "args"` |
+| `use_jupyter_lab` | boolean | No | Use JupyterLab instead of Jupyter Notebook |
+| `jupyter_dir` | string | No | Directory to launch Jupyter from |
+| `python_utf8` | boolean | No | Set Python locale to C.UTF-8 |
+| `lang_utf8` | boolean | No | Set locale to C.UTF-8 |
+| `image_login` | string | No | Docker registry credentials for private images (eg., `-u username -p access_token docker.io`) |
+| `cancel_unavail` | boolean | No | Cancel if instance cannot start immediately |
+| `vm` | boolean | No | Create a VM instance instead of a container |
+| `volume_info` | object | No | Volume creation or linking configuration |
+
+## Step 1: Find an Offer
+
+Before creating an instance, search for available machines that match your requirements.
+
+<CodeGroup>
+
+```bash curl
+# Search for machines with at least 1 RTX 4090, reliability > 99%
+curl -X POST "https://console.vast.ai/api/v0/bundles/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "gpu_name": {"in": ["RTX 4090"]},
+    "num_gpus": {"gte": 1},
+    "reliability": {"gte": 0.99},
+    "verified": {"eq": true},
+    "rentable": {"eq": true},
+    "type": "ondemand",
+    "limit": 5
+  }'
+```
+
+```python Python
+import requests
+
+api_key = "your_api_key"
+
+response = requests.post(
+    "https://console.vast.ai/api/v0/bundles/",
+    headers={
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    },
+    json={
+        "gpu_name": {"in": ["RTX 4090"]},
+        "num_gpus": {"gte": 1},
+        "reliability": {"gte": 0.99},
+        "verified": {"eq": True},
+        "rentable": {"eq": True},
+        "type": "ondemand",
+        "limit": 5
+    }
+)
+
+offers = response.json().get("offers", [])
+for offer in offers:
+    print(f"ID: {offer['id']}, GPUs: {offer['num_gpus']}x {offer['gpu_name']}, "
+          f"${offer['dph_total']:.3f}/hr")
+```
+
+</CodeGroup>
+
+<Note>
+The offer `id` returned from search is the value you pass as `{offer_id}` in the instance creation endpoint.
+</Note>
+
+## Step 2: Create the Instance
+
+### Option A: Create Instance Directly (No Template)
+
+Pass all configuration parameters directly in the request. At minimum, you must provide the `image` field.
+
+**Simple example** — create an SSH instance with Ubuntu:
+
+<CodeGroup>
+
+```bash curl
+curl -X PUT "https://console.vast.ai/api/v0/asks/12345678/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "image": "ubuntu:22.04",
+    "disk": 16,
+    "runtype": "ssh_direct"
+  }'
+```
+
+```python Python
+import requests
+
+api_key = "your_api_key"
+offer_id = 12345678
+
+response = requests.put(
+    f"https://console.vast.ai/api/v0/asks/{offer_id}/",
+    headers={
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    },
+    json={
+        "image": "ubuntu:22.04",
+        "disk": 16,
+        "runtype": "ssh_direct"
+    }
+)
+
+result = response.json()
+print(f"Instance ID: {result.get('new_contract')}")
+```
+
+</CodeGroup>
+
+**Full example** — SSH instance running a vLLM inference server:
+
+<CodeGroup>
+
+```bash curl
+curl -X PUT "https://console.vast.ai/api/v0/asks/12345678/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "image": "vllm/vllm-openai:latest",
+    "label": "vllm-inference-server",
+    "disk": 50,
+    "runtype": "ssh_direct",
+    "env": {"MODEL_ID": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B", "HF_TOKEN": "hf_xxxYourTokenHere", "-p 8000:8000": "1"},
+    "onstart": "vllm serve $MODEL_ID --port 8000"
+  }'
+```
+
+```python Python
+import requests
+
+api_key = "your_api_key"
+offer_id = 12345678
+
+response = requests.put(
+    f"https://console.vast.ai/api/v0/asks/{offer_id}/",
+    headers={
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    },
+    json={
+        "image": "vllm/vllm-openai:latest",
+        "label": "vllm-inference-server",
+        "disk": 50,
+        "runtype": "ssh_direct",
+        "env": {"MODEL_ID": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B", "HF_TOKEN": "hf_xxxYourTokenHere", "-p 8000:8000": "1"},
+        "onstart": "vllm serve $MODEL_ID --port 8000"
+    }
+)
+
+result = response.json()
+print(f"Instance ID: {result.get('new_contract')}")
+```
+
+</CodeGroup>
+
+### Option B: Create Instance from a Template
+
+Reference a template by its `hash_id`. The template provides default values for all configuration fields, so you don't need to specify `image` or other parameters unless you want to override them.
+
+**Basic template usage** — all configuration comes from the template:
+
+<CodeGroup>
+
+```bash curl
+curl -X PUT "https://console.vast.ai/api/v0/asks/12345678/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "template_hash_id": "4e17788f74f075dd9aab7d0d4427968f"
+  }'
+```
+
+```python Python
+import requests
+
+api_key = "your_api_key"
+offer_id = 12345678
+
+response = requests.put(
+    f"https://console.vast.ai/api/v0/asks/{offer_id}/",
+    headers={
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    },
+    json={
+        "template_hash_id": "4e17788f74f075dd9aab7d0d4427968f"
+    }
+)
+
+result = response.json()
+print(f"Instance ID: {result.get('new_contract')}")
+```
+
+</CodeGroup>
+
+**Template with overrides** — use a template but customize specific values:
+
+<CodeGroup>
+
+```bash curl
+curl -X PUT "https://console.vast.ai/api/v0/asks/12345678/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "template_hash_id": "4e17788f74f075dd9aab7d0d4427968f",
+    "label": "custom-inference-server",
+    "disk": 100,
+    "env": {"MODEL_ID": "mistralai/Mistral-7B-Instruct-v0.2", "HF_TOKEN": "hf_xxxYourTokenHere"}
+  }'
+```
+
+```python Python
+import requests
+
+api_key = "your_api_key"
+offer_id = 12345678
+
+response = requests.put(
+    f"https://console.vast.ai/api/v0/asks/{offer_id}/",
+    headers={
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    },
+    json={
+        "template_hash_id": "4e17788f74f075dd9aab7d0d4427968f",
+        "label": "custom-inference-server",
+        "disk": 100,
+        "env": {"MODEL_ID": "mistralai/Mistral-7B-Instruct-v0.2", "HF_TOKEN": "hf_xxxYourTokenHere"}
+    }
+)
+
+result = response.json()
+print(f"Instance ID: {result.get('new_contract')}")
+```
+
+</CodeGroup>
+
+## Runtype and Connection Options
+
+The `runtype` field controls how you connect to your instance:
+
+| Runtype | Auto-provisioned Ports | Description |
+|---------|----------------------|-------------|
+| `ssh_direct` | 22 (SSH) | Direct SSH connection. Port 22 is provisioned on the instance |
+| `ssh_proxy` | None | SSH via Vast.ai proxy. No ports provisioned on the instance |
+| `ssh` | None | Alias for `ssh_proxy` |
+| `jupyter_direct` | 8080 (Jupyter) + 22 (SSH) | **Recommended**. Direct Jupyter and SSH access. Ports 8080 and 22 are provisioned on the instance |
+| `jupyter_proxy` | None | Jupyter and SSH via Vast.ai proxy. No ports provisioned on the instance |
+| `jupyter` | None | Alias for `jupyter_proxy` |
+| `args` | None | Container runs with the original entrypoint and `args_str` appended. No SSH/Jupyter |
+
+<Note>
+All Jupyter runtypes **implicitly include SSH access**. Only the `_direct` runtypes provision ports on the instance itself — `jupyter_direct` provisions ports 8080 and 22, while `ssh_direct` provisions port 22. Proxy runtypes route connections through Vast.ai's infrastructure without opening ports on the instance.
+</Note>
+
+**Recommendation**: Use `runtype: "jupyter_direct"` for the most flexibility — you get both direct Jupyter and direct SSH access with ports provisioned on the instance. Use `runtype: "ssh_direct"` if you only need SSH.
+
+### Entrypoint Behavior
+
+How the container starts depends on the runtype:
+
+- **SSH and Jupyter runtypes**: The image's original entrypoint is **replaced** by Vast's own entrypoint, which sets up SSH/Jupyter access. Use the `onstart` field to run your own startup commands (e.g., launching a server). Your `onstart` script runs after the Vast entrypoint has initialized.
+- **`args` runtype**: The image's **original `ENTRYPOINT` is preserved**. The `args_str` value replaces the image's Docker `CMD` — if the image defines an `ENTRYPOINT`, `args_str` is passed as arguments to it. If the image has no `ENTRYPOINT` (only `CMD`), `args_str` replaces the command entirely. No SSH or Jupyter access is provisioned.
+
+<Warning>
+If you use an SSH or Jupyter runtype without an `onstart` command, the container will start with only SSH/Jupyter access — your application won't run automatically. Use `onstart` to start your services.
+</Warning>
+
+### Runtype Examples
+
+**Jupyter Lab with SSH** (recommended) — use `onstart` to start your application:
+```json
+{
+  "image": "ubuntu:22.04",
+  "disk": 16,
+  "runtype": "jupyter_direct",
+  "use_jupyter_lab": true,
+  "jupyter_dir": "/workspace",
+  "onstart": "echo 'Instance is ready'"
+}
+```
+
+**SSH with a vLLM server** — the server is started via `onstart`:
+```json
+{
+  "image": "vllm/vllm-openai:latest",
+  "disk": 50,
+  "runtype": "ssh_direct",
+  "env": {"MODEL_ID": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B", "-p 8000:8000": "1"},
+  "onstart": "vllm serve $MODEL_ID --port 8000"
+}
+```
+
+**Entrypoint arguments (headless)** — `args_str` replaces the image's `CMD` and is passed to its `ENTRYPOINT`:
+```json
+{
+  "image": "vllm/vllm-openai:latest",
+  "disk": 50,
+  "runtype": "args",
+  "args_str": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B --port 8000"
+}
+```
+
+## Environment Variables and Ports
+
+When creating instances, the `env` field is a JSON object (dict). Environment variables are key-value pairs, and port mappings use the Docker `-p` syntax as keys with `"1"` as the value.
+
+```json
+{
+  "env": {
+    "HF_TOKEN": "hf_xxx123",
+    "MODEL_ID": "meta-llama/Llama-3-8B",
+    "-p 8000:8000": "1",
+    "-p 8080:8080": "1"
+  }
+}
+```
+
+When using a template, the `env` dict from your request is **merged** with the template's `env`:
+- Existing keys from the template are retained
+- New keys from the request are added
+- Conflicting keys use the request value
+
+See [Precedence Rules](/api-reference/creating-and-using-templates-with-api#precedence-rules) in the templates guide for full details.
+
+## Instance Pricing
+
+### On-Demand Instances
+
+On-demand instances use fixed pricing. Simply omit the `price` field:
+
+```json
+{
+  "image": "ubuntu:22.04",
+  "disk": 16,
+  "runtype": "ssh_direct"
+}
+```
+
+### Interruptible (Bid) Instances
+
+For lower-cost interruptible instances, set a bid price. Search with `type: "bid"` to find interruptible offers, then provide the `price` field:
+
+<CodeGroup>
+
+```bash curl
+# Search for interruptible offers
+curl -X POST "https://console.vast.ai/api/v0/bundles/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "gpu_name": {"in": ["RTX 4090"]},
+    "num_gpus": {"gte": 1},
+    "verified": {"eq": true},
+    "rentable": {"eq": true},
+    "type": "bid"
+  }'
+
+# Create interruptible instance with bid price
+curl -X PUT "https://console.vast.ai/api/v0/asks/12345678/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "image": "ubuntu:22.04",
+    "disk": 16,
+    "runtype": "ssh_direct",
+    "price": 0.20
+  }'
+```
+
+```python Python
+import requests
+
+api_key = "your_api_key"
+
+# Search for interruptible offers
+response = requests.post(
+    "https://console.vast.ai/api/v0/bundles/",
+    headers={
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    },
+    json={
+        "gpu_name": {"in": ["RTX 4090"]},
+        "num_gpus": {"gte": 1},
+        "verified": {"eq": True},
+        "rentable": {"eq": True},
+        "type": "bid"
+    }
+)
+
+offers = response.json().get("offers", [])
+offer_id = offers[0]["id"]
+
+# Create interruptible instance with bid price
+response = requests.put(
+    f"https://console.vast.ai/api/v0/asks/{offer_id}/",
+    headers={
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    },
+    json={
+        "image": "ubuntu:22.04",
+        "disk": 16,
+        "runtype": "ssh_direct",
+        "price": 0.20  # Bid price in $/hour
+    }
+)
+
+result = response.json()
+print(f"Instance ID: {result.get('new_contract')}")
+```
+
+</CodeGroup>
+
+## Attaching Volumes
+
+Attach persistent storage to your instance using the `volume_info` field. The volume must already exist — you can create volumes separately via the API or CLI before attaching them to an instance.
+
+<Note>
+You can list your existing volumes with `vastai show volumes` or the equivalent API call to find the `volume_id` to use.
+</Note>
+
+<CodeGroup>
+
+```bash curl
+curl -X PUT "https://console.vast.ai/api/v0/asks/12345678/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "image": "ubuntu:22.04",
+    "disk": 16,
+    "runtype": "ssh_direct",
+    "volume_info": {
+      "volume_id": 12345,
+      "mount_path": "/workspace"
+    }
+  }'
+```
+
+```python Python
+import requests
+
+api_key = "your_api_key"
+offer_id = 12345678
+
+response = requests.put(
+    f"https://console.vast.ai/api/v0/asks/{offer_id}/",
+    headers={
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    },
+    json={
+        "image": "ubuntu:22.04",
+        "disk": 16,
+        "runtype": "ssh_direct",
+        "volume_info": {
+            "volume_id": 12345,  # Existing volume ID from "vastai show volumes"
+            "mount_path": "/workspace"
+        }
+    }
+)
+```
+
+</CodeGroup>
+
+## Using Private Docker Images
+
+If your Docker image is hosted in a private registry, provide credentials via the `image_login` field:
+
+<CodeGroup>
+
+```bash curl
+curl -X PUT "https://console.vast.ai/api/v0/asks/12345678/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "image": "registry.example.com/my-org/my-image:latest",
+    "image_login": "-u username -p access_token docker.io",
+    "runtype": "ssh_direct"
+  }'
+```
+
+```python Python
+import requests
+
+api_key = "your_api_key"
+offer_id = 12345678
+
+response = requests.put(
+    f"https://console.vast.ai/api/v0/asks/{offer_id}/",
+    headers={
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    },
+    json={
+        "image": "registry.example.com/my-org/my-image:latest",
+        "image_login": "-u username -p access_token docker.io",
+        "runtype": "ssh_direct"
+    }
+)
+```
+
+</CodeGroup>
+
+<Note>
+When using a template with private registry credentials (`docker_login_repo`, `docker_login_user`, `docker_login_pass`), those credentials carry over to the instance automatically.
+</Note>
+
+## End-to-End Example
+
+This example shows the complete workflow: searching for a machine, creating an instance, and checking its status.
+
+<CodeGroup>
+
+```bash curl
+# Step 1: Search for offers
+OFFERS=$(curl -s -X POST "https://console.vast.ai/api/v0/bundles/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "gpu_name": {"in": ["RTX 4090"]},
+    "num_gpus": {"gte": 1},
+    "gpu_ram": {"gte": 24000},
+    "reliability": {"gte": 0.99},
+    "verified": {"eq": true},
+    "rentable": {"eq": true},
+    "type": "ondemand",
+    "limit": 3
+  }')
+
+echo "Available offers:"
+echo "$OFFERS" | jq '.offers[] | {id, gpu_name, num_gpus, dph_total}'
+
+# Step 2: Create instance using the first offer
+OFFER_ID=$(echo "$OFFERS" | jq '.offers[0].id')
+
+RESULT=$(curl -s -X PUT "https://console.vast.ai/api/v0/asks/$OFFER_ID/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "image": "vllm/vllm-openai:latest",
+    "label": "my-vllm-server",
+    "disk": 50,
+    "runtype": "ssh_direct",
+    "env": {"MODEL_ID": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B", "-p 8000:8000": "1"},
+    "onstart": "vllm serve $MODEL_ID --port 8000"
+  }')
+
+INSTANCE_ID=$(echo "$RESULT" | jq '.new_contract')
+echo "Created instance: $INSTANCE_ID"
+
+# Step 3: Check instance status
+curl -s "https://console.vast.ai/api/v0/instances/$INSTANCE_ID/" \
+  -H "Authorization: Bearer $VAST_API_KEY" | jq '{id: .instances.id, status: .instances.actual_status, label: .instances.label}'
+```
+
+```python Python
+import requests
+import time
+
+api_key = "your_api_key"
+headers = {
+    "Authorization": f"Bearer {api_key}",
+    "Content-Type": "application/json"
+}
+
+# Step 1: Search for offers
+response = requests.post(
+    "https://console.vast.ai/api/v0/bundles/",
+    headers=headers,
+    json={
+        "gpu_name": {"in": ["RTX 4090"]},
+        "num_gpus": {"gte": 1},
+        "gpu_ram": {"gte": 24000},
+        "reliability": {"gte": 0.99},
+        "verified": {"eq": True},
+        "rentable": {"eq": True},
+        "type": "ondemand",
+        "limit": 3
+    }
+)
+
+offers = response.json().get("offers", [])
+for offer in offers:
+    print(f"Offer {offer['id']}: {offer['num_gpus']}x {offer['gpu_name']} "
+          f"- ${offer['dph_total']:.3f}/hr")
+
+# Step 2: Create instance using the first offer
+offer_id = offers[0]["id"]
+
+response = requests.put(
+    f"https://console.vast.ai/api/v0/asks/{offer_id}/",
+    headers=headers,
+    json={
+        "image": "vllm/vllm-openai:latest",
+        "label": "my-vllm-server",
+        "disk": 50,
+        "runtype": "ssh_direct",
+        "env": {"MODEL_ID": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B", "-p 8000:8000": "1"},
+        "onstart": "vllm serve $MODEL_ID --port 8000"
+    }
+)
+
+result = response.json()
+instance_id = result.get("new_contract")
+print(f"\nCreated instance: {instance_id}")
+
+# Step 3: Wait and check instance status
+time.sleep(5)
+
+response = requests.get(
+    f"https://console.vast.ai/api/v0/instances/{instance_id}/",
+    headers=headers
+)
+
+instance = response.json().get("instances", {})
+print(f"Status: {instance.get('actual_status')}")
+print(f"Label: {instance.get('label')}")
+```
+
+</CodeGroup>
+
+## CLI Reference
+
+The Vast.ai CLI provides equivalent commands for instance creation:
+
+| Command | Description |
+|---------|-------------|
+| `vastai search offers '<filters>'` | Search for available machines |
+| `vastai create instance <offer_id> <image> [options]` | Create an instance directly |
+| `vastai create instance <offer_id> --template_hash <hash>` | Create an instance from a template |
+
+**Common create instance options:**
+- `--image IMAGE` - Docker image
+- `--template_hash HASH` - Template hash ID
+- `--disk GB` - Disk space in GB
+- `--ssh` - Launch as SSH instance
+- `--direct` - Use direct connections
+- `--jupyter` - Launch as Jupyter instance
+- `--jupyter-lab` - Use JupyterLab
+- `--env ENV` - Docker options (env vars and ports)
+- `--onstart-cmd CMD` - Onstart script
+- `--label LABEL` - Instance name
+- `--price PRICE` - Bid price for interruptible instances
+- `--link-volume ID` - Attach an existing volume
+- `--mount-path PATH` - Volume mount path
+
+**Example CLI commands:**
+
+```bash
+# Direct instance creation
+vastai create instance 12345678 vllm/vllm-openai:latest \
+  --disk 50 --ssh --direct \
+  --env "-e MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-8B -p 8000:8000" \
+  --onstart-cmd "vllm serve \$MODEL_ID --port 8000"
+
+# Instance from template
+vastai create instance 12345678 --template_hash 4e17788f74f075dd9aab7d0d4427968f
+
+# Instance from template with overrides
+vastai create instance 12345678 --template_hash 4e17788f74f075dd9aab7d0d4427968f \
+  --disk 100 \
+  --env "-e HF_TOKEN=hf_xxxYourTokenHere"
+```
+
+## Common Pitfalls
+
+<AccordionGroup>
+  <Accordion title="My instance was created but I can't connect via SSH">
+    Ensure you set the correct `runtype`. For SSH access, use `runtype: "ssh_direct"` for best results. Also verify that:
+    - You have an SSH key registered with Vast.ai (`vastai create ssh-key`)
+    - The machine supports direct connections (most verified machines do)
+    - The instance has finished loading (check `actual_status` is `running`)
+  </Accordion>
+
+  <Accordion title="My environment variables aren't taking effect">
+    For instance creation, the `env` field must be a JSON object (dict), not a Docker flag string:
+    - Correct: `{"VAR1": "value1", "VAR2": "value2"}`
+    - Wrong: `"-e VAR1=value1 -e VAR2=value2"`
+
+    Port mappings use the `-p` syntax as keys with `"1"` as the value: `{"-p 8000:8000": "1"}`
+
+    Note: Template creation still uses the Docker flag string format.
+
+    Also note that environment variables set via `env` are **not automatically visible in SSH sessions**. To make them available when you SSH in, add the following to your `onstart` script:
+    ```
+    env >> /etc/environment
+    ```
+    This exports all environment variables so they persist across SSH logins.
+  </Accordion>
+
+  <Accordion title="Offer not found or no longer available">
+    Offers are dynamic — machines can be rented by others between your search and creation request. Handle this by:
+    - Searching for multiple offers and trying the next one if creation fails
+    - Using `cancel_unavail: true` to fail fast if the offer is no longer available
+    - Retrying the search to find fresh offers
+  </Accordion>
+
+  <Accordion title="My bid instance keeps getting interrupted">
+    Interruptible instances can be stopped when someone outbids you. To reduce interruptions:
+    - Increase your bid `price`
+    - Choose machines with lower demand
+    - Consider on-demand instances for critical workloads (omit `price` field)
+  </Accordion>
+
+  <Accordion title="Volume didn't mount to my instance">
+    The `volume_info` field must be included in the **instance creation request**, not just the template. Template `volume_info` is a UI hint only.
+
+    The volume must already exist before you can attach it. Ensure you provide the correct structure:
+    ```json
+    {
+      "volume_info": {
+        "volume_id": 12345,
+        "mount_path": "/workspace"
+      }
+    }
+    ```
+    Where `volume_id` is the ID of an existing volume from `vastai show volumes`.
+  </Accordion>
+</AccordionGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Templates Guide" href="/api-reference/creating-and-using-templates-with-api" icon="layer-group">
+    Create and manage templates for instance configuration
+  </Card>
+  <Card title="Create Instance API" href="/api-reference/instances/create-instance" icon="server">
+    Full API reference for the instance creation endpoint
+  </Card>
+  <Card title="Search Offers API" href="/api-reference/search/search-offers" icon="magnifying-glass">
+    Find available machines to rent
+  </Card>
+  <Card title="Instance Types" href="/documentation/instances/choosing/instance-types" icon="list">
+    On-demand vs interruptible vs reserved instances
+  </Card>
+</CardGroup>
