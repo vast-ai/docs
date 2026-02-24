@@ -1,0 +1,238 @@
+---
+title: "Permissions"
+sidebarTitle: "Permissions"
+---
+
+Every API key has a set of permissions that control which endpoints it can access. This page is the comprehensive reference for permission categories, how they map to API routes, and how to build custom scoped keys.
+
+For an overview of API key creation and usage, see [Authentication](/api-reference/authentication).
+
+## Permission Categories
+
+Permissions are organized into categories. When you create a scoped API key, you include only the categories the key needs. The available categories are:
+
+| Category | Controls |
+|----------|----------|
+| `instance_read` | Viewing instances, logs, SSH keys, volumes, deposits |
+| `instance_write` | Creating, managing, and destroying instances and volumes |
+| `user_read` | Viewing account info, API keys, SSH keys, environment variables, templates |
+| `user_write` | Creating/modifying API keys, SSH keys, environment variables, templates, teams |
+| `billing_read` | Viewing invoices and earnings |
+| `billing_write` | Transferring credit |
+| `machine_read` | Viewing machines and reports (hosts) |
+| `machine_write` | Managing machines, maintenance, listing/unlisting (hosts) |
+| `misc` | Search offers, benchmarks, network volumes, serverless endpoints |
+| `team_read` | Viewing team members and roles |
+| `team_write` | Inviting/removing team members, managing roles |
+
+## Creating Scoped Keys
+
+Define permissions as a JSON object and pass it when creating a key. The top-level key is always `"api"`, containing the categories you want to grant.
+
+**Example — Instance management with billing access:**
+
+```json
+{
+  "api": {
+    "misc": {},
+    "user_read": {},
+    "instance_read": {},
+    "instance_write": {},
+    "billing_read": {},
+    "billing_write": {}
+  }
+}
+```
+
+**Example — Instance management without billing:**
+
+```json
+{
+  "api": {
+    "misc": {},
+    "user_read": {},
+    "instance_read": {},
+    "instance_write": {}
+  }
+}
+```
+
+You can create scoped keys using:
+- **API**: [Create API Key](/api-reference/accounts/create-api-key)
+- **CLI**: [`vastai create api-key`](/cli/reference/create-api-key)
+- **SDK**: [`vast.create_api_key()`](/sdk/python/reference/create-api-key)
+
+## Custom Roles
+
+Custom roles let you assign the same set of permissions to multiple team members.
+
+- **Creating roles**: Use the CLI or the Manage page in the web console (requires `team_write` access).
+- **Defining permissions**: Select from any combination of the categories listed above.
+- **Assigning roles**: Assign created roles to team members through the team management interface or CLI.
+
+## Constraints
+
+Constraints narrow a permission category to specific parameter values. This lets you create keys that can only operate on certain resources.
+
+**Example — Read logs for a single instance only:**
+
+```json
+{
+  "api": {
+    "instance_read": {
+      "api.instance.request_logs": {
+        "constraints": {
+          "id": {
+            "eq": 1227
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+**Example — Read logs for a range of instance IDs:**
+
+```json
+{
+  "api": {
+    "instance_read": {
+      "api.instance.request_logs": {
+        "constraints": {
+          "id": {
+            "lte": 2,
+            "gte": 1
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Supported constraint operators: `eq`, `lte`, `gte`.
+
+<Note>
+API keys using constraints must be created via the CLI ([`vastai create api-key`](/cli/reference/create-api-key)) or the API ([Create API Key](/api-reference/accounts/create-api-key)).
+</Note>
+
+You can also use **wildcards** in `params` to represent placeholder values — useful when generating many keys that perform similar operations.
+
+## Endpoint Reference by Category
+
+Below is the complete mapping of which endpoints each permission category controls.
+
+### instance\_read
+
+- [Show Instance](/api-reference/instances/show-instance)
+- [Show Instances](/api-reference/instances/show-instances)
+- [Show Logs](/api-reference/instances/show-logs)
+- [Show SSH Keys](/api-reference/instances/show-ssh-keys)
+- [Show Volumes](/api-reference/volumes/list-volumes)
+- [Show Deposit](/api-reference/billing/show-deposit)
+
+### instance\_write
+
+- [Attach SSH Key](/api-reference/instances/attach-ssh-key)
+- [Copy](/api-reference/instances/copy)
+- [Cancel Copy](/api-reference/instances/cancel-copy)
+- [Cloud Copy](/api-reference/instances/cloud-copy)
+- [Cancel Sync](/api-reference/instances/cancel-sync)
+- [Change Bid](/api-reference/instances/change-bid)
+- [Create Instance](/api-reference/instances/create-instance)
+- [Manage Instance](/api-reference/instances/manage-instance)
+- [Delete Instance](/api-reference/instances/destroy-instance)
+- [Detach SSH Key](/api-reference/instances/detach-ssh-key)
+- [Execute](/api-reference/instances/execute)
+- [Prepay Instance](/api-reference/instances/prepay-instance)
+- [Reboot Instance](/api-reference/instances/reboot-instance)
+- [Recycle Instance](/api-reference/instances/recycle-instance)
+- [Create Volume](/api-reference/volumes/rent-volume)
+- [Delete Volume](/api-reference/volumes/delete-volume)
+
+### user\_read
+
+- [Show API Keys](/api-reference/accounts/show-api-keys)
+- [Show Connections](/api-reference/accounts/show-connections)
+- [Show Environment Variables](/api-reference/accounts/show-env-vars)
+- [Show IP Addresses](/api-reference/accounts/show-ipaddrs)
+- [Show SSH Keys](/api-reference/accounts/show-ssh-keys)
+- [Show Subaccounts](/api-reference/accounts/show-subaccounts)
+- [Show User](/api-reference/accounts/show-user)
+- [Search Templates](/api-reference/search/search-template)
+
+### user\_write
+
+- [Create API Key](/api-reference/accounts/create-api-key)
+- [Delete API Key](/api-reference/accounts/delete-api-key)
+- [Create Environment Variable](/api-reference/accounts/create-env-var)
+- [Update Environment Variable](/api-reference/accounts/update-env-var)
+- [Delete Environment Variable](/api-reference/accounts/delete-env-var)
+- [Create SSH Key](/api-reference/accounts/create-ssh-key)
+- [Update SSH Key](/api-reference/accounts/update-ssh-key)
+- [Delete SSH Key](/api-reference/accounts/delete-ssh-key)
+- [Create Subaccount](/api-reference/accounts/create-subaccount)
+- [Set User](/api-reference/accounts/set-user)
+- [Create Team](/api-reference/team/create-team)
+- [Delete Team](/api-reference/team/destroy-team)
+- [Create Template](/api-reference/templates/create-template)
+- [Edit Template](/api-reference/templates/edit-template)
+- [Delete Template](/api-reference/templates/delete-template)
+
+### billing\_read
+
+- [Search Invoices](/api-reference/billing/search-invoices)
+- [Show Invoices](/api-reference/billing/show-invoices)
+- [Show Earnings](/api-reference/billing/show-earnings)
+
+### billing\_write
+
+- [Transfer Credit](/api-reference/accounts/transfer-credit)
+
+### machine\_read
+
+- [Show Machines](/api-reference/machines/show-machines)
+- [Show Reports](/api-reference/machines/show-reports)
+
+### machine\_write
+
+- [Cancel Maintenance](/api-reference/machines/cancel-maint)
+- [Cleanup Machine](/api-reference/machines/cleanup-machine)
+- [List Machine](/api-reference/machines/list-machine)
+- [Remove Default Job](/api-reference/machines/remove-defjob)
+- [Schedule Maintenance](/api-reference/machines/schedule-maint)
+- [Set Default Job](/api-reference/machines/set-defjob)
+- [Set Minimum Bid](/api-reference/machines/set-min-bid)
+- [Unlist Machine](/api-reference/machines/unlist-machine)
+- [Add Network Disk](/api-reference/network-volumes/add-network-disk)
+- [Unlist Network Volume](/api-reference/network-volumes/unlist-network-volume)
+- [Unlist Volume](/api-reference/volumes/unlist-volume)
+
+### misc
+
+- [Search Network Volumes](/api-reference/network-volumes/search-network-volumes)
+- [Show Workergroups](/api-reference/serverless/show-workergroup)
+- [Create Workergroup](/api-reference/serverless/create-workergroup)
+- [Update Workergroup](/api-reference/serverless/update-workergroup)
+- [Delete Workergroup](/api-reference/serverless/delete-workergroup)
+- [Show Endpoints](/api-reference/serverless/show-endpoints)
+- [Create Endpoint](/api-reference/serverless/create-endpoint)
+- [Delete Endpoint](/api-reference/serverless/delete-endpoint)
+- [Search Benchmarks](/api-reference/search/search-benchmarks)
+- [Search Offers](/api-reference/search/search-offers)
+- [Search Volumes](/api-reference/volumes/search-volumes)
+
+### team\_read
+
+- [Show Team Members](/api-reference/team/show-team-members)
+- [Show Team Role](/api-reference/team/show-team-role)
+- [Show Team Roles](/api-reference/team/show-team-roles)
+
+### team\_write
+
+- [Invite Team Member](/api-reference/team/invite-team-member)
+- [Remove Team Member](/api-reference/team/remove-team-member)
+- [Create Team Role](/api-reference/team/create-team-role)
+- [Update Team Role](/api-reference/team/update-team-role)
+- [Remove Team Role](/api-reference/team/remove-team-role)

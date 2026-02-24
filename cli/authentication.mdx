@@ -1,0 +1,89 @@
+---
+title: "CLI Authentication"
+sidebarTitle: "Authentication"
+---
+
+Every request to the Vast.ai API requires an API key. The CLI stores your key locally and includes it automatically in every command. This page covers how to set up, verify, and manage API keys through the CLI.
+
+## Set Your API Key
+
+After creating a key from the [Keys page](https://cloud.vast.ai/cli/keys/), store it locally:
+
+```bash
+vastai set api-key YOUR_API_KEY
+```
+
+This writes the key to `~/.config/vastai/vast_api_key`. All subsequent commands use it automatically.
+
+<Tip>
+You can also create keys programmatically via the API ([Create API Key](/api-reference/accounts/create-api-key)) or SDK ([`vast.create_api_key()`](/sdk/python/reference/create-api-key)).
+</Tip>
+
+## Verify Your Key
+
+Confirm your key works by fetching your account info:
+
+```bash
+vastai show user
+```
+
+A successful response includes your user ID, email, and balance:
+
+```json
+{
+  "id": 123456,
+  "email": "you@example.com",
+  "credit": 25.00,
+  "ssh_key": "ssh-rsa AAAAB3..."
+}
+```
+
+<Note>
+If you get an authentication error, double-check your API key. The most common causes are a typo, an expired key, or a scoped key that lacks the required permission for the command you're running.
+</Note>
+
+## Create an API Key
+
+You can create new keys from the CLI:
+
+```bash
+vastai create api-key --name "ci-deploy-key"
+```
+
+The output includes the new key value. Copy it immediately -- you will not be able to retrieve it again.
+
+To create a key with restricted permissions, pass a JSON permissions file:
+
+```bash
+vastai create api-key --name "ci-deploy-key" --permission_file perms.json
+```
+
+See the [Permissions](/cli/permissions) page for the full permissions file format and examples.
+
+## View and Delete Keys
+
+List all API keys on your account:
+
+```bash
+vastai show api-keys
+```
+
+View a specific key's details by ID:
+
+```bash
+vastai show api-key 42
+```
+
+Delete a key:
+
+```bash
+vastai delete api-key 42
+```
+
+## Key Expiration
+
+API keys do not expire by default. You can revoke a key at any time from the [Keys page](https://cloud.vast.ai/cli/keys/) or with `vastai delete api-key`.
+
+<Warning>
+Treat your API key like a password. Do not commit keys to version control or share them in plaintext. If a key is compromised, revoke it immediately and create a new one.
+</Warning>
