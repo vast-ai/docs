@@ -1,0 +1,277 @@
+---
+title: "SDK Hello World"
+sidebarTitle: "Hello World"
+---
+
+This guide walks through the core Vast.ai workflow using the Python SDK: authenticate, search for a GPU, rent it, wait for it to boot, connect, and clean up. It mirrors the [API Hello World](/api-reference/introduction) but uses the SDK instead of raw REST calls.
+
+## Prerequisites
+
+- A Vast.ai account with credit (~$0.01–0.05, depending on test instance run time)
+- Python 3 with the `vastai-sdk` package installed
+
+## Install the SDK
+
+```bash
+pip install vastai-sdk
+```
+
+## Import and Initialize
+
+```python
+from vastai_sdk import VastAI
+
+vast = VastAI(api_key="your-api-key-here")
+```
+
+You can also read the key from an environment variable:
+
+```python
+import os
+from vastai_sdk import VastAI
+
+vast = VastAI(api_key=os.environ["VAST_API_KEY"])
+```
+
+## Resource Methods
+
+Most CLI commands have a direct SDK equivalent. For example, `vastai show instances` becomes `vast.show_instances()`. Your IDE will surface type hints and available parameters automatically.
+
+<Tip>
+Use `help(vast.search_offers)` (or any method) to view its description, parameters, and examples in your terminal.
+</Tip>
+
+---
+
+## 1. Get Your API Key
+
+Generate an API key from the [Keys page](https://cloud.vast.ai/cli/keys/) by clicking **+New**. Copy the key — you'll only see it once.
+
+Export it so scripts can pick it up:
+
+```bash
+export VAST_API_KEY="your-api-key-here"
+```
+
+<Tip>
+The console creates a full-access key by default. You can also create scoped API keys with limited permissions using [`vast.create_api_key()`](/sdk/python/reference/create-api-key) — useful for CI/CD or shared tooling where you want to restrict access.
+</Tip>
+
+## 2. Verify Authentication
+
+Confirm your key works by fetching your account info:
+
+```python
+import os
+from vastai_sdk import VastAI
+
+vast = VastAI(api_key=os.environ["VAST_API_KEY"])
+print(vast.show_user())
+```
+
+```json
+{
+  "id": 123456,
+  "email": "you@example.com",
+  "credit": 25.00,
+  "ssh_key": "ssh-rsa AAAAB3..."
+}
+```
+
+The `credit` field shows your available balance, and `ssh_key` is the public key that will be injected into new instances.
+
+<Note>
+If you get an authentication error, double-check your API key.
+</Note>
+
+## 3. Search for GPUs
+
+Find available machines using [`search_offers()`](/sdk/python/reference/search-offers). This query returns the top 5 on-demand RTX 4090s sorted by deep learning performance per dollar:
+
+```python
+import json
+
+result = vast.search_offers(
+    query="gpu_name=RTX_4090 num_gpus=1 verified=True rentable=True direct_port_count>=1",
+    type="on-demand",
+    order="dlperf_per_dphtotal-",
+    limit=5,
+)
+offers = json.loads(result)
+for offer in offers:
+    print(f"ID: {offer['id']}  GPU: {offer['gpu_name']}  $/hr: {offer['dph_total']:.4f}")
+```
+
+Each part of the `query` string controls a different filter:
+
+| Filter | Meaning |
+|--------|---------|
+| `gpu_name=RTX_4090` | Filter to a specific GPU model |
+| `num_gpus=1` | Exactly 1 GPU per instance |
+| `verified=True` | Only machines verified by Vast.ai |
+| `rentable=True` | Only machines currently available to rent |
+| `direct_port_count>=1` | At least 1 directly accessible port (needed for SSH) |
+
+The `order` parameter sorts results — a trailing `-` means descending. The `type` parameter selects on-demand pricing (vs. interruptible spot/bid).
+
+Note the `id` of the offer you want — you'll use it in the next step. If no offers are returned, try relaxing your filters (e.g. a different GPU model or removing `direct_port_count>=1`).
+
+<Tip>
+See the [Search Offers](/api-reference/search/search-offers) API reference for the full list of filter parameters and operators.
+</Tip>
+
+## 4. Create an Instance
+
+Rent a machine by calling [`create_instance()`](/sdk/python/reference/create-instance) with an offer `id` from step 3:
+
+```python
+offer_id = offers[0]["id"]  # from step 3
+
+result = vast.create_instance(
+    id=offer_id,
+    image="pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime",
+    disk=20,
+    onstart="echo hello && nvidia-smi",
+    direct=True,
+)
+result = json.loads(result)
+print(result)
+```
+
+```json
+{
+  "success": true,
+  "new_contract": 12345678
+}
+```
+
+Save the `new_contract` value — this is your **instance ID**.
+
+| Parameter | Meaning |
+|-----------|---------|
+| `id` | The offer ID from `search_offers()` |
+| `image` | Docker image to run |
+| `disk` | Disk space in GB |
+| `onstart` | Shell command(s) to run when the instance boots |
+| `direct` | `True` for direct SSH (lower latency than proxy SSH) |
+
+<Note>
+Setting `direct=True` is equivalent to `"runtype": "ssh_direct"` in the REST API. Recommended for interactive work.
+</Note>
+
+If you have a **template**, you can use it instead of specifying image and startup commands:
+
+```python
+result = vast.create_instance(
+    id=offer_id,
+    template_hash="YOUR_TEMPLATE_HASH",
+    disk=20,
+    direct=True,
+)
+```
+
+<Tip>
+**Shortcut:** [`launch_instance()`](/sdk/python/reference/launch-instance) combines search and create into a single call:
+
+```python
+vast.launch_instance(
+    num_gpus="1",
+    gpu_name="RTX_4090",
+    image="pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime",
+    disk=20,
+    direct=True,
+)
+```
+
+This searches for available offers matching your criteria and immediately creates an instance on the best match. Useful for scripts where you don't need to inspect offers first.
+</Tip>
+
+## 5. Wait Until Ready
+
+The instance needs time to pull the Docker image and boot. Poll with [`show_instance()`](/sdk/python/reference/show-instance) until `actual_status` is `"running"`:
+
+```python
+import time
+
+instance_id = result["new_contract"]
+
+while True:
+    info = json.loads(vast.show_instance(id=instance_id))
+    status = info.get("actual_status")
+    print(f"Status: {status}")
+    if status == "running":
+        break
+    time.sleep(10)
+
+ssh_host = info["ssh_host"]
+ssh_port = info["ssh_port"]
+print(f"SSH: ssh -p {ssh_port} root@{ssh_host}")
+```
+
+The `actual_status` field progresses through these states:
+
+| `actual_status` | Meaning |
+|-----------------|---------|
+| `null` | Instance is being provisioned |
+| `"loading"` | Docker image is downloading |
+| `"running"` | Ready to use |
+
+Poll every 10 seconds. Boot time is typically 1–5 minutes depending on Docker image size.
+
+## 6. Connect via SSH
+
+Use the `ssh_host` and `ssh_port` from the status response to connect:
+
+```bash
+ssh root@SSH_HOST -p SSH_PORT
+```
+
+Replace `SSH_HOST` and `SSH_PORT` with the values printed by the polling loop above.
+
+## 7. Copy Data
+
+The SDK provides [`copy()`](/sdk/python/reference/copy) for file transfers. Use the instance ID to reference remote paths:
+
+```python
+# Upload to instance
+vast.copy(src="./data/", dst=f"{instance_id}:/workspace/data/")
+
+# Download from instance
+vast.copy(src=f"{instance_id}:/workspace/results/", dst="./results/")
+```
+
+<Tip>
+You can also use standard tools like `rsync` or `scp` with the SSH connection from step 6:
+
+```bash
+rsync -avz -e "ssh -p SSH_PORT" ./data/ root@SSH_HOST:/workspace/data/
+```
+
+For cloud storage syncing and instance-to-instance transfers, see the [data movement guide](/documentation/instances/storage/data-movement).
+</Tip>
+
+## 8. Clean Up
+
+When you're done, destroy the instance to stop all billing:
+
+```python
+vast.destroy_instance(id=instance_id)
+```
+
+To **pause** an instance temporarily instead, use [`stop_instance()`](/sdk/python/reference/stop-instance). Stopping halts compute billing but disk storage charges continue:
+
+```python
+vast.stop_instance(id=instance_id)
+```
+
+<Warning>
+A stopped instance still incurs disk storage charges. Destroy the instance to stop all billing entirely.
+</Warning>
+
+## Next Steps
+
+You've completed the full instance lifecycle through the SDK. From here:
+
+- **SSH setup** — See the [SSH guide](/documentation/instances/connect/ssh) for key configuration and advanced connection options.
+- **Use templates** — Avoid repeating image and config parameters on every create call. The [Templates API guide](/api-reference/creating-and-using-templates-with-api) covers creating, sharing, and launching from templates.
+- **Full method reference** — Browse all available SDK methods in the [VastAI Client reference](/sdk/python/reference/vastai).
