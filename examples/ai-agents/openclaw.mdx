@@ -52,8 +52,6 @@ updatedAt: Mon Mar 03 2026 00:00:00 GMT+0000 (Coordinated Universal Time)
   })
 }} />
 
-# Run OpenClaw AI Assistant with vLLM on Vast.ai
-
 Deploy [Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B) on a Vast.ai GPU with [vLLM](https://docs.vllm.ai/) and connect [OpenClaw](https://docs.openclaw.ai/) to it for private, self-hosted AI conversations with tool use.
 
 ## Overview
@@ -124,7 +122,7 @@ Search for an RTX 3090 with direct port access:
 
 ```bash Bash
 vastai search offers \
-    "gpu_name = RTX_3090 num_gpus = 1 direct_port_count >= 1 cuda_vers >= 13.0 inet_down >= 2000" \
+    "gpu_name = RTX_3090 num_gpus = 1 direct_port_count >= 1 cuda_vers >= 13.0" \
     --order "dph_base" --limit 5
 ```
 
@@ -132,9 +130,6 @@ The results show available machines sorted by price. Note the **ID** in the firs
 
 The RTX 3090 (24GB VRAM) is the minimum GPU for Qwen3-8B. The model requires \~15 GiB of VRAM, leaving \~4.5 GiB for KV cache.
 
-<Note>
-  The `inet_down >= 2000` filter ensures fast model downloads.
-</Note>
 
 ## Step 4: Deploy vLLM with Qwen3-8B
 
@@ -143,15 +138,7 @@ Create an instance using the offer ID from Step 3. The offer ID is in the first 
 ```bash Bash
 vastai create instance YOUR_OFFER_ID \
     --image vastai/vllm:v0.16.0-cuda-12.9 \
-    --env '-p 1111:1111 -p 8080:8080 -p 8000:8000 -p 8265:8265 \
-        -e OPEN_BUTTON_PORT=1111 -e OPEN_BUTTON_TOKEN=1 \
-        -e JUPYTER_DIR=/ -e DATA_DIRECTORY=/workspace/ \
-        -e PORTAL_CONFIG="localhost:1111:11111:/:Instance Portal|localhost:8000:18000:/docs:vLLM API|localhost:8265:28265:/:Ray Dashboard|localhost:8080:18080:/:Jupyter|localhost:8080:8080:/terminals/1:Jupyter Terminal" \
-        -e VLLM_MODEL=Qwen/Qwen3-8B \
-        -e VLLM_ARGS="--max-model-len 32000 --dtype auto --enable-auto-tool-choice --tool-call-parser hermes --host 127.0.0.1 --port 18000" \
-        -e AUTO_PARALLEL=true \
-        -e RAY_ADDRESS=127.0.0.1 \
-        -e RAY_ARGS="--head --port 6379 --dashboard-host 127.0.0.1 --dashboard-port 28265"' \
+    --env '-p 1111:1111 -p 8080:8080 -p 8000:8000 -p 8265:8265 -e OPEN_BUTTON_PORT=1111 -e OPEN_BUTTON_TOKEN=1 -e JUPYTER_DIR=/ -e DATA_DIRECTORY=/workspace/ -e PORTAL_CONFIG="localhost:1111:11111:/:Instance Portal|localhost:8000:18000:/docs:vLLM API|localhost:8265:28265:/:Ray Dashboard|localhost:8080:18080:/:Jupyter|localhost:8080:8080:/terminals/1:Jupyter Terminal" -e VLLM_MODEL=Qwen/Qwen3-8B -e VLLM_ARGS="--max-model-len 32000 --dtype auto --enable-auto-tool-choice --tool-call-parser hermes --host 127.0.0.1 --port 18000" -e AUTO_PARALLEL=true -e RAY_ADDRESS=127.0.0.1 -e RAY_ARGS="--head --port 6379 --dashboard-host 127.0.0.1 --dashboard-port 28265"' \
     --onstart-cmd 'entrypoint.sh' \
     --disk 50
 ```
@@ -185,15 +172,19 @@ If the command returns `success: False`, the machine may be unavailable. Try a d
 
 ## Step 5: Wait for Model Loading
 
-Monitor the instance logs:
+Replace `YOUR_INSTANCE_ID` with the `new_contract` value from Step 4 (e.g., `98765432`).
+
+Wait for the status to show `running` (typically 5–10 minutes):
+
+```bash Bash
+vastai show instance YOUR_INSTANCE_ID
+```
+
+Then check the logs and wait until you see **`Application startup complete.`**:
 
 ```bash Bash
 vastai logs YOUR_INSTANCE_ID
 ```
-
-Replace `YOUR_INSTANCE_ID` with the `new_contract` value from Step 4 (e.g., `98765432`).
-
-vLLM will download the model weights, then initialize the KV cache and start the API server. Wait until you see **`Application startup complete.`** before proceeding.
 
 ## Step 6: Get Connection Details
 
@@ -280,7 +271,13 @@ Set the vLLM API key environment variable to the `OPEN_BUTTON_TOKEN` from Step 6
 export VLLM_API_KEY="YOUR_OPEN_BUTTON_TOKEN"
 ```
 
-Create the OpenClaw configuration file at `~/.openclaw/openclaw.json`:
+Create the OpenClaw configuration directory and file:
+
+```bash Bash
+mkdir -p ~/.openclaw
+```
+
+Create `~/.openclaw/openclaw.json`:
 
 ```json JSON
 {
@@ -355,6 +352,14 @@ The `--thinking off` flag disables Qwen3's reasoning mode. Without it, responses
 You now have a private AI assistant powered by your own GPU — no third-party API keys required. From here, you can start an interactive session, connect additional tools, or swap in a different model.
 
 ## Troubleshooting
+
+### Instance stuck in "loading"
+
+If the instance stays in `loading` for more than 15 minutes, it may have failed silently. Destroy it and try a different offer from Step 3:
+
+```bash Bash
+vastai destroy instance YOUR_INSTANCE_ID
+```
 
 ### "Model context window too small" error
 
