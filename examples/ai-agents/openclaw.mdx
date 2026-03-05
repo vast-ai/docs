@@ -1,0 +1,417 @@
+---
+title: OpenClaw AI Assistant with vLLM on Vast.ai
+slug: openclaw-ai-assistant-vllm-vast
+createdAt: Mon Mar 02 2026 00:00:00 GMT+0000 (Coordinated Universal Time)
+updatedAt: Mon Mar 03 2026 00:00:00 GMT+0000 (Coordinated Universal Time)
+---
+
+<script type="application/ld+json" dangerouslySetInnerHTML={{
+  __html: JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "Run OpenClaw AI Assistant with vLLM on Vast.ai",
+    "description": "Deploy a vLLM inference server on Vast.ai with Qwen3-8B and connect OpenClaw, an open-source AI assistant, to it for private, self-hosted AI conversations.",
+    "step": [
+      {
+        "@type": "HowToStep",
+        "name": "Install prerequisites",
+        "text": "Install the Vast.ai CLI, Node.js 22+, and OpenClaw locally."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Find a GPU instance",
+        "text": "Search for an RTX 3090 or equivalent GPU with 24GB+ VRAM on Vast.ai."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Deploy vLLM with Qwen3-8B",
+        "text": "Create a Vast instance running vLLM with the Qwen3-8B model and tool calling support."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Verify the vLLM API",
+        "text": "Confirm the model is loaded and serving by querying the OpenAI-compatible API."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Configure OpenClaw",
+        "text": "Point OpenClaw to the remote vLLM server by editing the OpenClaw configuration file."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Test the connection",
+        "text": "Send a message through OpenClaw and verify a response from Qwen3-8B on Vast."
+      }
+    ],
+    "author": {
+      "@type": "Organization",
+      "name": "Vast.ai Team"
+    },
+    "datePublished": "2026-03-02",
+    "dateModified": "2026-03-03"
+  })
+}} />
+
+Deploy [Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B) on a Vast.ai GPU with [vLLM](https://docs.vllm.ai/) and connect [OpenClaw](https://docs.openclaw.ai/) to it for private, self-hosted AI conversations with tool use.
+
+## Overview
+
+[OpenClaw](https://github.com/openclaw/openclaw) is an open-source AI assistant that runs locally on your machine. It supports multiple model providers through an OpenAI-compatible API, including self-hosted models via vLLM.
+
+In this guide, you will:
+
+1. Launch a vLLM inference server on a Vast.ai GPU serving Qwen3-8B
+2. Install and configure OpenClaw locally to connect to the remote vLLM server
+3. Send messages through OpenClaw and receive responses from Qwen3-8B
+
+This gives you a private AI assistant powered by your own GPU instance — no API keys from third-party providers needed.
+
+## Requirements
+
+- **Vast.ai account** with credits loaded ([quickstart guide](/documentation/get-started/quickstart))
+- **SSH key** added to your Vast.ai account ([SSH setup guide](/documentation/instances/connect/ssh))
+- **Node.js 22.12.0 or later** ([nodejs.org](https://nodejs.org/))
+- A terminal with `curl` available
+
+<Warning>
+  This guide creates a paid GPU instance that bills by the hour. An RTX 3090 typically costs $0.15–0.20/hr — following this guide end-to-end takes about 10 minutes and costs less than $0.05. Remember to destroy the instance when you're done — see [Cleanup](#cleanup).
+</Warning>
+
+## Step 1: Install the Vast.ai CLI
+
+```bash Bash
+pip install --upgrade vastai
+vastai set api-key YOUR_API_KEY
+```
+
+Verify the CLI is working:
+
+```bash Bash
+vastai show user
+```
+
+You should see your account details and credit balance.
+
+## Step 2: Install OpenClaw
+
+```bash Bash
+npm install -g openclaw@2026.2.13
+```
+
+Verify the installation:
+
+```bash Bash
+openclaw --version
+```
+
+```text Text
+2026.2.13
+```
+
+<Note>
+  OpenClaw requires Node.js 22.12.0 or later. If you see a version error, update Node.js or use [nvm](https://github.com/nvm-sh/nvm) to install a compatible version.
+</Note>
+
+<Warning>
+  This guide requires OpenClaw **2026.2.13**. Later versions have a [known bug](https://github.com/openclaw/openclaw/issues/17613) where the embedded agent times out when connecting to self-hosted OpenAI-compatible backends like vLLM, even though the server is responding correctly. If you have a newer version installed, downgrade with `npm install -g openclaw@2026.2.13`.
+</Warning>
+
+## Step 3: Find a GPU Instance
+
+Search for an RTX 3090 with direct port access:
+
+```bash Bash
+vastai search offers \
+    "gpu_name = RTX_3090 num_gpus = 1 direct_port_count >= 1 cuda_vers >= 13.0" \
+    --order "dph_base" --limit 5
+```
+
+The results show available machines sorted by price. Note the **ID** in the first column — you will use it in the next step.
+
+The RTX 3090 (24GB VRAM) is the minimum GPU for Qwen3-8B. The model requires \~15 GiB of VRAM, leaving \~4.5 GiB for KV cache.
+
+
+## Step 4: Deploy vLLM with Qwen3-8B
+
+Create an instance using the offer ID from Step 3. The offer ID is in the first column (`ID`) of the search results.
+
+```bash Bash
+vastai create instance YOUR_OFFER_ID \
+    --image vastai/vllm:v0.16.0-cuda-12.9 \
+    --env '-p 1111:1111 -p 8080:8080 -p 8000:8000 -p 8265:8265 -e OPEN_BUTTON_PORT=1111 -e OPEN_BUTTON_TOKEN=1 -e JUPYTER_DIR=/ -e DATA_DIRECTORY=/workspace/ -e PORTAL_CONFIG="localhost:1111:11111:/:Instance Portal|localhost:8000:18000:/docs:vLLM API|localhost:8265:28265:/:Ray Dashboard|localhost:8080:18080:/:Jupyter|localhost:8080:8080:/terminals/1:Jupyter Terminal" -e VLLM_MODEL=Qwen/Qwen3-8B -e VLLM_ARGS="--max-model-len 32000 --dtype auto --enable-auto-tool-choice --tool-call-parser hermes --host 127.0.0.1 --port 18000" -e AUTO_PARALLEL=true -e RAY_ADDRESS=127.0.0.1 -e RAY_ARGS="--head --port 6379 --dashboard-host 127.0.0.1 --dashboard-port 28265"' \
+    --onstart-cmd 'entrypoint.sh' \
+    --disk 50
+```
+
+Replace `YOUR_OFFER_ID` with the ID from Step 3 (e.g., `12345678`).
+
+```text Text
+Started. {'success': True, 'new_contract': 98765432, 'instance_api_key': 'a1b2c3...'}
+```
+
+Note the **`new_contract`** value — this is your **instance ID**, which is different from the offer ID. You will use the instance ID in the remaining steps.
+
+This command uses Vast's vLLM image, which includes a reverse proxy that automatically generates an authentication token (`OPEN_BUTTON_TOKEN`) for your instance.
+
+**Key environment variables**:
+
+| Variable | Purpose |
+|----------|---------|
+| `VLLM_MODEL` | Hugging Face model to serve |
+| `VLLM_ARGS` | Arguments passed to `vllm serve` |
+| `--max-model-len 32000` | Maximum context length for RTX 3090 |
+| `--enable-auto-tool-choice` | Required for OpenClaw tool calling |
+| `--tool-call-parser hermes` | Tool call format compatible with Qwen3 |
+| `OPEN_BUTTON_TOKEN=1` | Tells the image to generate an authentication token |
+
+<Note>
+  The `--max-model-len` value of 32000 is tuned for the RTX 3090. The model uses \~15 GiB of VRAM, leaving \~4.5 GiB for KV cache. Using 32768 (Qwen3-8B's native context) will fail with an out-of-memory error.
+</Note>
+
+If the command returns `success: False`, the machine may be unavailable. Try a different offer ID from Step 3.
+
+## Step 5: Wait for Model Loading
+
+Replace `YOUR_INSTANCE_ID` with the `new_contract` value from Step 4 (e.g., `98765432`).
+
+Wait for the status to show `running`:
+
+```bash Bash
+vastai show instance YOUR_INSTANCE_ID
+```
+
+Once the instance is running, SSH in and watch the vLLM log until you see **`Application startup complete.`**:
+
+```bash Bash
+vastai ssh-url YOUR_INSTANCE_ID
+```
+
+```bash Bash
+ssh -p PORT root@HOST 'tail -f /var/log/portal/vllm.log'
+```
+
+Replace `PORT` and `HOST` with the values from the `ssh-url` output (e.g., `ssh://root@ssh5.vast.ai:33426` means `HOST=ssh5.vast.ai` and `PORT=33426`).
+
+vLLM will download the model weights (~16 GB), then initialize the GPU and start the API server. This typically takes 3–8 minutes depending on download speed. Press `Ctrl+C` to stop watching once you see the startup message.
+
+## Step 6: Get Connection Details
+
+Find your instance's IP address and port:
+
+```bash Bash
+vastai show instance YOUR_INSTANCE_ID --raw | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+ip = d['public_ipaddr']
+port = d['ports']['8000/tcp'][0]['HostPort']
+print(f'API endpoint: http://{ip}:{port}')
+"
+```
+
+```text Text
+API endpoint: http://INSTANCE_IP:EXTERNAL_PORT
+```
+
+Next, retrieve the authentication token. The instance automatically generates an `OPEN_BUTTON_TOKEN` that protects the API. SSH into the instance to get it:
+
+```bash Bash
+vastai ssh-url YOUR_INSTANCE_ID
+```
+
+```text Text
+ssh://root@ssh5.vast.ai:33426
+```
+
+```bash Bash
+ssh -p 33426 root@ssh5.vast.ai 'echo $OPEN_BUTTON_TOKEN'
+```
+
+```text Text
+ebc1e4b9922bd49aacfb54bba36259c801f5c4d9edaace7576f9b1ecd067559d
+```
+
+Save this token — you will need it for all API requests and for the OpenClaw configuration.
+
+Verify the API is responding:
+
+```bash Bash
+curl -s http://INSTANCE_IP:EXTERNAL_PORT/v1/models \
+    -H "Authorization: Bearer YOUR_OPEN_BUTTON_TOKEN"
+```
+
+```json JSON
+{
+  "object": "list",
+  "data": [{
+    "id": "Qwen/Qwen3-8B",
+    "object": "model",
+    "owned_by": "vllm",
+    "max_model_len": 32000
+  }]
+}
+```
+
+Test a chat completion:
+
+```bash Bash
+curl -s http://INSTANCE_IP:EXTERNAL_PORT/v1/chat/completions \
+    -H "Authorization: Bearer YOUR_OPEN_BUTTON_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "model": "Qwen/Qwen3-8B",
+        "messages": [{"role": "user", "content": "Who are you? Introduce yourself briefly."}],
+        "max_tokens": 256,
+        "temperature": 0.6
+    }'
+```
+
+You should see Qwen3-8B introduce itself: "I am Qwen, a large language model developed by Alibaba Cloud."
+
+<Note>
+  Qwen3-8B includes a thinking mode by default. The response may contain `<think>...</think>` reasoning tokens before the final answer. This is expected behavior.
+</Note>
+
+## Step 7: Configure OpenClaw
+
+Set the vLLM API key environment variable to the `OPEN_BUTTON_TOKEN` from Step 6:
+
+```bash Bash
+export VLLM_API_KEY="YOUR_OPEN_BUTTON_TOKEN"
+```
+
+Create the OpenClaw configuration directory and file:
+
+```bash Bash
+mkdir -p ~/.openclaw
+```
+
+Create `~/.openclaw/openclaw.json`:
+
+```json JSON
+{
+  "models": {
+    "providers": {
+      "vllm": {
+        "baseUrl": "http://INSTANCE_IP:EXTERNAL_PORT/v1",
+        "apiKey": "${VLLM_API_KEY}",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "Qwen/Qwen3-8B",
+            "name": "Qwen3 8B on Vast",
+            "reasoning": false,
+            "input": ["text"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 32000,
+            "maxTokens": 4096
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": { "primary": "vllm/Qwen/Qwen3-8B" }
+    }
+  }
+}
+```
+
+Replace `INSTANCE_IP:EXTERNAL_PORT` with the values from Step 6.
+
+**Key configuration fields**:
+
+| Field | Purpose |
+|-------|---------|
+| `baseUrl` | Your vLLM API endpoint from Step 6 |
+| `apiKey` | Reads the `VLLM_API_KEY` environment variable at runtime |
+| `api` | Protocol to use — `openai-completions` for vLLM's OpenAI-compatible API |
+| `reasoning` | Set to `false` to disable structured reasoning (Qwen3's thinking mode is separate) |
+| `contextWindow` | Must match the `--max-model-len` value from Step 4 |
+| `maxTokens` | Maximum tokens per response |
+
+Verify OpenClaw can see the model:
+
+```bash Bash
+openclaw models list
+```
+
+```text Text
+Model                                      Input      Ctx      Local Auth  Tags
+vllm/Qwen/Qwen3-8B                         text       31k      no    yes   default
+```
+
+## Step 8: Test OpenClaw
+
+Send a message through OpenClaw to the vLLM backend:
+
+```bash Bash
+openclaw agent --local --session-id test \
+    --message "Who are you? Introduce yourself briefly." \
+    --thinking off
+```
+
+```text Text
+I am an AI assistant created by OpenClaw.
+```
+
+The `--thinking off` flag disables Qwen3's reasoning mode. Without it, responses may include `<think>...</think>` tokens before the answer.
+
+You now have a private AI assistant powered by your own GPU — no third-party API keys required. From here, you can start an interactive session, connect additional tools, or swap in a different model.
+
+## Troubleshooting
+
+### Instance stuck in "loading"
+
+If the instance stays in `loading` for more than 15 minutes, it may have failed silently. Destroy it and try a different offer from Step 3:
+
+```bash Bash
+vastai destroy instance YOUR_INSTANCE_ID
+```
+
+### "Model context window too small" error
+
+OpenClaw requires a minimum context window of 16,000 tokens. If you see this error, check that `--max-model-len` in the vLLM creation command is set to at least 32000. OpenClaw's system prompt and tool schemas consume approximately 12,000-13,000 tokens, so the model needs enough remaining context for your messages and responses.
+
+### "auto tool choice requires --enable-auto-tool-choice" error
+
+OpenClaw uses tool calling by default. Add `--enable-auto-tool-choice --tool-call-parser hermes` to the vLLM creation command.
+
+### "LLM request timed out" with newer OpenClaw versions
+
+OpenClaw versions after 2026.2.13 have a [known bug](https://github.com/openclaw/openclaw/issues/17613) in the embedded agent's streaming response path. The vLLM server generates tokens correctly, but OpenClaw's client never commits the assistant payload, causing a timeout after \~30 seconds. Direct `curl` requests to the same endpoint work fine.
+
+To fix this, downgrade to the compatible version:
+
+```bash Bash
+npm install -g openclaw@2026.2.13
+```
+
+### Context overflow errors
+
+If you see "Context overflow: prompt too large for the model", the conversation has exceeded the model's context window. Start a fresh session:
+
+```bash Bash
+openclaw agent --local --session-id new-session \
+    --message "Your message here" \
+    --thinking off
+```
+
+
+## Cleanup
+
+When you're done, destroy the instance to stop billing:
+
+```bash Bash
+vastai destroy instance YOUR_INSTANCE_ID
+```
+
+
+## Resources
+
+- [OpenClaw Documentation](https://docs.openclaw.ai/)
+- [OpenClaw vLLM Provider Guide](https://docs.openclaw.ai/providers/vllm)
+- [Qwen3-8B Model Card](https://huggingface.co/Qwen/Qwen3-8B)
+- [vLLM Documentation](https://docs.vllm.ai/)
+- [Vast.ai Quickstart](/documentation/get-started/quickstart)
+- [Vast.ai vLLM Template Guide](/vllm-llm-inference-and-serving)
