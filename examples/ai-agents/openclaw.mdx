@@ -74,7 +74,7 @@ This gives you a private AI assistant powered by your own GPU instance — no AP
 - A terminal with `curl` available
 
 <Warning>
-  This guide creates a paid GPU instance that bills by the hour. Remember to destroy it when you're done — see [Cleanup](#cleanup).
+  This guide creates a paid GPU instance that bills by the hour. An RTX 3090 typically costs $0.15–0.20/hr — following this guide end-to-end takes about 10 minutes and costs less than $0.05. Remember to destroy the instance when you're done — see [Cleanup](#cleanup).
 </Warning>
 
 ## Step 1: Install the Vast.ai CLI
@@ -174,17 +174,25 @@ If the command returns `success: False`, the machine may be unavailable. Try a d
 
 Replace `YOUR_INSTANCE_ID` with the `new_contract` value from Step 4 (e.g., `98765432`).
 
-Wait for the status to show `running` (typically 5–10 minutes):
+Wait for the status to show `running`:
 
 ```bash Bash
 vastai show instance YOUR_INSTANCE_ID
 ```
 
-Then check the logs and wait until you see **`Application startup complete.`**:
+Once the instance is running, SSH in and watch the vLLM log until you see **`Application startup complete.`**:
 
 ```bash Bash
-vastai logs YOUR_INSTANCE_ID
+vastai ssh-url YOUR_INSTANCE_ID
 ```
+
+```bash Bash
+ssh -p PORT root@HOST 'tail -f /var/log/portal/vllm.log'
+```
+
+Replace `PORT` and `HOST` with the values from the `ssh-url` output (e.g., `ssh://root@ssh5.vast.ai:33426` means `HOST=ssh5.vast.ai` and `PORT=33426`).
+
+vLLM will download the model weights (~16 GB), then initialize the GPU and start the API server. This typically takes 3–8 minutes depending on download speed. Press `Ctrl+C` to stop watching once you see the startup message.
 
 ## Step 6: Get Connection Details
 
