@@ -1,0 +1,361 @@
+---
+title: "BYOM: Bring Your Own Vast Hosted Model to Claude"
+slug: claude-code-byom-vast
+createdAt: Thu Mar 06 2026 00:00:00 GMT+0000 (Coordinated Universal Time)
+updatedAt: Thu Mar 06 2026 00:00:00 GMT+0000 (Coordinated Universal Time)
+---
+
+<script type="application/ld+json" dangerouslySetInnerHTML={{
+  __html: JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "Run Claude Code with Your Own Model on Vast.ai",
+    "description": "Deploy an open-source model on Vast.ai and connect Claude Code to it using Ollama's native Anthropic Messages API support.",
+    "step": [
+      {
+        "@type": "HowToStep",
+        "name": "Install Vast.ai CLI",
+        "text": "Install the Vast.ai CLI and configure your API key."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Choose a model",
+        "text": "Select either Qwen3-Coder-Next (80B) or GPT-OSS-20B based on your needs."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Deploy Ollama on Vast.ai",
+        "text": "Create a GPU instance running Ollama and pull your chosen model."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Get your endpoint",
+        "text": "Retrieve the public IP and port for your Ollama instance."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Connect Claude Code",
+        "text": "Set environment variables and launch Claude Code pointed at your self-hosted model."
+      }
+    ],
+    "author": {
+      "@type": "Organization",
+      "name": "Vast.ai Team"
+    },
+    "datePublished": "2026-03-06",
+    "dateModified": "2026-03-06"
+  })
+}} />
+
+Claude Code supports Bring Your Own Model (BYOM) — you can point it at any API that speaks the [Anthropic Messages format](https://docs.anthropic.com/en/api/messages) (`/v1/messages`). [Ollama](https://ollama.com/) serves this API natively, so you can deploy an open-source model on a Vast.ai GPU instance and connect Claude Code directly to it. No proxy, no API translation layer, no Anthropic account required.
+
+This guide covers deploying two models and connecting Claude Code to them:
+
+| Model | Parameters | VRAM Used | Best For |
+|-------|-----------|-----------|----------|
+| [Qwen3-Coder-Next](https://ollama.com/library/qwen3-coder-next) | 80B MoE (3B active) | ~57 GB | State-of-the-art coding, tool calling |
+| [GPT-OSS-20B](https://ollama.com/library/gpt-oss:20b) | 20B (4-bit quantized) | ~14 GB | Lightweight, fast responses, fine-tuned for Claude Code |
+
+Qwen3-Coder-Next is a Mixture of Experts model from Alibaba — 80 billion total parameters but only 3 billion active per token, giving strong coding ability at efficient inference cost. GPT-OSS-20B is fine-tuned specifically for Claude Code's tool-calling format.
+
+## Prerequisites
+
+- A [Vast.ai](https://vast.ai/) account with credits ([console](https://cloud.vast.ai/))
+- [Vast.ai CLI](https://vast.ai/docs/cli/commands) installed
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed locally
+- `curl` and `jq` for testing the endpoint
+
+## Hardware Requirements
+
+| Model | Min GPU VRAM | Recommended GPU | Disk |
+|-------|-------------|-----------------|------|
+| Qwen3-Coder-Next | 80 GB | A100 80GB, H100 | 200 GB |
+| GPT-OSS-20B | 16 GB | RTX 3090, RTX 4090 | 100 GB |
+
+Qwen3-Coder-Next uses ~48 GB for model weights and ~8 GB for KV cache in Ollama's default Q4 quantization — totaling ~57 GB, which requires an 80 GB GPU like the A100 or H100. GPT-OSS-20B uses ~12 GB for weights and ~1 GB for KV cache. Disk space is needed for the Ollama image plus model downloads.
+
+## Step 1: Install the Vast.ai CLI
+
+Install the CLI and set your API key. You can find your API key in the [Vast.ai console](https://cloud.vast.ai/) under Account → API Key:
+
+```bash
+pip install vastai
+vastai set api-key <YOUR_VAST_API_KEY>
+```
+
+## Step 2: Choose a Model, Find a GPU, and Deploy
+
+<Tabs>
+  <Tab title="Qwen3-Coder-Next">
+    Search for a GPU with at least 80 GB VRAM. Look for an A100 or H100 in the results — these offer the best performance for this model:
+
+    ```bash
+    vastai search offers \
+      'gpu_ram>=80 num_gpus=1 reliability>0.9 disk_space>=200 inet_down>200 dph<2.0' \
+      -o 'dph'
+    ```
+
+    Pick an offer ID from the first column, then create the instance:
+
+    ```bash
+    vastai create instance <OFFER_ID> \
+      --image ollama/ollama:latest \
+      --env "-p 11434:11434" \
+      --disk 200 \
+      --onstart-cmd "ollama serve & sleep 5 && ollama pull qwen3-coder-next"
+    ```
+  </Tab>
+  <Tab title="GPT-OSS-20B">
+    This model fits on smaller GPUs. Search for instances with at least 16 GB VRAM:
+
+    ```bash
+    vastai search offers \
+      'gpu_ram>=16 num_gpus=1 reliability>0.9 disk_space>=100 inet_down>200 dph<1.0' \
+      -o 'dph'
+    ```
+
+    Pick an offer ID from the first column, then create the instance:
+
+    ```bash
+    vastai create instance <OFFER_ID> \
+      --image ollama/ollama:latest \
+      --env "-p 11434:11434" \
+      --disk 100 \
+      --onstart-cmd "ollama serve & sleep 5 && ollama pull gpt-oss:20b"
+    ```
+  </Tab>
+</Tabs>
+
+The command starts the Ollama server, waits for it to initialize, then downloads the model weights. Save the instance ID from the output — you'll need it in the next steps.
+
+### What the flags do
+
+| Flag | Purpose |
+|------|---------|
+| `--image ollama/ollama:latest` | Official Ollama Docker image with GPU support |
+| `-p 11434:11434` | Exposes Ollama's default port to the internet |
+| `--disk 200` | Allocates enough disk for the Docker image plus model weights |
+| `ollama serve &` | Starts the Ollama server in the background |
+| `ollama pull <model>` | Downloads the model weights (runs once on first boot) |
+
+## Step 3: Wait for the Model to Download
+
+Monitor the instance logs to track the download progress:
+
+```bash
+vastai logs <INSTANCE_ID> --tail 20
+```
+
+Look for `success` in the output, which confirms the model finished downloading:
+
+```text
+pulling 30e51a7cb1cf: 100% ▏████████████████████  51 GB
+verifying sha256 digest
+writing manifest
+success
+```
+
+## Step 4: Get Your Endpoint
+
+Retrieve the public IP and mapped port for your instance:
+
+```bash
+vastai show instance <INSTANCE_ID> --raw | \
+  jq -r '"\(.public_ipaddr):\(.ports["11434/tcp"][0].HostPort)"'
+```
+
+This outputs your endpoint in `<IP>:<PORT>` format. Save this — you'll use it to verify and connect Claude Code.
+
+## Step 5: Verify the Endpoint
+
+Before connecting Claude Code, confirm the model is running and responding correctly.
+
+### Check model availability
+
+List the models loaded in Ollama:
+
+```bash
+curl -s http://<IP>:<PORT>/v1/models \
+  -H "x-api-key: ollama" | jq .
+```
+
+You should see your model listed in the response.
+
+### Test basic chat
+
+Send a simple message using the Anthropic Messages API format:
+
+```bash
+curl -s http://<IP>:<PORT>/v1/messages \
+  -H "content-type: application/json" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "x-api-key: ollama" \
+  -d '{
+    "model": "qwen3-coder-next",
+    "max_tokens": 256,
+    "messages": [{"role": "user", "content": "Say hello in one sentence"}]
+  }' | jq .
+```
+
+For GPT-OSS-20B, replace the model name with `gpt-oss:20b`.
+
+Expected output:
+
+```json
+{
+  "id": "msg_f2419f865f0ab7866135d9f2",
+  "type": "message",
+  "role": "assistant",
+  "model": "qwen3-coder-next",
+  "content": [
+    {
+      "type": "text",
+      "text": "Hello!"
+    }
+  ],
+  "stop_reason": "end_turn",
+  "usage": {
+    "input_tokens": 13,
+    "output_tokens": 3
+  }
+}
+```
+
+### Test tool calling
+
+Claude Code relies on tool calling to edit files, run commands, and navigate your codebase. Verify the model handles tool calls correctly:
+
+```bash
+curl -s http://<IP>:<PORT>/v1/messages \
+  -H "content-type: application/json" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "x-api-key: ollama" \
+  -d '{
+    "model": "qwen3-coder-next",
+    "max_tokens": 1024,
+    "tools": [
+      {
+        "name": "Write",
+        "description": "Write content to a file",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "file_path": {"type": "string"},
+            "content": {"type": "string"}
+          },
+          "required": ["file_path", "content"]
+        }
+      }
+    ],
+    "messages": [{"role": "user", "content": "Create hello.py that prints hello world"}]
+  }' | jq .
+```
+
+A successful response includes `"stop_reason": "tool_use"` and a `tool_use` content block with the file path and content:
+
+```json
+{
+  "id": "msg_00789b0ea0df023942763847",
+  "type": "message",
+  "role": "assistant",
+  "model": "qwen3-coder-next",
+  "content": [
+    {
+      "type": "tool_use",
+      "id": "call_spd57315",
+      "name": "Write",
+      "input": {
+        "file_path": "hello.py",
+        "content": "print(\"hello world\")\n"
+      }
+    }
+  ],
+  "stop_reason": "tool_use",
+  "usage": {
+    "input_tokens": 306,
+    "output_tokens": 36
+  }
+}
+```
+
+## Step 6: Connect Claude Code
+
+Set the environment variables that tell Claude Code to use your self-hosted model instead of Anthropic's API. Replace `<IP>:<PORT>` with the endpoint from step 4.
+
+<Tabs>
+  <Tab title="Qwen3-Coder-Next">
+    ```bash
+    export ANTHROPIC_BASE_URL="http://<IP>:<PORT>"
+    export ANTHROPIC_API_KEY="ollama"
+    export ANTHROPIC_AUTH_TOKEN="ollama"
+    export ANTHROPIC_MODEL="qwen3-coder-next"
+    claude --model qwen3-coder-next
+    ```
+  </Tab>
+  <Tab title="GPT-OSS-20B">
+    ```bash
+    export ANTHROPIC_BASE_URL="http://<IP>:<PORT>"
+    export ANTHROPIC_API_KEY="ollama"
+    export ANTHROPIC_AUTH_TOKEN="ollama"
+    export ANTHROPIC_MODEL="gpt-oss:20b"
+    claude --model "gpt-oss:20b"
+    ```
+  </Tab>
+</Tabs>
+
+Claude Code launches and connects to your model. Try asking it to create a file, edit code, or run a command to confirm tool calling works end-to-end.
+
+### What the environment variables do
+
+| Variable | Purpose |
+|----------|---------|
+| `ANTHROPIC_BASE_URL` | Points Claude Code at your Ollama instance instead of `api.anthropic.com` |
+| `ANTHROPIC_API_KEY` | Required by Claude Code but can be any value — Ollama doesn't enforce auth |
+| `ANTHROPIC_AUTH_TOKEN` | Same as above — set to any non-empty string |
+| `ANTHROPIC_MODEL` | The model name to request from Ollama |
+
+### Persistent Configuration (optional)
+
+To avoid setting environment variables every time, add the configuration to `~/.claude/settings.json`:
+
+```json
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "http://<IP>:<PORT>",
+    "ANTHROPIC_API_KEY": "ollama",
+    "ANTHROPIC_AUTH_TOKEN": "ollama"
+  }
+}
+```
+
+Then launch with:
+
+```bash
+claude --model qwen3-coder-next
+```
+
+<Warning>
+The `settings.json` approach stores your endpoint persistently. If you destroy the Vast.ai instance, you'll need to update the IP and port or remove the configuration to use Anthropic's API again.
+</Warning>
+
+## Cleanup
+
+Destroy your instance when you're done to stop billing:
+
+```bash
+vastai destroy instance <INSTANCE_ID>
+```
+
+## Next Steps
+
+- **Try other models**: Ollama supports [hundreds of models](https://ollama.com/search). Any model with tool-calling support works with Claude Code — try `qwen3-coder` (30B) for a middle ground between the two options above.
+- **Secure your endpoint**: The default setup has no authentication. For production use, add a reverse proxy with TLS and API key validation.
+- **Scale up**: An H100 offers faster inference than an A100 for Qwen3-Coder-Next, with more headroom for longer context windows and concurrent requests.
+
+## Resources
+
+- [Claude Code documentation](https://docs.anthropic.com/en/docs/claude-code)
+- [Ollama](https://ollama.com/)
+- [Qwen3-Coder-Next on Ollama](https://ollama.com/library/qwen3-coder-next)
+- [GPT-OSS-20B on Ollama](https://ollama.com/library/gpt-oss:20b)
+- [Vast.ai CLI documentation](https://vast.ai/docs/cli/commands)
