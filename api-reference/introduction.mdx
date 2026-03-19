@@ -69,6 +69,12 @@ The `credit` field shows your available credit, and `ssh_key` is the public key 
 If you get a `401` or `403`, double-check your API key.
 </Note>
 
+<Note>
+Save the numeric `id` value. If you need to update your user profile, use
+`PUT /api/v0/users/{id}/` with this ID. The alias `PUT /users/me/` is not supported
+and returns an error.
+</Note>
+
 ## 3. Search for GPUs
 
 Find available machines using the bundles endpoint. This query returns the top 5 on-demand RTX 4090s sorted by deep learning performance benchmarked per dollar:
@@ -124,11 +130,49 @@ Each parameter in the query above controls a different filter:
 
 The response contains an `offers` array. Note the `id` of the offer you want — you'll use it in the next step. If no offers are returned, try relaxing your filters (e.g. a different GPU model or removing `direct_port_count`).
 
+<Note>
+**VRAM units:** `gpu_ram` and `gpu_total_ram` in the REST API are in **megabytes**.
+To filter for 48 GB of VRAM, use `{"gte": 49152}`. The CLI (`vastai search offers`)
+accepts gigabytes — `gpu_ram>=48` — and converts automatically.
+</Note>
+
 <Tip>
 See the [Search Offers](/api-reference/search/search-offers) reference for the full list of filter parameters and operators.
 </Tip>
 
-## 4. Create an Instance
+## 4. Register Your SSH Key (Required for SSH Access)
+
+**Do this before creating an instance.** Account-level SSH public keys are applied at container creation time, but can also be added to a running instance via the SSH key button on the instance.
+
+<Warning>
+If you create an instance before registering your SSH key, you will not be able to SSH in.
+You can add a key to a running instance without recreating it — use the SSH key button on the
+instance card in the console, or via CLI: `vastai create ssh-key ~/.ssh/id_ed25519.pub`, or
+via API: `POST /api/v0/instances/{id}/ssh/` with `{"ssh_key": "..."}`.
+</Warning>
+
+Register your public key:
+
+<CodeGroup>
+```bash cURL
+curl -s -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -X POST \
+  -d '{"ssh_key": "ssh-ed25519 AAAA... user@host"}' \
+  "https://console.vast.ai/api/v0/ssh/"
+```
+
+```python Python
+pubkey = open(os.path.expanduser("~/.ssh/id_ed25519.pub")).read().strip()
+requests.post(f"{BASE_URL}/ssh/", headers=headers, json={"ssh_key": pubkey})
+```
+</CodeGroup>
+
+Or with the CLI: `vastai create ssh-key ~/.ssh/id_ed25519.pub`
+
+Your key persists on your account — you only need to do this once per key.
+
+## 5. Create an Instance
 
 Rent the machine by sending a PUT request to the asks endpoint. Replace `OFFER_ID` with the `id` from step 3.
 
@@ -184,6 +228,11 @@ print(result)
 ```
 </CodeGroup>
 
+<Note>
+The `onstart` field is limited to 4048 characters. See the [Template Settings](/documentation/templates/template-settings#on-start-script)
+page for a gzip+base64 workaround for longer scripts.
+</Note>
+
 ```json
 {
   "success": true,
@@ -198,7 +247,7 @@ Save the `new_contract` value — this is your instance ID. The `instance_api_ke
 Setting `"runtype": "ssh_direct"` gives you a direct SSH connection to the machine, which has lower latency than the default proxy SSH. Recommended for interactive work.
 </Note>
 
-## 5. Wait Until Ready
+## 6. Wait Until Ready
 
 The instance needs time to pull the Docker image and boot. Poll the status endpoint until `actual_status` is `"running"`. Replace `INSTANCE_ID` with the `new_contract` value from step 4.
 
@@ -252,11 +301,17 @@ The `actual_status` field progresses through these states:
 
 Poll every 10 seconds. Boot time is typically 1–5 minutes depending on the Docker image size. You can also use the `onstart` script to send a callback when the instance is ready, instead of polling.
 
+<Note>
+`GET /instances/` (listing all instances) returns `{"instances": {"ID": {...}, ...}}` —
+an **object keyed by instance ID**, not an array. When polling a specific instance by ID
+(`GET /instances/{id}/`), the `instances` value is a single object (not a dict of dicts).
+</Note>
+
 This endpoint returns extensive instance details (hardware specs, pricing, networking, utilization metrics, and more). See the [Show Instance](/api-reference/instances/show-instance) endpoint for the full field reference.
 
 Once `actual_status` is `"running"`, you're ready to connect. Since we set `runtype` to `ssh_direct` in step 4, this is a direct connection to the machine.
 
-## 6. Connect via SSH
+## 7. Connect via SSH
 
 Use the `ssh_host` and `ssh_port` from the status response to connect directly to your new instance:
 
@@ -264,7 +319,7 @@ Use the `ssh_host` and `ssh_port` from the status response to connect directly t
 ssh root@SSH_HOST -p SSH_PORT
 ```
 
-## 7. Copy Data
+## 8. Copy Data
 
 With SSH access, you can transfer files using any standard tool — `scp`, `rsync`, `rclone`, etc. For example:
 
@@ -278,7 +333,7 @@ rsync -avz -e "ssh -p SSH_PORT" root@SSH_HOST:/workspace/results/ ./results/
 
 For cloud storage syncing and instance-to-instance transfers, see the [data movement guide](/documentation/instances/storage/data-movement).
 
-## 8. Clean Up
+## 9. Clean Up
 
 When you're done, destroy the instance to stop all billing.
 
