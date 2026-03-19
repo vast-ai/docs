@@ -1,0 +1,144 @@
+---
+title: "For AI Agents"
+sidebarTitle: "AI Agent Guide"
+description: "Bootstrap information for AI agents working with the Vast.ai platform — API key setup, SSH timing, VRAM units, onstart limits, and response format quirks."
+---
+
+This page documents the key facts that AI agents need to work with Vast.ai without burning
+compute or hitting silent failures. It covers authentication, SSH key timing, VRAM units,
+onstart limits, and response format quirks that are not obvious from the API surface alone.
+
+## Execute — Don't Plan
+
+When asked to perform Vast.ai tasks, use the CLI with `--raw` for machine-readable JSON output.
+Fall back to the REST API only for operations the CLI doesn't expose. Do not deliver runbooks
+or step-by-step guides unless the user explicitly asks for one.
+
+## Install CLI (if needed)
+
+```bash
+pip install vastai
+```
+
+Platform caveats:
+- **macOS**: use `pip3 install vastai` (or `python3 -m pip install vastai`) — `pip` may point to Python 2 or be missing
+- **Linux (no venv)**: if `vastai` is not found after install, add `~/.local/bin` to your PATH, or run `python3 -m vastai`
+- **Windows**: use `pip install vastai` in a standard terminal, or `py -m pip install vastai` if `pip` is not on PATH
+- **Permission errors**: prefer `pip install --user vastai` over `sudo pip install`
+
+## Authentication
+
+<Warning>
+Before asking the user for an API key, check the standard location first:
+```bash
+cat ~/.vast_api_key
+```
+</Warning>
+
+API key locations (checked in order by the CLI):
+
+1. `$VAST_API_KEY` environment variable — highest priority
+2. `~/.config/vastai/vast_api_key` — primary file (XDG-compliant)
+3. `~/.vast_api_key` — legacy location (auto-migrated on first run)
+
+Set the key:
+```bash
+vastai set api-key YOUR_KEY
+# or
+export VAST_API_KEY=YOUR_KEY
+```
+
+## SSH Key Workflow (Critical)
+
+<Warning>
+**Register your SSH key before creating an instance.** Account-level SSH keys are applied
+at container creation time.
+
+If you forgot:
+- **Docker instance:** `POST /api/v0/instances/{id}/ssh/` with `{"ssh_key": "..."}` — no destroy needed
+- **VM instance:** destroy and recreate (keys cannot be added after VM creation)
+</Warning>
+
+Register via CLI:
+```bash
+vastai create ssh-key ~/.ssh/id_ed25519.pub
+```
+
+Register via REST:
+```bash
+curl -s -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -X POST \
+  -d '{"ssh_key": "ssh-ed25519 AAAA... user@host"}' \
+  "https://console.vast.ai/api/v0/ssh/"
+```
+
+Your key persists on your account — register once per key, not once per instance.
+
+## GPU Search — VRAM Units
+
+<Warning>
+`gpu_ram` means different things in the CLI vs REST API:
+</Warning>
+
+| Interface | Field | Unit | Example (48 GB) |
+|-----------|-------|------|-----------------|
+| CLI (`vastai search offers`) | `gpu_ram` | **GB** | `gpu_ram>=48` |
+| REST API (`POST /api/v0/bundles/`) | `gpu_ram` | **MB** | `{"gte": 49152}` |
+
+The CLI converts gigabytes to megabytes automatically before sending to the API.
+
+## Onstart Script Limit
+
+The `onstart` field is limited to **4048 characters**. For longer scripts, gzip and base64 encode:
+
+```bash
+onstart_b64=$(gzip -c setup.sh | base64 -w0)
+onstart_cmd="echo $onstart_b64 | base64 -d | gunzip | bash"
+```
+
+Pass `onstart_cmd` as the `onstart` value when creating the instance.
+
+## Instance Response Format
+
+`GET /api/v0/instances/` (list all) returns an **object keyed by instance ID**, not an array:
+
+```json
+{
+  "instances": {
+    "12345678": {"actual_status": "running", "ssh_host": "...", "ssh_port": 12345},
+    "87654321": {"actual_status": "loading", ...}
+  }
+}
+```
+
+`GET /api/v0/instances/{id}/` (single instance) returns `{"instances": <object>}` where
+`instances` is a single object, not a dict of dicts.
+
+## User ID Pattern
+
+`PUT /users/me/` returns "Invalid user ID format" — it is not supported. Correct flow:
+
+1. `GET /api/v0/users/current/` → extract the numeric `"id"` field
+2. `PUT /api/v0/users/{id}/` with your payload
+
+## Recommended Docker Images
+
+| Use case | Image |
+|----------|-------|
+| PyTorch (general) | `pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime` |
+| Fine-tuning (Axolotl) | `winglian/axolotl:main-latest` |
+| Image generation (ComfyUI) | `vastai/comfyui:latest` |
+
+<Note>
+`diffusers` on the PyTorch 2.4 base image requires version pins:
+`pip install diffusers==0.26.3 huggingface_hub==0.22.2`
+</Note>
+
+## Billing / Spending
+
+```bash
+vastai show invoices
+```
+
+REST: `GET /api/v0/users/me/charges/` with `Authorization: Bearer $VAST_API_KEY`
