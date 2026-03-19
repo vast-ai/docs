@@ -120,9 +120,20 @@ Note the `id` of the offer you want — you'll use it in the next step. If no of
 See the [Search Offers](/api-reference/search/search-offers) API reference for the full list of filter parameters and operators.
 </Tip>
 
-## 4. Create an Instance
+## 4. Register Your SSH Key
 
-Rent a machine by calling [`create_instance()`](/sdk/python/reference/create-instance) with an offer `id` from step 3:
+**Do this before creating an instance.** Your SSH public key must be registered on your account — it is applied at container creation time.
+
+```python
+pubkey = open(os.path.expanduser("~/.ssh/id_ed25519.pub")).read().strip()
+vast.create_ssh_key(ssh_key=pubkey)
+```
+
+Your key persists on your account — you only need to do this once per key. If you forgot and already created an instance, use the SSH key button on the instance card in the console to add a key without recreating.
+
+## 5. Create an Instance
+
+Rent a machine by calling [`create_instance()`](/sdk/python/reference/create-instance) with an offer `id` from step 3 (search):
 
 ```python
 offer_id = offers[0]["id"]  # from step 3
@@ -131,7 +142,7 @@ result = vast.create_instance(
     id=offer_id,
     image="pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime",
     disk=20,
-    onstart="echo hello && nvidia-smi",
+    onstart_cmd="echo hello && nvidia-smi",
     direct=True,
 )
 result = json.loads(result)
@@ -152,11 +163,15 @@ Save the `new_contract` value — this is your **instance ID**.
 | `id` | The offer ID from `search_offers()` |
 | `image` | Docker image to run |
 | `disk` | Disk space in GB |
-| `onstart` | Shell command(s) to run when the instance boots |
+| `onstart_cmd` | Shell command(s) to run when the instance boots |
 | `direct` | `True` for direct SSH (lower latency than proxy SSH) |
 
 <Note>
 Setting `direct=True` is equivalent to `"runtype": "ssh_direct"` in the REST API. Recommended for interactive work.
+</Note>
+
+<Note>
+`onstart_cmd` is limited to **4048 characters**. For longer scripts, gzip and base64 encode them — see the [Template Settings](/documentation/templates/template-settings#on-start-script) page for the workaround.
 </Note>
 
 If you have a **template**, you can use it instead of specifying image and startup commands:
@@ -186,7 +201,7 @@ vast.launch_instance(
 This searches for available offers matching your criteria and immediately creates an instance on the best match. Useful for scripts where you don't need to inspect offers first.
 </Tip>
 
-## 5. Wait Until Ready
+## 6. Wait Until Ready
 
 The instance needs time to pull the Docker image and boot. Poll with [`show_instance()`](/sdk/python/reference/show-instance) until `actual_status` is `"running"`:
 
@@ -218,7 +233,7 @@ The `actual_status` field progresses through these states:
 
 Poll every 10 seconds. Boot time is typically 1–5 minutes depending on Docker image size.
 
-## 6. Connect via SSH
+## 7. Connect via SSH
 
 Use the `ssh_host` and `ssh_port` from the status response to connect:
 
@@ -228,7 +243,7 @@ ssh root@SSH_HOST -p SSH_PORT
 
 Replace `SSH_HOST` and `SSH_PORT` with the values printed by the polling loop above.
 
-## 7. Copy Data
+## 8. Copy Data
 
 The SDK provides [`copy()`](/sdk/python/reference/copy) for file transfers. Use the instance ID to reference remote paths:
 
@@ -250,7 +265,7 @@ rsync -avz -e "ssh -p SSH_PORT" ./data/ root@SSH_HOST:/workspace/data/
 For cloud storage syncing and instance-to-instance transfers, see the [data movement guide](/documentation/instances/storage/data-movement).
 </Tip>
 
-## 8. Clean Up
+## 9. Clean Up
 
 When you're done, destroy the instance to stop all billing:
 
