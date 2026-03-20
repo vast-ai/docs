@@ -1,253 +1,220 @@
 ---
-title: Python SDK Usage
-createdAt: Mon Jan 13 2025 21:20:40 GMT+0000 (Coordinated Universal Time)
-updatedAt: Mon Apr 28 2025 17:22:01 GMT+0000 (Coordinated Universal Time)
+title: "SDK Hello World"
+sidebarTitle: "Hello World"
 ---
 
-<script type="application/ld+json" dangerouslySetInnerHTML={{
-  __html: JSON.stringify({
-    "@context": "https://schema.org",
-    "@type": "HowTo",
-    "name": "How to Use the Vast.ai Python SDK",
-    "description": "A comprehensive guide to using the Vast.ai Python SDK including installation, basic usage, and examples for managing instances, SSH keys, file transfers, teams, and more.",
-    "step": [
-      {
-        "@type": "HowToStep",
-        "name": "Install the Python SDK",
-        "text": "Install the latest stable PyPI release using pip: 'pip install vastai-sdk'. This will install the vastai-sdk package which provides convenient Python access to the Vast.ai API."
-      },
-      {
-        "@type": "HowToStep",
-        "name": "Import and Initialize the SDK",
-        "text": "Import the VastAI class from the package: 'from vastai_sdk import VastAI'. Then construct a Vast client with your API key: 'vast_sdk = VastAI(api_key=\"YOUR_API_KEY\")'. This creates a client object that provides access to all Vast.ai resources."
-      },
-      {
-        "@type": "HowToStep",
-        "name": "Use Resource Methods",
-        "text": "Call methods on the vast_sdk client object. Most CLI commands have equivalent methods. For example, 'vastai show instances' becomes 'vast_sdk.show_instances()'. IDEs will show type hints and available methods. Example: 'output = vast_sdk.show_instances(); print(output)'."
-      },
-      {
-        "@type": "HowToStep",
-        "name": "Manage Instances",
-        "text": "Use instance management methods: 'vast_sdk.start_instance(ID=12345678)' to start, 'vast_sdk.stop_instance(ID=12345678)' to stop, 'vast_sdk.launch_instance(num_gpus=\"1\", gpu_name=\"RTX_3090\", image=\"pytorch/pytorch\")' to create new instances. Additional methods available for reboot, destroy, recycle, label, show details, and retrieve logs."
-      },
-      {
-        "@type": "HowToStep",
-        "name": "Perform Additional Operations",
-        "text": "Use additional SDK features: Copy files with 'vast_sdk.copy(src=\"source_path\", dst=\"destination_path\", identity=\"identity_file\")'. Manage SSH keys with 'vast_sdk.create_ssh_key(ssh_key=\"your_ssh_key\")', 'vast_sdk.show_ssh_keys()', and 'vast_sdk.delete_ssh_key(ID=123456)'. Access API key management, autoscalers, endpoints, teams, host management, and more through respective methods."
-      }
-    ]
-  })
-}} />
+The Vast.ai Python SDK gives you programmatic access to the entire platform from Python — authentication, GPU search, instance lifecycle, templates, volumes, serverless endpoints, and more. Anything you can do in the web console, you can automate from a Python script.
 
-We provide a [PyPI package](https://pypi.org/project/vastai/), `vastai-sdk`, for convenient Python usage.
+This guide walks through the core workflow: install the SDK, authenticate, search for a GPU, rent it, wait for it to boot, connect to it, copy data, and clean up. By the end you'll understand the method calls needed to manage instances without touching the web console.
 
-## PyPI Install
+## Prerequisites
 
-You can install the latest stable PyPI release with:
+- A Vast.ai account with credit (~$0.01-0.05, depending on test instance run time)
+- Python 3 installed
 
-```text Text
+## 1. Install the SDK
+
+Install from PyPI:
+
+```bash
 pip install vastai-sdk
 ```
 
-## Usage
+## 2. Authenticate
 
-Import the package:
+Import the SDK and create a client with your API key. Generate an API key from the [Keys page](https://cloud.vast.ai/cli/keys/) by clicking **+New**. Copy the key — you'll only see it once.
 
-```text Text
-from vastai_sdk import VastAI
+```python
+from vastai import VastAI
+
+vast = VastAI(api_key="YOUR_API_KEY")
 ```
 
-Construct a Vast client with your API key:
+If you've previously set a key via the CLI (`vastai set api-key`), the SDK reads it automatically from `~/.config/vast/vast_api_key` — no need to pass it explicitly:
 
-```text Text
-vast_sdk = VastAI(api_key='YOUR_API_KEY')
+```python
+vast = VastAI()
 ```
 
-## Resource Methods
+<Tip>
+The console creates a full-access key by default. You can also create scoped keys with limited permissions using `vast.create_api_key()` — useful for CI/CD or shared tooling. See the [permissions guide](/sdk/python/permissions) for details.
+</Tip>
 
-Most CLI commands have direct equivalents in the Python SDK. Your VastAI client exposes the same functionality through class methods and IDE's will surface type hints and arguments automatically.
+## 3. Verify Authentication
 
-For example, the CLI command `vastai show instances` has the equivalent, `vast_sdk.show_instances()`.
+Confirm your key works by fetching your account info:
 
-```text Text
-output = vast_sdk.show_instances()
-print(output)
+```python
+user = vast.show_user()
+print(user)
 ```
 
-### Getting help 
+This returns your user ID, email, balance, and SSH key. If you see an authentication error, double-check your API key.
 
-Use the built-in `help()` method to view detailed documentation for any SDK method. This will show you the method’s description, parameters, query syntax, and usage examples.
+## 4. Search for GPUs
 
-```text Text
-help(vast_sdk.search_offers)
+Find available machines using `search_offers`. This query returns on-demand RTX 4090s on verified machines with direct port access, sorted by deep learning performance per dollar:
+
+```python
+offers = vast.search_offers(
+    query="gpu_name=RTX_4090 num_gpus=1 verified=true direct_port_count>=1 rentable=true",
+    order="dlperf_usd-",
+    limit="5",
+)
+print(offers)
 ```
 
-## Example Usage
+Each parameter in the query string controls a different filter:
 
-Here are some example usages of our Python SDK class `VastAI`:
+| Parameter | Meaning |
+|-----------|---------|
+| `gpu_name=RTX_4090` | Filter to a specific GPU model |
+| `num_gpus=1` | Exactly 1 GPU per instance |
+| `verified=true` | Only machines verified by Vast.ai (identity-checked hosts) |
+| `direct_port_count>=1` | At least 1 directly accessible port (needed for direct SSH) |
+| `rentable=true` | Only machines currently available to rent |
+| `order="dlperf_usd-"` | Sort by DL performance per dollar, best value first |
 
-### Search offers
+Note the `id` of the offer you want — you'll use it in the next step. If no offers are returned, try relaxing your filters (e.g. a different GPU model or removing `direct_port_count`).
 
-Find an available RTX 3090 GPU
+<Tip>
+Use `help(vast.search_offers)` for the full list of filter fields and options, or see the [search_offers reference](/sdk/python/reference/search-offers).
+</Tip>
 
-```text Text
-vast_sdk.search_offers(query='gpu_name=RTX_5090 rented=False rentable=True)
+## 5. Create an Instance
+
+Rent the machine using `create_instance` with the offer ID from step 4:
+
+```python
+result = vast.create_instance(
+    ID=OFFER_ID,
+    image="pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime",
+    disk=20,
+    onstart_cmd="echo hello && nvidia-smi",
+    ssh=True,
+    direct=True,
+)
+print(result)
 ```
 
-### Starting and Stopping Instances
+| Parameter | Meaning |
+|-----------|---------|
+| `image` | Docker image to launch |
+| `disk` | Disk storage in GB |
+| `onstart_cmd` | Command to run when the instance boots |
+| `ssh=True, direct=True` | Direct SSH access (lower latency than proxy SSH) |
 
-```text Text
-vast_sdk.start_instance(ID=12345678)
+The output includes the new instance ID:
 
-vast_sdk.stop_instance(ID=12345678)
+```json
+{"success": true, "new_contract": 12345678}
 ```
 
-### Creating a New Instance
+Save the `new_contract` value — this is your instance ID.
 
-Create a new instance based on given parameters (performs search offers + create instance).
+<Note>
+Storage charges begin at creation. GPU charges begin when the instance reaches the `running` state.
+</Note>
 
-```text Text
-vast_sdk.launch_instance(num_gpus="1", gpu_name="RTX_3090", image="pytorch/pytorch")
+## 6. Wait Until Ready
+
+The instance needs time to pull the Docker image and boot. Check the status:
+
+```python
+import time
+
+instance_id = result["new_contract"]
+
+while True:
+    info = vast.show_instance(id=instance_id)
+    status = info.get("actual_status")
+    print(f"Status: {status}")
+    if status == "running":
+        break
+    time.sleep(10)
 ```
 
-### Copying Files Between Instances
+The status progresses through these states:
 
-```text Text
-vast_sdk.copy(src='source_path', dst='destination_path', identity='identity_file')
+| Status | Meaning |
+|--------|---------|
+| `loading` | Docker image is downloading |
+| `running` | Ready to use |
+
+Boot time is typically 1-5 minutes depending on the Docker image size.
+
+## 7. Connect via SSH
+
+Once the instance is running, get the SSH connection details:
+
+```python
+ssh_url = vast.ssh_url(id=instance_id)
+print(ssh_url)
 ```
 
-### Managing SSH Keys
+Then connect from your terminal:
 
-Create a new SSH key, show all SSH keys, and delete an SSH key.
-
-```text Text  
-vast_sdk.create_ssh_key(ssh_key='your_ssh_key')
-
-ssh_keys = vast_sdk.show_ssh_keys()
-print(ssh_keys)
-
-vast_sdk.delete_ssh_key(ID=123456)
+```bash
+ssh root@SSH_HOST -p SSH_PORT
 ```
 
-## Contribution and Issue Reporting
+## 8. Copy Data
 
-This [code repository](https://github.com/vast-ai/vast-python) is open source and can be rapidly changing at times. If you find a potential bug, please open an issue on GitHub. If you wish to contribute to improving this code and its functionality, feel welcome to open a PR with any improvements on our [GitHub repository](https://github.com/vast-ai/vast-python).
+Use `copy` to transfer files between your local machine and the instance:
 
-## Available Methods
+```python
+# Upload to instance
+vast.copy(src="local:./data/", dst=f"{instance_id}:/workspace/data/")
 
-Below is a list of the available methods you can call on the `VastAI` client. These methods are categorized for better readability.
+# Download from instance
+vast.copy(src=f"{instance_id}:/workspace/results/", dst="local:./results/")
+```
 
-### Instance Management
+You can also copy between instances or to/from cloud storage:
 
-| Method | Description |
-| ------ | ----------- |
-| `start_instance(ID: int)` | Start an instance. |
-| `stop_instance(ID: int)` | Stop an instance. |
-| `reboot_instance(ID: int)` | Reboot an instance. |
-| `destroy_instance(id: int)` | Destroy an instance. |
-| `destroy_instances(ids: List[int])` | Destroy multiple instances. |
-| `recycle_instance(ID: int)` | Recycle an instance. |
-| `label_instance(id: int, label: str)` | Label an instance. |
-| `show_instance(id: int)` | Show details of an instance. |
-| `show_instances(quiet: bool = False)` | Show all instances. |
-| `logs(INSTANCE_ID: int, tail: Optional[str] = None)` | Retrieve logs for an instance. |
-| `execute(ID: int, COMMAND: str)` | Execute a command on an instance. |
-| `launch_instance(...)` | Launch a new instance with various parameters. |
+```python
+# Instance to instance
+vast.copy(src=f"{instance_a}:/workspace/", dst=f"{instance_b}:/workspace/")
 
-### SSH Key Management
+# Cloud storage (requires a configured cloud connection)
+vast.cloud_copy(src=f"s3.CONNECTION_ID:/bucket/data/", dst=f"{instance_id}:/workspace/")
+```
 
-| Method | Description |
-| ------ | ----------- |
-| `create_ssh_key(ssh_key: str)` | Create a new SSH key. |
-| `delete_ssh_key(ID: int)` | Delete an SSH key. |
-| `show_ssh_keys()` | Show all SSH keys. |
-| `attach_ssh(instance_id: int, ssh_key: str)` | Attach an SSH key to an instance. |
-| `detach_ssh(instance_id: int, ssh_key_id: str)` | Detach an SSH key from an instance. |
+For cloud storage syncing and instance-to-instance transfers, see the [data movement guide](/documentation/instances/storage/data-movement).
 
-### API Key Management
+## 9. Clean Up
 
-| Method | Description |
-| ------ | ----------- |
-| `create_api_key(name: Optional[str] = None, ...)` | Create a new API key. |
-| `delete_api_key(ID: int)` | Delete an API key. |
-| `reset_api_key()` | Reset the API key. |
-| `show_api_key(id: int)` | Show details of an API key. |
-| `show_api_keys()` | Show all API keys. |
-| `set_api_key(new_api_key: str)` | Set a new API key. |
+When you're done, destroy the instance to stop all billing.
 
-### Autoscaler Management
+Alternatively, to pause an instance temporarily instead of destroying it, you can **stop** it. Stopping halts compute billing but disk storage charges continue.
 
-| Method | Description |
-| ------ | ----------- |
-| `create_autoscaler(test_workers: int = 3, ...)` | Create a new autoscaler. |
-| `update_autoscaler(ID: int, min_load: Optional[float] = None, ...)` | Update an autoscaler. |
-| `delete_autoscaler(ID: int)` | Delete an autoscaler. |
-| `show_autoscalers()` | Show all autoscalers. |
+**Destroy** (removes everything):
 
-### Endpoint Management
+```python
+vast.destroy_instance(id=instance_id)
+```
 
-| Method | Description |
-| ------ | ----------- |
-| `create_endpoint(min_load: float = 0.0, ...)` | Create a new endpoint. |
-| `update_endpoint(ID: int, min_load: Optional[float] = None, ...)` | Update an endpoint. |
-| `delete_endpoint(ID: int)` | Delete an endpoint. |
-| `show_endpoints()` | Show all endpoints. |
+**Stop** (pauses compute, disk charges continue):
 
-### File Management
+```python
+vast.stop_instance(ID=instance_id)
+```
 
-| Method | Description |
-| ------ | ----------- |
-| `copy(src: str, dst: str, identity: Optional[str] = None)` | Copy files between instances. |
-| `cloud_copy(src: Optional[str] = None, dst: Optional[str] = "/workspace", ...)` | Copy files between cloud and instance. |
-| `cancel_copy(dst: str)` | Cancel a file copy operation. |
-| `cancel_sync(dst: str)` | Cancel a file sync operation. |
-| `scp_url(id: int)` | Get the SCP URL for transferring files to/from an instance. |
+## Getting Help
 
-### Team Management
+Use Python's built-in `help()` to view detailed documentation for any SDK method:
 
-| Method | Description |
-| ------ | ----------- |
-| `create_team(team_name: Optional[str] = None)` | Create a new team. |
-| `destroy_team()` | Destroy a team. |
-| `invite_team_member(email: Optional[str] = None, role: Optional[str] = None)` | Invite a new member to the team. |
-| `remove_team_member(ID: int)` | Remove a member from the team. |
-| `create_team_role(name: Optional[str] = None, permissions: Optional[str] = None)` | Create a new team role. |
-| `remove_team_role(NAME: str)` | Remove a role from the team. |
-| `update_team_role(ID: int, name: Optional[str] = None, permissions: Optional[str] = None)` | Update details of a team role. |
-| `show_team_members()` | Show all team members. |
-| `show_team_role(NAME: str)` | Show details of a specific team role. |
-| `show_team_roles()` | Show all team roles. |
+```python
+help(vast.search_offers)
+```
 
-### Host Management
+Your IDE will also surface type hints and available methods automatically.
 
-| Method | Description |
-| ------ | ----------- |
-| `cleanup_machine(ID: int)` | Clean up a machine's configuration and resources. |
-| `list_machine(ID: int, price_gpu: Optional[float] = None, price_disk: Optional[float] = None, price_inetu: Optional[float] = None, price_inetd: Optional[float] = None, discount_rate: Optional[float] = None, min_chunk: Optional[int] = None, end_date: Optional[str] = None)` | List details of a single machine with optional pricing and configuration parameters. |
-| `list_machines(IDs: List[int], price_gpu: Optional[float] = None, price_disk: Optional[float] = None, price_inetu: Optional[float] = None, price_inetd: Optional[float] = None, discount_rate: Optional[float] = None, min_chunk: Optional[int] = None, end_date: Optional[str] = None)` | List details of multiple machines with optional pricing and configuration parameters. |
-| `remove_defjob(id: int)` | Remove the default job from a machine. |
-| `set_defjob(id: int, price_gpu: Optional[float] = None, price_inetu: Optional[float] = None, price_inetd: Optional[float] = None, image: Optional[str] = None, args: Optional[List[str]] = None)` | Set a default job on a machine with specified parameters. |
-| `set_min_bid(id: int, price: Optional[float] = None)` | Set the minimum bid price for a machine. |
-| `schedule_maint(id: int, sdate: Optional[float] = None, duration: Optional[float] = None)` | Schedule maintenance for a machine. |
-| `cancel_maint(id: int)` | Cancel scheduled maintenance for a machine. |
-| `unlist_machine(id: int)` | Unlist a machine from being available for new jobs. |
-| `show_machines(quiet: bool = False, filter: Optional[str] = None)` | Retrieve and display a list of machines based on specified criteria. |
+## Next Steps
 
-### Other Methods
+You've now completed the full instance lifecycle through the SDK: installation, authentication, search, creation, polling, data transfer, and teardown. From here:
 
-| Method | Description |
-| ------ | ----------- |
-| `get_gpu_names()` | Returns a set of GPU names available on Vast.ai. |
-| `show_connections()` | Show all connections. |
-| `show_deposit(ID: int)` | Show deposit details for an instance. |
-| `show_earnings(quiet: bool = False, start_date: Optional[str] = None, end_date: Optional[str] = None, machine_id: Optional[int] = None)` | Show earnings information. |
-| `show_invoices(quiet: bool = False, start_date: Optional[str] = None, end_date: Optional[str] = None, ...)` | Show invoice details. |
-| `show_ipaddrs()` | Show IP addresses. |
-| `show_user(quiet: bool = False)` | Show user details. |
-| `show_subaccounts(quiet: bool = False)` | Show all subaccounts of the current user. |
-| `transfer_credit(recipient: str, amount: float)` | Transfer credit to another account. |
-| `update_ssh_key(id: int, ssh_key: str)` | Update an SSH key. |
-| `generate_pdf_invoices(quiet: bool = False, start_date: Optional[str] = None, end_date: Optional[str] = None, only_charges: bool = False, only_credits: bool = False)` | Generate PDF invoices based on filters. |
-
-For a complete list of methods and their usage, please refer to [Commands](https://docs.vast.ai/cli/commands).
+- **SSH setup** — See the [SSH guide](/documentation/instances/connect/ssh) for key configuration and advanced connection options.
+- **Full method reference** — See the [SDK reference](/sdk/python/reference/vastai) for every available method.
+- **Use templates** — Avoid repeating image and config parameters on every create call. See the [templates guide](/sdk/python/templates) for creating and managing templates.
+- **Permissions** — Create scoped API keys for CI/CD or shared tooling. See the [permissions guide](/sdk/python/permissions).
