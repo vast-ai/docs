@@ -1,0 +1,343 @@
+# Vast.ai Serverless from Scratch: A Hello World Guide
+
+This guide builds a serverless endpoint on Vast.ai from first principles. Instead of starting with a complex ML model, we start with the simplest possible backend -- a FastAPI server that returns `"Hello"` -- and use it to explain every piece of the system. By the end, you will understand exactly how the PyWorker, the Serverless Engine, and the client SDK fit together, and you will have a working endpoint you can hit from your own code.
+
+## Prerequisites
+
+- A [Vast.ai](https://vast.ai) account with credit balance
+- Your Vast.ai API key (found in your [Account settings](https://cloud.vast.ai/account/))
+- Python 3.9+
+- A public Git repository (e.g., on GitHub) where you will host your worker code
+
+Install the Vast.ai SDK:
+
+```bash
+pip install vastai-sdk
+```
+
+Set your API key as an environment variable:
+
+```bash
+export VAST_API_KEY="<YOUR_API_KEY>"
+```
+
+- **`<YOUR_API_KEY>`** -- Your Vast.ai API key. Find it in your [Account settings](https://cloud.vast.ai/account/).
+
+---
+
+## How Vast Serverless Works
+
+Before writing any code, here is the mental model.
+
+Vast.ai Serverless is a system that manages GPU-backed workers to serve your application. It has three layers:
+
+1. **Your model backend** -- An HTTP server (FastAPI, Flask, aiohttp, etc.) that does the actual work. It runs locally on each worker instance and is never exposed to the internet directly.
+2. **The PyWorker** -- A Python web server provided by the Vast SDK that runs alongside your model backend on the same instance. It acts as an ingress proxy: it receives requests from the Serverless Engine, forwards them to your backend, and returns the results. It also tails your backend's log file to know when it is ready, runs benchmarks to measure performance, and reports metrics to the Serverless Engine.
+3. **The Serverless Engine** -- Vast's infrastructure that routes client requests to available workers, recruits new workers when load increases, and releases workers when load drops.
+
+As a developer, you write two things:
+- The **model backend** (your application logic)
+- A **`worker.py`** file (a small configuration script that tells the PyWorker where your backend is and how to talk to it)
+
+The Serverless Engine and PyWorker runtime are provided by Vast.
+
+---
+
+## Step 1: Write the Model Backend
+
+This is the code that does the actual work on each worker instance. For this guide, it is a FastAPI server with a single `/hello` route:
+
+```python
+# model_backend.py
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+import logging
+import uvicorn
+
+logging.basicConfig(
+    level=logging.INFO,
+    filename="<MODEL_LOG_FILE>",  # e.g. "/var/log/model.log"
+    format="%(message)s"
+)
+logger = logging.getLogger(__name__)
+
+app = FastAPI()
+
+@app.on_event("startup")
+async def startup():
+    logger.info("Model backend started")
+
+@app.exception_handler(Exception)
+async def exception_handler(request: Request, exc: Exception):
+    logger.error("Model backend error", exc_info=exc)
+    return JSONResponse(status_code=500, content={"error": str(exc)})
+
+@app.get("/hello")
+async def hello():
+    return {"message": "Hello"}
+
+@app.get("/health")
+async def health():
+    return {"ok": True}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=<MODEL_PORT>)  # e.g. 8080
+```
+
+- **`<MODEL_LOG_FILE>`** -- Path where the backend writes its logs. The PyWorker tails this file to detect when the backend is ready. Must be an absolute path (e.g., `"/var/log/model.log"`).
+- **`<MODEL_PORT>`** -- The port your backend listens on (e.g., `8080`). You will reference this in `worker.py`.
+
+Notice a few things about this code that matter for the PyWorker:
+
+- **It logs `"Model backend started"` on startup.** The PyWorker watches for this exact string in the log file. When it appears, the PyWorker knows the backend is ready and begins benchmarking.
+- **It logs `"Model backend error"` on exceptions.** The PyWorker watches for this string too. If it appears, the PyWorker marks the worker as failed so the Serverless Engine can replace it.
+- **It has a `/health` endpoint.** The PyWorker calls this periodically to verify the backend is still alive.
+- **It has a `/hello` endpoint.** This is the route we will expose through the PyWorker.
+
+In a real application, you would replace `/hello` with your inference logic -- running a model, processing data, generating images, etc. The pattern is the same regardless of what the backend does.
+
+---
+
+## Step 2: Write the PyWorker Configuration
+
+The `worker.py` file tells the PyWorker everything it needs to know about your backend. Create this file in the same repository as your model backend:
+
+```python
+# worker.py
+from vastai import Worker, WorkerConfig, HandlerConfig, LogActionConfig, BenchmarkConfig
+
+worker_config = WorkerConfig(
+    model_server_url="http://127.0.0.1",
+    model_server_port=<MODEL_PORT>,             # e.g. 8080 -- must match model_backend.py
+    model_log_file="<MODEL_LOG_FILE>",          # e.g. "/var/log/model.log" -- must match model_backend.py
+    model_healthcheck_url="/health",
+
+    handlers=[
+        HandlerConfig(
+            route="/hello",
+            allow_parallel_requests=<ALLOW_PARALLEL>,   # e.g. False
+            max_queue_time=<MAX_QUEUE_TIME>,             # e.g. 30.0
+            benchmark_config=BenchmarkConfig(
+                dataset=[<BENCHMARK_PAYLOADS>],          # e.g. [{}]
+                runs=<BENCHMARK_RUNS>,                   # e.g. 3
+            ),
+        )
+    ],
+
+    log_action_config=LogActionConfig(
+        on_load=["Model backend started"],
+        on_error=["Model backend error"],
+        on_info=[]
+    )
+)
+
+Worker(worker_config).run()
+```
+
+- **`<MODEL_PORT>`** -- Must match the port in `model_backend.py`.
+- **`<MODEL_LOG_FILE>`** -- Must match the log file path in `model_backend.py`.
+- **`<ALLOW_PARALLEL>`** -- Set to `False` if your backend handles one request at a time (the PyWorker enforces FIFO queuing). Set to `True` if it can handle concurrent requests.
+- **`<MAX_QUEUE_TIME>`** -- Maximum seconds a request waits in the PyWorker's queue before being rejected (HTTP 429). The SDK automatically retries rejected requests, and the Serverless Engine treats queue pressure as a signal to recruit more workers.
+- **`<BENCHMARK_PAYLOADS>`** -- Sample request payloads for benchmarking. For our `/hello` route that takes no input, an empty dict `{}` works. For a real model, these would be representative inference payloads.
+- **`<BENCHMARK_RUNS>`** -- How many benchmark rounds to run. More runs give more accurate throughput measurements but delay worker readiness.
+
+### Why each field maps to your backend
+
+This is the key insight: **every config value in `worker.py` points directly at something in your model backend code.**
+
+| worker.py field | Points to... |
+|---|---|
+| `model_server_port=8080` | The port in `uvicorn.run(app, port=8080)` |
+| `model_log_file="/var/log/model.log"` | The `filename=` in `logging.basicConfig(...)` |
+| `model_healthcheck_url="/health"` | The `@app.get("/health")` route |
+| `route="/hello"` | The `@app.get("/hello")` route |
+| `on_load=["Model backend started"]` | The `logger.info("Model backend started")` in `startup()` |
+| `on_error=["Model backend error"]` | The `logger.error("Model backend error")` in `exception_handler()` |
+
+If you change a log message in the backend, you must update `LogActionConfig` to match. If you add a new route to the backend, you add a new `HandlerConfig` to expose it. The PyWorker does not inspect your code -- it only knows what you tell it in the config.
+
+---
+
+## Step 3: Transforming Requests and Responses
+
+The PyWorker can transform payloads on the way in and responses on the way out. This is useful when you want the public API shape to differ from what your backend expects.
+
+For example, suppose you want clients to send `{"name": "World"}` and receive `{"greeting": "Hello, World"}`, but your backend only returns `{"message": "Hello"}`. You can add a `request_parser` and `response_generator` to the `HandlerConfig`:
+
+```python
+from aiohttp import web, ClientResponse
+
+def parse_request(payload: dict) -> dict:
+    """Transform the incoming client payload before it reaches the backend."""
+    # The client sends {"name": "World"}, but our backend ignores the body.
+    # We could validate, reshape, or enrich the payload here.
+    return payload
+
+async def generate_response(
+    client_request: web.Request,
+    model_response: ClientResponse
+) -> web.Response:
+    """Transform the backend response before it reaches the client."""
+    body = await model_response.json()
+    # Backend returns {"message": "Hello"}, we reshape it
+    name = (await client_request.json()).get("name", "World")
+    return web.json_response({
+        "greeting": f"{body['message']}, {name}"
+    })
+
+worker_config = WorkerConfig(
+    model_server_url="http://127.0.0.1",
+    model_server_port=<MODEL_PORT>,             # e.g. 8080
+    model_log_file="<MODEL_LOG_FILE>",          # e.g. "/var/log/model.log"
+    model_healthcheck_url="/health",
+
+    handlers=[
+        HandlerConfig(
+            route="/hello",
+            allow_parallel_requests=False,
+            max_queue_time=30.0,
+            request_parser=parse_request,
+            response_generator=generate_response,
+            benchmark_config=BenchmarkConfig(
+                dataset=[{"name": "benchmark"}],
+                runs=3,
+            ),
+        )
+    ],
+
+    log_action_config=LogActionConfig(
+        on_load=["Model backend started"],
+        on_error=["Model backend error"],
+        on_info=[]
+    )
+)
+
+Worker(worker_config).run()
+```
+
+- **`<MODEL_PORT>`** -- Must match the port in `model_backend.py`.
+- **`<MODEL_LOG_FILE>`** -- Must match the log file path in `model_backend.py`.
+
+`request_parser` receives the raw JSON dict from the client and returns the dict that gets forwarded to the backend. `response_generator` receives the original client request and the backend's response, and returns the final response sent to the client.
+
+If you do not provide these, the PyWorker passes payloads and responses through unchanged, which is the right default for most cases.
+
+---
+
+## Step 4: Set Up the Repository
+
+Push both files to a public Git repository:
+
+```
+serverless-hello-world/
+  model_backend.py
+  worker.py
+  requirements.txt
+```
+
+Your `requirements.txt` should include:
+
+```
+fastapi
+uvicorn
+vastai-sdk
+```
+
+---
+
+## Step 5: Create a Vast Template and Endpoint
+
+1. Go to the [Vast.ai Templates page](https://cloud.vast.ai/templates/) and create a new template.
+2. Choose a base Docker image with Python (e.g., `python:3.10-slim`).
+3. In the **On-Start Script** field, add a script that:
+   - Clones your repository
+   - Installs dependencies
+   - Starts the model backend
+   - Starts the PyWorker
+
+   For example:
+
+   ```bash
+   #!/bin/bash
+   cd /workspace
+   git clone <YOUR_REPO_URL> app    # e.g. https://github.com/youruser/serverless-hello-world.git
+   cd app
+   pip install -r requirements.txt
+   python model_backend.py &
+   python worker.py
+   ```
+
+   - **`<YOUR_REPO_URL>`** -- The HTTPS URL of your public Git repository.
+
+4. Go to the [Serverless dashboard](https://cloud.vast.ai/serverless/) and create an endpoint using your new template.
+5. Name the endpoint `<ENDPOINT_NAME>` (e.g., `"my-hello-endpoint"`).
+
+   - **`<ENDPOINT_NAME>`** -- Pick a name you will reference in client code. Must be unique within your account.
+
+The Serverless Engine will begin recruiting workers. On each worker, the on-start script clones your repo, starts the model backend, and starts the PyWorker. The PyWorker tails the log file, sees `"Model backend started"`, runs benchmarks against `/hello`, and then marks the worker as ready.
+
+---
+
+## Step 6: Send a Request
+
+Now call your endpoint from any Python script:
+
+```python
+import asyncio
+from vastai import Serverless
+
+ENDPOINT_NAME = "<ENDPOINT_NAME>"   # e.g. "my-hello-endpoint"
+
+async def main():
+    async with Serverless() as client:
+        endpoint = await client.get_endpoint(name=ENDPOINT_NAME)
+
+        result = await endpoint.request("/hello", {})
+        if result["ok"]:
+            print(result["response"])
+        else:
+            print(f"Request failed. Status={result.get('status')}, Msg={result.get('text')}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+- **`<ENDPOINT_NAME>`** -- The name you gave your endpoint in step 5. Must match exactly.
+
+The SDK handles routing, authentication, retries, and error handling. You send a request to the `/hello` route with an empty payload. The Serverless Engine picks an available worker, the PyWorker forwards the request to your FastAPI backend, and the response comes back as `{"message": "Hello"}`.
+
+If you added the `response_generator` from step 3, you could instead send:
+
+```python
+result = await endpoint.request("/hello", {"name": "World"})
+# result["response"] -> {"greeting": "Hello, World"}
+```
+
+---
+
+## What Happens Under the Hood
+
+Here is the full request lifecycle, mapped to the code you wrote:
+
+1. **Your script** calls `endpoint.request("/hello", {})` using the Serverless SDK.
+2. **The Serverless Engine** selects a ready worker from your endpoint's pool based on available capacity and returns its address.
+3. **The SDK** sends the payload to the selected worker's PyWorker.
+4. **The PyWorker** receives the request on the `/hello` route (defined in `HandlerConfig`). If `request_parser` is set, it transforms the payload. If `allow_parallel_requests=False`, it queues the request and waits for its turn.
+5. **The PyWorker** forwards the payload to your FastAPI backend at `http://127.0.0.1:8080/hello` (defined in `WorkerConfig`).
+6. **Your FastAPI backend** processes the request and returns `{"message": "Hello"}`.
+7. **The PyWorker** receives the response. If `response_generator` is set, it transforms the response. Otherwise, it passes it through unchanged.
+8. **The response** flows back through the SDK to your script.
+9. **Independently**, the PyWorker periodically reports workload metrics to the Serverless Engine, which uses them to decide whether to recruit or release workers.
+
+---
+
+## Where to Go from Here
+
+This guide used a trivial backend to show how the pieces connect. To build something real:
+
+- **Replace `/hello` with your inference route.** Load a model in the `startup()` function, run inference in your route handler, and return results. The PyWorker config stays the same -- just update the route, benchmarks, and log messages.
+- **Add more routes.** Each route gets its own `HandlerConfig`. Only one handler needs a `BenchmarkConfig`.
+- **Add a `workload_calculator`.** For backends where requests have variable cost (e.g., different prompt lengths), provide a function that returns a float representing the computational cost. This helps the Serverless Engine make better scaling decisions. For constant-cost workloads, you can omit it.
+- **Use sessions for stateful workflows.** If you need sequential requests pinned to the same worker, see the [ComfyUI Quickstart](comfyui-quickstart.md) for a session example.
+
+For a complete real-world example, see the [ComfyUI Quickstart](comfyui-quickstart.md) guide.

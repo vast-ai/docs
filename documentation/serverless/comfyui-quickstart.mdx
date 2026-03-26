@@ -1,0 +1,337 @@
+# ComfyUI Serverless Quickstart
+
+Get a ComfyUI image generation endpoint running on Vast.ai Serverless and call it from Python. This guide assumes you understand the basics of Vast Serverless (PyWorker, WorkerConfig, HandlerConfig). If not, start with the [Hello World guide](serverless-hello-world.md) first.
+
+## Setup
+
+Install the SDK and set your API key:
+
+```bash
+pip install vastai-sdk
+export VAST_API_KEY="<YOUR_API_KEY>"
+```
+
+- **`<YOUR_API_KEY>`** -- Your Vast.ai API key from [Account settings](https://cloud.vast.ai/account/).
+
+## Create the Endpoint
+
+1. Go to the [Serverless dashboard](https://cloud.vast.ai/serverless/).
+2. Click **Create Endpoint**.
+3. Select the **ComfyUI** serverless template.
+4. Name it `my-comfy-endpoint`.
+5. Click **Create**.
+
+The template includes a pre-configured PyWorker. For reference, here is what it looks like:
+
+```python
+import random
+import sys
+from vastai import Worker, WorkerConfig, HandlerConfig, LogActionConfig, BenchmarkConfig
+
+benchmark_prompts = [
+    "Cartoon hoodie hero; orc, anime cat, bunny; black goo; buff; vector on white.",
+    "Cozy farming-game scene with fine details.",
+    "Realistic futuristic downtown of low buildings at sunset.",
+    "Perfect wave front view; sunny seascape; ultra-detailed water; artful feel.",
+    "Medieval village inside glass sphere; volumetric light; macro focus.",
+]
+
+benchmark_dataset = [
+    {
+        "input": {
+            "request_id": f"test-{random.randint(1000, 99999)}",
+            "modifier": "Text2Image",
+            "modifications": {
+                "prompt": prompt,
+                "width": 512,
+                "height": 512,
+                "steps": 20,
+                "seed": random.randint(0, sys.maxsize)
+            }
+        }
+    } for prompt in benchmark_prompts
+]
+
+worker_config = WorkerConfig(
+    model_server_url='http://127.0.0.1',
+    model_server_port=18288,
+    model_log_file='/var/log/portal/comfyui.log',
+    model_healthcheck_url="/health",
+    handlers=[
+        HandlerConfig(
+            route="/generate/sync",
+            allow_parallel_requests=False,
+            max_queue_time=10.0,
+            benchmark_config=BenchmarkConfig(dataset=benchmark_dataset)
+        )
+    ],
+    log_action_config=LogActionConfig(
+        on_load=["To see the GUI go to: "],
+        on_error=["MetadataIncompleteBuffer", "Value not in list: ", "[ERROR] Provisioning Script failed"],
+        on_info=['"message":"Downloading']
+    )
+)
+
+Worker(worker_config).run()
+```
+
+You do not need to modify this. It is bundled with the template and starts automatically when a Workergroup is created.
+
+---
+
+## Making Requests
+
+### Single Request
+
+Send one request and wait for the result.
+
+```python
+import asyncio
+from vastai import Serverless
+import random
+
+ENDPOINT_NAME = "<ENDPOINT_NAME>"   # e.g. "my-comfy-endpoint"
+
+async def main():
+    async with Serverless() as client:
+        endpoint = await client.get_endpoint(name=ENDPOINT_NAME)
+
+        payload = {
+            "input": {
+                "modifier": "<WORKFLOW_MODIFIER>",  # e.g. "Text2Image"
+                "modifications": {
+                    "prompt": "<YOUR_PROMPT>",      # e.g. "A cat in a spacesuit on Mars."
+                    "width": <IMAGE_WIDTH>,          # e.g. 512
+                    "height": <IMAGE_HEIGHT>,        # e.g. 512
+                    "steps": <NUM_STEPS>,            # e.g. 10
+                    "seed": <SEED>                   # e.g. random.randint(1, 1000)
+                }
+            }
+        }
+        try:
+            result = await endpoint.request("/generate/sync", payload)
+            if result["ok"]:
+                print(result["response"]["output"][0]["local_path"])
+            else:
+                print(f"Request failed. Status={result.get('status')}, Msg={result.get('text')}")
+        except Exception as ex:
+            print(f"Request failed with exception: {ex}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+- **`<ENDPOINT_NAME>`** -- The name you gave your endpoint in the dashboard (e.g., `"my-comfy-endpoint"`). Must match exactly.
+- **`<WORKFLOW_MODIFIER>`** -- The ComfyUI workflow to run. Use `"Text2Image"` for text-to-image generation.
+- **`<YOUR_PROMPT>`** -- The text description of the image you want to generate.
+- **`<IMAGE_WIDTH>`, `<IMAGE_HEIGHT>`** -- Output image dimensions in pixels. Common values: `512`, `768`, `1024`.
+- **`<NUM_STEPS>`** -- Number of diffusion steps. Higher values (e.g., `20`--`50`) produce more detailed images but take longer. Lower values (e.g., `10`) are faster for previews.
+- **`<SEED>`** -- Random seed for reproducibility. Use a fixed integer to get the same image every time, or `random.randint(1, 1000)` for variety.
+
+### Continuous Load
+
+Fire requests continuously with callbacks. Useful for production services or load testing.
+
+```python
+import asyncio
+from vastai import Serverless, ServerlessRequest
+import random
+
+ENDPOINT_NAME    = "<ENDPOINT_NAME>"    # e.g. "my-comfy-endpoint"
+COST_PER_REQUEST = <COST_PER_REQUEST>   # e.g. 100
+TARGET_LOAD      = <TARGET_LOAD>        # e.g. 300
+
+async def main():
+    async with Serverless() as client:
+        endpoint = await client.get_endpoint(name=ENDPOINT_NAME)
+
+        payload = {
+            "input": {
+                "modifier": "<WORKFLOW_MODIFIER>",  # e.g. "Text2Image"
+                "modifications": {
+                    "prompt": "<YOUR_PROMPT>",      # e.g. "A cat in a spacesuit on Mars."
+                    "width": <IMAGE_WIDTH>,          # e.g. 512
+                    "height": <IMAGE_HEIGHT>,        # e.g. 512
+                    "steps": <NUM_STEPS>,            # e.g. 10
+                    "seed": <SEED>                   # e.g. random.randint(1, 1000)
+                }
+            }
+        }
+
+        responses = []
+
+        while True:
+            req = ServerlessRequest()
+
+            def work_finished_callback(response):
+                if response.get("ok"):
+                    print(f"{len([x for x in responses if x.status != 'Complete'])} in flight")
+                else:
+                    print(f"Request failed in callback. Status={response.get('status')}")
+
+            req.then(work_finished_callback)
+            responses.append(
+                endpoint.request(
+                    route="/generate/sync",
+                    payload=payload,
+                    serverless_request=req,
+                    cost=COST_PER_REQUEST
+                )
+            )
+            await asyncio.sleep(COST_PER_REQUEST / TARGET_LOAD)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+- **`<ENDPOINT_NAME>`** -- The name you gave your endpoint in the dashboard. Must match exactly.
+- **`<COST_PER_REQUEST>`** -- Numeric weight for load balancing and autoscaling. For constant-cost workloads like image generation, a fixed value (e.g., `100`) works well.
+- **`<TARGET_LOAD>`** -- Controls submission rate. The loop sleeps for `COST_PER_REQUEST / TARGET_LOAD` seconds between requests. With `COST_PER_REQUEST=100` and `TARGET_LOAD=300`, that is one request every ~0.33 seconds.
+- **`<WORKFLOW_MODIFIER>`** -- The ComfyUI workflow to run (e.g., `"Text2Image"`).
+- **`<YOUR_PROMPT>`** -- The text description of the image to generate. In production, replace with the prompt from each user request.
+- **`<IMAGE_WIDTH>`, `<IMAGE_HEIGHT>`** -- Output image dimensions in pixels.
+- **`<NUM_STEPS>`** -- Number of diffusion steps.
+- **`<SEED>`** -- Random seed. Use `random.randint(1, 1000)` for unique images, or a fixed integer for reproducibility.
+
+### Session-Based Requests
+
+Sessions pin all requests to a single worker. Use this when:
+
+- **Your workflow is multi-step.** Generate a base image, then refine it, then upscale. Each step needs intermediate files from the previous step, which live on one machine.
+- **The worker holds state between requests.** ComfyUI caches loaded LoRA weights, precomputed latents, and partial outputs. A different worker would not have that cache.
+- **You need predictable latency.** A session reserves a worker so requests do not compete with other users for routing.
+
+Single request example:
+
+```python
+import asyncio
+from vastai import Serverless
+import random
+
+ENDPOINT_NAME    = "<ENDPOINT_NAME>"    # e.g. "my-comfy-endpoint"
+SESSION_COST     = <SESSION_COST>       # e.g. 100
+SESSION_LIFETIME = <SESSION_LIFETIME>   # e.g. 30 (seconds)
+
+async def main():
+    async with Serverless() as client:
+        endpoint = await client.get_endpoint(name=ENDPOINT_NAME)
+        session = await endpoint.session(cost=SESSION_COST, lifetime=SESSION_LIFETIME)
+
+        payload = {
+            "input": {
+                "modifier": "<WORKFLOW_MODIFIER>",  # e.g. "Text2Image"
+                "modifications": {
+                    "prompt": "<YOUR_PROMPT>",      # e.g. "A cat in a spacesuit on Mars."
+                    "width": <IMAGE_WIDTH>,          # e.g. 512
+                    "height": <IMAGE_HEIGHT>,        # e.g. 512
+                    "steps": <NUM_STEPS>,            # e.g. 10
+                    "seed": <SEED>                   # e.g. random.randint(1, 1000)
+                }
+            }
+        }
+
+        try:
+            response = await session.request("/generate", payload)
+            if not response.get("ok"):
+                print(f"Request failed: {response.get('text')}")
+            else:
+                print("Request succeeded")
+        except Exception as ex:
+            print(f"Request failed: {ex}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+- **`<ENDPOINT_NAME>`** -- The name you gave your endpoint in the dashboard. Must match exactly.
+- **`<SESSION_COST>`** -- Compute budget allocated to this session.
+- **`<SESSION_LIFETIME>`** -- How long (in seconds) the session reserves a worker before automatically closing. Set this long enough to cover all planned requests.
+- **`<WORKFLOW_MODIFIER>`** -- The ComfyUI workflow to run (e.g., `"Text2Image"`).
+- **`<YOUR_PROMPT>`** -- The text description of the image to generate.
+- **`<IMAGE_WIDTH>`, `<IMAGE_HEIGHT>`** -- Output image dimensions in pixels.
+- **`<NUM_STEPS>`** -- Number of diffusion steps.
+- **`<SEED>`** -- Random seed.
+
+Multi-step example (generate then refine on the same worker):
+
+```python
+import asyncio
+from vastai import Serverless
+import random
+
+ENDPOINT_NAME    = "<ENDPOINT_NAME>"    # e.g. "my-comfy-endpoint"
+SESSION_COST     = <SESSION_COST>       # e.g. 100
+SESSION_LIFETIME = <SESSION_LIFETIME>   # e.g. 120 (seconds)
+
+async def main():
+    async with Serverless() as client:
+        endpoint = await client.get_endpoint(name=ENDPOINT_NAME)
+        session = await endpoint.session(cost=SESSION_COST, lifetime=SESSION_LIFETIME)
+
+        # Step 1: Generate a base image
+        base_payload = {
+            "input": {
+                "modifier": "<WORKFLOW_MODIFIER>",      # e.g. "Text2Image"
+                "modifications": {
+                    "prompt": "<BASE_PROMPT>",          # e.g. "A robot exploring an ancient temple, cinematic lighting."
+                    "width": <IMAGE_WIDTH>,              # e.g. 512
+                    "height": <IMAGE_HEIGHT>,            # e.g. 512
+                    "steps": <NUM_STEPS>,                # e.g. 20
+                    "seed": <SEED>                       # e.g. 42
+                }
+            }
+        }
+
+        response = await session.request("/generate", base_payload)
+        if not response.get("ok"):
+            print(f"Base generation failed: {response.get('text')}")
+            return
+        print("Base image generated")
+
+        # Step 2: Refine with a variation on the same worker
+        refined_payload = {
+            "input": {
+                "modifier": "<WORKFLOW_MODIFIER>",
+                "modifications": {
+                    "prompt": "<REFINED_PROMPT>",       # e.g. "A robot exploring an ancient temple, cinematic lighting, mossy stone walls, volumetric fog."
+                    "width": <IMAGE_WIDTH>,
+                    "height": <IMAGE_HEIGHT>,
+                    "steps": <NUM_STEPS>,
+                    "seed": <SEED>
+                }
+            }
+        }
+
+        response = await session.request("/generate", refined_payload)
+        if not response.get("ok"):
+            print(f"Refinement failed: {response.get('text')}")
+            return
+        print("Refined image generated")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+- **`<ENDPOINT_NAME>`** -- The name you gave your endpoint in the dashboard. Must match exactly.
+- **`<SESSION_COST>`** -- Compute budget for this session. Should cover all planned requests.
+- **`<SESSION_LIFETIME>`** -- For multi-step workflows, set this to cover the total expected time for all steps plus buffer (e.g., `120` for two generation steps).
+- **`<WORKFLOW_MODIFIER>`** -- The ComfyUI workflow to run. Use the same modifier for both steps if they use the same pipeline.
+- **`<BASE_PROMPT>`** -- The text prompt for the initial image generation.
+- **`<REFINED_PROMPT>`** -- The modified prompt for the refinement step. Typically the base prompt with added or adjusted details.
+- **`<IMAGE_WIDTH>`, `<IMAGE_HEIGHT>`** -- Output image dimensions in pixels. Use the same dimensions across steps for consistency.
+- **`<NUM_STEPS>`** -- Number of diffusion steps. You can use different values per step if needed.
+- **`<SEED>`** -- Random seed. Using the same seed across steps produces more coherent iterations.
+
+Both requests are guaranteed to hit the same machine, so cached models and intermediate state from the first generation are available for the second.
+
+---
+
+## Troubleshooting
+
+**"Endpoint not found"** -- The `name` in `get_endpoint()` must match the dashboard name exactly.
+
+**Requests timing out** -- Workers may still be provisioning. Check endpoint status in the dashboard. Workers must download the model and pass benchmarks before accepting requests.
+
+**"Request failed" with no status** -- Check that `VAST_API_KEY` is set. You can also pass it directly: `Serverless(api_key="your-key")`.
+
+**Slow first request** -- The first request to a cold endpoint triggers worker provisioning. Subsequent requests are faster once workers are warm.
