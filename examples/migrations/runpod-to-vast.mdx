@@ -49,18 +49,16 @@ updatedAt: "Tue Mar 18 2026 16:00:00 GMT+0000 (Coordinated Universal Time)"
 
 A guide for users moving GPU workloads from Runpod to Vast.ai. Whether you use Runpod Pods for training and development or Runpod Serverless for inference, this guide maps every concept to its Vast.ai equivalent and walks you through the transition.
 
-**What you gain:** transparent marketplace pricing, a broader GPU selection with transparent specs, and the ability to shop across hosts for the best price-to-performance ratio anywhere.
-
-**What is different:** you have more control. You choose your specific host, see exactly what you are getting, and set the reliability level you need, rather than accepting an opaque allocation. This guide addresses each of these differences head-on so there are no surprises.
+**What is different:** In a nutshell, you have more control. You choose your specific machine, see the exact specs you are getting, and set the reliability level you need, rather than relying on an opaque allocation. This guide addresses each of these differences head-on so there are no surprises.
 
 <Note>
 **What Runpod users need to know about Vast.ai:**
 
 1. **Your existing Runpod images may work as-is.** Many Runpod-compatible Docker images run on Vast with little or no modification.
-2. **Often cheaper for the same GPU.** Marketplace competition drives prices down. You'll frequently find the same hardware at lower rates than fixed-tier providers.
-3. **You pick the individual machine, not just the GPU type.** Every offer shows reliability score, network speed, CPU, location, and other critical specs. Two A100s at the same price can be very different machines. Vast gives you the data to choose the right one.
-4. **Bandwidth billed separately.** Providers set rates for bandwidth use per GB, which you can view in the price breakdown by hovering over the price of an instance offer. Filter for instances with lower bandwidth rates using the pricing filters on the search page. Note that both inbound and outbound traffic are billed, so pulling large models or datasets counts toward your bandwidth costs.
-5. **Set your disk size right at launch.** Resizing requires recreating the container. Storage is cheap, so err on the side of more space.
+2. **You pick the individual machine, not just the GPU type.** Every offer shows reliability score, network speed, CPU, location, and other critical specs. Two A100s at the same price can be very different machines. Vast gives you the data to choose the right one.
+3. **Bandwidth billed separately.** Providers set rates for bandwidth use per GB, which you can view in the price breakdown by hovering over the price of an instance offer. Filter for instances with lower bandwidth rates using the pricing filters on the search page. Note that both inbound and outbound traffic are billed, so pulling large models or datasets counts toward your bandwidth costs.
+4. **Set your disk size right at launch.** Resizing requires recreating the container. Storage is cheap, so err on the side of more space.
+5. **Often lower prices for the same GPU performance.** Marketplace competition drives prices down. You'll frequently find the same hardware at lower rates than fixed-tier providers.
 </Note>
 
 ## In This Guide
@@ -426,19 +424,19 @@ On Runpod, you SSH into a pod using the connection info from the console. On Vas
     ```
 
     ```bash Vast CLI
-    # Get the full SSH connection command
+    # Get SSH connection details
     vastai ssh-url <INSTANCE_ID>
-    # Example output: ssh -p 20544 root@142.214.185.187
+    # Example output: ssh://root@142.214.185.187:20544
 
-    # Connect directly
-    $(vastai ssh-url <INSTANCE_ID>)
+    # Then connect using the host and port from the output above
+    ssh -p 20544 root@142.214.185.187
     ```
 
     </CodeGroup>
   </Tab>
 </Tabs>
 
-Vast instances connect to a tmux session by default. Use `Ctrl+B C` to open a new window and `Ctrl+B N` to cycle between windows. To disable tmux, create `~/.no_auto_tmux` inside the container.
+Instances using [Vast base images](https://github.com/vast-ai/base-image/) connect to a tmux session by default. Use `Ctrl+B C` to open a new window and `Ctrl+B N` to cycle between windows. To disable tmux, create `~/.no_auto_tmux` inside the container.
 
 **Port forwarding** works the same as any SSH connection:
 
@@ -451,7 +449,7 @@ ssh -p <PORT> root@<VAST_IP> -L 8080:localhost:8080
 Both platforms support JupyterLab. On Vast, Jupyter is available out of the box with two access modes:
 
 - **Proxy mode** (default): Click the Jupyter button in the [Vast console](https://cloud.vast.ai). Works immediately, no setup needed. Uses Cloudflare tunnels, which are best-effort.
-- **Direct HTTPS** (recommended): Faster, more reliable connection that bypasses the proxy. Vast instances include a built-in Jupyter TLS certificate. Install the Vast TLS root certificate (`jvastai_root.cer`), downloadable from the [Vast console](https://cloud.vast.ai), to connect directly over HTTPS without browser warnings.
+- **Direct HTTPS** (recommended): Faster, more reliable connection that bypasses the proxy. Instances using Vast base images include a built-in Jupyter TLS certificate. Install the Vast TLS root certificate (`jvastai_root.cer`), downloadable from the [Vast console](https://cloud.vast.ai), to connect directly over HTTPS without browser warnings.
 
 Both platforms support VS Code / Cursor via Remote-SSH.
 
@@ -601,9 +599,9 @@ Reserved instances cannot migrate between hosts. If the host machine goes down, 
 
 Runpod **Serverless** lets you deploy a handler function that scales to zero. You send a request, Runpod spins up a worker, runs your handler, and tears it down. You pay per second of compute, not for idle GPUs.
 
-Vast **Serverless** delivers autoscaling inference at marketplace rates with no usage tiers or hidden surcharges, just per-second billing across 68+ GPU types globally. Vast handles routing, queueing, and autoscaling automatically. You can deploy using a pre-built template (vLLM, TGI, ComfyUI) or implement a custom handler with PyWorker, analogous to RunPod's handler pattern.
+Vast **Serverless** delivers autoscaling inference at marketplace rates, with per-second billing across 68+ GPU types globally. Vast handles routing, queueing, and autoscaling automatically. You can deploy using a pre-built template (vLLM, TGI, ComfyUI) or implement a custom handler with PyWorker, analogous to RunPod's handler pattern.
 
-**Pricing:** Runpod charges a premium for Serverless GPU time on top of the base instance cost. On Vast, Serverless workers run on the same marketplace instances you'd rent directly. You pay the same rate, just with autoscaling on top.
+**Pricing:** Serverless workers run on the same marketplace instances you'd rent directly — you pay the same per-second rate, just with autoscaling on top.
 
 ### Vast Serverless Architecture
 
@@ -676,7 +674,7 @@ Vast Serverless supports two deployment paths:
 Install the Vast SDK:
 
 ```bash
-pip install vastai_sdk
+pip install vastai-sdk
 ```
 
 <CodeGroup>
