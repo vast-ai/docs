@@ -1,0 +1,756 @@
+---
+title: "Migrate from Runpod to Vast.ai"
+slug: "migrate-from-runpod"
+createdAt: "Mon Mar 17 2026 16:00:00 GMT+0000 (Coordinated Universal Time)"
+updatedAt: "Tue Mar 18 2026 16:00:00 GMT+0000 (Coordinated Universal Time)"
+---
+
+<script type="application/ld+json" dangerouslySetInnerHTML={{
+  __html: JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "Migrate from Runpod to Vast.ai",
+    "description": "A complete guide for moving GPU workloads from Runpod to Vast.ai, covering concept mapping, account setup, instance management, serverless migration, networking, and cost optimization.",
+    "step": [
+      {
+        "@type": "HowToStep",
+        "name": "Set up your Vast.ai account",
+        "text": "Create a Vast.ai account, generate an API key, install the CLI, and add your SSH public key."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Find and rent a GPU instance",
+        "text": "Search the Vast.ai marketplace for GPU instances matching your requirements using filters for GPU type, VRAM, price, and reliability."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Migrate your Docker environment",
+        "text": "Use your existing Runpod-compatible Docker images on Vast.ai with environment variables, startup scripts, and port mappings."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Configure storage",
+        "text": "Set up persistent storage using Vast volumes or object storage for model weights."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Run your workload",
+        "text": "Connect via SSH or Jupyter, serve inference endpoints using Vast Serverless or manual deployment, and manage instances programmatically."
+      }
+    ],
+    "author": {
+      "@type": "Organization",
+      "name": "Vast.ai Team"
+    },
+    "datePublished": "2026-03-17",
+    "dateModified": "2026-03-18"
+  })
+}} />
+
+A guide for users moving GPU workloads from Runpod to Vast.ai. Whether you use Runpod Pods for training and development or Runpod Serverless for inference, this guide maps every concept to its Vast.ai equivalent and walks you through the transition.
+
+**What is different:** In a nutshell, you have more control. You choose your specific machine, see the exact specs you are getting, and set the reliability level you need, rather than relying on an opaque allocation. This guide addresses each of these differences head-on so there are no surprises.
+
+<Note>
+**What Runpod users need to know about Vast.ai:**
+
+1. **Your existing Runpod images may work as-is.** Many Runpod-compatible Docker images run on Vast with little or no modification.
+2. **You pick the individual machine, not just the GPU type.** Every offer shows reliability score, network speed, CPU, location, and other critical specs. Two A100s at the same price can be very different machines. Vast gives you the data to choose the right one.
+3. **Bandwidth billed separately.** Providers set rates for bandwidth use per GB, which you can view in the price breakdown by hovering over the price of an instance offer. Filter for instances with lower bandwidth rates using the pricing filters on the search page. Note that both inbound and outbound traffic are billed, so pulling large models or datasets counts toward your bandwidth costs.
+4. **Set your disk size right at launch.** Resizing requires recreating the container. Storage is cheap, so err on the side of more space.
+5. **Often lower prices for the same GPU performance.** Marketplace competition drives prices down. You'll frequently find the same hardware at lower rates than fixed-tier providers.
+</Note>
+
+## In This Guide
+
+1. [Concept Mapping](#concept-mapping): Runpod terms → Vast equivalents
+2. [Account Setup](#account-setup)
+3. **[Migrating from Pods](#migrating-from-pods)**: instances, Docker config, storage, networking, SSH, logs, lifecycle/cost
+4. **[Migrating from Serverless](#migrating-from-serverless)**: endpoints, PyWorker
+5. [CLI Reference](#cli-reference): full side-by-side table
+
+## Concept Mapping
+
+| Runpod | Vast.ai | Notes |
+|---|---|---|
+| Pod | Instance | Docker container with exclusive GPU access |
+| Serverless Endpoint -> Worker | Serverless Endpoint -> Workergroup -> Worker | Vast has managed autoscaling inference. See [Migrating from Serverless](#migrating-from-serverless) |
+| Community Cloud / Secure Cloud | Verified Machines (default) / Secure Cloud | Vast defaults to verified machines; Secure Cloud filters to datacenter-grade hosts |
+| Template | Template / Docker image | Specify a Docker image and configuration at launch |
+| Volume Disk | (Local) Volume | Machine-local storage that can attach to any GPU on the same physical node. See [Storage](#storage) |
+| Network Volume | Object Storage (S3, R2, GCS) | Vast has no cross-host network volume. For data that persists across machines, use object storage. See [Storage](#storage) |
+| Hub | [Model Library](/documentation/serverless/getting-started-with-serverless) + [Template Library](/documentation/templates/introduction) | Official templates for popular inference engines and applications, plus specific model configs through the model library |
+| Pod API | Vast REST API / `vastai` CLI | Full programmatic control over instances |
+| GPU Type selector | Search filters (CUDA, VRAM, price/hr) | Vast is a marketplace: you search and filter offers |
+| On-Demand Pod | On-Demand Instance | Fixed pricing, guaranteed resources |
+| Spot Pod | Interruptible Instance | You set a max $/hr; higher-priority on-demand renters can displace you |
+| Savings Plan | Reserved Instance | Pre-pay an on-demand instance for up to 50% discount |
+| Runpod Console | [Vast Console](https://cloud.vast.ai) | Web UI for managing instances, billing, and templates |
+
+## Account Setup
+
+1. **Create an account** at [cloud.vast.ai](https://cloud.vast.ai)
+2. **Add credits.** Similar to Runpod, Vast is prepaid. Add funds via the [Billing page](https://cloud.vast.ai/billing/) before renting.
+3. **Add your SSH public key** at [cloud.vast.ai/manage-keys/](https://cloud.vast.ai/manage-keys/). If you do not have one, generate it with `ssh-keygen -t ed25519`. Keys are applied at container creation time. If you forgot, use the SSH key button on the instance card to add one without recreating.
+
+That's all you need to get started via the console. **If you plan to use the CLI or REST API**, also:
+
+4. **Generate an API key** at [API Keys](https://cloud.vast.ai/api-keys/) and authenticate:
+
+```bash Vast CLI
+pip install vastai
+vastai set api-key <YOUR_API_KEY>
+```
+
+## Migrating from Pods
+
+A Runpod **Pod** is a Docker container running on a GPU-equipped machine. You pick a GPU type and a template (Docker image + config), and Runpod assigns you a machine from its managed fleet. The Vast.ai equivalent is an **Instance**: also a Docker container with exclusive GPU access, but rented from an open marketplace of independent hosts rather than a single provider.
+
+The core workflow is the same (pick a GPU, choose an image, launch), but how you find that GPU is different.
+
+### Finding and Creating Instances
+
+Runpod presents a curated list of GPUs at set prices. Vast.ai is a marketplace: hosts list their machines with specs and asking prices, and you search through available offers using filters. Two A100 80GB offers at the same price can be on very different machines. Vast surfaces reliability scores, network speeds, and location for every offer so you can pick the right one for your workload.
+
+**Always check these before renting:**
+- **Reliability score**: historical uptime percentage. Look for 0.95+ for production workloads. If reliability is critical, filter for Secure Cloud machines only.
+- **Network speed**: `inet_down` and `inet_up` in Mbps. Matters for model downloads and data transfer.
+- **Geolocation**: filter by region for latency-sensitive workloads.
+
+<Tabs>
+  <Tab title="Console">
+    1. Go to [Search](https://cloud.vast.ai/create/)
+    2. Use the GPU type, VRAM, reliability, and region filters to narrow results
+    3. Review each offer's reliability score and network speed before renting
+    4. Click **Rent** on your chosen offer and configure image, disk, and Docker options in the dialog
+  </Tab>
+  <Tab title="CLI">
+    <CodeGroup>
+
+    ```bash Runpod API
+    curl -X POST "https://rest.runpod.io/v1/pods" \
+        -H "Authorization: Bearer $RUNPOD_API_KEY" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "my-pod",
+            "imageName": "pytorch/pytorch:latest",
+            "gpuTypeIds": ["NVIDIA GeForce RTX 4090"],
+            "containerDiskInGb": 50,
+            "cloudType": "SECURE"
+        }'
+    ```
+
+    ```bash Vast CLI
+    # Step 1: Search for matching offers
+    vastai search offers 'gpu_name = RTX_4090 reliability > 0.95' \
+        --order "dph_base" --limit 5
+
+    # Step 2: Create instance from an offer ID
+    vastai create instance <OFFER_ID> \
+        --image pytorch/pytorch:latest \
+        --disk 50
+    ```
+
+
+    </CodeGroup>
+
+    Common GPU searches:
+
+    ```bash Vast CLI
+    # RTX 4090 (24GB) — popular for inference
+    vastai search offers 'gpu_name = RTX_4090' --order "dph_base" --limit 5
+
+    # A100 80GB — training and large model inference
+    vastai search offers 'gpu_name in ["A100 SXM4","A100 PCIE"] gpu_ram >= 80' --order "dph_base" --limit 5
+
+    # H100 — highest performance
+    vastai search offers 'gpu_name in ["H100 SXM","H100 NVL"]' --order "dph_base" --limit 5
+
+    # Multi-GPU for distributed training
+    vastai search offers 'num_gpus >= 4 gpu_ram >= 80' --order "dph_base" --limit 5
+
+    # US only
+    vastai search offers 'gpu_ram >= 24 geolocation = US' --order "dph_base" --limit 10
+    ```
+  </Tab>
+</Tabs>
+
+### Docker Environment
+
+#### Images
+
+If you have a working Runpod template, you likely already have a Docker image that works on Vast. Many Runpod-compatible images may run as-is. Just specify the image in the `--image` flag.
+
+To minimize cold start times:
+- Use [**Vast base images**](https://github.com/vast-ai/base-image/) (also on [DockerHub](https://hub.docker.com/u/vastai)), which are pre-cached on many hosts
+- Use smaller, optimized images where possible
+- For very large images, build on top of a pre-cached base
+
+#### Environment Variables
+
+On Runpod, environment variables are set in the template UI or passed as a JSON object in the API. Vast works the same way.
+
+<Tabs>
+  <Tab title="Console">
+    In the instance creation dialog or template editor, set environment variables using the GUI fields or the **Docker Options** field with Docker syntax:
+
+    ```
+    -e HF_TOKEN=hf_xxxxx -e MODEL_NAME=meta-llama/Llama-3-8B
+    ```
+  </Tab>
+  <Tab title="CLI">
+    <CodeGroup>
+
+    ```bash Runpod API
+    curl -X POST "https://rest.runpod.io/v1/pods" \
+        -H "Authorization: Bearer $RUNPOD_API_KEY" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "my-pod",
+            "imageName": "your-image:latest",
+            "gpuTypeIds": ["NVIDIA GeForce RTX 4090"],
+            "env": {
+                "HF_TOKEN": "hf_xxxxx",
+                "MODEL_NAME": "meta-llama/Llama-3-8B"
+            }
+        }'
+    ```
+
+    ```bash Vast CLI
+    vastai create instance <OFFER_ID> \
+        --image your-image:latest \
+        --env "-e HF_TOKEN=hf_xxxxx -e MODEL_NAME=meta-llama/Llama-3-8B" \
+        --disk 100
+    ```
+
+    </CodeGroup>
+
+    <Note>
+    The Vast CLI `--env` flag takes **raw Docker run options**, not just `KEY=VALUE` pairs. Port mappings go here too, for example: `--env "-e MY_VAR=foo -p 8080:8080"`.
+    </Note>
+  </Tab>
+</Tabs>
+
+#### Entrypoint Arguments
+
+Runpod's "Docker Command" field passes arguments to the container's ENTRYPOINT (`"dockerStartCmd"` in the API). On Vast, use `--args`.
+
+<Tabs>
+  <Tab title="Console">
+    In the template editor or instance creation dialog, enter entrypoint arguments in the **Docker Options** field.
+  </Tab>
+  <Tab title="CLI">
+    <CodeGroup>
+
+    ```bash Runpod API
+    curl -X POST "https://rest.runpod.io/v1/pods" \
+        -H "Authorization: Bearer $RUNPOD_API_KEY" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "vllm-server",
+            "imageName": "vllm/vllm-openai:latest",
+            "gpuTypeIds": ["NVIDIA GeForce RTX 4090"],
+            "containerDiskInGb": 40,
+            "ports": ["8000/http"],
+            "dockerStartCmd": ["--model", "Qwen/Qwen2.5-7B-Instruct", "--max-model-len", "4096"]
+        }'
+    ```
+
+    ```bash Vast CLI
+    vastai create instance <OFFER_ID> \
+        --image vllm/vllm-openai:latest \
+        --env "-p 8000:8000" \
+        --disk 40 \
+        --args --model Qwen/Qwen2.5-7B-Instruct --max-model-len 4096
+    ```
+
+    </CodeGroup>
+  </Tab>
+</Tabs>
+
+#### Startup Scripts
+
+Vast has an on-start script that runs a shell command *after* the container starts. Runpod does not have a direct equivalent; the closest is baking the command into a custom Docker image.
+
+<Tabs>
+  <Tab title="Console">
+    In the template editor or instance creation dialog, enter your startup commands in the **On-start Script** field.
+  </Tab>
+  <Tab title="CLI">
+    ```bash Vast CLI
+    vastai create instance <OFFER_ID> \
+        --image pytorch/pytorch:latest \
+        --env "-p 8000:8000" \
+        --disk 50 \
+        --onstart-cmd "cd /workspace && pip install -r requirements.txt && python server.py"
+    ```
+  </Tab>
+</Tabs>
+
+#### Converting a Runpod Template
+
+Runpod templates bundle an image, environment, ports, and a Docker command into a reusable config. Here is how each field maps to Vast:
+
+| Runpod template field | Vast console | Vast CLI flag |
+|---|---|---|
+| Container Image (`imageName`) | Image field | `--image` |
+| Container Disk (`containerDiskInGb`) | Disk field | `--disk` |
+| Exposed Ports (`"8000/http"`) | Docker Options: `-p 8000:8000` | `--env "-p 8000:8000"` |
+| Environment Variables (`env: {...}`) | Docker Options: `-e KEY=VALUE` | `--env "-e KEY=VALUE"` |
+| Docker Command (`dockerStartCmd`) | Docker Options (entrypoint args) | `--args` |
+| *(no equivalent)* | On-start Script | `--onstart-cmd` |
+
+**Full example:** a Runpod vLLM template converted to Vast:
+
+<CodeGroup>
+
+```bash Runpod (API)
+curl -X POST "https://rest.runpod.io/v1/pods" \
+    -H "Authorization: Bearer $RUNPOD_API_KEY" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "imageName": "vllm/vllm-openai:latest",
+        "containerDiskInGb": 40,
+        "ports": ["8000/http"],
+        "env": {"HF_TOKEN": "hf_xxxxx"},
+        "dockerStartCmd": ["--model", "meta-llama/Llama-3.1-8B-Instruct"]
+    }'
+```
+
+```bash Vast CLI
+vastai create instance <OFFER_ID> \
+    --image vllm/vllm-openai:latest \
+    --disk 40 \
+    --env "-p 8000:8000 -e HF_TOKEN=hf_xxxxx" \
+    --args --model meta-llama/Llama-3.1-8B-Instruct
+```
+
+</CodeGroup>
+
+Once you have a working configuration, save it as a reusable **Vast template** in the [console](https://cloud.vast.ai/templates/). See the [Templates guide](/documentation/templates/introduction) for details.
+
+### Storage
+
+For model weights and datasets, the recommended approach is to pull from object storage on boot. This works across any host and keeps your instance stateless:
+
+- **Object storage** (S3, R2, GCS): pull weights on boot. Most flexible, works across any host.
+- **[Cloud Sync](/documentation/instances/storage/cloud-sync)**: Vast's built-in sync tool supports S3, Google Drive, Backblaze, and Dropbox. Access it via the console or `vastai cloud copy`. Docker instances only; use IAM credentials with S3 for bucket-scoped access rather than account-level credentials.
+
+<Note>
+Vast local volumes are tied to the physical machine they were created on. For data that needs to persist across instances or move to a new host, use cloud object storage (S3, R2, GCS), a more portable and provider-agnostic approach than any single vendor's proprietary network volume.
+</Note>
+
+### Networking and Ports
+
+Both platforms provide proxy access to services. On Runpod, proxy URLs are static: `https://<POD_ID>-<PORT>.proxy.runpod.net`. On Vast, there are two proxy mechanisms:
+
+- **HTTP/HTTPS proxy**: instances using [Vast base images](https://github.com/vast-ai/base-image/) get auto-generated Cloudflare tunnel URLs (`https://four-random-words.trycloudflare.com`) per open port via the [Instance Portal](/documentation/instances/connect/instance-portal). These tunnels are best-effort and may not always be available; for reliable HTTPS access, use direct connections or the built-in Jupyter certificate (see [Jupyter / IDE Access](#jupyter--ide-access)).
+- **SSH proxy**: instances using SSH-compatible images support proxy SSH through Vast's proxy server, which works even on machines without open ports. Direct SSH (faster) is preferred when available.
+
+Instances also have direct access via a **random external port** on the host's public IP, which you discover after launch.
+
+#### Declaring Ports at Launch
+
+<Tabs>
+  <Tab title="Console">
+    In the instance creation dialog or template editor, enter port mappings in the **Docker Options** field:
+
+    ```
+    -p 8000:8000 -p 8080:8080
+    ```
+  </Tab>
+  <Tab title="CLI">
+    <CodeGroup>
+
+    ```bash Runpod API
+    # Ports configured in template UI or API "ports" field
+    # e.g. "ports": ["8000/http", "22/tcp"]
+    # Accessed via proxy URL: https://<POD_ID>-8000.proxy.runpod.net
+    ```
+
+    ```bash Vast CLI
+    vastai create instance <OFFER_ID> \
+        --image your-image:latest \
+        --env "-p 8000:8000 -p 8080:8080" \
+        --disk 50
+    ```
+
+    </CodeGroup>
+  </Tab>
+</Tabs>
+
+**Limits:** Maximum 64 open ports per container. For a stable external port number, use internal ports above 70000, which are identity-mapped (the external port matches the internal port).
+
+#### Discovering Your External Port
+
+<Tabs>
+  <Tab title="Console">
+    After the instance starts, click the **Open Ports** button on the instance card to see the external port mapping.
+  </Tab>
+  <Tab title="CLI">
+    <CodeGroup>
+
+    ```bash Runpod
+    # Access via proxy URL (automatic)
+    curl https://<POD_ID>-8000.proxy.runpod.net/v1/models
+    ```
+
+    ```bash Vast CLI
+    vastai show instance <INSTANCE_ID> --raw | jq '.ports'
+    ```
+
+    </CodeGroup>
+  </Tab>
+</Tabs>
+
+Vast also sets `VAST_TCP_PORT_<N>` environment variables inside the container for each mapped port. Use these in your application code to construct external URLs.
+
+### Connecting to Your Instance
+
+#### SSH
+
+On Runpod, you SSH into a pod using the connection info from the console. On Vast, SSH uses key-only authentication (make sure you've added your public key in [Account Setup](#account-setup)).
+
+<Tabs>
+  <Tab title="Console">
+    Click the **SSH** button on the instance card to see the full connection command, then paste it into your terminal.
+  </Tab>
+  <Tab title="CLI">
+    <CodeGroup>
+
+    ```bash Runpod
+    # SSH connection string from Runpod console
+    ssh <POD_ID>@ssh.runpod.io -i ~/.ssh/id_ed25519
+    ```
+
+    ```bash Vast CLI
+    # Get SSH connection details
+    vastai ssh-url <INSTANCE_ID>
+    # Example output: ssh://root@142.214.185.187:20544
+
+    # Then connect using the host and port from the output above
+    ssh -p 20544 root@142.214.185.187
+    ```
+
+    </CodeGroup>
+  </Tab>
+</Tabs>
+
+Instances using [Vast base images](https://github.com/vast-ai/base-image/) connect to a tmux session by default. Use `Ctrl+B C` to open a new window and `Ctrl+B N` to cycle between windows. To disable tmux, create `~/.no_auto_tmux` inside the container.
+
+**Port forwarding** works the same as any SSH connection:
+
+```bash Bash
+ssh -p <PORT> root@<VAST_IP> -L 8080:localhost:8080
+```
+
+#### Jupyter / IDE Access
+
+Both platforms support JupyterLab. On Vast, Jupyter is available out of the box with two access modes:
+
+- **Proxy mode** (default): Click the Jupyter button in the [Vast console](https://cloud.vast.ai). Works immediately, no setup needed. Uses Cloudflare tunnels, which are best-effort.
+- **Direct HTTPS** (recommended): Faster, more reliable connection that bypasses the proxy. Instances using Vast base images include a built-in Jupyter TLS certificate. Install the Vast TLS root certificate (`jvastai_root.cer`), downloadable from the [Vast console](https://cloud.vast.ai), to connect directly over HTTPS without browser warnings.
+
+Both platforms support VS Code / Cursor via Remote-SSH.
+
+#### Logs
+
+<Tabs>
+  <Tab title="Console">
+    Click the **Logs** button on the instance card to view live output.
+  </Tab>
+  <Tab title="CLI">
+    ```bash Vast CLI
+    vastai logs <INSTANCE_ID>
+
+    # Tail the last 50 lines
+    vastai logs <INSTANCE_ID> --tail 50
+    ```
+
+    <Note>
+    Vast logs may take a short time to become available after an instance starts. If you see "waiting on logs" messages, retry after a moment.
+    </Note>
+  </Tab>
+</Tabs>
+
+### Instance Lifecycle and Cost
+
+#### Start, Stop, and Destroy
+
+<Tabs>
+  <Tab title="Console">
+    Use the buttons on the instance card: **Stop** to pause compute, **Destroy** to delete the instance and stop all charges.
+  </Tab>
+  <Tab title="CLI">
+    <CodeGroup>
+
+    ```bash Runpod API
+    # Stop pod
+    curl -X POST "https://rest.runpod.io/v1/pods/$POD_ID/stop" \
+        -H "Authorization: Bearer $RUNPOD_API_KEY"
+
+    # Terminate pod
+    curl -X DELETE "https://rest.runpod.io/v1/pods/$POD_ID" \
+        -H "Authorization: Bearer $RUNPOD_API_KEY"
+    ```
+
+    ```bash Vast CLI
+    # Stop — pauses compute, storage keeps billing
+    vastai stop instance <INSTANCE_ID>
+
+    # Destroy — stops all charges, deletes all data
+    vastai destroy instance <INSTANCE_ID>
+    ```
+
+    </CodeGroup>
+  </Tab>
+</Tabs>
+
+| Action | Compute Charges | Storage Charges | Data Preserved |
+|---|---|---|---|
+| **Stop** | Stop | **Continue** | Yes |
+| **Destroy** | Stop | Stop | **No** |
+
+**If you are done with an instance, destroy it.** Stopped instances continue to cost money for storage. Only stop instances you plan to resume soon.
+
+#### On-Demand vs Interruptible
+
+| Type | Runpod Equivalent | Price | Interruption Risk |
+|---|---|---|---|
+| On-Demand | On-Demand Pod | Standard marketplace rate | None (guaranteed) |
+| Interruptible | Spot Pod | Often significantly cheaper | Can be displaced by on-demand renters |
+
+<Tabs>
+  <Tab title="Console">
+    On the [Search](https://cloud.vast.ai/create/) page, use the **Instance Type** toggle to switch between on-demand and interruptible offers before renting.
+  </Tab>
+  <Tab title="CLI">
+    <CodeGroup>
+
+    ```bash Runpod API
+    # On-Demand (Secure Cloud)
+    curl -X POST "https://rest.runpod.io/v1/pods" \
+        -H "Authorization: Bearer $RUNPOD_API_KEY" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "my-pod",
+            "imageName": "pytorch/pytorch:latest",
+            "gpuTypeIds": ["NVIDIA GeForce RTX 4090"],
+            "cloudType": "SECURE"
+        }'
+
+    # Spot (Community Cloud)
+    curl -X POST "https://rest.runpod.io/v1/pods" \
+        -H "Authorization: Bearer $RUNPOD_API_KEY" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "my-pod",
+            "imageName": "pytorch/pytorch:latest",
+            "gpuTypeIds": ["NVIDIA GeForce RTX 4090"],
+            "cloudType": "COMMUNITY"
+        }'
+    ```
+
+    ```bash Vast CLI
+    # On-demand — guaranteed, higher price
+    vastai search offers 'gpu_ram >= 24' --type=on-demand --order "dph_base" --limit 10
+
+    # Interruptible — cheapest, may be interrupted
+    vastai search offers 'gpu_ram >= 24' --type=bid --order "dph_base" --limit 10
+    ```
+
+    </CodeGroup>
+  </Tab>
+</Tabs>
+
+Use interruptible instances for batch inference, training with checkpointing, or any workload that can be restarted if interrupted. Save checkpoints frequently.
+
+#### Reserved Instances
+
+If you run an on-demand instance for days or weeks, convert it to a **reserved instance** for up to 50% savings. Reserved instances lock in a discounted rate in exchange for a time commitment:
+
+<Tabs>
+  <Tab title="Console">
+    Not all machines support reserved pricing. To find eligible machines before renting, go to [Search](https://cloud.vast.ai/create/) and switch the **On-demand** filter to **Reserved**. After renting, go to the **Instances** page and click the **green discount badge** on your instance card to open the pre-payment dialog.
+  </Tab>
+  <Tab title="CLI">
+    ```bash Vast CLI
+    vastai prepay instance <INSTANCE_ID> 100
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+Reserved instances cannot migrate between hosts. If the host machine goes down, your reservation is tied to that machine.
+</Note>
+
+### Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Instances Overview" icon="server" href="/documentation/instances/overview">
+    How Vast instances work: GPU access, billing, and connectivity
+  </Card>
+  <Card title="Pricing" icon="dollar-sign" href="/documentation/instances/pricing">
+    How compute, storage, and bandwidth charges work
+  </Card>
+</CardGroup>
+
+## Migrating from Serverless
+
+Runpod **Serverless** lets you deploy a handler function that scales to zero. You send a request, Runpod spins up a worker, runs your handler, and tears it down. You pay per second of compute, not for idle GPUs.
+
+Vast **Serverless** delivers autoscaling inference at marketplace rates, with per-second billing across 68+ GPU types globally. Vast handles routing, queueing, and autoscaling automatically. You can deploy using a pre-built template (vLLM, TGI, ComfyUI) or implement a custom handler with PyWorker, analogous to RunPod's handler pattern.
+
+**Pricing:** Serverless workers run on the same marketplace instances you'd rent directly — you pay the same per-second rate, just with autoscaling on top.
+
+### Vast Serverless Architecture
+
+The system has three layers:
+
+| Component | Purpose |
+|---|---|
+| **Endpoint** | Routes requests, manages autoscaling |
+| **Workergroup** | Defines what code runs and how workers are recruited |
+| **Worker** | Individual GPU instance running your model via PyWorker |
+
+### Deployment Options
+
+Vast Serverless supports two deployment paths:
+
+**PyWorker (Custom Handlers)** is the core framework for building serverless workers. You implement a handler function in Python, analogous to RunPod's handler pattern, with full control over request preprocessing, model loading, and response formatting. Most production deployments use custom PyWorker handlers. See the [PyWorker documentation](/documentation/serverless/creating-new-pyworkers) to get started.
+
+**Pre-built Templates** serve as ready-to-use starting points and examples. Vast provides templates for common frameworks (vLLM, TGI, ComfyUI) that you can deploy directly or use as a reference for building your own handlers.
+
+### Creating Endpoints and Workergroups
+
+<Tabs>
+  <Tab title="Console">
+    1. Go to [Serverless](https://cloud.vast.ai/serverless/) in the console
+    2. Click **New Endpoint** and configure name, max workers, and scaling parameters
+    3. Add a workergroup: choose a pre-built template (vLLM, TGI, ComfyUI) for quick setup, or configure a custom PyWorker by specifying your Docker image and `PYWORKER_REPO` environment variable
+  </Tab>
+  <Tab title="CLI">
+    <CodeGroup>
+
+    ```bash Runpod
+    # Create a serverless endpoint from a template
+    runpodctl create endpoint \
+        --name "my-llm-endpoint" \
+        --templateId "runpod-vllm" \
+        --gpuIds "NVIDIA RTX A5000" \
+        --minWorkers 0 \
+        --maxWorkers 5
+    ```
+
+    ```bash Vast CLI
+    # Create an endpoint
+    vastai create endpoint \
+        --endpoint_name "my-llm-endpoint" \
+        --max_workers 5 \
+        --cold_workers 1 \
+        --target_util 0.9
+
+    # Option 1: Create a workergroup with a custom PyWorker handler
+    # PYWORKER_REPO points to your worker code (see github.com/vast-ai/pyworker for examples)
+    vastai create workergroup \
+        --endpoint_name "my-llm-endpoint" \
+        --search_params "gpu_ram>=24 num_gpus=1 rentable=true verified=true" \
+        --launch_args "--image vastai/base:latest --disk 64 --env '-e PYWORKER_REPO=https://github.com/vast-ai/pyworker -e MODEL_NAME=your-model'" \
+        --gpu_ram 24
+
+    # Option 2: Use a pre-built template (vLLM, TGI, ComfyUI)
+    vastai create workergroup \
+        --endpoint_name "my-llm-endpoint" \
+        --template_hash <TEMPLATE_HASH> \
+        --gpu_ram 24
+    ```
+
+    </CodeGroup>
+  </Tab>
+</Tabs>
+
+### Calling Your Endpoint
+
+Install the Vast SDK:
+
+```bash
+pip install vastai-sdk
+```
+
+<CodeGroup>
+
+```python Runpod
+import runpod
+import os
+
+runpod.api_key = os.environ["RUNPOD_API_KEY"]
+endpoint = runpod.Endpoint("your-endpoint-id")
+
+result = endpoint.run_sync({"input": {"prompt": "Explain quantum computing"}})
+print(result["output"])
+```
+
+```python Vast.ai
+import asyncio
+from vastai import Serverless
+
+MAX_TOKENS = 100
+
+async def main():
+    client = Serverless()  # Uses VAST_API_KEY environment variable
+    endpoint = await client.get_endpoint(name="vLLM-Qwen3-8B")
+
+    payload = {
+        "model": "Qwen/Qwen3-8B",
+        "prompt": "Explain quantum computing in simple terms",
+        "max_tokens": MAX_TOKENS,
+        "temperature": 0.7
+    }
+
+    result = await endpoint.request("/v1/completions", payload, cost=MAX_TOKENS)
+    print(result["response"]["choices"][0]["text"])
+
+    await client.close()
+
+asyncio.run(main())
+```
+
+</CodeGroup>
+
+### Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Serverless Quickstart" icon="rocket" href="/documentation/serverless/quickstart">
+    Deploy your first serverless endpoint
+  </Card>
+  <Card title="Serverless Pricing" icon="dollar-sign" href="/documentation/serverless/pricing">
+    Pay-as-you-go billing, cold workers, and endpoint suspension
+  </Card>
+</CardGroup>
+
+## CLI Reference
+
+| Task | Runpod | Vast CLI |
+|---|---|---|
+| Authenticate | `Authorization: Bearer <KEY>` | `vastai set api-key <KEY>` |
+| Search GPUs | `GET /v1/pods/gpu-types` | `vastai search offers '<FILTERS>'` |
+| Create instance | `POST /v1/pods` | `vastai create instance <ID> --image img` |
+| List instances | `GET /v1/pods` | `vastai show instances` |
+| Show instance | `GET /v1/pods/<ID>` | `vastai show instance <ID>` |
+| Start instance | `POST /v1/pods/<ID>/start` | `vastai start instance <ID>` |
+| Stop instance | `POST /v1/pods/<ID>/stop` | `vastai stop instance <ID>` |
+| Destroy instance | `DELETE /v1/pods/<ID>` | `vastai destroy instance <ID>` |
+| View logs | *(console only)* | `vastai logs <ID>` |
+| SSH connection | `ssh <ID>@ssh.runpod.io` | `vastai ssh-url <ID>` |
+| Create endpoint | — | `vastai create endpoint --endpoint_name "x"` |
+| Create workergroup | — | `vastai create workergroup --endpoint_name "x"` |
+| Reserve instance | — | `vastai prepay instance <ID> <AMOUNT>` |
+
+For programmatic usage, the Vast CLI supports `--raw` for JSON output that can be parsed in scripts. See the [CLI Reference](/cli/commands) for full documentation.
+
+## Next Steps
+
+- [CLI Reference](/cli/commands): full command reference for the `vastai` CLI
+- [FAQ](/documentation/reference/faq/index): common questions and troubleshooting
+- [Community Discord](https://discord.gg/vast): get help from the Vast.ai community
+- [24/7 Technical Support](https://cloud.vast.ai): live chat support available around the clock from the Vast console
