@@ -246,3 +246,28 @@ Delete unnecessary files:
 ```
 vastai execute INSTANCE_ID 'rm file_name.txt'
 ```
+
+## Troubleshooting Stuck Transfers
+
+### Transfer appears stuck or shows no progress
+
+1. **Check transfer status** — Run `vastai show instances` (or check the instance card in the console). A copy operation in progress shows a status message on the destination instance.
+2. **Wait for the initial handshake** — After clicking the copy button in the GUI, allow 5–10 seconds for the transfer to begin before assuming it is stuck.
+3. **Verify both instances are reachable** — If either instance is in an error state, the copy will silently fail. Check that both source and destination show `running` or `stopped` (not `error`).
+4. **Cancel and retry** — Use the Cancel Copy button in the GUI or the `vastai cancel copy INSTANCE_ID` CLI command. Then start a new copy operation.
+5. **Check available disk space on the destination** — A transfer that starts but stops mid-way is often caused by the destination running out of disk space. Use `vastai execute DEST_ID 'df -h'` to check.
+
+### VM copy fails or destination is corrupted
+
+- The destination VM must be **stopped** before running `vastai vm copy SRC_ID DEST_ID`. If it is running, stop it first with `vastai stop instance DEST_ID`.
+- VM copy replaces the entire destination disk — there is no incremental option. Ensure the destination has at least as much disk space as the source.
+
+### GUI copy button is missing for VM instances
+
+- Instance-to-instance folder copy (the folder picker dialog) is only available for Docker-based instances. For VMs, use the CLI command `vastai vm copy SRC_ID DEST_ID`, which copies the entire VM disk.
+
+### Cloud Sync not completing
+
+- Verify that your cloud credentials are saved in [Account Settings](https://cloud.vast.ai/settings/) and that the bucket/folder path is correct.
+- Check the instance logs (`vastai logs INSTANCE_ID`) for authentication errors from the cloud provider.
+- Ensure the instance has outbound internet access and sufficient disk space to buffer the transfer.
