@@ -91,138 +91,175 @@ pip install vastai
 vastai set api-key YOUR_API_KEY
 ```
 
-## Rent a GPU Instance
+## Rent a GPU Instance and Set Up
 
 Autoresearch requires a single NVIDIA GPU with 80GB VRAM (H100 or A100 80GB). It needs CUDA 12.8+ and about 50GB of disk for the repo, data, and dependencies.
 
-Search for available instances:
+<Tabs>
+  <Tab title="Use Template">
+    Use the [Autoresearcher template](https://cloud.vast.ai?template_id=934769670bfd9bc5e05d8696ef340c2b) to launch a pre-configured instance with uv, Claude Code, and autoresearch already installed.
 
-```bash
-vastai search offers 'gpu_ram>=70 num_gpus=1 cuda_vers>=12.8 disk_space>=50 reliability>0.95' -o 'dph+'
-```
+    <Card title="Learn more about templates" href="/documentation/templates/introduction" icon="layer-group">
+      Templates are reusable configurations that bundle a Docker image, environment variables, and startup scripts into a one-click launch.
+    </Card>
 
-Pick an instance ID from the results and rent it:
+    Search for available instances:
 
-```bash
-vastai create instance INSTANCE_ID \
-  --image vastai/pytorch \
-  --disk 50 \
-  --ssh \
-  --direct
-```
+    ```bash
+    vastai search offers 'gpu_ram>=70 num_gpus=1 cuda_vers>=12.8 disk_space>=50 reliability>0.95' -o 'dph+'
+    ```
 
-Wait for the instance to be ready:
+    Pick an instance ID from the results and rent it using the template:
 
-```bash
-vastai show instances
-```
+    ```bash
+    vastai create instance INSTANCE_ID \
+      --template_hash 934769670bfd9bc5e05d8696ef340c2b \
+      --disk 50
+    ```
 
-Once the status shows `running`, get your SSH connection details:
+    Wait for the instance to be ready, then SSH in:
 
-```bash
-vastai ssh-url INSTANCE_ID
-```
+    ```bash
+    vastai show instances
+    ssh -p PORT root@HOST_IP
+    ```
 
-## Set Up the Environment
+    <Tip>
+      The template installs everything on first boot (~10 minutes). You can monitor progress with `tail -f /var/log/provisioning.log`.
+    </Tip>
 
-SSH into your instance:
+    The template automatically configures Claude Code permissions (`Read`, `Edit`, `Write`, `Bash`) in `.claude/settings.json` so it can run experiments without prompting — no manual setup needed.
 
-```bash
-ssh -p PORT root@HOST_IP
-```
+    Once provisioning completes, skip ahead to [Launch Autonomous Research](#launch-autonomous-research).
+  </Tab>
 
-<Tip>
-  Vast instances start in a tmux session by default. This keeps your processes running if your SSH connection drops — essential for overnight research runs.
-</Tip>
+  <Tab title="Manual Setup">
+    Search for available instances:
 
-### Install uv
+    ```bash
+    vastai search offers 'gpu_ram>=70 num_gpus=1 cuda_vers>=12.8 disk_space>=50 reliability>0.95' -o 'dph+'
+    ```
 
-[uv](https://docs.astral.sh/uv/) is the package manager used by autoresearch:
+    Pick an instance ID from the results and rent it:
 
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-source $HOME/.local/bin/env
-```
+    ```bash
+    vastai create instance INSTANCE_ID \
+      --image vastai/pytorch \
+      --disk 50 \
+      --ssh \
+      --direct
+    ```
 
-### Install Claude Code
+    Wait for the instance to be ready:
 
-Claude Code requires Node.js:
+    ```bash
+    vastai show instances
+    ```
 
-```bash
-curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-apt-get install -y nodejs
-npm install -g @anthropic-ai/claude-code
-```
+    Once the status shows `running`, get your SSH connection details:
 
-## Prepare Data and Run Baseline
+    ```bash
+    vastai ssh-url INSTANCE_ID
+    ```
 
-### Clone and install
+    ### SSH in
 
-```bash
-cd /workspace
-git clone https://github.com/karpathy/autoresearch.git
-cd autoresearch
-uv sync
-```
+    ```bash
+    ssh -p PORT root@HOST_IP
+    ```
 
-### Prepare the data
+    <Tip>
+      Vast instances start in a tmux session by default. This keeps your processes running if your SSH connection drops — essential for overnight research runs.
+    </Tip>
 
-This downloads training data from HuggingFace and trains a BPE tokenizer. Takes about 2 minutes:
+    ### Install uv
 
-```bash
-uv run prepare.py
-```
+    [uv](https://docs.astral.sh/uv/) is the package manager used by autoresearch:
 
-Data is cached in `~/.cache/autoresearch/` — you only need to run this once.
+    ```bash
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    source $HOME/.local/bin/env
+    ```
 
-### Run a baseline experiment
+    ### Install Claude Code
 
-Verify everything works by running a single 5-minute training experiment:
+    Claude Code requires Node.js:
 
-```bash
-uv run train.py
-```
+    ```bash
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+    apt-get install -y nodejs
+    npm install -g @anthropic-ai/claude-code
+    ```
 
-After ~5 minutes you'll see output like:
+    ### Clone and install
 
-```
----
-val_bpb:          0.995583
-training_seconds: 300.3
-total_seconds:    349.8
-peak_vram_mb:     45060.2
-mfu_percent:      39.57
-total_tokens_M:   497.0
-num_steps:        948
-num_params_M:     50.3
-depth:            8
-```
+    ```bash
+    cd /workspace
+    git clone https://github.com/karpathy/autoresearch.git
+    cd autoresearch
+    uv sync
+    ```
 
-The key metric is `val_bpb` (validation bits per byte) — lower is better. Note this baseline number; Claude will try to beat it.
+    ### Prepare the data
+
+    This downloads training data from HuggingFace and trains a BPE tokenizer. Takes about 2 minutes:
+
+    ```bash
+    uv run prepare.py
+    ```
+
+    Data is cached in `~/.cache/autoresearch/` — you only need to run this once.
+
+    ### Run a baseline experiment
+
+    Verify everything works by running a single 5-minute training experiment:
+
+    ```bash
+    uv run train.py
+    ```
+
+    After ~5 minutes you'll see output like:
+
+    ```
+    ---
+    val_bpb:          0.995583
+    training_seconds: 300.3
+    total_seconds:    349.8
+    peak_vram_mb:     45060.2
+    mfu_percent:      39.57
+    total_tokens_M:   497.0
+    num_steps:        948
+    num_params_M:     50.3
+    depth:            8
+    ```
+
+    The key metric is `val_bpb` (validation bits per byte) — lower is better. Note this baseline number; Claude will try to beat it.
+
+    ### Configure permissions
+
+    Claude Code normally asks for permission before running commands or editing files. For autonomous overnight research, you need to pre-approve the tools Claude will use. Create a settings file in the autoresearch directory:
+
+    ```bash
+    mkdir -p /workspace/autoresearch/.claude
+    cat > /workspace/autoresearch/.claude/settings.json << 'EOF'
+    {
+      "permissions": {
+        "allow": [
+          "Read",
+          "Edit",
+          "Write",
+          "Bash"
+        ]
+      }
+    }
+    EOF
+    ```
+
+    This tells Claude Code to run these commands without asking — essential for unattended operation.
+  </Tab>
+</Tabs>
 
 ## Launch Autonomous Research
-
-### Configure permissions
-
-Claude Code normally asks for permission before running commands or editing files. For autonomous overnight research, you need to pre-approve the tools Claude will use. Create a settings file in the autoresearch directory:
-
-```bash
-mkdir -p /workspace/autoresearch/.claude
-cat > /workspace/autoresearch/.claude/settings.json << 'EOF'
-{
-  "permissions": {
-    "allow": [
-      "Read",
-      "Edit",
-      "Write",
-      "Bash"
-    ]
-  }
-}
-EOF
-```
-
-This tells Claude Code to run these commands without asking — essential for unattended operation.
 
 ### Start Claude Code
 
