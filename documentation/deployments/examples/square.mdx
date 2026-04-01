@@ -1,0 +1,58 @@
+---
+title: "Example: Square Function"
+description: A minimal deployment that squares a number on a remote GPU.
+---
+
+The simplest possible deployment — a single function with no context or dependencies.
+
+## Deployment
+
+```python
+# deploy.py
+from vastai import Deployment
+from vastai.data.query import gpu_name, RTX_4090, RTX_5090
+
+app = Deployment(webserver_url="https://alpha-server.vast.ai")
+
+
+@app.remote(benchmark_dataset=[{"x": 2}])
+async def square(x):
+    return x * x
+
+
+app.configure_autoscaling(min_load=1000)
+image = app.image("vastai/base-image:@vastai-automatic-tag", 16)
+image.require(gpu_name.in_([RTX_4090, RTX_5090]))
+app.ensure_ready()
+```
+
+## Client
+
+```python
+# client.py
+import asyncio
+import time
+from deploy import app, square
+
+
+async def main():
+    prev_time = time.perf_counter()
+    for x in range(1, 10):
+        result = await square(x)
+        now = time.perf_counter()
+        elapsed = now - prev_time
+        label = "first response" if x == 1 else "since last"
+        print(f"square({x}) = {result}  ({label}: {elapsed:.3f}s)")
+        prev_time = now
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## What This Demonstrates
+
+- Minimal `@remote` function with no dependencies
+- The `benchmark_dataset` with a single sample input
+- Calling the remote function in a loop and timing responses
+- The first call includes deployment setup time; subsequent calls are fast
