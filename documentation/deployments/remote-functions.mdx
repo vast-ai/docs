@@ -1,0 +1,125 @@
+---
+title: "@remote Functions"
+description: Define, call, and benchmark async Python functions that execute on remote GPU workers.
+---
+
+The `@remote` decorator is the core of Vast Deployments. It marks an async Python function for remote execution on GPU workers, and configures the benchmark used to measure worker performance.
+
+## Defining a @remote Function
+
+```python
+@app.remote(benchmark_dataset=[{"x": 2}])
+async def square(x):
+    return x * x
+```
+
+Remote functions must be:
+- **Async**: Defined with `async def`
+- **Serializable**: All arguments and return values must be serializable (primitives, lists, dicts, bytes, and custom objects with `__dict__`)
+- **Benchmarked**: At least one `@remote` function in a deployment must define a benchmark via `benchmark_dataset` or `benchmark_generator`
+
+### Decorator Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `benchmark_dataset` | `list[dict] \| None` | `None` | Static list of sample input dicts. Keys must match the function's parameter names. |
+| `benchmark_generator` | `Callable[[], dict] \| None` | `None` | A callable returning a sample input dict. Use for dynamic or randomized test data. |
+| `benchmark_runs` | `int` | `10` | Number of iterations to run during the benchmark. |
+
+## Calling @remote Functions
+
+From a client script, import the deployment and the function, then `await` the call:
+
+```python
+# client.py
+import asyncio
+from deploy import app, square
+
+async def main():
+    result = await square(5)  # Returns 25
+    print(result)
+
+asyncio.run(main())
+```
+
+When you call a `@remote` function:
+
+1. The SDK waits for the deployment to be ready (workers provisioned and benchmarked)
+2. Arguments are serialized and routed to the quickest available worker
+3. The worker executes the function with full GPU access
+4. The return value is serialized and sent back to the caller
+
+### Accessing @context in @remote Functions
+
+Use `app.get_context(ContextClass)` to access resources loaded during worker startup:
+
+```python
+@app.context()
+class MyModel:
+    async def __aenter__(self):
+        import torch
+        self.model = torch.load("model.pt").cuda()
+        return self
+    async def __aexit__(self, *exc):
+        pass
+
+@app.remote(benchmark_dataset=[{"text": "hello"}])
+async def predict(text: str) -> dict:
+    ctx = app.get_context(MyModel)
+    result = ctx.model(text)
+    return {"prediction": result}
+```
+
+## Benchmarks
+
+Exactly one `@remote` function should define a benchmark. Benchmarks run automatically before a worker first enters "ready" state and are used to measure each worker's performance for autoscaling.
+
+### How Benchmarks Work
+
+1. **Warmup** (enabled by default): A warmup pass runs before timing to settle caches, JIT compilation, and GPU memory allocation
+2. **Timed runs**: The function is executed `benchmark_runs` times using inputs from the dataset or generator, with a default concurrency of 10 parallel requests
+3. **Scoring**: Results produce a performance score that the autoscaler uses to determine worker capacity
+
+### Using benchmark_dataset
+
+Provide a static list of sample inputs. During benchmarking, inputs are randomly selected from this list:
+
+```python
+@app.remote(benchmark_dataset=[{"x": 2}, {"x": 100}, {"x": -5}])
+async def square(x):
+    return x * x
+```
+
+Each dict's keys must match the function's parameter names. The values should be representative of real workloads.
+
+### Using benchmark_generator
+
+For dynamic or randomized test data, provide a callable:
+
+```python
+import random
+
+def gen_input():
+    return {"x": random.randint(1, 1000)}
+
+@app.remote(benchmark_generator=gen_input, benchmark_runs=20)
+async def square(x):
+    return x * x
+```
+
+You can provide either `benchmark_dataset` or `benchmark_generator`.
+
+### Workload Calculators
+
+By default, each request counts as a fixed amount of workload for autoscaling. For functions where request cost varies significantly (e.g., different prompt lengths for an LLM), you can define a custom workload calculator that computes the load from the request payload. This allows the autoscaler to make more accurate scaling decisions based on actual request complexity rather than just request count.
+
+## Serialization
+
+The SDK automatically handles serialization and deserialization of function arguments and return values. Supported types:
+
+- **Primitives**: `int`, `str`, `float`, `bool`, `None`
+- **Bytes**: Encoded as base64
+- **Collections**: `list`, `tuple`, `dict`
+- **Custom objects**: Stored with module path, class name, and `__dict__`
+
+Errors raised inside remote functions are serialized and re-raised on the client side.
