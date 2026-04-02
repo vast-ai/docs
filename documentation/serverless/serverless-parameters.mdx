@@ -30,6 +30,16 @@ description: Learn about the parameters that control your scaling and best pract
         "@type": "HowToStep",
         "name": "Reserve Headroom with Target Utilization",
         "text": "Configure target_util to control how much spare capacity is reserved to absorb short-term traffic spikes before recruiting or activating additional workers."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Configure Inactivity Timeout for Scale-to-Zero",
+        "text": "Set inactivity_timeout to control how long the endpoint must be idle before it is allowed to scale to zero active or total workers."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Tune Queue Time Parameters",
+        "text": "Use max_queue_time and target_queue_time to control per-worker request buffering and the scaling trigger threshold for queue-based autoscaling."
       }
     ]
   })
@@ -130,3 +140,36 @@ For example, if anticipated load is `900 tokens/sec` and `target_util = 0.9`, th
 - `target_util = 0.4` → 150% spare capacity
 
 If not specified during endpoint creation, the default value is `0.9`.
+
+## Inactivity Timeout (`inactivity_timeout`)
+
+An optional value (in seconds) that gates scaling to zero on the time elapsed since the last activity on the endpoint. After the specified duration of inactivity, the serverless engine is permitted to scale down to zero active workers or zero total workers, depending on your other parameter settings:
+
+- If `cold_workers` is set (e.g., `5`), the endpoint will never scale below that number of total workers, but can reach zero **active** workers after the timeout.
+- If `min_load` is greater than `0`, you will not reach zero active workers even after the timeout — `min_load` still acts as a floor.
+- If both `cold_workers = 0` and `min_load = 0`, the endpoint can scale to **zero total workers** after the inactivity timeout.
+
+Special values:
+- `0` — Disable inactivity gating entirely. The endpoint scales purely based on normal autoscaling decisions.
+- Negative value (e.g., `-1`) — Never allow scaling to zero, even if `min_load` and `cold_workers` would otherwise permit it.
+
+If not specified during endpoint creation, this parameter is not applied.
+
+## Max Queue Time (`max_queue_time`)
+
+The maximum number of seconds of expected queue time allowed to build up on each individual worker. The serverless engine uses this value when routing requests: if all workers have reached their `max_queue_time` limit, new requests are held in a global queue until a worker has capacity.
+
+This parameter controls how much work can be buffered on each worker before the system considers the worker "full" for routing purposes.
+
+If not specified during endpoint creation, a system default is applied.
+
+## Target Queue Time (`target_queue_time`)
+
+The acceptable queue time threshold (in seconds) across the endpoint. When observed queue times exceed this value, the serverless engine begins aggressively scaling up workers to handle the excess load.
+
+In practice, `max_queue_time` defines how much each worker can absorb, while `target_queue_time` defines the point at which the system decides more workers are needed. Together they control the autoscaler's sensitivity to queuing:
+
+- **`max_queue_time`** — Per-worker routing limit. "How full can each worker get?"
+- **`target_queue_time`** — Endpoint-wide scaling trigger. "At what queue time do we start adding workers?"
+
+If not specified during endpoint creation, a system default is applied.
