@@ -1,0 +1,97 @@
+---
+title: "Authentication"
+sidebarTitle: "Authentication"
+---
+
+Every request to the Vast.ai API must include an API key. This page covers how to create keys, how to include them in requests, and key lifecycle details.
+
+## Create an API Key
+
+Generate a key from the [Keys page](https://cloud.vast.ai/cli/keys/) in the web console:
+
+1. Click **+New**.
+2. Give the key a name (optional but recommended — e.g. "CI pipeline" or "notebook").
+3. Copy the key immediately — you'll only see it once.
+
+<Tip>
+You can also create keys programmatically via the API ([Create API Key](/api-reference/accounts/create-api-key)), CLI ([`vastai create api-key`](/cli/reference/create-api-key)), or SDK ([`vast.create_api_key()`](/sdk/python/reference/create-api-key)).
+</Tip>
+
+## Use an API Key
+
+Include your key as a Bearer token in the `Authorization` header:
+
+<CodeGroup>
+```bash cURL
+curl -s -H "Authorization: Bearer $VAST_API_KEY" \
+  "https://console.vast.ai/api/v0/users/current/"
+```
+
+```python Python
+import os
+import requests
+
+headers = {"Authorization": f"Bearer {os.environ['VAST_API_KEY']}"}
+resp = requests.get("https://console.vast.ai/api/v0/users/current/", headers=headers)
+print(resp.json())
+```
+</CodeGroup>
+
+A common pattern is to store your key in an environment variable:
+
+```bash
+export VAST_API_KEY="your-api-key-here"
+```
+
+This keeps the key out of your code and makes it easy to rotate.
+
+<Note>
+If you get a `401 Unauthorized` or `403 Forbidden` response, double-check your API key. The most common causes are a typo, an expired key, or a scoped key that lacks the required permission for the endpoint you're calling.
+</Note>
+
+## Verify Your Key
+
+A quick way to confirm your key works is to fetch your account info:
+
+```bash
+curl -s -H "Authorization: Bearer $VAST_API_KEY" \
+  "https://console.vast.ai/api/v0/users/current/"
+```
+
+A successful response includes your user ID, email, balance, and SSH key:
+
+```json
+{
+  "id": 123456,
+  "email": "you@example.com",
+  "credit": 25.00,
+  "ssh_key": "ssh-rsa AAAAB3..."
+}
+```
+
+## Scoped Keys and Permissions
+
+By default, the web console creates a **full-access** key. For CI/CD pipelines, shared tooling, or team environments, you should create **scoped keys** that restrict access to only the permissions you need.
+
+For example, a key that can only read and manage instances (but cannot access billing):
+
+```json
+{
+  "api": {
+    "misc": {},
+    "user_read": {},
+    "instance_read": {},
+    "instance_write": {}
+  }
+}
+```
+
+See the [Permissions](/api-reference/permissions) page for the full list of permission categories, endpoint mappings, constraint syntax, and advanced examples.
+
+## Key Expiration
+
+API keys do not expire by default. You can revoke a key at any time from the [Keys page](https://cloud.vast.ai/cli/keys/) or by calling the [Delete API Key](/api-reference/accounts/delete-api-key) endpoint.
+
+<Warning>
+Treat your API key like a password. Do not commit keys to version control or share them in plaintext. If a key is compromised, revoke it immediately and create a new one.
+</Warning>
