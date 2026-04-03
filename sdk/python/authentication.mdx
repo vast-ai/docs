@@ -1,0 +1,128 @@
+---
+title: "SDK Authentication"
+sidebarTitle: "Authentication"
+---
+
+Every request to the Vast.ai API requires an API key. The Python SDK accepts your key at initialization and includes it automatically in every call. This page covers how to set up, verify, and manage API keys through the SDK.
+
+## Set Your API Key
+
+Create a key from the [Keys page](https://cloud.vast.ai/cli/keys/), then pass it when initializing the client:
+
+```python
+from vastai import VastAI
+
+vast = VastAI(api_key="your-api-key")
+```
+
+If you omit `api_key`, the SDK reads from `~/.config/vastai/vast_api_key` (the same file the CLI uses). You can also use an environment variable:
+
+```python
+import os
+from vastai import VastAI
+
+vast = VastAI(api_key=os.environ["VAST_API_KEY"])
+```
+
+<Tip>
+You can also create keys programmatically via the API ([Create API Key](/api-reference/accounts/create-api-key)) or CLI ([`vastai create api-key`](/cli/reference/create-api-key)).
+</Tip>
+
+## Verify Your Key
+
+Confirm your key works by fetching your account info:
+
+```python
+user = vast.show_user()
+print(user)
+```
+
+A successful response includes your user ID, email, and balance:
+
+```json
+{
+  "id": 123456,
+  "email": "you@example.com",
+  "credit": 25.00,
+  "ssh_key": "ssh-rsa AAAAB3..."
+}
+```
+
+<Note>
+If you get an authentication error, double-check your API key. The most common causes are a typo, an expired key, or a scoped key that lacks the required permission for the method you're calling.
+</Note>
+
+## Create an API Key
+
+You can create new keys from the SDK:
+
+```python
+result = vast.create_api_key(name="ci-deploy-key")
+print(result)
+```
+
+The response includes the new key value. Store it immediately -- you will not be able to retrieve it again.
+
+To create a key with restricted permissions, pass a JSON permissions file:
+
+```python
+result = vast.create_api_key(
+    name="ci-deploy-key",
+    permission_file="perms.json"
+)
+print(result)
+```
+
+See the [Permissions](/sdk/python/permissions) page for the full permissions file format and examples.
+
+## View and Delete Keys
+
+List all API keys on your account:
+
+```python
+keys = vast.show_api_keys()
+print(keys)
+```
+
+View a specific key's details by ID:
+
+```python
+key = vast.show_api_key(id=42)
+print(key)
+```
+
+Delete a key:
+
+```python
+vast.delete_api_key(id=42)
+```
+
+## Using a Scoped Key
+
+Once you have a scoped key, initialize a separate SDK client with it:
+
+```python
+from vastai import VastAI
+
+# Main client (full access)
+admin = VastAI(api_key="full-access-key")
+
+# Create a scoped key
+result = admin.create_api_key(
+    name="worker-key",
+    permission_file="readonly.json"
+)
+scoped_key = result["api_key"]
+
+# Use the scoped key in a separate client
+worker = VastAI(api_key=scoped_key)
+instances = worker.show_instances()
+```
+
+## Key Expiration
+
+API keys do not expire by default. You can revoke a key at any time from the [Keys page](https://cloud.vast.ai/cli/keys/) or with `vast.delete_api_key()`.
+
+<Warning>
+Treat your API key like a password. Do not commit keys to version control or share them in plaintext. If a key is compromised, revoke it immediately and create a new one.
+</Warning>
