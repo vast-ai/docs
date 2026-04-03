@@ -1,0 +1,428 @@
+# Deployments
+Learn how to use Vast Deployments, the quickest way to run GPU code and setup endpoints in the Vast Cloud.
+
+## How It Works
+Deployments define everything required to create a Vast Serverless endpoint running your code. This includes:
+- @remote decorated Python functions
+- The image name and tag
+- GPU search filters
+- Any `pip install` or `apt get install` reuqirements
+- Environment variables and secrets
+- Any custom start-up scripts
+- Endpoint autoscaling settings
+
+You define your deployment in a single .py file, like `my-deployment.py`.
+Then, to run code one a Vast GPU, you can import and call your @remote functions.
+This will:
+- Automatically package and upload your code
+- Create a Serverless endpoint
+- Create worker GPU instances with your image
+- Install requirements and run the on_start.sh
+- Execute any @remote function calls.
+
+## Architecture
+### Deploy Mode
+When you import and call a function from your deployment file, the SDK will automatically handle
+uploading all of the files, secrets, and scripts associated with your deployment to the cloud.
+It will also automatically create a managed Serverless endpoint and workergroup according to your
+autoscaling settings configuration. When your Serverless workers start up for the first time, they
+will download your code, load your secrets in the environment, and run any pip installs, apt installs,
+and your startup scripts before entering "serve" mode.
+
+### Serve Mode
+When in serve mode, your workers will load 
+all of the @context classes that you have defined, ensuring that their __aenter__() functions have completed
+before marking your worker as ready. Once your context is setup, the worker will run a benchmark based on to 
+determine a performance score for that worker, which is used by
+the Serverless engine to determine how much capacity is needed to serve your endpoint. Once benchmarked,
+the worker will enter a "ready" state, meaning that it will begin to execute any remote functions that 
+you invoke. 
+
+### Calling @remote Functions
+When you call a @remote function, it will first wait for your deployment to be set up, and for your workers to load
+and enter a ready state. As soon as a worker is available to execute your function, the Vast.ai SDK will
+automatically package the parameters for the function call and route to the quickest ready worker. The worker
+then receives those parameters, executes the function with access to the context and the GPU on the instance,
+and then packages and sends the return value back to the original function call you made on your local machine.
+A full round-trip HTTP request to a load-balanced, distributed GPU worker endpoint is abstracted into a single
+function call.
+
+## Updating your Deployment
+Whenever you make changes to your deployment, the SDK will automatically handle the minimal update required
+to get your latest code, settings, secrets, and configuration onto your live endpoint. This is generally broken
+down into several tiers of updates:
+
+### Tier 0: No changes
+If your deployment is identical to the last time that you ran it, no changes are needed and you can connect to
+your endpoint right away.
+
+### Tier 1: Autoscaling changes
+If the deployed code and settings are the same, but you are just tweaking the autoscaling parameters, then the 
+SDK updates your endpoint and workergroup settings without needing to re-upload the code and restart your workers.
+
+### Tier 2: Code changes
+If you change the contents of the code, scripts, or package requirements, but don't make any changes to the image,
+environment variables, search filters, or secrets, then we can issue a "soft-update" to your workers. This involves
+updating the latest state of your code to the cloud, and signaling to your endpoint to enter a "soft-update" that
+automatically pulls the latest code and reinstalls all other requirements.
+
+### Tier 3: Image changes
+If your Docker image has changed, or you need to run fresh with new environment variables configured, then the SDK
+will issue a "hard-update" to the endpoint, which re-uses the same workers but updates their image. This is similar
+to a soft-update, but generally takes a bit longer since it requires pulling a new Docker image potentially, and
+requires re-populating the contents of your workers storage.
+
+### Tier 4: Forced Redeploy
+This is used for making changes to your deployment that are *not* backwards compatible. It takes place whenever the "tag"
+of your Deployment changes, and it creates an entirely new Serverless endpoint and workergroup for separate routing. This
+is useful for when you need to ensure that clients running the new version of a deployment don't route to workers serving
+an older version of the same deployment that isn't backwards compatible. It requires recruiting entirely new workers.
+
+## Managing Deployment Lifecycles
+By default, Deployments and their endpoints will exist indefinitely after a client invokes a @remote function call
+and sets up a Deployment for the first time. However, you can instead configure your Deployment to automatically
+tear down after a specified number of seconds since the last client connection, which can be configured with the `ttl`
+parameter in the Deployment object. 
+
+## Search Queries
+
+The SDK provides a Pythonic query builder for specifying GPU and hardware requirements for your deployment.
+Queries are built using `Column` objects and standard Python comparison operators, then passed to `image.require()`.
+
+### Basic Usage
+
+```python
+from vastai.data.query import gpu_name, gpu_ram, cpu_cores, RTX_4090, RTX_5090, H100_SXM
+
+# Require a specific GPU
+image.require(gpu_name == H100_SXM)
+
+# Require one of several GPUs
+image.require(gpu_name.in_([RTX_4090, RTX_5090]))
+
+# Require minimum GPU RAM (in GB)
+image.require(gpu_ram >= 48)
+
+# Combine multiple requirements
+image.require(gpu_ram >= 24, cpu_cores >= 16)
+```
+
+### Supported Operators
+
+| Operator | Example | Description |
+|----------|---------|-------------|
+| `==` | `gpu_name == RTX_4090` | Equals |
+| `!=` | `gpu_name != RTX_3090` | Not equals |
+| `<` | `dph_total < 2.0` | Less than |
+| `<=` | `gpu_ram <= 24` | Less than or equal |
+| `>` | `inet_down > 500` | Greater than |
+| `>=` | `cpu_cores >= 16` | Greater than or equal |
+| `.in_()` | `gpu_name.in_([RTX_4090, H100_SXM])` | Value in list |
+| `.notin_()` | `gpu_name.notin_([RTX_3060])` | Value not in list |
+
+### Queryable Columns
+
+**GPU**
+`gpu_name`, `gpu_ram`, `gpu_total_ram`, `gpu_max_power`, `gpu_max_temp`, `gpu_arch`, `gpu_mem_bw`,
+`gpu_lanes`, `gpu_frac`, `gpu_display_active`, `num_gpus`, `compute_cap`, `cuda_max_good`, `bw_nvlink`,
+`total_flops`
+
+**CPU**
+`cpu_name`, `cpu_cores`, `cpu_cores_effective`, `cpu_ghz`, `cpu_ram`, `cpu_arch`
+
+**Storage & Disk**
+`disk_space`, `disk_bw`, `disk_name`, `allocated_storage`
+
+**Network**
+`inet_up`, `inet_down`, `inet_up_cost`, `inet_down_cost`, `direct_port_count`, `pcie_bw`, `pci_gen`
+
+**Pricing**
+`dph_base`, `dph_total`, `storage_cost`, `storage_total_cost`, `vram_costperhour`, `min_bid`,
+`credit_discount_max`, `flops_per_dphtotal`, `dlperf_per_dphtotal`
+
+**Machine & Host**
+`host_id`, `machine_id`, `hostname`, `public_ipaddr`, `reliability`, `expected_reliability`,
+`os_version`, `driver_vers`, `mobo_name`, `has_avx`, `static_ip`, `external`, `verification`,
+`hosting_type`, `vms_enabled`, `resource_type`, `cluster_id`
+
+**Virtual Columns** (convenience aliases resolved by the API)
+`geolocation`, `datacenter`, `duration`, `verified`, `allocated_storage`, `target_reliability`
+
+
+### GPU Name Constants
+
+The SDK exports constants for all known GPU models. A selection of commonly used ones:
+
+**NVIDIA Data Center:** `A100_PCIE`, `A100_SXM4`, `H100_PCIE`, `H100_SXM`, `H100_NVL`, `H200`, `H200_NVL`,
+`B200`, `GH200_SXM`, `L4`, `L40`, `L40S`, `A10`, `A30`, `A40`, `Tesla_T4`, `Tesla_V100`
+
+**NVIDIA Consumer:** `RTX_5090`, `RTX_5080`, `RTX_5070_Ti`, `RTX_5070`, `RTX_4090`, `RTX_4080S`, `RTX_4080`,
+`RTX_4070_Ti`, `RTX_4070S`, `RTX_3090`, `RTX_3090_Ti`, `RTX_3080_Ti`, `RTX_3080`
+
+**NVIDIA Professional:** `RTX_A6000`, `RTX_6000Ada`, `RTX_5880Ada`, `RTX_5000Ada`, `RTX_PRO_6000`
+
+**AMD:** `InstinctMI250X`, `InstinctMI210`, `InstinctMI100`, `RX_7900_XTX`, `PRO_W7900`, `PRO_W7800`
+
+Import them from `vastai.data.query`:
+```python
+from vastai.data.query import gpu_name, RTX_4090, H100_SXM, gpu_ram, cpu_cores
+```
+
+## Creating and Configuring a Deployment
+
+### The Deployment Object
+
+```python
+from vastai import Deployment
+
+app = Deployment(
+    name="my-deployment",       # Deployment name (auto-detected from module if omitted)
+    tag="default",              # Version tag for routing (changing this triggers a Tier 4 redeploy)
+    version_label=None,         # Optional semantic version label
+    api_key=...,                # Vast API key (uses $VAST_API_KEY env var if omitted)
+    ttl=None,                   # Auto-teardown after N seconds of no client connections (None = live forever)
+)
+```
+
+### Configuring the Image
+
+`app.image(from_image, storage)` returns an `Image` object for configuring the Docker image, packages,
+environment, and hardware requirements. All methods return `self` for chaining.
+
+```python
+image = app.image("vastai/pytorch:@vastai-automatic-tag", storage=16)
+```
+
+| Method | Description |
+|--------|-------------|
+| `image.require(*queries)` | Set GPU/hardware search requirements |
+| `image.pip_install(*packages)` | Install pip packages on worker startup |
+| `image.apt_get(*packages)` | Install apt packages on worker startup |
+| `image.env(**kwargs)` | Set environment variables |
+| `image.run_script(script_str)` | Run a shell script on startup |
+| `image.run_cmd(*args)` | Run a command on startup (args as tuple) |
+| `image.copy(src, dst)` | Copy local files into the deployment bundle |
+| `image.venv(path)` | Use an existing venv at the given path instead of the SDK-managed one |
+| `image.use_system_python()` | Use the image's system Python instead of a venv |
+| `image.publish_port(number, type_="tcp")` | Publish additional ports on the worker |
+
+```python
+image = app.image("vastai/base-image:@vastai-automatic-tag", 16)
+image.pip_install("torch==2.0.0", "transformers")
+image.apt_get("ffmpeg")
+image.env(MODEL_NAME="my-model", DEBUG="true")
+image.require(gpu_name.in_([RTX_4090, RTX_5090]))
+image.venv("/venv/main")
+```
+
+### Configuring Autoscaling
+
+```python
+app.configure_autoscaling(
+    cold_workers=2,          # Number of idle workers to keep ready
+    max_workers=10,          # Maximum concurrent workers
+    min_load=100,            # Minimum load threshold to trigger scaling
+    min_cold_load=50,        # Load threshold for cold workers
+    target_util=0.8,         # Target utilization ratio (0-1)
+    cold_mult=2,             # Cold worker multiplier
+    max_queue_time=30.0,     # Maximum seconds a request can wait in queue
+    target_queue_time=5.0,   # Target queue wait time in seconds
+    inactivity_timeout=300,  # Seconds of inactivity before scaling down
+)
+```
+
+All autoscaling parameters are optional. You can call `configure_autoscaling()` multiple times; later
+calls update (not replace) previously set values.
+
+### ensure_ready()
+
+After defining your remote functions, image configuration, and autoscaling settings, call `ensure_ready()`
+to deploy everything:
+
+```python
+app.ensure_ready()
+```
+
+This is a synchronous, blocking call that:
+1. Packages your deployment code and configuration into a tarball
+2. Computes a content hash to determine if anything changed since the last deploy
+3. Registers the deployment with the Vast API
+4. Uploads the tarball to cloud storage (if the code has changed)
+5. Triggers the appropriate update tier (soft-update, hard-update, etc.) if workers are already running
+
+Once `ensure_ready()` returns, your deployment is registered and workers will begin provisioning.
+You must call `ensure_ready()` before invoking any `@remote` functions.
+
+### Defining @remote Functions
+
+The `@app.remote` decorator marks an async function for remote execution on GPU workers:
+
+```python
+@app.remote(benchmark_dataset=[{"x": 2}])
+async def square(x):
+    return x * x
+```
+
+When called from a client, the SDK serializes the function arguments, routes the call to an available
+worker, executes the function on the GPU, and deserializes the return value back to the caller.
+
+```python
+# client.py
+import asyncio
+from deploy import app, square
+
+async def main():
+    result = await square(5)  # Returns 25, executed on a remote GPU worker
+    print(result)
+
+asyncio.run(main())
+```
+
+### Full Example
+
+```python
+from vastai import Deployment
+from vastai.data.query import gpu_name, RTX_4090, RTX_5090
+
+app = Deployment(name="my-app")
+
+@app.remote(benchmark_dataset=[{"x": 2}])
+async def square(x):
+    return x * x
+
+image = app.image("vastai/base-image:@vastai-automatic-tag", 16)
+image.require(gpu_name.in_([RTX_4090, RTX_5090]))
+app.configure_autoscaling(min_load=1000)
+app.ensure_ready()
+```
+
+## The @context Decorator
+
+The `@context` decorator registers an async context manager class whose lifecycle is tied to the worker.
+Contexts are used to load heavy resources (models, database connections, engines) once at worker startup,
+making them available to all `@remote` function calls without reloading on every request.
+
+### Defining a Context
+
+A context class must implement the async context manager protocol (`__aenter__` and `__aexit__`):
+
+```python
+@app.context()
+class MyModel:
+    async def __aenter__(self):
+        # Runs once when the worker starts up, before it enters "ready" state.
+        # Use this to load models, allocate GPU memory, warm up caches, etc.
+        import torch
+        self.model = torch.load("model.pt").cuda()
+        return self
+
+    async def __aexit__(self, *exc):
+        # Runs on worker shutdown. Use for cleanup.
+        del self.model
+```
+
+Key points:
+- `__aenter__` must return `self` (or whatever object you want `get_context` to return)
+- `__aexit__` receives exception info if the worker is shutting down due to an error
+- All registered contexts are entered **in parallel** at startup
+- All contexts are exited **in parallel** during shutdown
+- You can pass arguments to the context constructor via the decorator: `@app.context(arg1, kwarg=val)`
+
+### Accessing Context in @remote Functions
+
+Use `app.get_context(ContextClass)` inside a remote function to retrieve the initialized context:
+
+```python
+@app.context()
+class VLLMEngine:
+    async def __aenter__(self):
+        from vllm import AsyncLLMEngine, AsyncEngineArgs
+        args = AsyncEngineArgs(model="Qwen/Qwen3-0.6B", max_model_len=512)
+        self.engine = AsyncLLMEngine.from_engine_args(args)
+        return self
+
+    async def __aexit__(self, *exc):
+        self.engine.shutdown_background_loop()
+
+
+@app.remote(benchmark_dataset=[{"prompt": "Hello"}])
+async def generate(prompt: str, max_tokens: int = 128) -> str:
+    engine = app.get_context(VLLMEngine)
+    # Use engine.engine to generate text...
+```
+
+## Benchmarks
+
+Exactly one `@remote` function should define a benchmark. Benchmarks run automatically before a worker first
+enters "ready" state and are used by the Serverless engine to measure each worker's performance, which
+informs autoscaling capacity decisions.
+
+### Defining a Benchmark
+
+Benchmarks are configured via parameters on the `@remote` decorator:
+
+```python
+@app.remote(
+    benchmark_dataset=[{"x": 2}, {"x": 100}],  # Static list of sample inputs
+    benchmark_runs=10,                           # Number of benchmark iterations (default: 10)
+)
+async def square(x):
+    return x * x
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `benchmark_dataset` | `list[dict] \| None` | `None` | A list of sample input dicts. Keys must match the function's parameter names. During benchmarking, inputs are randomly selected from this list. |
+| `benchmark_generator` | `Callable[[], dict] \| None` | `None` | A callable that returns a sample input dict. Use this instead of `benchmark_dataset` when you need dynamic or randomized test data. |
+| `benchmark_runs` | `int` | `10` | Number of iterations to run during the benchmark. |
+
+You must provide either `benchmark_dataset` or `benchmark_generator`. The benchmark dataset
+entries should be representative of real workloads. They don't need to be exhaustive, but should exercise
+the same code paths that production requests will.
+
+### How Benchmarks Work
+
+1. **Warmup** (optional, enabled by default): Before timing, the worker runs a warmup pass to ensure caches,
+   JIT compilation, and GPU memory allocation are settled.
+2. **Timed runs**: The worker executes the remote function `benchmark_runs` times using inputs from the
+   dataset or generator, with a default concurrency of 10 parallel requests.
+3. **Scoring**: The results produce a performance score for the worker, which the Serverless engine uses
+   to determine how much capacity that worker provides relative to others.
+
+### Workload Calculators
+
+By default, each request counts as a fixed amount of workload (100 units) for autoscaling purposes. For
+functions where request cost varies significantly (e.g., different prompt lengths for an LLM), you can
+define a custom workload calculator that computes the load from the request payload:
+
+```python
+def calculate_tokens(payload: dict) -> float:
+    """Heavier requests count for more load."""
+    return float(len(payload.get("tokens", [])))
+```
+
+This allows the autoscaler to make more accurate scaling decisions based on actual request complexity
+rather than just request count.
+
+### Benchmark Examples
+
+**Simple function:**
+```python
+@app.remote(benchmark_dataset=[{"x": 2}])
+async def square(x):
+    return x * x
+```
+
+**Image inference (28x28 zero image):**
+```python
+@app.remote(benchmark_dataset=[{"pixel_values": [[0.0] * 28] * 28}])
+async def infer(pixel_values: list[list[float]]) -> dict:
+    ...
+```
+
+**LLM generation:**
+```python
+@app.remote(benchmark_dataset=[{"prompt": "Hello"}])
+async def generate(prompt: str, max_tokens: int = 128) -> str:
+    ...
+```
