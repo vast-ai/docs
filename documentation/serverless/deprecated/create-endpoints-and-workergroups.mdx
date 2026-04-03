@@ -32,6 +32,9 @@ The `/endptjobs/` and `/workergroups/` endpoints calls on the webserver to creat
 - `cold_mult`(float): A multiplier applied to your target capacity for longer-term planning (1+ hours). This parameter controls how much extra capacity the serverless engine will plan for in the future compared to immediate needs.
 - `cold_workers` (integer): The minimum number of workers that must be kept in a "ready quick" state before the serverless engine is allowed to destroy any workers.&#x20;
 - `max_workers` (integer): A hard upper limit on the total number of worker instances (ready, stopped, loading, etc.) that your endpoint can have at any given time.
+- `inactivity_timeout` (integer, optional): Number of seconds of inactivity after which the endpoint is allowed to scale to zero active or total workers (depending on other settings). A value of `0` disables inactivity gating; a negative value prevents scaling to zero entirely.
+- `max_queue_time` (float, optional): Maximum seconds of expected queue time allowed per worker before new requests are held in the global queue.
+- `target_queue_time` (float, optional): Queue time threshold (in seconds) above which the autoscaler aggressively scales up workers.
 
 ```json JSON icon="js"
 {
@@ -41,7 +44,10 @@ The `/endptjobs/` and `/workergroups/` endpoints calls on the webserver to creat
     "target_util": 0.9,
     "cold_mult": 2.0,
     "cold_workers": 5,
-    "max_workers": 20
+    "max_workers": 20,
+    "inactivity_timeout": 300,
+    "max_queue_time": 30,
+    "target_queue_time": 10
 }
 ```
 
@@ -86,6 +92,9 @@ curl --location 'https://console.vast.ai/api/v0/endptjobs/' \
   "cold_mult": 2.5,
   "cold_workers": 5,
   "max_workers": 20,
+  "inactivity_timeout": 300,
+  "max_queue_time": 30,
+  "target_queue_time": 10,
   "endpoint_name": "my-endpoint"
 }'
 ```
@@ -93,7 +102,7 @@ curl --location 'https://console.vast.ai/api/v0/endptjobs/' \
 ## Example: Creating an Endpoint with the Vast CLI
 
   ```none Terminal
-  vastai create endpoint --min_load 10 --target_util 0.9 --cold_mult 2.0 --cold_workers 5 --max_workers 20 --endpoint_name "my-endpoint"
+  vastai create endpoint --min_load 10 --target_util 0.9 --cold_mult 2.0 --cold_workers 5 --max_workers 20 --inactivity_timeout 300 --max_queue_time 30 --target_queue_time 10 --endpoint_name "my-endpoint"
   ```
 
 ***
