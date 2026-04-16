@@ -164,131 +164,151 @@ Use 'vast COMMAND --help' for more info about a command
 
 ```
 
+## Global options
+
+The following flags are accepted with every command and are omitted from each command's option list below.
+
+```text Text
+ --url URL          Server REST API URL
+ --retry RETRY      Retry limit
+ --explain          Output verbose explanation of mapping of CLI calls to HTTPS API endpoints
+ --raw              Output machine-readable json
+ --full             Print full results instead of paging with less for commands that support it
+ --curl             Show a curl equivalency to the call
+ --api-key API_KEY  API key. Defaults to the one stored in ~/.config/vastai/vast_api_key
+ --version          Show CLI version
+ --no-color         Disable colored output for commands that support it
+ -h, --help         Show help for a command
+```
+
 # Client Commands
+
+## attach ssh
+
+Attach an ssh key to an instance, allowing you to connect to it with that key.
+
+```text Text
+usage: vastai attach ssh INSTANCE_ID SSH_KEY
+
+positional arguments:
+ instance_id        id of instance to attach to
+ ssh_key            ssh key to attach to instance
+
+options:
+ -h, --help         show this help message and exit
+
+Examples:
+    vastai attach ssh 12371 AAAAB3NzaC1yc2EAAA...
+    vastai attach ssh 12371 $(cat ~/.ssh/id_rsa.pub)
+    vastai attach ssh 12371 ~/.ssh/id_rsa.pub
+```
 
 ## cancel copy
 
-Cancel a remote copy in progress, specified by DST id
+Cancel a remote copy in progress, specified by DST id.
 
 ```text Text
 usage: vastai cancel copy DST
 
 positional arguments:
-  dst                instance_id:/path to target of copy operation.
+ dst                instance_id:/path to target of copy operation
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
+ -h, --help         show this help message and exit
 
-Use this command to cancel any/all current remote copy operations copying to a specific named instance, given by DST.
-Examples:
- vastai cancel copy 12371
+Cancels any/all remote copy operations currently copying data into the specified DST instance.
 
-The first example cancels all copy operations currently copying data into instance 12371
-
+Example:
+vastai cancel copy 12371
 ```
 
 ## cancel sync
 
-Cancel a remote copy in progress, specified by DST id
+Cancel a remote cloud-sync copy in progress, specified by DST id.
 
 ```text Text
 usage: vastai cancel sync DST
 
 positional arguments:
-  dst                instance_id:/path to target of sync operation.
+ dst                instance_id:/path to target of sync operation
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
+ -h, --help         show this help message and exit
 
-Use this command to cancel any/all current remote cloud sync operations copying to a specific named instance, given by DST.
-Examples:
- vastai cancel sync 12371
+Cancels any/all remote cloud sync operations currently copying data into the specified DST instance.
 
-The first example cancels all copy operations currently copying data into instance 12371
-
+Example:
+vastai cancel sync 12371
 ```
 
 ## change bid
 
-Change the bid price for a spot/interruptible instance
+Change the bid price for a spot/interruptible instance.
 
 ```text Text
 usage: vastai change bid id [--price PRICE]
 
 positional arguments:
-  id                 id of instance type to change bid
+ id                                id of instance type to change bid
 
 options:
-  -h, --help         show this help message and exit
-  --price PRICE      per machine bid price in $/hour
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
+ -h, --help                        show this help message and exit
+ --price PRICE                     per machine bid price in $/hour
+ --schedule {HOURLY,DAILY,WEEKLY}  try to schedule a command to run hourly, daily, or weekly. Valid values are HOURLY, DAILY, WEEKLY. For ex. --schedule DAILY
+ --start_date START_DATE           Start date/time in format 'YYYY-MM-DD HH:MM:SS PM' (UTC). Default is now. (optional)
+ --end_date END_DATE               End date/time in format 'YYYY-MM-DD HH:MM:SS PM' (UTC). Default is 7 days from now. (optional)
+ --day DAY                         Day of week you want scheduled job to run on (0-6, where 0=Sunday) or "*". Default will be 0. For ex. --day 0
+ --hour HOUR                       Hour of day you want scheduled job to run on (0-23) or "*" (UTC). Default will be 0. For ex. --hour 16
 
 Change the current bid price of instance id to PRICE.
-If PRICE is not specified, then a winning bid price is used as the default.
-
+If PRICE is not specified, a winning bid price is used as the default.
 ```
 
 ## cloud copy
 
-Copy files/folders to and from cloud providers
+Copy files or folders between an instance and a configured cloud provider.
 
 ```text Text
-usage: vastai cloud_copy SRC DST CLOUD_SERVICE INSTANCE_ID CLOUD_SERVICE_SELECTED TRANSFER
+usage: vastai cloud copy --src SRC --dst DST --instance INSTANCE_ID --connection CONNECTION_ID --transfer TRANSFER_TYPE
 
 options:
-  -h, --help            show this help message and exit
-  --src SRC             path to source of object to copy.
-  --dst DST             path to target of copy operation.
-  --instance INSTANCE   id of the instance
-  --connection CONNECTION
-                        id of cloud connection on your account
-  --transfer TRANSFER   type of transfer, possible options include Instance To
-                        Cloud and Cloud To Instance
-  --url URL             server REST api url
-  --retry RETRY         retry limit
-  --raw                 output machine-readable json
-  --explain             output verbose explanation of mapping of CLI calls to
-                        HTTPS API endpoints
-  --api-key API_KEY     api key. defaults to using the one stored in
-                        ~/.vast_api_key
+ -h, --help                        show this help message and exit
+ --src SRC                         path to source of object to copy
+ --dst DST                         path to target of copy operation
+ --instance INSTANCE               id of the instance
+ --connection CONNECTION           id of cloud connection on your account (get from calling 'vastai show connections')
+ --transfer TRANSFER               type of transfer: "Instance To Cloud" or "Cloud To Instance"
+ --dry-run                         show what would have been transferred
+ --size-only                       skip based on size only, not mod-time or checksum
+ --ignore-existing                 skip all files that exist on destination
+ --update                          skip files that are newer on the destination
+ --delete-excluded                 delete files on dest excluded from transfer
+ --schedule {HOURLY,DAILY,WEEKLY}  schedule the transfer hourly, daily, or weekly (e.g. --schedule DAILY)
+ --start_date START_DATE           start date/time in format 'YYYY-MM-DD HH:MM:SS PM' (UTC). Default is now.
+ --end_date END_DATE               end date/time in format 'YYYY-MM-DD HH:MM:SS PM' (UTC). Default is contract's end.
+ --day DAY                         day of week (0-6, 0=Sunday) or "*". Default is 0.
+ --hour HOUR                       hour of day (0-23) or "*" (UTC). Default is 0.
 
-Copies a directory from a source location to a target location. Each of source and destination
-directories can be either local or remote, subject to appropriate read and write
-permissions required to carry out the action. The format for both src and dst is [instance_id:]path.
-You can find more information about the cloud copy operation here: [Cloud Sync](/documentation/instances/cloud-sync)
+Copies a directory from a source location to a target location. Each of source and destination directories can be either local or remote, subject to read and write permissions.
+See [Cloud Sync](/documentation/instances/cloud-sync) for more information.
 
-Examples:
- vastai cloud_copy --src folder --dst /workspace --cloud_service "Amazon S3" --instance_id 6003036 --cloud_service_selected 52 --transfer "Instance To Cloud"
+Example:
 
-The example copies all contents of /folder into /workspace on instance 6003036 from Amazon S3.
+    vastai show connections
+    ID    NAME      Cloud Type
+    1001  test_dir  drive
+    1003  data_dir  drive
 
+    vastai cloud copy --src /folder --dst /workspace --instance 6003036 --connection 1001 --transfer "Instance To Cloud"
+
+The example copies all contents of /folder into /workspace on instance 6003036 from the gdrive connection 'test_dir'.
 ```
 
 ## copy
 
-Copy directories between instances and/or local
+Copy directories between instances, local, volumes, and cloud storage.
 
-```text Text  
+```text Text
 usage: vastai copy SRC DST
 
 positional arguments:
@@ -298,62 +318,50 @@ positional arguments:
 options:
  -h, --help                        show this help message and exit
  -i IDENTITY, --identity IDENTITY  Location of ssh private key
- --url URL                         server REST api url
- --retry RETRY                     retry limit
- --raw                             output machine-readable json
- --explain                         output verbose explanation of mapping of CLI calls to HTTPS API endpoints
- --curl                            show a curl equivalency to the call
- --api-key API_KEY                 api key. defaults to using the one stored in /home/anthony-benjamin/.config/vastai/vast_api_key
- --version                         show version
 
-Copies a directory from a source location to a target location. Each of source and destination
-directories can be either local or remote, subject to appropriate read and write
-permissions required to carry out the action.
+Copies a directory from a source location to a target location. Each of source and destination can be either local or remote, subject to read and write permissions required to carry out the action.
 
 Supported location formats:
 - [instance_id:]path               (legacy format, still supported)
-- C.instance_id:path              (container copy format)
-- cloud_service:path              (cloud service format)
+- C.instance_id:path               (container copy format)
+- cloud_service:path               (cloud service format)
 - cloud_service.cloud_service_id:path  (cloud service with ID)
-- local:path                      (explicit local path)
+- local:path                       (explicit local path)
+- V.volume_id:path                 (volume copy, see restrictions)
 
-You should not copy to /root or / as a destination directory, as this can mess up the permissions on your instance ssh folder, breaking future copy operations (as they use ssh authentication)
-You can see more information about constraints here: [Data Movement](/documentation/instances/data-movement#constraints)
+Do not copy to /root or / as a destination directory. That can break permissions on the instance's ssh folder and prevent future copy operations (which use ssh authentication).
+See [Data Movement](/documentation/instances/data-movement#constraints) for more constraints.
+Volume copy is currently only supported for copying to other volumes or instances, not to cloud services or local.
 
 Examples:
- vast copy 6003036:/workspace/ 6003038:/workspace/
- vast copy C.11824:/data/test local:data/test
- vast copy local:data/test C.11824:/data/test
- vast copy drive:/folder/file.txt C.6003036:/workspace/
- vast copy s3.101:/data/ C.6003036:/workspace/
+ vastai copy 6003036:/workspace/ 6003038:/workspace/
+ vastai copy C.11824:/data/test local:data/test
+ vastai copy local:data/test C.11824:/data/test
+ vastai copy drive:/folder/file.txt C.6003036:/workspace/
+ vastai copy s3.101:/data/ C.6003036:/workspace/
+ vastai copy V.1234:/file C.5678:/workspace/
 
-The first example copy syncs all files from the absolute directory '/workspace' on instance 6003036 to the directory '/workspace' on instance 6003038.
-The second example copy syncs files from container 11824 to the local machine using structured syntax.
-The third example copy syncs files from local to container 11824 using structured syntax.
-The fourth example copy syncs files from Google Drive to an instance.
-The fifth example copy syncs files from S3 bucket with id 101 to an instance.
+The first example copies all files from '/workspace' on instance 6003036 to '/workspace' on instance 6003038.
+The second copies files from container 11824 to the local machine.
+The third copies files from local to container 11824.
+The fourth copies files from Google Drive to an instance.
+The fifth copies files from S3 bucket with id 101 to an instance.
 ```
 
 ## create api-key
 
-Create a new api-key with restricted permissions.
+Create a new api-key with restricted permissions. Can be shared with other users and teammates.
 
 ```text Text
-usage: vastai create api-key
+usage: vastai create api-key --name NAME --permission_file PERMISSIONS
 
 options:
-  -h, --help            show this help message and exit
-  --permissions PERMISSIONS
-                        file path for json encoded permissions, look in the
-                        docs for more information
-  --url URL             server REST api url
-  --retry RETRY         retry limit
-  --raw                 output machine-readable json
-  --explain             output verbose explanation of mapping of CLI calls to
-                        HTTPS API endpoints
-  --api-key API_KEY     api key. defaults to using the one stored in
-                        ~/.vast_api_key
+ -h, --help                         show this help message and exit
+ --name NAME                        name of the api-key
+ --permission_file PERMISSION_FILE  file path for json encoded permissions. See https://vast.ai/docs/cli/roles-and-permissions for more information.
+ --key_params KEY_PARAMS            optional wildcard key params for advanced keys
 
+Permissions must be sent in JSON format. See https://vast.ai/docs/cli/roles-and-permissions for the schema.
 ```
 
 ## create autoscaler
@@ -406,72 +414,117 @@ Example: vastai create autoscaler --min_load 100 --target_util 0.9 --cold_mult 2
 
 ## create instance
 
-Create a new instance
+Create a new instance.
 
 ```text Text
 usage: vastai create instance ID [OPTIONS] [--args ...]
 
 positional arguments:
-  ID                    id of instance type to launch (returned from search
-                        offers)
+ id                                id of instance type to launch (returned from search offers)
 
 options:
-  -h, --help            show this help message and exit
-  --price PRICE         per machine bid price in $/hour
-  --disk DISK           size of local disk partition in GB
-  --image IMAGE         docker container image to launch
-  --login LOGIN         docker login arguments for private repo
-                        authentication, surround with ''
-  --label LABEL         label to set on the instance
-  --onstart ONSTART     filename to use as onstart script
-  --onstart-cmd ONSTART_CMD
-                        contents of onstart script as single argument
-  --entrypoint ENTRYPOINT
-                        override entrypoint for args launch instance
-  --ssh                 Launch as an ssh instance type.
-  --jupyter             Launch as a jupyter instance instead of an ssh
-                        instance.
-  --direct              Use (faster) direct connections for jupyter & ssh.
-  --jupyter-dir JUPYTER_DIR
-                        For runtype 'jupyter', directory in instance to use to
-                        launch jupyter. Defaults to image's working directory.
-  --jupyter-lab         For runtype 'jupyter', Launch instance with jupyter
-                        lab.
-  --lang-utf8           Workaround for images with locale problems: install
-                        and generate locales before instance launch, and set
-                        locale to C.UTF-8.
-  --python-utf8         Workaround for images with locale problems: set
-                        python's locale to C.UTF-8.
-  --env ENV             env variables and port mapping options, surround with
-                        ''
-  --args ...            list of arguments passed to container ENTRYPOINT.
-                        Onstart is recommended for this purpose.
-  --create-from CREATE_FROM
-                        Existing instance id to use as basis for new instance.
-                        Instance configuration should usually be identical, as
-                        only the difference from the base image is copied.
-  --force               Skip sanity checks when creating from an existing
-                        instance
-  --url URL             server REST api url
-  --retry RETRY         retry limit
-  --raw                 output machine-readable json
-  --explain             output verbose explanation of mapping of CLI calls to
-                        HTTPS API endpoints
-  --api-key API_KEY     api key. defaults to using the one stored in
-                        ~/.vast_api_key
+ -h, --help                        show this help message and exit
+ --template_hash TEMPLATE_HASH     Create instance from template info
+ --user USER                       User to use with docker create. This breaks some images, so only use this if you are certain you need it.
+ --disk DISK                       size of local disk partition in GB
+ --image IMAGE                     docker container image to launch
+ --login LOGIN                     docker login arguments for private repo authentication, surround with ''
+ --label LABEL                     label to set on the instance
+ --onstart ONSTART                 filename to use as onstart script
+ --onstart-cmd ONSTART_CMD         contents of onstart script as single argument
+ --entrypoint ENTRYPOINT           override entrypoint for args launch instance
+ --ssh                             Launch as an ssh instance type
+ --jupyter                         Launch as a jupyter instance instead of an ssh instance
+ --direct                          Use (faster) direct connections for jupyter & ssh
+ --jupyter-dir JUPYTER_DIR         For runtype 'jupyter', directory in instance to use to launch jupyter. Defaults to image's working directory
+ --jupyter-lab                     For runtype 'jupyter', Launch instance with jupyter lab
+ --lang-utf8                       Workaround for images with locale problems: install and generate locales before instance launch, and set locale to C.UTF-8
+ --python-utf8                     Workaround for images with locale problems: set python's locale to C.UTF-8
+ --env ENV                         env variables and port mapping options, surround with ''
+ --args ...                        list of arguments passed to container ENTRYPOINT. Onstart is recommended for this purpose. (must be last argument)
+ --force                           Skip sanity checks when creating from an existing instance
+ --cancel-unavail                  Return error if scheduling fails (rather than creating a stopped instance)
+ --bid_price BID_PRICE             (OPTIONAL) create an INTERRUPTIBLE instance with per machine bid price in $/hour
+ --create-volume VOLUME_ASK_ID     Create a new local volume using an ID returned from the "search volumes" command and link it to the new instance
+ --link-volume EXISTING_VOLUME_ID  ID of an existing rented volume to link to the instance during creation. (returned from "show volumes" cmd)
+ --volume-size VOLUME_SIZE         Size of the volume to create in GB. Only usable with --create-volume (default 15GB)
+ --mount-path MOUNT_PATH           The path to the volume from within the new instance container. e.g. /root/volume
+ --volume-label VOLUME_LABEL       (optional) A name to give the new volume. Only usable with --create-volume
 
-Performs the same action as pressing the "RENT" button on the website at https://console.vast.ai/create/
+Performs the same action as pressing the "RENT" button on the website at https://console.vast.ai/create/.
 Creates an instance from an offer ID (which is returned from "search offers"). Each offer ID can only be used to create one instance.
 Besides the offer ID, you must pass in an '--image' argument as a minimum.
 
+If you use args/entrypoint launch mode, we create a container from your image as is, without attempting to inject ssh and or jupyter.
+If you use the args launch mode, you can override the entrypoint with --entrypoint, and pass arguments to the entrypoint with --args.
+If you use --args, that must be the last argument, as any following tokens are consumed into the args string.
+For ssh/jupyter launch types, use --onstart-cmd to pass in startup script, instead of --entrypoint and --args.
+
 Examples:
-vastai create instance 6995713 --image pytorch/pytorch --disk 40 --env '-p 8081:80801/udp -h billybob' --ssh --direct --onstart-cmd "env | grep _ >> /etc/environment; echo 'starting up'";
-vastai create instance 384827  --image bobsrepo/pytorch:latest --login '-u bob -p 9d8df!fd89ufZ docker.io' --jupyter --direct --env '-e TZ=PDT -e XNAME=XX4 -p 22:22 -p 8080:8080' --disk 20
+
+# on-demand instance with the PyTorch (cuDNN Devel) template and 64 GB of disk
+vastai create instance 384826 --template_hash 661d064bbda1f2a133816b6d55da07c3 --disk 64
+
+# on-demand instance with pytorch/pytorch, 40 GB of disk, UDP port 8081, direct ssh, hostname set, small onstart script
+vastai create instance 6995713 --image pytorch/pytorch --disk 40 --env '-p 8081:8081/udp -h billybob' --ssh --direct --onstart-cmd "env | grep _ >> /etc/environment; echo 'starting up'";
+
+# on-demand instance with bobsrepo/pytorch:latest, 20 GB of disk, open ports 22 and 8080, jupyter ssh, and some env variables
+vastai create instance 384827 --image bobsrepo/pytorch:latest --login '-u bob -p 9d8df!fd89ufZ docker.io' --jupyter --direct --env '-e TZ=PDT -e XNAME=XX4 -p 22:22 -p 8080:8080' --disk 20
+
+# on-demand instance with pytorch/pytorch, 40 GB of disk, override entrypoint to bash, pass bash a simple command (args launch, no ssh/jupyter)
+vastai create instance 5801802 --image pytorch/pytorch --disk 40 --onstart-cmd 'bash' --args -c 'echo hello; sleep infinity;'
+
+# interruptible (spot) instance with the PyTorch (cuDNN Devel) template, 64 GB of disk, bid price $0.10/hr
+vastai create instance 384826 --template_hash 661d064bbda1f2a133816b6d55da07c3 --disk 64 --bid_price 0.1
 
 Return value:
-Returns a json reporting the instance ID of the newly created instance.
-Example: {'success': True, 'new_contract': 7835610}
+Returns a json reporting the instance ID of the newly created instance:
+{'success': True, 'new_contract': 7835610}
+```
 
+## create instances
+
+Create instances from a list of offers.
+
+```text Text
+usage: vastai create instances [OPTIONS] ID0 ID1 ID2... [--args ...]
+
+positional arguments:
+ ids                               ids of instance types to launch (returned from search offers)
+
+options:
+ -h, --help                        show this help message and exit
+ --template_hash TEMPLATE_HASH     Create instance from template info
+ --user USER                       User to use with docker create
+ --disk DISK                       size of local disk partition in GB
+ --image IMAGE                     docker container image to launch
+ --login LOGIN                     docker login arguments for private repo authentication, surround with ''
+ --label LABEL                     label to set on the instance
+ --onstart ONSTART                 filename to use as onstart script
+ --onstart-cmd ONSTART_CMD         contents of onstart script as single argument
+ --entrypoint ENTRYPOINT           override entrypoint for args launch instance
+ --ssh                             Launch as an ssh instance type
+ --jupyter                         Launch as a jupyter instance instead of an ssh instance
+ --direct                          Use (faster) direct connections for jupyter & ssh
+ --jupyter-dir JUPYTER_DIR         For runtype 'jupyter', directory in instance to use to launch jupyter
+ --jupyter-lab                     For runtype 'jupyter', Launch instance with jupyter lab
+ --lang-utf8                       install and generate locales before launch, set locale to C.UTF-8
+ --python-utf8                     set python's locale to C.UTF-8
+ --env ENV                         env variables and port mapping options, surround with ''
+ --args ...                        list of arguments passed to container ENTRYPOINT (must be last argument)
+ --force                           Skip sanity checks when creating from an existing instance
+ --cancel-unavail                  Return error if scheduling fails (rather than creating a stopped instance)
+ --bid_price BID_PRICE             create INTERRUPTIBLE instances with per machine bid price in $/hour
+ --create-volume VOLUME_ASK_ID     Create a new local volume from a "search volumes" result and link it to the new instance
+ --link-volume EXISTING_VOLUME_ID  ID of an existing rented volume to link to the instance during creation
+ --volume-size VOLUME_SIZE         Size of the volume to create in GB. Only usable with --create-volume (default 15GB)
+ --mount-path MOUNT_PATH           The path to the volume from within the new instance container
+ --volume-label VOLUME_LABEL       (optional) A name to give the new volume. Only usable with --create-volume
+
+Same options as create instance, but accepts multiple offer IDs and launches one instance per ID in parallel.
+
+Example:
+vastai create instances 12345 67890 24680 --image pytorch/pytorch --disk 32 --ssh --direct
 ```
 
 ## create overlay
@@ -499,6 +552,35 @@ options:
 
 Creates an overlay network to allow local networking between instances on a physical cluster
 
+```
+
+## create ssh-key
+
+Create a new ssh key, or register an existing public key with your Vast account.
+
+```text Text
+usage: vastai create ssh-key [ssh_public_key] [-y]
+
+positional arguments:
+ ssh_key            add your existing ssh public key to your account (from the .pub file). If no public key is provided, a new key pair will be generated.
+
+options:
+ -h, --help         show this help message and exit
+ -y, --yes          automatically answer yes to prompts
+
+Use this command to register an existing public key on your Vast account, or to generate a new ssh key pair and register the public half.
+
+If you provide an ssh_public_key.pub argument, that public key will be added to your Vast account. All ssh public keys should be in OpenSSH format.
+
+    Example: vastai create ssh-key 'ssh_public_key.pub'
+
+If you don't provide an argument, a new Ed25519 key pair will be generated.
+
+    Example: vastai create ssh-key
+
+Generated keys are saved as ~/.ssh/id_ed25519 (private) and ~/.ssh/id_ed25519.pub (public). Existing id_ed25519 keys are backed up as .backup_<timestamp>.
+
+All registered public keys are stored in your Vast account and can be used to connect to instances they've been attached to.
 ```
 
 ## create subaccount
@@ -549,47 +631,60 @@ options:
 
 ## create team-role
 
-Add a new role to your
+Add a new role to your team.
 
 ```text Text
 usage: vastai create team-role name --permissions PERMISSIONS
 
 options:
-  -h, --help            show this help message and exit
-  --name NAME           name of the role
-  --permissions PERMISSIONS
-                        file path for json encoded permissions, look in the
-                        docs for more information
-  --url URL             server REST api url
-  --retry RETRY         retry limit
-  --raw                 output machine-readable json
-  --explain             output verbose explanation of mapping of CLI calls to
-                        HTTPS API endpoints
-  --api-key API_KEY     api key. defaults to using the one stored in
-                        ~/.vast_api_key
+ -h, --help                show this help message and exit
+ --name NAME               name of the role
+ --permissions PERMISSIONS file path for json encoded permissions. See https://vast.ai/docs/cli/roles-and-permissions for the schema.
+```
 
+## create template
+
+Create a new template.
+
+```text Text
+usage: vastai create template [OPTIONS]
+
+options:
+ -h, --help                     show this help message and exit
+ --name NAME                    name of the template
+ --image IMAGE                  docker container image to launch
+ --image_tag IMAGE_TAG          docker image tag
+ --href HREF                    link you want to provide
+ --repo REPO                    link to repository
+ --login LOGIN                  docker login arguments for private repo authentication, surround with ''
+ --env ENV                      contents of the 'Docker options' field
+ --ssh                          Launch as an ssh instance type
+ --jupyter                      Launch as a jupyter instance instead of an ssh instance
+ --direct                       Use (faster) direct connections for jupyter & ssh
+ --jupyter-dir JUPYTER_DIR      for runtype 'jupyter', directory to use
+ --jupyter-lab                  for runtype 'jupyter', launch with jupyter lab
+ --onstart-cmd ONSTART_CMD      contents of onstart script as single argument
+ --search_params SEARCH_PARAMS  search offers filters
+ -n, --no-default               Disable default search param query args
+ --disk_space DISK_SPACE        disk storage space, in GB
+ --readme README                readme string
+ --hide-readme                  hide the readme from users
+ --desc DESC                    description string
+ --public                       make template available to public
 ```
 
 ## delete api-key
 
-Remove an api-key
+Remove an api-key.
 
 ```text Text
 usage: vastai delete api-key ID
 
 positional arguments:
-  ID                 id of apikey to remove
+ id                 id of apikey to remove
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
+ -h, --help         show this help message and exit
 ```
 
 ## delete autoscaler
@@ -617,6 +712,36 @@ Example: vastai delete autoscaler 4242
 
 ```
 
+## delete ssh-key
+
+Remove an ssh-key from your account.
+
+```text Text
+usage: vastai delete ssh-key ID
+
+positional arguments:
+ id                 id of ssh key to delete
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## delete template
+
+Delete a template by ID.
+
+```text Text
+usage: vastai delete template --template-id TEMPLATE_ID
+
+options:
+ -h, --help                 show this help message and exit
+ --template-id TEMPLATE_ID  Template ID to delete
+```
+
+Example:
+
+    vastai delete template --template-id 1508
+
 ## delete overlay
 
 Deletes an overlay
@@ -642,49 +767,59 @@ options:
 
 ## destroy instance
 
-Destroy an instance (irreversible, deletes data)
+Destroy an instance (irreversible, deletes data).
 
 ```text Text
-usage: vastai destroy instance id [-h] [--api-key API_KEY] [--raw]
+usage: vastai destroy instance id [-h] [-y] [--api-key API_KEY] [--raw]
 
 positional arguments:
-  id                 id of instance to delete
+ id                 id of instance to delete
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
+ -h, --help         show this help message and exit
+ -y, --yes          Skip confirmation prompt
 
-Perfoms the same action as pressing the "DESTROY" button on the website at https://console.vast.ai/instances/
-Example: vastai destroy instance 4242
+Performs the same action as pressing the "DESTROY" button on the website at https://console.vast.ai/instances/.
+Use -y or --yes to skip the confirmation prompt.
 
+Example:
+vastai destroy instance 4242
 ```
 
 ## destroy instances
 
-Destroy a list of instances (irreversible, deletes
+Destroy a list of instances (irreversible, deletes data).
 
 ```text Text
-usage: vastai destroy instances [--raw] <id>
+usage: vastai destroy instances [--raw] [-y] <id> [<id> ...]
 
 positional arguments:
-  ids                ids of instance to destroy
+ ids                ids of instance to destroy
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
+ -h, --help         show this help message and exit
+ -y, --yes          Skip confirmation prompt
 
+Example:
+vastai destroy instances 4242 4243 4244
+```
+
+## detach ssh
+
+Detach an ssh key from an instance.
+
+```text Text
+usage: vastai detach ssh INSTANCE_ID SSH_KEY_ID
+
+positional arguments:
+ instance_id        id of the instance
+ ssh_key_id         id of the key to detach from the instance
+
+options:
+ -h, --help         show this help message and exit
+
+Example:
+vastai detach ssh 99999 12345
 ```
 
 ## destroy team
@@ -708,38 +843,35 @@ options:
 
 ## execute
 
-Execute a (constrained) remote command on a machine
+Execute a constrained remote command on an instance. Works even when the instance is stopped.
 
 ```text Text
-usage: vastai execute ID COMMAND
+usage: vastai execute id COMMAND
 
 positional arguments:
-  ID                 id of instance to execute on
-  COMMAND            bash command surrounded by single quotes
+ id                                id of instance to execute on
+ COMMAND                           bash command surrounded by single quotes
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
+ -h, --help                        show this help message and exit
+ --schedule {HOURLY,DAILY,WEEKLY}  schedule the command hourly, daily, or weekly (e.g. --schedule DAILY)
+ --start_date START_DATE           start date/time in format 'YYYY-MM-DD HH:MM:SS PM' (UTC). Default is now.
+ --end_date END_DATE               end date/time in format 'YYYY-MM-DD HH:MM:SS PM' (UTC). Default is 7 days from now.
+ --day DAY                         day of week (0-6, 0=Sunday) or "*". Default is 0.
+ --hour HOUR                       hour of day (0-23) or "*" (UTC). Default is 0.
 
-examples:
-  vastai execute 99999 'ls -l -o -r'
-  vastai execute 99999 'rm -r home/delete_this.txt'
-  vastai execute 99999 'du -d2 -h'
-
-available commands:
+Available commands:
   ls                 List directory contents
-  rm                 Remote files or directories
-  du                 Summarize device usage for a set of files
+  rm                 Remove files or directories
+  du                 Summarize disk usage for a set of files
+
+Examples:
+    vastai execute 99999 'ls -l -o -r'
+    vastai execute 99999 'rm -r home/delete_this.txt'
+    vastai execute 99999 'du -d2 -h'
 
 Return value:
-Returns the output of the command which was executed on the instance, if successful. May take a few seconds to retrieve the results.
-
+Returns the output of the command executed on the instance, if successful. May take a few seconds to retrieve the results.
 ```
 
 ## generate pdf-invoices
@@ -816,97 +948,135 @@ options:
 
 ## label instance
 
-Assign a string label to an instance
+Assign a string label to an instance.
 
-```text Text  
+```text Text
 usage: vastai label instance <id> <label>
 
 positional arguments:
-  id                 id of instance to label
-  label              label to set
+ id                 id of instance to label
+ label              label to set
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
+ -h, --help         show this help message and exit
+```
 
+## launch instance
+
+Launch the top instance from "search offers" matching the given parameters. Combines search and create in one command.
+
+```text Text
+usage: vastai launch instance [--help] [--api-key API_KEY] <gpu_name> <num_gpus> <image> [geolocation] [disk_space]
+
+options:
+ -h, --help                                 show this help message and exit
+ -g GPU, --gpu-name GPU                     Name of the GPU model, replace spaces with underscores (e.g. RTX_4090). See --help for the full list.
+ -n {1,2,4,8,12,14}, --num-gpus             Number of GPUs required
+ -r REGION, --region REGION                 Geographical location of the instance
+ -i IMAGE, --image IMAGE                    Name of the image to use for the instance
+ -d DISK, --disk DISK                       Disk space required in GB
+ --limit LIMIT                              max number of offers to consider
+ -o ORDER, --order ORDER                    Comma-separated list of fields to sort on. Postfix field with - to sort desc. ex: -o 'num_gpus,total_flops-'. Default='score-'.
+ --login LOGIN                              docker login arguments for private repo authentication, surround with ''
+ --label LABEL                              label to set on the instance
+ --onstart ONSTART                          filename to use as onstart script
+ --onstart-cmd ONSTART_CMD                  contents of onstart script as single argument
+ --entrypoint ENTRYPOINT                    override entrypoint for args launch instance
+ --ssh                                      Launch as an ssh instance type
+ --jupyter                                  Launch as a jupyter instance instead of an ssh instance
+ --direct                                   Use (faster) direct connections for jupyter & ssh
+ --jupyter-dir JUPYTER_DIR                  directory to use for jupyter; defaults to image's working directory
+ --jupyter-lab                              Launch instance with jupyter lab
+ --lang-utf8                                install and generate locales before launch, set locale to C.UTF-8
+ --python-utf8                              set python's locale to C.UTF-8
+ --env ENV                                  env variables and port mapping options, surround with ''
+ --args ...                                 list of arguments passed to container ENTRYPOINT (must be last argument)
+ --force                                    Skip sanity checks when creating from an existing instance
+ --cancel-unavail                           Return error if scheduling fails (rather than creating a stopped instance)
+ --template_hash TEMPLATE_HASH              template hash containing all relevant information about an instance. Replaces other parameters describing the instance configuration.
+
+Launches an instance based on the given parameters. The top offer from the search results is used.
+Besides gpu_name and num_gpus, you must pass an '--image' argument as a minimum.
+
+If you use args/entrypoint launch mode, we create a container from your image as is, without injecting ssh or jupyter.
+If you use the args launch mode, override the entrypoint with --entrypoint and pass arguments with --args.
+If --args is used, it must be the last argument, as any following tokens are consumed into the args string.
+For ssh/jupyter launch types, use --onstart-cmd to pass a startup script instead of --entrypoint and --args.
+
+Examples:
+
+    # single RTX 3090 with pytorch/pytorch and 16 GB disk, any region
+    vastai launch instance -g RTX_3090 -n 1 -i pytorch/pytorch
+
+    # 4x RTX 3090 with pytorch/pytorch, 32 GB disk, in North America
+    vastai launch instance -g RTX_3090 -n 4 -i pytorch/pytorch -d 32.0 -r North_America
 ```
 
 ## logs
 
-Get the logs for an instance
+Get the logs for an instance.
 
 ```text Text
-usage: vastai logs [OPTIONS] INSTANCE_ID
+usage: vastai logs INSTANCE_ID [OPTIONS]
 
 positional arguments:
-  INSTANCE_ID        id of instance
+ INSTANCE_ID        id of instance
 
 options:
-  -h, --help         show this help message and exit
-  --tail TAIL        Number of lines to show from the end of the logs (default
-                     '1000')
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
+ -h, --help         show this help message and exit
+ --tail TAIL        Number of lines to show from the end of the logs (default '1000')
+ --filter FILTER    Grep filter for log entries
+ --daemon-logs      Fetch daemon system logs instead of container logs
 ```
 
 ## prepay instance
 
-Deposit credits into reserved instance.
+Deposit credits into a reserved instance.
 
 ```text Text
-usage: vastai prepay instance <id> <amount>
+usage: vastai prepay instance ID AMOUNT
 
 positional arguments:
-  id                 id of instance to prepay for
-  amount             amount of instance credit prepayment (default discount
-                     func of 0.2 for 1 month, 0.3 for 3 months)
+ id                 id of instance to prepay for
+ amount             amount of instance credit prepayment (default discount func of 0.2 for 1 month, 0.3 for 3 months)
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
+ -h, --help         show this help message and exit
 ```
 
 ## reboot instance
 
-Reboot (stop/start) an instance
+Reboot (stop/start) an instance.
 
 ```text Text
-usage: vastai reboot instance <id> [--raw]
+usage: vastai reboot instance ID [OPTIONS]
 
 positional arguments:
-  id                 id of instance to reboot
+ id                                id of instance to reboot
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
+ -h, --help                        show this help message and exit
+ --schedule {HOURLY,DAILY,WEEKLY}  try to schedule a command to run hourly, daily, or weekly. For ex. --schedule DAILY
+ --start_date START_DATE           Start date/time in format 'YYYY-MM-DD HH:MM:SS PM' (UTC). Default is now.
+ --end_date END_DATE               End date/time in format 'YYYY-MM-DD HH:MM:SS PM' (UTC). Default is 7 days from now.
+ --day DAY                         Day of week (0-6, where 0=Sunday) or "*". Default is 0.
+ --hour HOUR                       Hour of day (0-23) or "*" (UTC). Default is 0.
 
-Instance is stopped and started without any risk of losing GPU priority.
+Stops and starts the container without any risk of losing GPU priority.
+```
 
+## recycle instance
+
+Recycle (destroy/create) an instance. Destroys and recreates the container in place from a newly pulled image, without losing GPU priority.
+
+```text Text
+usage: vastai recycle instance ID [OPTIONS]
+
+positional arguments:
+ id                 id of instance to recycle
+
+options:
+ -h, --help         show this help message and exit
 ```
 
 ## remove team-member
@@ -983,75 +1153,142 @@ Reset your api-key (get new key from website).
 usage: vastai reset api-key
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
+ -h, --help         show this help message and exit
 ```
 
 ## scp-url
 
-scp url helper
+Print the scp connection string for an instance.
 
 ```text Text
 usage: vastai scp-url ID
 
 positional arguments:
-  id                 id
+ id                 id of instance
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
+ -h, --help         show this help message and exit
+```
 
+## search benchmarks
+
+Search for benchmark results using a custom query.
+
+```text Text
+usage: vastai search benchmarks [--help] [--api-key API_KEY] [--raw] <query>
+
+positional arguments:
+ query              Search query in simple query syntax (see search offers)
+
+options:
+ -h, --help         show this help message and exit
+
+Example:
+
+    # benchmarks with score > 100 for llama2_70B model on specific machines
+    vastai search benchmarks 'score > 100.0 model=llama2_70B machine_id in [302,402]'
+
+Available fields:
+    contract_id      int      ID of instance/contract reporting benchmark
+    id               int      benchmark unique ID
+    image            string   image used for benchmark
+    last_update      float    date of benchmark
+    machine_id       int      id of machine benchmarked
+    model            string   name of model used in benchmark
+    name             string   name of benchmark
+    num_gpus         int      number of gpus used in benchmark
+    score            float    benchmark score result
+```
+
+## search invoices
+
+Search invoice history using a custom query.
+
+```text Text
+usage: vastai search invoices [--help] [--api-key API_KEY] [--raw] <query>
+
+positional arguments:
+ query              Search query in simple query syntax (see search offers)
+
+options:
+ -h, --help         show this help message and exit
+
+Example:
+
+    vastai search invoices 'amount_cents > 3000'
+
+Available fields:
+    id                 int     invoice id
+    user_id            int
+    when               float   utc epoch of invoice creation
+    paid_on            float   actual payment date (utc epoch)
+    payment_expected   float   expected payment date (utc epoch)
+    amount_cents       int     amount in cents
+    is_credit          bool    is a credit purchase
+    is_delayed         bool    not yet paid
+    balance_before     float
+    balance_after      float
+    original_amount    int
+    service            string  type of payment
+    paypal_email       string  email for paypal/wise payments
+    failed             bool
+    refunded           bool
+```
+
+## search network-volumes
+
+Search network volume offers using a custom query.
+
+```text Text
+usage: vastai search network-volumes [--help] [--api-key API_KEY] [--raw] <query>
+
+positional arguments:
+ query                    Query to search for. default: 'external=false verified=true disk_space>=1', pass -n to ignore default
+
+options:
+ -h, --help               show this help message and exit
+ -n, --no-default         Disable default query
+ --limit LIMIT            max results
+ --storage STORAGE        Amount of storage to use for pricing, in GiB. default=1.0GiB
+ -o ORDER, --order ORDER  Comma-separated list of fields to sort on. Postfix field with - to sort desc. Default='score-'.
+
+Example:
+
+    vastai search network-volumes 'disk_space > 50 inet_up > 500 inet_down > 500'
+
+Available fields:
+    duration        float   max rental duration in days
+    geolocation     string  two letter country code
+    id              int     network volume offer unique ID
+    inet_down       float   internet download speed in Mb/s
+    inet_up         float   internet upload speed in Mb/s
+    reliability     float   machine reliability score (see FAQ)
+    storage_cost    float   storage cost in $/GB/month
+    verified        bool    is the machine verified
 ```
 
 ## search offers
 
-Search for instance types using custom query
+Search for instance types using a custom query.
 
 ```text Text
 usage: vastai search offers [--help] [--api-key API_KEY] [--raw] <query>
 
 positional arguments:
-  query                 Query to search for. default: 'external=false
-                        rentable=true verified=true', pass -n to ignore
-                        default
+ query                    Query to search for. default: 'external=false rentable=true verified=true', pass -n to ignore default
 
 options:
-  -h, --help            show this help message and exit
-  -t TYPE, --type TYPE  Show 'on-demand', 'reserved', or 'bid'(interruptible)
-                        pricing. default: on-demand
-  -i, --interruptible   Alias for --type=bid
-  -b, --bid             Alias for --type=bid
-  -r, --reserved        Alias for --type=reserved
-  -d, --on-demand       Alias for --type=on-demand
-  -n, --no-default      Disable default query
-  --disable-bundling    Show identical offers. This request is more heavily
-                        rate limited.
-  --storage STORAGE     Amount of storage to use for pricing, in GiB.
-                        default=5.0GiB
-  -o ORDER, --order ORDER
-                        Comma-separated list of fields to sort on. postfix
-                        field with - to sort desc. ex: -o
-                        'num_gpus,total_flops-'. default='score-'
-  --url URL             server REST api url
-  --retry RETRY         retry limit
-  --raw                 output machine-readable json
-  --explain             output verbose explanation of mapping of CLI calls to
-                        HTTPS API endpoints
-  --api-key API_KEY     api key. defaults to using the one stored in
-                        ~/.vast_api_key
+ -h, --help               show this help message and exit
+ -t TYPE, --type TYPE     Show 'on-demand', 'reserved', or 'bid' (interruptible) pricing. default: on-demand
+ -i, --interruptible      Alias for --type=bid
+ -b, --bid                Alias for --type=bid
+ -r, --reserved           Alias for --type=reserved
+ -d, --on-demand          Alias for --type=on-demand
+ -n, --no-default         Disable default query
+ --new                    New search experience
+ --limit LIMIT            max results
+ --storage STORAGE        Amount of storage to use for pricing, in GiB. default=5.0GiB
+ -o ORDER, --order ORDER  Comma-separated list of fields to sort on. Postfix field with - to sort desc. Default='score-'.
 
 Query syntax:
 
@@ -1134,67 +1371,126 @@ Available fields:
 
 ```
 
+## search templates
+
+Search templates using a custom query.
+
+```text Text
+usage: vastai search templates [--help] [--api-key API_KEY] [--raw] <query>
+
+positional arguments:
+ query              Search query in simple query syntax (see search offers)
+
+options:
+ -h, --help         show this help message and exit
+
+Example:
+
+    vastai search templates 'count_created > 100 creator_id in [38382,48982]'
+
+Available fields:
+    creator_id              int      ID of creator
+    created_at              float    initial template creation (UTC epoch)
+    count_created           int      # instances created (popularity)
+    default_tag             string   image default tag
+    docker_login_repo       string   image docker repository
+    id                      int      template unique ID
+    image                   string   image used for template
+    jup_direct              bool     supports jupyter direct
+    hash_id                 string   unique hash ID of template
+    name                    string   displayable name
+    recent_create_date      float    last instance creation (UTC epoch)
+    recommended_disk_space  float    min disk space required
+    recommended             bool     is on the recommended list
+    ssh_direct              bool     supports ssh direct
+    tag                     string   image tag
+    use_ssh                 bool     supports ssh (direct or proxy)
+```
+
+## search volumes
+
+Search volume offers using a custom query.
+
+```text Text
+usage: vastai search volumes [--help] [--api-key API_KEY] [--raw] <query>
+
+positional arguments:
+ query                    Query to search for. default: 'external=false verified=true disk_space>=1', pass -n to ignore default
+
+options:
+ -h, --help               show this help message and exit
+ -n, --no-default         Disable default query
+ --limit LIMIT            max results
+ --storage STORAGE        Amount of storage to use for pricing, in GiB. default=1.0GiB
+ -o ORDER, --order ORDER  Comma-separated list of fields to sort on. Postfix field with - to sort desc. Default='score-'.
+
+Example:
+
+    vastai search volumes "disk_space>50 inet_up>500 inet_down>500"
+
+Available fields:
+    cpu_arch             string   host machine cpu architecture (amd64, arm64)
+    cuda_vers            float    machine max supported cuda version
+    datacenter           bool     show only datacenter offers
+    disk_bw              float    disk read bandwidth, in MB/s
+    disk_space           float    disk storage space, in GB
+    driver_version       string   machine's driver version (e.g. "535.86.05")
+    duration             float    max rental duration in days
+    geolocation          string   two letter country code
+    gpu_arch             string   host machine gpu architecture (nvidia, amd)
+    gpu_name             string   GPU model name (underscore spaces, e.g. RTX_3090)
+    has_avx              bool     CPU supports AVX
+    id                   int      volume offer unique ID
+    inet_down            float    internet download speed in Mb/s
+    inet_up              float    internet upload speed in Mb/s
+    machine_id           int      machine id of volume offer
+    pci_gen              float    PCIE generation
+    pcie_bw              float    PCIE bandwidth (CPU to GPU)
+    reliability          float    machine reliability score (see FAQ)
+    storage_cost         float    storage cost in $/GB/month
+    static_ip            bool     is the IP addr static
+    total_flops          float    total TFLOPs from all GPUs
+    ubuntu_version       string   host machine ubuntu OS version
+    verified             bool     is the machine verified
+```
+
 ## set api-key
 
-Set api-key (get your api-key from the console/CLI)
+Set api-key (get your api-key from the console/CLI).
 
-```text Text  
+```text Text
 usage: vastai set api-key APIKEY
 
 positional arguments:
-  new_api_key        Api key to set as currently logged in user
+ new_api_key        Api key to set as currently logged in user
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
+ -h, --help         show this help message and exit
 ```
 
 ## show api-key
 
-Show an api-key
+Show details of an api-key.
 
 ```text Text
-usage: vastai show api-key
+usage: vastai show api-key ID
 
 positional arguments:
-  id                 id of apikey to get
+ id                 id of apikey to get
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
+ -h, --help         show this help message and exit
 ```
 
 ## show api-keys
 
-List your api-keys associated with your account
+List the api-keys associated with your account.
 
-```text
+```text Text
 usage: vastai show api-keys
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
+ -h, --help         show this help message and exit
 ```
 
 ## show autoscalers
@@ -1265,44 +1561,69 @@ options:
 
 ## show instance
 
-Display user's current instances
+Display details of a single instance.
 
 ```text Text
-usage: vastai show instance [--api-key API_KEY] [--raw]
+usage: vastai show instance ID [options]
 
 positional arguments:
-  id                 id of instance to get
+ id                 id of instance to get
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
+ -h, --help         show this help message and exit
+ -q, --quiet        only display numeric id
 ```
 
 ## show instances
 
-Display user's current instances
+Display the user's current instances.
 
 ```text Text
-usage: vastai show instances [OPTIONS] [--api-key API_KEY] [--raw]
+usage: vastai show instances [OPTIONS]
 
 options:
-  -h, --help         show this help message and exit
-  -q, --quiet        only display numeric ids
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
+ -h, --help         show this help message and exit
+ -q, --quiet        only display numeric ids
 
+Shows stats on the instances the user is currently renting.
+
+Examples:
+    vastai show instances
+    vastai show instances --raw
+    vastai show instances -q
+```
+
+## show instances-v1
+
+List instances with filtering, sorting, and pagination.
+
+```text Text
+usage: vastai show instances-v1 [OPTIONS]
+
+options:
+ -h, --help                              show this help message and exit
+ -q, --quiet                             only print instance IDs, one per line
+ -v, --verbose                           show additional columns (SSH, location, template, etc.)
+ -a, --all                               fetch all pages automatically; useful for scripting
+ -s STATUS [STATUS ...], --status        filter by container status: running loading exited
+ --label LABEL [LABEL ...]               filter by instance label; pass empty string '' for unlabeled
+ --gpu-name GPU [GPU ...]                filter by GPU model name
+ --verification VERIF [VERIF ...]        filter by verification status
+ -l LIMIT, --limit LIMIT                 max instances per page (1-25, default 25)
+ -t NEXT_TOKEN, --next-token NEXT_TOKEN  resume from a pagination token
+ --order-by COL [asc|desc]               sort by column; repeat for multiple keys
+ --cols COLS                             override displayed columns (available: id,status,label,gpu,disk,volumes,dph,image,age,verified,machine,net,location,template,ssh,msg)
+
+Displays instances in a table with auto-sizing columns. Narrow terminals drop lower-priority columns automatically; use --cols to override.
+
+Examples:
+    vastai show instances-v1
+    vastai show instances-v1 -v
+    vastai show instances-v1 --status running loading
+    vastai show instances-v1 --gpu-name 'RTX A5000' 'GTX 1070'
+    vastai show instances-v1 --label training --order-by start_date desc
+    vastai show instances-v1 --cols id,status,gpu,dph
+    vastai show instances-v1 --next-token eyJ2YWx1ZXMi...
 ```
 
 ## show invoices
@@ -1447,6 +1768,17 @@ Show overlays associated with your account.
 
 ```
 
+## show ssh-keys
+
+List the ssh keys registered on your account.
+
+```text Text
+usage: vastai show ssh-keys
+
+options:
+ -h, --help         show this help message and exit
+```
+
 ## show subaccounts
 
 Get current subaccounts
@@ -1551,119 +1883,86 @@ Shows stats for logged-in user. These include user balance, email, and ssh key. 
 
 ## ssh-url
 
-ssh url helper
+Print the ssh connection string for an instance. Pipe into ssh directly in bash/zsh: `ssh $(vastai ssh-url <id>)`.
 
 ```text Text
 usage: vastai ssh-url ID
 
 positional arguments:
-  id                 id of instance
+ id                 id of instance
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
+ -h, --help         show this help message and exit
 ```
 
 ## start instance
 
-Start a stopped instance
+Start a stopped instance.
 
 ```text Text
-usage: vastai start instance <id> [--raw]
+usage: vastai start instance ID [OPTIONS]
 
 positional arguments:
-  id                 id of instance to start/restart
+ id                 ID of instance to start/restart
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
+ -h, --help         show this help message and exit
 
-This command attempts to bring an instance from the "stopped" state into the "running" state. This is subject to resource availability on the machine that the instance is located on.
-If your instance is stuck in the "scheduling" state for more than 30 seconds after running this, it likely means that the required resources on the machine to run your instance are currently unavailable.
+Attempts to bring an instance from the "stopped" state into the "running" state. This is subject to resource availability on the machine the instance is located on.
+If your instance is stuck in the "scheduling" state for more than 30 seconds after running this, the required resources on the machine are likely unavailable.
+
 Examples:
-    vastai start instances $(vastai show instances -q)
     vastai start instance 329838
-
+    vastai start instances $(vastai show instances -q)
 ```
 
 ## start instances
 
-Start a list of instances
+Start a list of instances.
 
 ```text Text
-usage: vastai start instances [--raw] ID0 ID1 ID2...
+usage: vastai start instances [OPTIONS] ID0 ID1 ID2...
 
 positional arguments:
-  ids                ids of instance to start
+ ids                ids of instance to start
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
+ -h, --help         show this help message and exit
 ```
 
 ## stop instance
 
-Stop a running instance
+Stop a running instance.
 
 ```text Text
-usage: vastai stop instance [--raw] ID
+usage: vastai stop instance ID [OPTIONS]
 
 positional arguments:
-  id                 id of instance to stop
+ id                 id of instance to stop
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
+ -h, --help         show this help message and exit
 
-This command brings an instance from the "running" state into the "stopped" state. When an instance is "stopped" all of your data on the instance is preserved,
-and you can resume use of your instance by starting it again. Once stopped, starting an instance is subject to resource availability on the machine that the instance is located on.
-There are ways to move data off of a stopped instance, which are described here: [Data Movement](/documentation/instances/data-movement)
-
+Brings an instance from the "running" state into the "stopped" state. Data on the instance is preserved; resume by starting it again. Starting a stopped instance is subject to resource availability on the machine.
+Moving data off a stopped instance is described at [Data Movement](/documentation/instances/data-movement).
 ```
 
 ## stop instances
 
-Stop a list of instances
+Stop a list of instances.
 
 ```text Text
-usage: vastai stop instances [--raw] ID0 ID1 ID2...
+usage: vastai stop instances [OPTIONS] ID0 ID1 ID2...
 
 positional arguments:
-  ids                ids of instance to stop
+ ids                ids of instance to stop
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
+ -h, --help         show this help message and exit
+
+Examples:
+    vastai stop instances 329838 984849
+    vastai stop instances $(vastai show instances -q)
   --api-key API_KEY  api key. defaults to using the one stored in
                      ~/.vast_api_key
 
@@ -1745,6 +2044,78 @@ options:
 
 Example: vastai update autoscaler 4242 --min_load 100 --target_util 0.9 --cold_mult 2.0 --search_params "gpu_ram>=23 num_gpus=2 gpu_name=RTX_4090 inet_down>200 direct_port_count>2 disk_space>=64" --launch_args "--onstart onstart_wget.sh  --env '-e ONSTART_PATH=https://s3.amazonaws.com/vast.ai/onstart_OOBA.sh' --image atinoda/text-generation-webui:default-nightly --disk 64" --gpu_ram 32.0 --endpoint_name "LLama"
 
+```
+
+## update instance
+
+Update an instance, recreating it from a new or updated template.
+
+```text Text
+usage: vastai update instance ID [OPTIONS]
+
+positional arguments:
+ id                                   id of instance to update
+
+options:
+ -h, --help                           show this help message and exit
+ --template_id TEMPLATE_ID            new template ID to associate with the instance
+ --template_hash_id TEMPLATE_HASH_ID  new template hash ID to associate with the instance
+ --image IMAGE                        new image UUID for the instance
+ --args ARGS                          new arguments for the instance
+ --env ENV                            new environment variables for the instance
+ --onstart ONSTART                    new onstart script for the instance
+
+Example:
+vastai update instance 1234 --template_hash_id 661d064bbda1f2a133816b6d55da07c3
+```
+
+## update ssh-key
+
+Replace the public key on an existing ssh-key entry.
+
+```text Text
+usage: vastai update ssh-key ID SSH_KEY
+
+positional arguments:
+ id                 id of the ssh key to update
+ ssh_key            new public key value
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## update template
+
+Update an existing template.
+
+```text Text
+usage: vastai update template HASH_ID
+
+positional arguments:
+ HASH_ID                        hash id of the template
+
+options:
+ -h, --help                     show this help message and exit
+ --name NAME                    name of the template
+ --image IMAGE                  docker container image to launch
+ --image_tag IMAGE_TAG          docker image tag
+ --href HREF                    link you want to provide
+ --repo REPO                    link to repository
+ --login LOGIN                  docker login arguments for private repo authentication, surround with ''
+ --env ENV                      contents of the 'Docker options' field
+ --ssh                          Launch as an ssh instance type
+ --jupyter                      Launch as a jupyter instance instead of an ssh instance
+ --direct                       Use (faster) direct connections for jupyter & ssh
+ --jupyter-dir JUPYTER_DIR      for runtype 'jupyter', directory to use
+ --jupyter-lab                  for runtype 'jupyter', launch with jupyter lab
+ --onstart-cmd ONSTART_CMD      contents of onstart script as single argument
+ --search_params SEARCH_PARAMS  search offers filters
+ -n, --no-default               Disable default search param query args
+ --disk_space DISK_SPACE        disk storage space, in GB
+ --readme README                readme string
+ --hide-readme                  hide the readme from users
+ --desc DESC                    description string
+ --public                       make template available to public
 ```
 
 ## update team-role
