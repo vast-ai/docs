@@ -1,0 +1,67 @@
+---
+title: "RequestStatus"
+sidebarTitle: "RequestStatus"
+---
+
+Observable status tracker for a serverless request's lifecycle. Pass an instance to `queue_endpoint_request(serverless_request=...)` to watch state changes (queued → running → complete) without wrapping the request in a full `ServerlessRequest` future.
+
+## Import
+
+```python
+from vastai import RequestStatus
+```
+
+## Constructor
+
+```python
+RequestStatus(
+    status: str = "New",
+    create_time: float = <time.time()>,
+    start_time: Optional[float] = None,
+    complete_time: Optional[float] = None,
+    req_idx: int = 0,
+)
+```
+
+<ParamField path="status" type="str" default='"New"'>
+  Current lifecycle state. Updated by the client as the request progresses.
+</ParamField>
+
+<ParamField path="create_time" type="float">
+  Unix timestamp at construction (defaults to `time.time()`).
+</ParamField>
+
+<ParamField path="start_time" type="Optional[float]">
+  Unix timestamp when the worker began processing. `None` while queued.
+</ParamField>
+
+<ParamField path="complete_time" type="Optional[float]">
+  Unix timestamp when the worker finished. `None` until terminal.
+</ParamField>
+
+<ParamField path="req_idx" type="int" default="0">
+  Internal request index used by the client.
+</ParamField>
+
+## Example
+
+```python
+from vastai import AsyncClient, RequestStatus
+
+async def main():
+    async with AsyncClient(api_key="...") as client:
+        sl = client.serverless()
+        endpoint = await sl.get_endpoint(name="my-endpoint")
+
+        tracker = RequestStatus()
+        coro = sl.queue_endpoint_request(
+            endpoint=endpoint,
+            worker_route="/v1/completions",
+            worker_payload={"prompt": "Hello"},
+            serverless_request=tracker,
+        )
+
+        # tracker.status updates as the request progresses
+        result = await coro
+        print(f"completed in {tracker.complete_time - tracker.create_time:.2f}s")
+```

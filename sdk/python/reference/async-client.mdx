@@ -1,0 +1,137 @@
+---
+title: "AsyncClient"
+sidebarTitle: "AsyncClient"
+---
+
+Asynchronous (`aiohttp`-based) Vast.ai API client for marketplace search and instance lifecycle. Returns typed result wrappers (`AsyncOffer`, `AsyncInstance`) that expose follow-up operations directly on the object. Also supplies a factory for a `CoroutineServerless` client that shares its session.
+
+For a sync variant with the same surface, see [`SyncClient`](/sdk/python/reference/sync-client).
+
+## Import
+
+```python
+from vastai import AsyncClient
+```
+
+## Constructor
+
+```python
+AsyncClient(
+    api_key: object = <from env / file>,
+    vast_server: str = "https://console.vast.ai",
+    connection_limit: int = 100,
+)
+```
+
+<ParamField path="api_key" type="Optional[str]">
+  Vast API key. Resolution order: explicit argument → `VAST_API_KEY` env var → `$XDG_CONFIG_HOME/vastai/vast_api_key` → `~/.vast_api_key` (legacy).
+</ParamField>
+
+<ParamField path="vast_server" type="str" default='"https://console.vast.ai"'>
+  Vast API base URL.
+</ParamField>
+
+<ParamField path="connection_limit" type="int" default="100">
+  Maximum concurrent HTTP connections on the underlying `aiohttp` connector.
+</ParamField>
+
+## Context manager
+
+`AsyncClient` supports `async with` to manage the underlying `aiohttp.ClientSession` lifecycle:
+
+```python
+async with AsyncClient(api_key="...") as client:
+    offers = await client.search(query=...)
+```
+
+## Methods
+
+### search
+
+```python
+async search(
+    query: Query,
+    type_: Optional[str] = None,
+    order: Optional[list] = [["score", "desc"]],
+    limit: Optional[int] = None,
+    allocated_storage: Optional[float] = None,
+    target_reliability: Optional[float] = None,
+    disable_bundling: Optional[bool] = None,
+    external: Optional[bool] = None,
+    extra_ids: Optional[list] = None,
+    has_avx: Optional[int] = None,
+    gpu_option: Optional[Any] = None,
+    show_incompatible: Optional[Any] = None,
+    sort_option: Optional[Any] = None,
+    template_id: Optional[Any] = None,
+) -> list[AsyncOffer]
+```
+
+Search available offers. `query` is a `vastai.data.query.Query` built via the column DSL.
+
+### create_instance
+
+```python
+async create_instance(offer_id: int, config: InstanceConfig) -> AsyncInstance
+```
+
+Accept an offer and create an instance. Returns an `AsyncInstance` wrapper.
+
+### show_instances
+
+```python
+async show_instances() -> list[AsyncInstance]
+```
+
+Return all instances owned by the authenticated user.
+
+### destroy_instance
+
+```python
+async destroy_instance(instance_or_id: Union[AsyncInstance, int]) -> None
+```
+
+Destroy a running or stopped instance. Accepts either the numeric ID or an `AsyncInstance` wrapper.
+
+### serverless
+
+```python
+serverless(
+    *,
+    instance: str = "prod",
+    autoscaler_url: Optional[str] = None,
+    debug: bool = False,
+    default_request_timeout: float = 600.0,
+    max_poll_interval: float = 5.0,
+) -> CoroutineServerless
+```
+
+Create a [`CoroutineServerless`](/sdk/python/serverless/coroutine-serverless) that shares this client's `aiohttp` session and SSL context.
+
+### is_open / close / get_ssl_context
+
+```python
+is_open() -> bool
+async close(force: bool = False) -> None
+async get_ssl_context() -> ssl.SSLContext
+```
+
+Session lifecycle helpers. `get_ssl_context` downloads the Vast root CA once and caches a context that works for both `console.vast.ai` and serverless worker connections.
+
+## Example
+
+```python
+import asyncio
+from vastai import AsyncClient
+from vastai.data.query import gpu_name, RTX_4090
+from vastai.data.instance import InstanceConfig
+
+async def main():
+    async with AsyncClient(api_key="YOUR_API_KEY") as client:
+        offers = await client.search(query=(gpu_name == RTX_4090), limit=5)
+        config = InstanceConfig(image="pytorch/pytorch:latest", disk=20)
+        instance = await client.create_instance(offer_id=offers[0].id, config=config)
+        print(instance.id)
+
+asyncio.run(main())
+```
