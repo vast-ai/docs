@@ -1,0 +1,289 @@
+---
+title: "CLI Templates"
+sidebarTitle: "Templates"
+---
+
+A **template** is a configuration bundle that stores default settings for instance creation. Instead of passing every parameter each time you create an instance, you define a template once and reference it by its `hash_id`. You can optionally override specific values at creation time.
+
+Templates are useful for:
+- **Standardization** -- ensure all team members launch instances with consistent configurations
+- **Convenience** -- avoid repeating the same image, env, and onstart parameters across commands
+- **Sharing** -- distribute configurations via template hash ID
+
+For information about managing templates in the web interface, see [Templates Introduction](/documentation/templates/introduction).
+
+## Template Fields Reference
+
+When creating or editing a template, the following fields can be configured:
+
+| Field | Type | CLI Flag | Description |
+|-------|------|----------|-------------|
+| `name` | string | `--name` | Human-readable name for the template |
+| `image` | string | `--image` | Docker image path (e.g., `vllm/vllm-openai`) |
+| `tag` | string | `--image_tag` | Docker image tag. Defaults to `latest` |
+| `desc` | string | `--desc` | Short description of the template |
+| `readme` | string | `--readme` | Longer documentation/readme content |
+| `env` | string | `--env` | Environment variables and port mappings in Docker flag format (e.g., `"-e VAR=val -p 8000:8000"`) |
+| `onstart` | string | `--onstart-cmd` | Shell commands to run when the instance starts |
+| `runtype` | string | `--ssh` / `--jupyter` | Launch mode: `ssh`, `jupyter`, or `args` (default). Set via flags |
+| `ssh_direct` | boolean | `--ssh --direct` | Enable direct SSH (set by combining `--ssh` and `--direct`) |
+| `use_ssh` | boolean | `--ssh` | Enable SSH access |
+| `jup_direct` | boolean | `--jupyter --direct` | Enable direct Jupyter (set by combining `--jupyter` and `--direct`) |
+| `jupyter_dir` | string | `--jupyter-dir` | Directory to launch Jupyter from |
+| `use_jupyter_lab` | boolean | `--jupyter-lab` | Use JupyterLab instead of Jupyter Notebook |
+| `docker_login_repo` | string | `--login` | Private Docker registry URL (first token of the login string) |
+| `extra_filters` | object | `--search_params` | Default machine search filters (parsed from query string) |
+| `recommended_disk_space` | number | `--disk_space` | Recommended disk space in GB |
+| `private` | boolean | `--public` | Private by default; pass `--public` to make it public |
+| `href` | string | `--href` | Link to Docker Hub or image documentation |
+| `repo` | string | `--repo` | Repository identifier |
+
+## Template Identifiers
+
+Templates have two identifiers. Which one you use depends on the operation:
+
+| Identifier | Type | Used For |
+|------------|------|----------|
+| `id` | integer | Deleting templates (`--template-id`) |
+| `hash_id` | string | Creating instances (`--template_hash`), editing templates (positional arg) |
+
+<Warning>
+The `hash_id` is derived from the template's content. After editing a template, the `hash_id` changes. Always retrieve the latest `hash_id` from the command output or by searching for the template.
+</Warning>
+
+## Create a Template
+
+Use `vastai create template` to define a reusable configuration:
+
+```bash
+vastai create template \
+  --name "vLLM Inference Server" \
+  --image "vllm/vllm-openai" \
+  --image_tag "latest" \
+  --env "-e MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-8B -p 8000:8000" \
+  --onstart-cmd 'echo "Starting vLLM server"; vllm serve $MODEL_ID' \
+  --disk_space 50 \
+  --ssh --direct \
+  --desc "Template for running vLLM inference server"
+```
+
+The output includes both identifiers:
+
+```
+New Template: {'id': 334548, 'hash_id': '4e17788f74f075dd9aab7d0d4427968f', ...}
+```
+
+Save both the `id` and `hash_id` -- you'll need them for different operations.
+
+You can also attach default machine search filters using `--search_params`:
+
+```bash
+vastai create template \
+  --name "tgi-llama2-7B-quantized" \
+  --image "ghcr.io/huggingface/text-generation-inference:1.0.3" \
+  --env "-p 3000:3000 -e MODEL_ARGS='--model-id TheBloke/Llama-2-7B-chat-GPTQ --quantize gptq'" \
+  --onstart-cmd 'wget -O - https://raw.githubusercontent.com/vast-ai/vast-pyworker/main/scripts/launch_tgi.sh | bash' \
+  --search_params "gpu_ram>=23 num_gpus=1 gpu_name=RTX_3090 inet_down>128 direct_port_count>3 disk_space>=192" \
+  --disk_space 8.0 --ssh --direct
+```
+
+## Search for Templates
+
+Find templates using `vastai search templates` with the same query syntax used by `search offers`:
+
+```bash
+# Search for popular templates (more than 100 instances created)
+vastai search templates 'count_created > 100'
+
+# Search for templates by specific creators
+vastai search templates 'count_created > 100 creator_id in [38382,48982]'
+
+# Search for recommended templates with SSH support
+vastai search templates 'recommended == True use_ssh == True'
+```
+
+### Query Syntax
+
+```
+query = comparison comparison ...
+comparison = field op value
+op = one of: <, <=, ==, !=, >=, >, in, notin
+```
+
+<Note>
+Quote the query string to prevent shell interpretation of `>` and `<` characters.
+</Note>
+
+### Searchable Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `creator_id` | int | ID of the creator |
+| `created_at` | float | Time of initial creation (UTC epoch) |
+| `count_created` | int | Number of instances created (popularity) |
+| `default_tag` | string | Image default tag |
+| `docker_login_repo` | string | Image docker repository |
+| `id` | int | Template unique ID |
+| `image` | string | Image used for the template |
+| `jup_direct` | bool | Supports Jupyter direct |
+| `hash_id` | string | Unique hash ID |
+| `name` | string | Displayable name |
+| `recent_create_date` | float | Last time of instance creation (UTC epoch) |
+| `recommended_disk_space` | float | Minimum disk space required |
+| `recommended` | bool | On the recommended list |
+| `ssh_direct` | bool | Supports SSH direct |
+| `tag` | string | Image tag |
+| `use_ssh` | bool | Supports SSH (direct or proxy) |
+
+## Create an Instance from a Template
+
+Pass `--template_hash` to `create instance` to use a template as the base configuration. You don't need to specify `--image` or other fields already defined in the template:
+
+```bash
+vastai create instance 12345678 --template_hash 4e17788f74f075dd9aab7d0d4427968f --disk 20
+```
+
+Output:
+
+```json
+{"success": true, "new_contract": 7835610}
+```
+
+You can combine a template with an interruptible (spot) bid:
+
+```bash
+vastai create instance 12345678 --template_hash 4e17788f74f075dd9aab7d0d4427968f --disk 64 --bid_price 0.1
+```
+
+## Override Template Values
+
+When you create an instance with both a template and additional flags, the following precedence rules apply:
+
+| Field Type | Behavior |
+|------------|----------|
+| **Scalar fields** (image, disk, runtype, etc.) | Request value **overrides** template value |
+| **`env`** (string) | **Merged**. Template values retained, request values appended. Conflicting keys use the request value |
+| **`extra_filters`** (dict) | **Merged** by key. Request values win on conflicts |
+
+### Example: Overriding the Image
+
+```bash
+# Use template config but swap the Docker image
+vastai create instance 12345678 \
+  --template_hash 4e17788f74f075dd9aab7d0d4427968f \
+  --image nvidia/cuda:12.1-devel-ubuntu22.04 \
+  --disk 20
+```
+
+### Example: Merging Environment Variables
+
+If your template defines:
+```
+env: "-e MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-8B -e MAX_TOKENS=4096"
+```
+
+And you create an instance with:
+```bash
+vastai create instance 12345678 \
+  --template_hash 4e17788f74f075dd9aab7d0d4427968f \
+  --env "-e MODEL_ID=mistralai/Mistral-7B-v0.1 -e HF_TOKEN=hf_xxx" \
+  --disk 20
+```
+
+The resulting environment will be:
+- `MODEL_ID=mistralai/Mistral-7B-v0.1` -- request overrides template
+- `MAX_TOKENS=4096` -- retained from template
+- `HF_TOKEN=hf_xxx` -- added from request
+
+## Edit a Template
+
+Update an existing template using `vastai update template` with the template's `hash_id` as the positional argument. Include only the flags you want to change:
+
+```bash
+vastai update template 5915f1dc1ce881defb572015eb9d8178 \
+  --desc "Updated description" \
+  --disk_space 16
+```
+
+You can change any of the same flags available in `create template`:
+
+```bash
+vastai update template c81e7ab0e928a508510d1979346de10d \
+  --name "tgi-llama2-7B-quantized" \
+  --image "ghcr.io/huggingface/text-generation-inference:1.0.3" \
+  --env "-p 3000:3000 -e MODEL_ARGS='--model-id TheBloke/Llama-2-7B-chat-GPTQ --quantize gptq'" \
+  --onstart-cmd 'wget -O - https://raw.githubusercontent.com/vast-ai/vast-pyworker/main/scripts/launch_tgi.sh | bash' \
+  --ssh --direct
+```
+
+<Note>
+The `hash_id` changes after editing because it is derived from the template's content. Use the new `hash_id` returned in the output for subsequent operations.
+</Note>
+
+## Delete a Template
+
+Delete a template using either its numeric `id` or its `hash_id`:
+
+```bash
+# Delete by numeric ID
+vastai delete template --template-id 334548
+
+# Delete by hash ID
+vastai delete template --hash-id 49c538d097ad6437413b83711c9f61e8
+```
+
+<Note>
+Deleting a template removes your relationship to it. It does not destroy the underlying template record.
+</Note>
+
+## Common Pitfalls
+
+<AccordionGroup>
+  <Accordion title="Using the wrong identifier for the operation">
+    Templates have two identifiers and each is used in different contexts:
+    - `create instance --template_hash` takes the **hash_id** (string)
+    - `update template` takes the **hash_id** as a positional argument
+    - `delete template --template-id` takes the numeric **id** (integer)
+
+    If you pass the numeric `id` where a `hash_id` is expected (or vice versa), the operation will fail.
+  </Accordion>
+
+  <Accordion title="Environment variables aren't applying">
+    The `--env` flag expects Docker flag format as a single string, not key=value pairs:
+
+    ```bash
+    # Correct
+    --env "-e VAR1=value1 -e VAR2=value2 -p 8000:8000"
+
+    # Wrong -- missing -e prefix
+    --env "VAR1=value1 VAR2=value2"
+    ```
+
+    Port mappings are also specified in this string using `-p`:
+    ```bash
+    --env "-e MY_VAR=hello -p 8080:8080 -p 8081:8081/udp"
+    ```
+  </Accordion>
+
+  <Accordion title="Template image overridden unexpectedly">
+    When you specify both `--template_hash` and `--image`, the `--image` flag overrides the template's image. If you want to use the template's image, omit the `--image` flag entirely.
+  </Accordion>
+
+  <Accordion title="Volume didn't mount from template">
+    The `volume_info` field stored in templates is a **UI hint only**. To actually mount a volume, pass the volume flags in the `create instance` command:
+
+    ```bash
+    # Link an existing volume
+    vastai create instance 12345678 --template_hash abc123 \
+      --link-volume 12345 --mount-path /workspace
+
+    # Create a new volume
+    vastai create instance 12345678 --template_hash abc123 \
+      --create-volume 28908979 --volume-size 10 --mount-path /workspace
+    ```
+  </Accordion>
+
+  <Accordion title="hash_id changed after editing">
+    This is expected behavior. The `hash_id` is content-based, so any edit produces a new hash. Always capture the new `hash_id` from the update command output or search for your template again before referencing it.
+  </Accordion>
+</AccordionGroup>
