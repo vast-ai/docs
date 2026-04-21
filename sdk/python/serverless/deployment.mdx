@@ -1,0 +1,151 @@
+---
+title: "Deployment"
+sidebarTitle: "Deployment"
+---
+
+Declarative serverless deployment. Bundles your Python code, Docker image, hardware filters, environment, and autoscaling settings into one object, and manages the remote endpoint + workergroup lifecycle for you.
+
+For the end-to-end guide (including `@remote` functions, `@context`, benchmarks, and update tiers), see the [Deployments page](/deployments).
+
+## Import
+
+```python
+from vastai import Deployment
+```
+
+## Constructor
+
+```python
+Deployment(
+    name: Optional[str] = None,
+    tag: str = "default",
+    version_label: Optional[str] = None,
+    api_key: str | object = <from env / ~/.vast_api_key>,
+    ttl: Optional[float] = None,
+    autoscaler_instance: str = "prod",
+    autoscaler_url: Optional[str] = None,
+    webserver_url: str = "https://console.vast.ai",
+)
+```
+
+<ParamField path="name" type="Optional[str]">
+  Deployment name. Auto-detected from the calling module if omitted.
+</ParamField>
+
+<ParamField path="tag" type="str" default='"default"'>
+  Version tag for routing. Changing the tag triggers a forced redeploy onto fresh workers (Tier 4 update).
+</ParamField>
+
+<ParamField path="version_label" type="Optional[str]">
+  Optional semantic version label displayed in the console.
+</ParamField>
+
+<ParamField path="api_key" type="str">
+  Vast API key. Resolves from `VAST_API_KEY` env var or `~/.vast_api_key` if omitted.
+</ParamField>
+
+<ParamField path="ttl" type="Optional[float]">
+  Seconds of client-idle before the deployment auto-tears down. `None` keeps it running indefinitely.
+</ParamField>
+
+<ParamField path="autoscaler_instance" type="str" default='"prod"'>
+  Serverless engine instance to target.
+</ParamField>
+
+<ParamField path="autoscaler_url" type="Optional[str]">
+  Override URL for the autoscaler. Leave unset for production.
+</ParamField>
+
+<ParamField path="webserver_url" type="str" default='"https://console.vast.ai"'>
+  Vast API base URL.
+</ParamField>
+
+## Methods
+
+### image
+
+```python
+image(from_image: str, storage: int) -> Image
+```
+
+Configure the deployment's Docker image and attach pip/apt packages, env vars, and hardware requirements. Returns an `Image` whose methods chain (`pip_install`, `apt_get`, `env`, `require`, `run_script`, `copy`, `venv`, `use_system_python`, `publish_port`).
+
+<ParamField path="from_image" type="str" required>
+  Docker image. Supports `@vastai-automatic-tag` for Vast-managed base images.
+</ParamField>
+
+<ParamField path="storage" type="int" required>
+  Worker disk allocation, in GB.
+</ParamField>
+
+### configure_autoscaling
+
+```python
+configure_autoscaling(**kwargs)
+```
+
+Set autoscaling parameters. Callable multiple times — later calls merge into earlier settings.
+
+Accepts: `cold_workers`, `max_workers`, `min_load`, `min_cold_load`, `target_util`, `cold_mult`, `max_queue_time`, `target_queue_time`, `inactivity_timeout`.
+
+### remote
+
+```python
+@app.remote(
+    benchmark_dataset: Optional[list[dict]] = None,
+    benchmark_generator: Optional[Callable[[], dict]] = None,
+    benchmark_runs: int = 10,
+)
+```
+
+Decorator that marks an async function for remote execution on GPU workers. Exactly one `@remote` function per deployment must supply a benchmark (via `benchmark_dataset` or `benchmark_generator`).
+
+### context
+
+```python
+@app.context(*args, **kwargs)
+```
+
+Class decorator that registers an async context manager whose lifecycle is tied to the worker. Use for heavy setup (models, engines, DB connections) that should load once at worker startup. The decorated class must implement `__aenter__` / `__aexit__`.
+
+### get_context
+
+```python
+get_context(context_class: Type[AsyncContextManager[T]]) -> T
+```
+
+Retrieve an initialized context from within a `@remote` function.
+
+### ensure_ready
+
+```python
+ensure_ready()
+```
+
+Synchronous, blocking call. Packages the deployment, registers it with the Vast API, uploads the tarball if code changed, and triggers the appropriate update tier. Must be called before invoking any `@remote` functions.
+
+### lookup
+
+```python
+Deployment.lookup(name: str) -> Optional[Deployment]
+```
+
+Class method. Retrieve a previously-constructed `Deployment` by name.
+
+## Example
+
+```python
+from vastai import Deployment
+from vastai.data.query import gpu_name, RTX_4090, RTX_5090
+
+app = Deployment(name="my-app")
+
+@app.remote(benchmark_dataset=[{"x": 2}])
+async def square(x):
+    return x * x
+
+image = app.image("vastai/base-image:@vastai-automatic-tag", storage=16)
+image.require(gpu_name.in_([RTX_4090, RTX_5090]))
+app.configure_autoscaling(min_load=1000)
+app.ensure_ready()
+```
