@@ -1,384 +1,250 @@
 ---
 title: Commands
-createdAt: Mon Jan 13 2025 21:20:40 GMT+0000 (Coordinated Universal Time)
-updatedAt: Sat Jul 12 2025 01:09:10 GMT+0000 (Coordinated Universal Time)
+description: "Complete reference of all vastai CLI commands, grouped by category. Generated from `vastai --help` output."
 ---
 
+The Vast.ai CLI (`vastai`) is installed via `pip install vastai` — the same package exposes both the `vastai` command-line entry point and the Python SDK.
 
-# CLI Commands
+Every command supports a shared set of global options (shown under "Global options" in each command's `--help` output):
+
+| Option | Description |
+| --- | --- |
+| `--url URL` | Server REST API URL |
+| `--retry N` | Retry limit |
+| `--raw` | Output machine-readable JSON |
+| `--explain` | Verbose explanation of API calls |
+| `--curl` | Print the equivalent curl command |
+| `--api-key KEY` | API key (defaults to `~/.config/vastai/vast_api_key`) |
+| `--no-color` | Disable colored output |
+| `--version` | Show CLI version |
+
+---
+
+# Command Index
+
+## Instances
+
+| Command | Description |
+| --- | --- |
+| [`vastai show instance`](#show-instance) | Display user's current instances |
+| [`vastai show instances`](#show-instances) | List instances with filtering, sorting, and pagination |
+| [`vastai create instance`](#create-instance) | Create a new instance |
+| [`vastai create instances`](#create-instances) | Create instances from a list of offers |
+| [`vastai destroy instance`](#destroy-instance) | Destroy an instance (irreversible, deletes data) |
+| [`vastai destroy instances`](#destroy-instances) | Destroy a list of instances (irreversible, deletes data) |
+| [`vastai start instance`](#start-instance) | Start a stopped instance |
+| [`vastai start instances`](#start-instances) | Start a list of instances |
+| [`vastai stop instance`](#stop-instance) | Stop a running instance |
+| [`vastai stop instances`](#stop-instances) | Stop a list of instances |
+| [`vastai reboot instance`](#reboot-instance) | Reboot (stop/start) an instance |
+| [`vastai recycle instance`](#recycle-instance) | Recycle (destroy/create) an instance |
+| [`vastai update instance`](#update-instance) | Update recreate an instance from a new/updated template |
+| [`vastai label instance`](#label-instance) | Assign a string label to an instance |
+| [`vastai prepay instance`](#prepay-instance) | Deposit credits into reserved instance |
+| [`vastai change bid`](#change-bid) | Change the bid price for a spot/interruptible instance |
+| [`vastai launch instance`](#launch-instance) | Launch the top instance from the search offers based on the given parameters |
+| [`vastai execute`](#execute) | Execute a (constrained) remote command on a machine |
+| [`vastai logs`](#logs) | Get the logs for an instance |
+| [`vastai attach ssh`](#attach-ssh) | Attach an ssh key to an instance. This will allow you to connect to the instance with the ssh key |
+| [`vastai detach ssh`](#detach-ssh) | Detach an ssh key from an instance |
+| [`vastai ssh-url`](#ssh-url) | ssh url helper |
+| [`vastai scp-url`](#scp-url) | scp url helper |
+| [`vastai copy`](#copy) | Copy directories between instances and/or local |
+| [`vastai cloud copy`](#cloud-copy) | Copy files/folders to and from cloud providers |
+| [`vastai cancel copy`](#cancel-copy) | Cancel a remote copy in progress, specified by DST id |
+| [`vastai cancel sync`](#cancel-sync) | Cancel a remote copy in progress, specified by DST id |
+| [`vastai show connections`](#show-connections) | Display user's cloud connections |
+| [`vastai take snapshot`](#take-snapshot) | Schedule a snapshot of a running container and push it to your repo in a container registry |
+
+
+## Search & Templates
+
+| Command | Description |
+| --- | --- |
+| [`vastai search offers`](#search-offers) | Search for instance types using custom query |
+| [`vastai search benchmarks`](#search-benchmarks) | Search for benchmark results using custom query |
+| [`vastai search templates`](#search-templates) | Search for template results using custom query |
+| [`vastai search invoices`](#search-invoices) | Search for invoices using custom query |
+| [`vastai search volumes`](#search-volumes) | Search for volume offers using custom query |
+| [`vastai search network-volumes`](#search-network-volumes) | Search for network volume offers using custom query |
+| [`vastai create template`](#create-template) | Create a new template |
+| [`vastai update template`](#update-template) | Update an existing template |
+| [`vastai delete template`](#delete-template) | Delete a Template |
+
+
+## Volumes
+
+| Command | Description |
+| --- | --- |
+| [`vastai create volume`](#create-volume) | Create a new volume |
+| [`vastai create network-volume`](#create-network-volume) | Create a new network volume |
+| [`vastai delete volume`](#delete-volume) | Delete a volume |
+| [`vastai clone volume`](#clone-volume) | Clone an existing volume |
+| [`vastai show volumes`](#show-volumes) | Show stats on owned volumes. |
+| [`vastai list volume`](#list-volume) | [Host] list disk space for rent as a volume on a machine |
+| [`vastai list volumes`](#list-volumes) | [Host] list disk space for rent as a volume on machines |
+| [`vastai list network-volume`](#list-network-volume) | [Host] list disk space for rent as a network volume |
+| [`vastai unlist volume`](#unlist-volume) | [Host] unlist volume offer |
+| [`vastai unlist network-volume`](#unlist-network-volume) | [Host] Unlists network volume offer |
+
+
+## Serverless
+
+| Command | Description |
+| --- | --- |
+| [`vastai create endpoint`](#create-endpoint) | Create a new endpoint group |
+| [`vastai show endpoints`](#show-endpoints) | Display user's current endpoint groups |
+| [`vastai update endpoint`](#update-endpoint) | Update an existing endpoint group |
+| [`vastai delete endpoint`](#delete-endpoint) | Delete an endpoint group |
+| [`vastai get endpt-logs`](#get-endpt-logs) | Fetch logs for a specific serverless endpoint group |
+| [`vastai create workergroup`](#create-workergroup) | Create a new autoscale group |
+| [`vastai show workergroups`](#show-workergroups) | Display user's current workergroups |
+| [`vastai update workergroup`](#update-workergroup) | Update an existing autoscale group |
+| [`vastai update workers`](#update-workers) | Trigger a rolling update of all workers in a workergroup, or cancel an in-progress update |
+| [`vastai delete workergroup`](#delete-workergroup) | Delete a workergroup group |
+| [`vastai get wrkgrp-logs`](#get-wrkgrp-logs) | Fetch logs for a specific serverless worker group |
+| [`vastai show deployments`](#show-deployments) | Display user's current deployments |
+| [`vastai show deployment`](#show-deployment) | Display a single deployment |
+| [`vastai delete deployment`](#delete-deployment) | Delete a deployment by id, or by name and optional tag |
+
+
+## Teams
+
+| Command | Description |
+| --- | --- |
+| [`vastai create team`](#create-team) | Create a new team |
+| [`vastai destroy team`](#destroy-team) | Destroy your team |
+| [`vastai create team-role`](#create-team-role) | Add a new role to your team |
+| [`vastai show team-role`](#show-team-role) | Show your team role |
+| [`vastai show team-roles`](#show-team-roles) | Show roles for a team |
+| [`vastai update team-role`](#update-team-role) | Update an existing team role |
+| [`vastai remove team-role`](#remove-team-role) | Remove a role from your team |
+| [`vastai invite member`](#invite-member) | Invite a team member |
+| [`vastai show members`](#show-members) | Show your team members |
+| [`vastai remove member`](#remove-member) | Remove a team member |
+
+
+## Accounts & Keys
+
+| Command | Description |
+| --- | --- |
+| [`vastai create api-key`](#create-api-key) | Create a new api-key with restricted permissions. Can be sent to other users and teammates |
+| [`vastai show api-keys`](#show-api-keys) | List your api-keys associated with your account |
+| [`vastai delete api-key`](#delete-api-key) | Remove an api-key |
+| [`vastai set api-key`](#set-api-key) | Set api-key (get your api-key from the console/CLI) |
+| [`vastai create ssh-key`](#create-ssh-key) | Create a new ssh-key |
+| [`vastai show ssh-keys`](#show-ssh-keys) | List your ssh keys associated with your account |
+| [`vastai delete ssh-key`](#delete-ssh-key) | Remove an ssh-key |
+| [`vastai update ssh-key`](#update-ssh-key) | Update an existing SSH key |
+| [`vastai show user`](#show-user) | Get current user data |
+| [`vastai set user`](#set-user) | Update user data from json file |
+| [`vastai show subaccounts`](#show-subaccounts) | Get current subaccounts |
+| [`vastai create subaccount`](#create-subaccount) | Create a subaccount |
+| [`vastai show ipaddrs`](#show-ipaddrs) | Display user's history of ip addresses |
+| [`vastai show audit-logs`](#show-audit-logs) | Display account's history of important actions |
+| [`vastai show env-vars`](#show-env-vars) | Show user environment variables |
+| [`vastai create env-var`](#create-env-var) | Create a new user environment variable |
+| [`vastai update env-var`](#update-env-var) | Update an existing user environment variable |
+| [`vastai delete env-var`](#delete-env-var) | Delete a user environment variable |
+| [`vastai transfer credit`](#transfer-credit) | Transfer credits to another account |
+| [`vastai show scheduled-jobs`](#show-scheduled-jobs) | Display the list of scheduled jobs |
+| [`vastai delete scheduled-job`](#delete-scheduled-job) | Delete a scheduled job |
+| [`vastai tfa activate`](#tfa-activate) | Activate a new 2FA method by verifying the code |
+| [`vastai tfa delete`](#tfa-delete) | Remove a 2FA method from your account |
+| [`vastai tfa login`](#tfa-login) | Complete 2FA login by verifying code |
+| [`vastai tfa resend-sms`](#tfa-resend-sms) | Resend SMS 2FA code |
+| [`vastai tfa regen-codes`](#tfa-regen-codes) | Regenerate backup codes for 2FA |
+| [`vastai tfa send-sms`](#tfa-send-sms) | Request a 2FA SMS verification code |
+| [`vastai tfa send-email`](#tfa-send-email) | Request a 2FA Email verification code |
+| [`vastai tfa auth-new`](#tfa-auth-new) | Authorize your account to add a new 2FA method |
+| [`vastai tfa status`](#tfa-status) | Shows the current 2FA status and configured methods |
+| [`vastai tfa totp-setup`](#tfa-totp-setup) | Generate TOTP secret and QR code for Authenticator app setup |
+| [`vastai tfa update`](#tfa-update) | Update a 2FA method's settings |
+
+
+## Billing
+
+| Command | Description |
+| --- | --- |
+| [`vastai show invoices`](#show-invoices) | Get billing (invoices/charges) history reports with advanced filtering and pagination |
+| [`vastai show earnings`](#show-earnings) | Get machine earning history reports |
+| [`vastai show deposit`](#show-deposit) | Display reserve deposit info for an instance |
+
+
+## Host
+
+| Command | Description |
+| --- | --- |
+| [`vastai show machine`](#show-machine) | [Host] Show hosted machines |
+| [`vastai show machines`](#show-machines) | [Host] Show hosted machines |
+| [`vastai show maints`](#show-maints) | [Host] Show maintenance information for host machines |
+| [`vastai show network-disks`](#show-network-disks) | [Host] Show network disks associated with your account. |
+| [`vastai list machine`](#list-machine) | [Host] list a machine for rent |
+| [`vastai list machines`](#list-machines) | [Host] list machines for rent |
+| [`vastai unlist machine`](#unlist-machine) | [Host] Unlist a listed machine |
+| [`vastai delete machine`](#delete-machine) | [Host] Delete machine if the machine is not being used by clients. host jobs on their own machines are disregarded and machine is force deleted. |
+| [`vastai cleanup machine`](#cleanup-machine) | [Host] Remove all expired storage instances from the machine, freeing up space |
+| [`vastai defrag machines`](#defrag-machines) | [Host] Defragment machines |
+| [`vastai set min-bid`](#set-min-bid) | [Host] Set the minimum bid/rental price for a machine |
+| [`vastai set defjob`](#set-defjob) | [Host] Create default jobs for a machine |
+| [`vastai remove defjob`](#remove-defjob) | [Host] Delete default jobs |
+| [`vastai schedule maint`](#schedule-maint) | [Host] Schedule upcoming maint window |
+| [`vastai cancel maint`](#cancel-maint) | [Host] Cancel maint window |
+| [`vastai add network-disk`](#add-network-disk) | [Host] Add Network Disk to Physical Cluster. |
+| [`vastai self-test machine`](#self-test-machine) | [Host] Perform a self-test on the specified machine |
+| [`vastai reports`](#reports) | Get the user reports for a given machine |
+
+
+## Misc
+
+| Command | Description |
+| --- | --- |
+| [`vastai benchmark`](#benchmark) | Compare GPU perf/cost using live marketplace data |
+
+
+---
+
+# Commands
+
+
+## Instances
+
+## show instance
+
+Display user's current instances
 
 ```text Text
-usage: vastai [-h] [--url URL] [--retry RETRY] [--raw] [--explain] [--curl] [--api-key API_KEY] [--version] command ...
+usage: vastai show instance ID [options]
 
 positional arguments:
- command               command to run. one of:
-  help                 print this help message
-  attach ssh           Attach an ssh key to an instance. This will allow you to connect to the instance with the ssh key
-  cancel copy          Cancel a remote copy in progress, specified by DST id
-  cancel sync          Cancel a remote copy in progress, specified by DST id
-  change bid           Change the bid price for a spot/interruptible instance
-  clone volume         Clone an existing volume
-  copy                 Copy directories between instances and/or local
-  cloud copy           Copy files/folders to and from cloud providers
-  take snapshot        Schedule a snapshot of a running container and push it to your repo in a container registry
-  create api-key       Create a new api-key with restricted permissions. Can be sent to other users and teammates
-  create env-var       Create a new user environment variable
-  create ssh-key       Create a new ssh-key
-  create autogroup     Create a new autoscale group
-  create endpoint      Create a new endpoint group
-  create instance      Create a new instance
-  create subaccount    Create a subaccount
-  create team          Create a new team
-  create team-role     Add a new role to your team
-  create template      Create a new template
-  create volume        Create a new volume
-  delete api-key       Remove an api-key
-  delete ssh-key       Remove an ssh-key
-  delete scheduled-job
-                       Delete a scheduled job
-  delete autogroup     Delete an autogroup group
-  delete endpoint      Delete an endpoint group
-  delete env-var       Delete a user environment variable
-  delete template      Delete a Template
-  delete volume        Delete a volume
-  destroy instance     Destroy an instance (irreversible, deletes data)
-  destroy instances    Destroy a list of instances (irreversible, deletes data)
-  destroy team         Destroy your team
-  detach ssh           Detach an ssh key from an instance
-  execute              Execute a (constrained) remote command on a machine
-  get endpt-logs       Fetch logs for a specific serverless endpoint group
-  invite member        Invite a team member
-  label instance       Assign a string label to an instance
-  launch instance      Launch the top instance from the search offers based on the given parameters
-  logs                 Get the logs for an instance
-  prepay instance      Deposit credits into reserved instance
-  reboot instance      Reboot (stop/start) an instance
-  recycle instance     Recycle (destroy/create) an instance
-  remove member        Remove a team member
-  remove team-role     Remove a role from your team
-  reports              Get the user reports for a given machine
-  reset api-key        Reset your api-key (get new key from website)
-  start instance       Start a stopped instance
-  start instances      Start a list of instances
-  stop instance        Stop a running instance
-  stop instances       Stop a list of instances
-  search benchmarks    Search for benchmark results using custom query
-  search invoices      Search for benchmark results using custom query
-  search offers        Search for instance types using custom query
-  search templates     Search for template results using custom query
-  search volumes       Search for volume offers using custom query
-  set api-key          Set api-key (get your api-key from the console/CLI)
-  set user             Update user data from json file
-  ssh-url              ssh url helper
-  scp-url              scp url helper
-  show api-key         Show an api-key
-  show api-keys        List your api-keys associated with your account
-  show audit-logs      Display account's history of important actions
-  show scheduled-jobs  Display the list of scheduled jobs
-  show ssh-keys        List your ssh keys associated with your account
-  show autogroups      Display user's current autogroup groups
-  show endpoints       Display user's current endpoint groups
-  show connections     Display user's cloud connections
-  show deposit         Display reserve deposit info for an instance
-  show earnings        Get machine earning history reports
-  show env-vars        Show user environment variables
-  show invoices        Get billing history reports
-  show instance        Display user's current instances
-  show instances       Display user's current instances
-  show ipaddrs         Display user's history of ip addresses
-  show user            Get current user data
-  show subaccounts     Get current subaccounts
-  show members         Show your team members
-  show team-role       Show your team role
-  show team-roles      Show roles for a team
-  show volumes         Show stats on owned volumes.
-  create cluster       Create Vast cluster
-  join cluster         Join Machine to Cluster
-  delete cluster       Delete Cluster
-  remove-machine-from-cluster  Removes machine from cluster
-  show overlays        Show overlays associated with your account.
-  create overlay       Creates overlay network on top of a physical cluster
-  join overlay         Adds instance to an overlay network
-  delete overlay       Deletes overlay and removes all of its associated instances
-  show clusters        Show clusters associated with your account.
-  transfer credit      Transfer credits to another account
-  update autogroup     Update an existing autoscale group
-  update endpoint      Update an existing endpoint group
-  update env-var       Update an existing user environment variable
-  update instance      Update recreate an instance from a new/updated template
-  update team-role     Update an existing team role
-  update template      Update an existing template
-  update ssh-key       Update an existing ssh key
-  cancel maint         [Host] Cancel maint window
-  cleanup machine      [Host] Remove all expired storage instances from the machine, freeing up space
-  delete machine       [Host] Delete machine if the machine is not being used by clients. host jobs on their own machines are disregarded and machine is force deleted.
-  list machine         [Host] list a machine for rent
-  list machines        [Host] list machines for rent
-  list volume          [Host] list disk space for rent as a volume on a machine
-  list volumes         [Host] list disk space for rent as a volume on machines
-  unlist volume        [Host] unlist volume offer
-  remove defjob        [Host] Delete default jobs
-  set defjob           [Host] Create default jobs for a machine
-  set min-bid          [Host] Set the minimum bid/rental price for a machine
-  schedule maint       [Host] Schedule upcoming maint window
-  show machine         [Host] Show hosted machines
-  show machines        [Host] Show hosted machines
-  show maints          [Host] Show maintenance information for host machines
-  unlist machine       [Host] Unlist a listed machine
-  self-test machine    [Host] Perform a self-test on the specified machine
+ id                 id of instance to get
 
 options:
- -h, --help            show this help message and exit
- --url URL             server REST api url
- --retry RETRY         retry limit
- --raw                 output machine-readable json
- --explain             output verbose explanation of mapping of CLI calls to HTTPS API endpoints
- --curl                show a curl equivalency to the call
- --api-key API_KEY     api key. defaults to using the one stored in /home/scott_vast/.config/vastai/vast_api_key
- --version             show version
-
-Use 'vast COMMAND --help' for more info about a command
-
+ -h, --help         show this help message and exit
+ -q, --quiet        only display numeric id
 ```
 
-# Client Commands
+## show instances
 
-## cancel copy
-
-Cancel a remote copy in progress, specified by DST id
+List instances with filtering, sorting, and pagination
 
 ```text Text
-usage: vastai cancel copy DST
-
-positional arguments:
-  dst                instance_id:/path to target of copy operation.
+usage: vastai show instances [OPTIONS]
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-Use this command to cancel any/all current remote copy operations copying to a specific named instance, given by DST.
-Examples:
- vastai cancel copy 12371
-
-The first example cancels all copy operations currently copying data into instance 12371
-
-```
-
-## cancel sync
-
-Cancel a remote copy in progress, specified by DST id
-
-```text Text
-usage: vastai cancel sync DST
-
-positional arguments:
-  dst                instance_id:/path to target of sync operation.
-
-options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-Use this command to cancel any/all current remote cloud sync operations copying to a specific named instance, given by DST.
-Examples:
- vastai cancel sync 12371
-
-The first example cancels all copy operations currently copying data into instance 12371
-
-```
-
-## change bid
-
-Change the bid price for a spot/interruptible instance
-
-```text Text
-usage: vastai change bid id [--price PRICE]
-
-positional arguments:
-  id                 id of instance type to change bid
-
-options:
-  -h, --help         show this help message and exit
-  --price PRICE      per machine bid price in $/hour
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-Change the current bid price of instance id to PRICE.
-If PRICE is not specified, then a winning bid price is used as the default.
-
-```
-
-## cloud copy
-
-Copy files/folders to and from cloud providers
-
-```text Text
-usage: vastai cloud_copy SRC DST CLOUD_SERVICE INSTANCE_ID CLOUD_SERVICE_SELECTED TRANSFER
-
-options:
-  -h, --help            show this help message and exit
-  --src SRC             path to source of object to copy.
-  --dst DST             path to target of copy operation.
-  --instance INSTANCE   id of the instance
-  --connection CONNECTION
-                        id of cloud connection on your account
-  --transfer TRANSFER   type of transfer, possible options include Instance To
-                        Cloud and Cloud To Instance
-  --url URL             server REST api url
-  --retry RETRY         retry limit
-  --raw                 output machine-readable json
-  --explain             output verbose explanation of mapping of CLI calls to
-                        HTTPS API endpoints
-  --api-key API_KEY     api key. defaults to using the one stored in
-                        ~/.vast_api_key
-
-Copies a directory from a source location to a target location. Each of source and destination
-directories can be either local or remote, subject to appropriate read and write
-permissions required to carry out the action. The format for both src and dst is [instance_id:]path.
-You can find more information about the cloud copy operation here: [Cloud Sync](/documentation/instances/cloud-sync)
-
-Examples:
- vastai cloud_copy --src folder --dst /workspace --cloud_service "Amazon S3" --instance_id 6003036 --cloud_service_selected 52 --transfer "Instance To Cloud"
-
-The example copies all contents of /folder into /workspace on instance 6003036 from Amazon S3.
-
-```
-
-## copy
-
-Copy directories between instances and/or local
-
-```text Text  
-usage: vastai copy SRC DST
-
-positional arguments:
- src                               Source location for copy operation (supports multiple formats)
- dst                               Target location for copy operation (supports multiple formats)
-
-options:
- -h, --help                        show this help message and exit
- -i IDENTITY, --identity IDENTITY  Location of ssh private key
- --url URL                         server REST api url
- --retry RETRY                     retry limit
- --raw                             output machine-readable json
- --explain                         output verbose explanation of mapping of CLI calls to HTTPS API endpoints
- --curl                            show a curl equivalency to the call
- --api-key API_KEY                 api key. defaults to using the one stored in /home/anthony-benjamin/.config/vastai/vast_api_key
- --version                         show version
-
-Copies a directory from a source location to a target location. Each of source and destination
-directories can be either local or remote, subject to appropriate read and write
-permissions required to carry out the action.
-
-Supported location formats:
-- [instance_id:]path               (legacy format, still supported)
-- C.instance_id:path              (container copy format)
-- cloud_service:path              (cloud service format)
-- cloud_service.cloud_service_id:path  (cloud service with ID)
-- local:path                      (explicit local path)
-
-You should not copy to /root or / as a destination directory, as this can mess up the permissions on your instance ssh folder, breaking future copy operations (as they use ssh authentication)
-You can see more information about constraints here: [Data Movement](/documentation/instances/data-movement#constraints)
-
-Examples:
- vast copy 6003036:/workspace/ 6003038:/workspace/
- vast copy C.11824:/data/test local:data/test
- vast copy local:data/test C.11824:/data/test
- vast copy drive:/folder/file.txt C.6003036:/workspace/
- vast copy s3.101:/data/ C.6003036:/workspace/
-
-The first example copy syncs all files from the absolute directory '/workspace' on instance 6003036 to the directory '/workspace' on instance 6003038.
-The second example copy syncs files from container 11824 to the local machine using structured syntax.
-The third example copy syncs files from local to container 11824 using structured syntax.
-The fourth example copy syncs files from Google Drive to an instance.
-The fifth example copy syncs files from S3 bucket with id 101 to an instance.
-```
-
-## create api-key
-
-Create a new api-key with restricted permissions.
-
-```text Text
-usage: vastai create api-key
-
-options:
-  -h, --help            show this help message and exit
-  --permissions PERMISSIONS
-                        file path for json encoded permissions, look in the
-                        docs for more information
-  --url URL             server REST api url
-  --retry RETRY         retry limit
-  --raw                 output machine-readable json
-  --explain             output verbose explanation of mapping of CLI calls to
-                        HTTPS API endpoints
-  --api-key API_KEY     api key. defaults to using the one stored in
-                        ~/.vast_api_key
-
-```
-
-## create autoscaler
-
-Create a new autoscale group
-
-```text Text
-usage: vastai autoscaler create [OPTIONS]
-
-options:
-  -h, --help            show this help message and exit
-  --min_load MIN_LOAD   minimum floor load in perf units/s (token/s for LLms)
-  --target_util TARGET_UTIL
-                        target capacity utilization (fraction, max 1.0,
-                        default 0.9)
-  --cold_mult COLD_MULT
-                        cold/stopped instance capacity target as multiple of
-                        hot capacity target (default 2.5)
-  --gpu_ram GPU_RAM     estimated GPU RAM req (independent of search string)
-  --template_hash TEMPLATE_HASH
-                        template hash (optional)
-  --template_id TEMPLATE_ID
-                        template id (optional)
-  --search_params SEARCH_PARAMS
-                        search param string for search offers ex: "gpu_ram>=23
-                        num_gpus=2 gpu_name=RTX_4090 inet_down>200
-                        direct_port_count>2 disk_space>=64"
-  --launch_args LAUNCH_ARGS
-                        launch args string for create instance ex: "--onstart
-                        onstart_wget.sh --env '-e ONSTART_PATH=https://s3.amaz
-                        onaws.com/vast.ai/onstart_OOBA.sh' --image
-                        atinoda/text-generation-webui:default-nightly --disk
-                        64"
-  --endpoint_name ENDPOINT_NAME
-                        deployment endpoint name (allows multiple autoscale
-                        groups to share same deployment endpoint)
-  --url URL             server REST api url
-  --retry RETRY         retry limit
-  --raw                 output machine-readable json
-  --explain             output verbose explanation of mapping of CLI calls to
-                        HTTPS API endpoints
-  --api-key API_KEY     api key. defaults to using the one stored in
-                        ~/.vast_api_key
-
-Create a new autoscaling group to manage a pool of worker instances.
-
-Example: vastai create autoscaler --min_load 100 --target_util 0.9 --cold_mult 2.0 --search_params "gpu_ram>=23 num_gpus=2 gpu_name=RTX_4090 inet_down>200 direct_port_count>2 disk_space>=64" --launch_args "--onstart onstart_wget.sh  --env '-e ONSTART_PATH=https://s3.amazonaws.com/vast.ai/onstart_OOBA.sh' --image atinoda/text-generation-webui:default-nightly --disk 64" --gpu_ram 32.0 --endpoint_name "LLama"
-
+ -h, --help                                       show this help message and exit
+ -q, --quiet                                      only print instance IDs, one per line
+ -v, --verbose                                    show additional columns (SSH, location, template, etc.)
+ -a, --all                                        fetch all pages automatically; useful for scripting
+ -s STATUS [STATUS ...], --status STATUS [STATUS ...]
+                                                  filter by container status: running loading exited
+ --label LABEL [LABEL ...]                        filter by instance label; pass empty string '' for unlabeled
+ --gpu-name GPU [GPU ...]                         filter by GPU model name
+ --verification VERIF [VERIF ...]                 filter by verification status
+ -l LIMIT, --limit LIMIT                          max instances per page (1-25, default 25)
+ -t NEXT_TOKEN, --next-token NEXT_TOKEN           resume from a pagination token
+ --order-by COL [asc|desc]                        sort by column; repeat for multiple keys
+ --cols COLS                                      override displayed columns (available: id,status,label,gpu,disk,volumes,dph,image,age,verified,machine,net,location,template,ssh,msg)
 ```
 
 ## create instance
@@ -389,232 +255,76 @@ Create a new instance
 usage: vastai create instance ID [OPTIONS] [--args ...]
 
 positional arguments:
-  ID                    id of instance type to launch (returned from search
-                        offers)
+ id                                id of instance type to launch (returned from search offers)
 
 options:
-  -h, --help            show this help message and exit
-  --price PRICE         per machine bid price in $/hour
-  --disk DISK           size of local disk partition in GB
-  --image IMAGE         docker container image to launch
-  --login LOGIN         docker login arguments for private repo
-                        authentication, surround with ''
-  --label LABEL         label to set on the instance
-  --onstart ONSTART     filename to use as onstart script
-  --onstart-cmd ONSTART_CMD
-                        contents of onstart script as single argument
-  --entrypoint ENTRYPOINT
-                        override entrypoint for args launch instance
-  --ssh                 Launch as an ssh instance type.
-  --jupyter             Launch as a jupyter instance instead of an ssh
-                        instance.
-  --direct              Use (faster) direct connections for jupyter & ssh.
-  --jupyter-dir JUPYTER_DIR
-                        For runtype 'jupyter', directory in instance to use to
-                        launch jupyter. Defaults to image's working directory.
-  --jupyter-lab         For runtype 'jupyter', Launch instance with jupyter
-                        lab.
-  --lang-utf8           Workaround for images with locale problems: install
-                        and generate locales before instance launch, and set
-                        locale to C.UTF-8.
-  --python-utf8         Workaround for images with locale problems: set
-                        python's locale to C.UTF-8.
-  --env ENV             env variables and port mapping options, surround with
-                        ''
-  --args ...            list of arguments passed to container ENTRYPOINT.
-                        Onstart is recommended for this purpose.
-  --create-from CREATE_FROM
-                        Existing instance id to use as basis for new instance.
-                        Instance configuration should usually be identical, as
-                        only the difference from the base image is copied.
-  --force               Skip sanity checks when creating from an existing
-                        instance
-  --url URL             server REST api url
-  --retry RETRY         retry limit
-  --raw                 output machine-readable json
-  --explain             output verbose explanation of mapping of CLI calls to
-                        HTTPS API endpoints
-  --api-key API_KEY     api key. defaults to using the one stored in
-                        ~/.vast_api_key
-
-Performs the same action as pressing the "RENT" button on the website at https://console.vast.ai/create/
-Creates an instance from an offer ID (which is returned from "search offers"). Each offer ID can only be used to create one instance.
-Besides the offer ID, you must pass in an '--image' argument as a minimum.
-
-Examples:
-vastai create instance 6995713 --image pytorch/pytorch --disk 40 --env '-p 8081:80801/udp -h billybob' --ssh --direct --onstart-cmd "env | grep _ >> /etc/environment; echo 'starting up'";
-vastai create instance 384827  --image bobsrepo/pytorch:latest --login '-u bob -p 9d8df!fd89ufZ docker.io' --jupyter --direct --env '-e TZ=PDT -e XNAME=XX4 -p 22:22 -p 8080:8080' --disk 20
-
-Return value:
-Returns a json reporting the instance ID of the newly created instance.
-Example: {'success': True, 'new_contract': 7835610}
-
+ -h, --help                        show this help message and exit
+ --template_hash TEMPLATE_HASH     Create instance from template info
+ --user USER                       User to use with docker create. This breaks some images, so only use this if you are certain you need it.
+ --disk DISK                       size of local disk partition in GB
+ --image IMAGE                     docker container image to launch
+ --login LOGIN                     docker login arguments for private repo authentication, surround with '' 
+ --label LABEL                     label to set on the instance
+ --onstart ONSTART                 filename to use as onstart script
+ --onstart-cmd ONSTART_CMD         contents of onstart script as single argument
+ --entrypoint ENTRYPOINT           override entrypoint for args launch instance
+ --ssh                             Launch as an ssh instance type
+ --jupyter                         Launch as a jupyter instance instead of an ssh instance
+ --direct                          Use (faster) direct connections for jupyter & ssh
+ --jupyter-dir JUPYTER_DIR         For runtype 'jupyter', directory in instance to use to launch jupyter. Defaults to image's working directory
+ --jupyter-lab                     For runtype 'jupyter', Launch instance with jupyter lab
+ --lang-utf8                       Workaround for images with locale problems: install and generate locales before instance launch, and set locale to C.UTF-8
+ --python-utf8                     Workaround for images with locale problems: set python's locale to C.UTF-8
+ --env ENV                         env variables and port mapping options, surround with '' 
+ --args ...                        list of arguments passed to container ENTRYPOINT. Onstart is recommended for this purpose. (must be last argument)
+ --force                           Skip sanity checks when creating from an existing instance
+ --cancel-unavail                  Return error if scheduling fails (rather than creating a stopped instance)
+ --bid_price BID_PRICE             (OPTIONAL) create an INTERRUPTIBLE instance with per machine bid price in $/hour
+ --create-volume VOLUME_ASK_ID     Create a new local volume using an ID returned from the "search volumes" command and link it to the new instance
+ --link-volume EXISTING_VOLUME_ID  ID of an existing rented volume to link to the instance during creation. (returned from "show volumes" cmd)
+ --volume-size VOLUME_SIZE         Size of the volume to create in GB. Only usable with --create-volume (default 15GB)
+ --mount-path MOUNT_PATH           The path to the volume from within the new instance container. e.g. /root/volume
+ --volume-label VOLUME_LABEL       (optional) A name to give the new volume. Only usable with --create-volume
 ```
 
-## create overlay
+## create instances
 
-Create an overlay network inside a physical cluster.&#x20;
+Create instances from a list of offers
 
-
-
-```none
-usage: vastai create overlay CLUSTER_ID OVERLAY_NAME
+```text Text
+usage: vastai create instances [OPTIONS] ID0 ID1 ID2... [--args ...]
 
 positional arguments:
- cluster_id         ID of cluster to create overlay on top of
- name               overlay network name
+ ids                               ids of instance types to launch (returned from search offers)
 
 options:
- -h, --help         show this help message and exit
- --url URL          server REST api url
- --retry RETRY      retry limit
- --raw              output machine-readable json
- --explain          output verbose explanation of mapping of CLI calls to HTTPS API endpoints
- --curl             show a curl equivalency to the call
- --api-key API_KEY  api key. defaults to using the one stored in /home/edgarlin/.config/vastai/vast_api_key
- --version          show version
-
-Creates an overlay network to allow local networking between instances on a physical cluster
-
-```
-
-## create subaccount
-
-Create a subaccount
-
-```text Text
-usage: vastai create subaccount --email EMAIL --username USERNAME --password PASSWORD --type TYPE
-
-options:
-  -h, --help           show this help message and exit
-  --email EMAIL        email address to use for login
-  --username USERNAME  username to use for login
-  --password PASSWORD  password to use for login
-  --type TYPE          host/client
-  --url URL            server REST api url
-  --retry RETRY        retry limit
-  --raw                output machine-readable json
-  --explain            output verbose explanation of mapping of CLI calls to
-                       HTTPS API endpoints
-  --api-key API_KEY    api key. defaults to using the one stored in
-                       ~/.vast_api_key
-
-Creates a new account that is considered a child of your current account as defined via the API key.
-
-```
-
-## create team
-
-Create a new team
-
-```text Text
-usage: vastai create-team --team_name TEAM_NAME
-
-options:
-  -h, --help            show this help message and exit
-  --team_name TEAM_NAME
-                        name of the team
-  --url URL             server REST api url
-  --retry RETRY         retry limit
-  --raw                 output machine-readable json
-  --explain             output verbose explanation of mapping of CLI calls to
-                        HTTPS API endpoints
-  --api-key API_KEY     api key. defaults to using the one stored in
-                        ~/.vast_api_key
-
-```
-
-## create team-role
-
-Add a new role to your
-
-```text Text
-usage: vastai create team-role name --permissions PERMISSIONS
-
-options:
-  -h, --help            show this help message and exit
-  --name NAME           name of the role
-  --permissions PERMISSIONS
-                        file path for json encoded permissions, look in the
-                        docs for more information
-  --url URL             server REST api url
-  --retry RETRY         retry limit
-  --raw                 output machine-readable json
-  --explain             output verbose explanation of mapping of CLI calls to
-                        HTTPS API endpoints
-  --api-key API_KEY     api key. defaults to using the one stored in
-                        ~/.vast_api_key
-
-```
-
-## delete api-key
-
-Remove an api-key
-
-```text Text
-usage: vastai delete api-key ID
-
-positional arguments:
-  ID                 id of apikey to remove
-
-options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-```
-
-## delete autoscaler
-
-Delete an autoscaler group
-
-```text Text
-usage: vastai delete autoscaler ID 
-
-positional arguments:
-  ID                 id of group to delete
-
-options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-Note that deleteing an autoscaler group doesn't automatically destroy all the instances that are associated with your autoscaler group.
-Example: vastai delete autoscaler 4242
-
-```
-
-## delete overlay
-
-Deletes an overlay
-
-
-
-```none
-usage: vastai delete overlay OVERLAY_ID
-
-positional arguments:
- overlay_id         ID of overlay to delete
-
-options:
- -h, --help         show this help message and exit
- --url URL          server REST api url
- --retry RETRY      retry limit
- --raw              output machine-readable json
- --explain          output verbose explanation of mapping of CLI calls to HTTPS API endpoints
- --curl             show a curl equivalency to the call
- --api-key API_KEY  api key. defaults to using the one stored in /home/edgarlin/.config/vastai/vast_api_key
-
+ -h, --help                        show this help message and exit
+ --template_hash TEMPLATE_HASH     Create instance from template info
+ --user USER                       User to use with docker create. This breaks some images, so only use this if you are certain you need it.
+ --disk DISK                       size of local disk partition in GB
+ --image IMAGE                     docker container image to launch
+ --login LOGIN                     docker login arguments for private repo authentication, surround with '' 
+ --label LABEL                     label to set on the instance
+ --onstart ONSTART                 filename to use as onstart script
+ --onstart-cmd ONSTART_CMD         contents of onstart script as single argument
+ --entrypoint ENTRYPOINT           override entrypoint for args launch instance
+ --ssh                             Launch as an ssh instance type
+ --jupyter                         Launch as a jupyter instance instead of an ssh instance
+ --direct                          Use (faster) direct connections for jupyter & ssh
+ --jupyter-dir JUPYTER_DIR         For runtype 'jupyter', directory in instance to use to launch jupyter. Defaults to image's working directory
+ --jupyter-lab                     For runtype 'jupyter', Launch instance with jupyter lab
+ --lang-utf8                       Workaround for images with locale problems: install and generate locales before instance launch, and set locale to C.UTF-8
+ --python-utf8                     Workaround for images with locale problems: set python's locale to C.UTF-8
+ --env ENV                         env variables and port mapping options, surround with '' 
+ --args ...                        list of arguments passed to container ENTRYPOINT. Onstart is recommended for this purpose. (must be last argument)
+ --force                           Skip sanity checks when creating from an existing instance
+ --cancel-unavail                  Return error if scheduling fails (rather than creating a stopped instance)
+ --bid_price BID_PRICE             (OPTIONAL) create an INTERRUPTIBLE instance with per machine bid price in $/hour
+ --create-volume VOLUME_ASK_ID     Create a new local volume using an ID returned from the "search volumes" command and link it to the new instance
+ --link-volume EXISTING_VOLUME_ID  ID of an existing rented volume to link to the instance during creation. (returned from "show volumes" cmd)
+ --volume-size VOLUME_SIZE         Size of the volume to create in GB. Only usable with --create-volume (default 15GB)
+ --mount-path MOUNT_PATH           The path to the volume from within the new instance container. e.g. /root/volume
+ --volume-label VOLUME_LABEL       (optional) A name to give the new volume. Only usable with --create-volume
 ```
 
 ## destroy instance
@@ -622,244 +332,85 @@ options:
 Destroy an instance (irreversible, deletes data)
 
 ```text Text
-usage: vastai destroy instance id [-h] [--api-key API_KEY] [--raw]
+usage: vastai destroy instance id [-h] [-y] [--api-key API_KEY] [--raw]
 
 positional arguments:
-  id                 id of instance to delete
+ id                 id of instance to delete
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-Perfoms the same action as pressing the "DESTROY" button on the website at https://console.vast.ai/instances/
-Example: vastai destroy instance 4242
-
+ -h, --help         show this help message and exit
+ -y, --yes          Skip confirmation prompt
 ```
 
 ## destroy instances
 
-Destroy a list of instances (irreversible, deletes
+Destroy a list of instances (irreversible, deletes data)
 
 ```text Text
-usage: vastai destroy instances [--raw] <id>
+usage: vastai destroy instances [--raw] [-y] <id> [<id> ...]
 
 positional arguments:
-  ids                ids of instance to destroy
-
-options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-```
-
-## destroy team
-
-Destroy your team
-
-```text Text
-usage: vastai destroy team
-
-options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-```
-
-## execute
-
-Execute a (constrained) remote command on a machine
-
-```text Text
-usage: vastai execute ID COMMAND
-
-positional arguments:
-  ID                 id of instance to execute on
-  COMMAND            bash command surrounded by single quotes
-
-options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-examples:
-  vastai execute 99999 'ls -l -o -r'
-  vastai execute 99999 'rm -r home/delete_this.txt'
-  vastai execute 99999 'du -d2 -h'
-
-available commands:
-  ls                 List directory contents
-  rm                 Remote files or directories
-  du                 Summarize device usage for a set of files
-
-Return value:
-Returns the output of the command which was executed on the instance, if successful. May take a few seconds to retrieve the results.
-
-```
-
-## generate pdf-invoices
-
-```text Text
-usage: vastai generate pdf-invoices [OPTIONS]
-
-options:
-  -h, --help            show this help message and exit
-  -q, --quiet           only display numeric ids
-  -s START_DATE, --start_date START_DATE
-                        start date and time for report. Many formats accepted
-                        (optional)
-  -e END_DATE, --end_date END_DATE
-                        end date and time for report. Many formats accepted
-                        (optional)
-  -c, --only_charges    Show only charge items.
-  -p, --only_credits    Show only credit items.
-  --url URL             server REST api url
-  --retry RETRY         retry limit
-  --raw                 output machine-readable json
-  --explain             output verbose explanation of mapping of CLI calls to
-                        HTTPS API endpoints
-  --api-key API_KEY     api key. defaults to using the one stored in
-                        ~/.vast_api_key
-
-```
-
-## join overlay
-
-Attaches an instance to an overlay network
-
-```none
-usage: vastai join overlay OVERLAY_NAME INSTANCE_ID
-
-positional arguments:
- name               Overlay network name to join instance to.
- instance_id        Instance ID to add to overlay.
+ ids                ids of instance to destroy
 
 options:
  -h, --help         show this help message and exit
- --url URL          server REST api url
- --retry RETRY      retry limit
- --raw              output machine-readable json
- --explain          output verbose explanation of mapping of CLI calls to HTTPS API endpoints
- --curl             show a curl equivalency to the call
- --api-key API_KEY  api key. defaults to using the one stored in /home/edgarlin/.config/vastai/vast_api_key
- --version          show version
-
-Adds an instance to a compatible overlay network.
-
+ -y, --yes          Skip confirmation prompt
 ```
 
-## invite team-member
+## start instance
 
-Invite a team member
+Start a stopped instance
 
 ```text Text
-usage: vastai invite team-member --email EMAIL --role ROLE
-
-options:
-  -h, --help         show this help message and exit
-  --email EMAIL      email of user to be invited
-  --role ROLE        role of user to be invited
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-```
-
-## label instance
-
-Assign a string label to an instance
-
-```text Text  
-usage: vastai label instance <id> <label>
+usage: vastai start instance ID [OPTIONS]
 
 positional arguments:
-  id                 id of instance to label
-  label              label to set
+ id                 ID of instance to start/restart
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
+ -h, --help         show this help message and exit
 ```
 
-## logs
+## start instances
 
-Get the logs for an instance
+Start a list of instances
 
 ```text Text
-usage: vastai logs [OPTIONS] INSTANCE_ID
+usage: vastai start instances [OPTIONS] ID0 ID1 ID2...
 
 positional arguments:
-  INSTANCE_ID        id of instance
+ ids                ids of instance to start
 
 options:
-  -h, --help         show this help message and exit
-  --tail TAIL        Number of lines to show from the end of the logs (default
-                     '1000')
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
+ -h, --help         show this help message and exit
 ```
 
-## prepay instance
+## stop instance
 
-Deposit credits into reserved instance.
+Stop a running instance
 
 ```text Text
-usage: vastai prepay instance <id> <amount>
+usage: vastai stop instance ID [OPTIONS]
 
 positional arguments:
-  id                 id of instance to prepay for
-  amount             amount of instance credit prepayment (default discount
-                     func of 0.2 for 1 month, 0.3 for 3 months)
+ id                 id of instance to stop
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
+ -h, --help         show this help message and exit
+```
 
+## stop instances
+
+Stop a list of instances
+
+```text Text
+usage: vastai stop instances [OPTIONS] ID0 ID1 ID2...
+
+positional arguments:
+ ids                ids of instance to stop
+
+options:
+ -h, --help         show this help message and exit
 ```
 
 ## reboot instance
@@ -867,663 +418,205 @@ options:
 Reboot (stop/start) an instance
 
 ```text Text
-usage: vastai reboot instance <id> [--raw]
+usage: vastai reboot instance ID [OPTIONS]
 
 positional arguments:
-  id                 id of instance to reboot
+ id                                id of instance to reboot
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-Instance is stopped and started without any risk of losing GPU priority.
-
+ -h, --help                        show this help message and exit
+ --schedule {HOURLY,DAILY,WEEKLY}  try to schedule a command to run hourly, daily, or weekly. Valid values are HOURLY, DAILY, WEEKLY  For ex. --schedule DAILY
+ --start_date START_DATE           Start date/time in format 'YYYY-MM-DD HH:MM:SS PM' (UTC). Default is now. (optional)
+ --end_date END_DATE               End date/time in format 'YYYY-MM-DD HH:MM:SS PM' (UTC). Default is 7 days from now. (optional)
+ --day DAY                         Day of week you want scheduled job to run on (0-6, where 0=Sunday) or "*". Default will be 0. For ex. --day 0
+ --hour HOUR                       Hour of day you want scheduled job to run on (0-23) or "*" (UTC). Default will be 0. For ex. --hour 16
 ```
 
-## remove team-member
+## recycle instance
 
-Remove a team member
+Recycle (destroy/create) an instance
 
 ```text Text
-usage: vastai remove team-member ID
+usage: vastai recycle instance ID [OPTIONS]
 
 positional arguments:
-  ID                 id of user to remove
-
-options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-```
-
-## remove team-role
-
-Remove a role from your team
-
-```text Text
-usage: vastai remove team-role NAME
-
-positional arguments:
-  NAME               name of the role
-
-options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-```
-
-## reports
-
-Get the user reports for a given machine
-
-```text Text
-usage: vastai reports m_id
-
-positional arguments:
-  m_id               machine id
-
-options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-```
-
-## reset api-key
-
-Reset your api-key (get new key from website).
-
-```text Text
-usage: vastai reset api-key
-
-options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-```
-
-## scp-url
-
-scp url helper
-
-```text Text
-usage: vastai scp-url ID
-
-positional arguments:
-  id                 id
-
-options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-```
-
-## search offers
-
-Search for instance types using custom query
-
-```text Text
-usage: vastai search offers [--help] [--api-key API_KEY] [--raw] <query>
-
-positional arguments:
-  query                 Query to search for. default: 'external=false
-                        rentable=true verified=true', pass -n to ignore
-                        default
-
-options:
-  -h, --help            show this help message and exit
-  -t TYPE, --type TYPE  Show 'on-demand', 'reserved', or 'bid'(interruptible)
-                        pricing. default: on-demand
-  -i, --interruptible   Alias for --type=bid
-  -b, --bid             Alias for --type=bid
-  -r, --reserved        Alias for --type=reserved
-  -d, --on-demand       Alias for --type=on-demand
-  -n, --no-default      Disable default query
-  --disable-bundling    Show identical offers. This request is more heavily
-                        rate limited.
-  --storage STORAGE     Amount of storage to use for pricing, in GiB.
-                        default=5.0GiB
-  -o ORDER, --order ORDER
-                        Comma-separated list of fields to sort on. postfix
-                        field with - to sort desc. ex: -o
-                        'num_gpus,total_flops-'. default='score-'
-  --url URL             server REST api url
-  --retry RETRY         retry limit
-  --raw                 output machine-readable json
-  --explain             output verbose explanation of mapping of CLI calls to
-                        HTTPS API endpoints
-  --api-key API_KEY     api key. defaults to using the one stored in
-                        ~/.vast_api_key
-
-Query syntax:
-
-    query = comparison comparison...
-    comparison = field op value
-    field = <name of a field>
-    op = one of: <, <=, ==, !=, >=, >, in, notin
-    value = <bool, int, float, etc> | 'any'
-    bool: True, False
-
-note: to pass '>' and '<' on the command line, make sure to use quotes
-note: to encode a string query value (ie for gpu_name), replace any spaces ' ' with underscore '_'
-
-Examples:
-
-    # search for somewhat reliable single RTX 3090 instances, filter out any duplicates or offers that conflict with our existing stopped instances
-    vastai search offers 'reliability > 0.98 num_gpus=1 gpu_name=RTX_3090 rented=False'
-
-    # search for datacenter gpus with minimal compute_cap and total_flops
-    vastai search offers 'compute_cap > 610 total_flops > 5 datacenter=True'
-
-    # search for reliable machines with at least 4 gpus, unverified, order by num_gpus, allow duplicates
-    vastai search offers 'reliability > 0.99  num_gpus>=4 verified=False rented=any' -o 'num_gpus-'
-
-Available fields:
-
-      Name                  Type       Description
-
-    bw_nvlink               float     bandwidth NVLink
-    compute_cap:            int       cuda compute capability*100  (ie:  650 for 6.5, 700 for 7.0)
-    cpu_arch:               string    host machine cpu architecture (e.g. amd64, arm64)
-    cpu_cores:              int       # virtual cpus
-    cpu_cores_effective:    float     # virtual cpus you get
-    cpu_ghz:                float     # cpu clock speed GHZ
-    cpu_ram:                float     system RAM in gigabytes
-    cuda_vers:              float     machine max supported cuda version (based on driver version)
-    datacenter:             bool      show only datacenter offers
-    direct_port_count       int       open ports on host's router
-    disk_bw:                float     disk read bandwidth, in MB/s
-    disk_space:             float     disk storage space, in GB
-    dlperf:                 float     DL-perf score  (see FAQ for explanation)
-    dlperf_usd:             float     DL-perf/$
-    dph:                    float     $/hour rental cost
-    driver_version:         string    machine's nvidia/amd driver version as 3 digit string ex. "535.86.05,"
-    duration:               float     max rental duration in days
-    external:               bool      show external offers in addition to datacenter offers
-    flops_usd:              float     TFLOPs/$
-    geolocation:            string    Two letter country code. Works with operators =, !=, in, notin (e.g. geolocation not in ['XV','XZ'])
-    gpu_arch:               string    host machine gpu architecture (e.g. nvidia, amd)
-    gpu_display_active:     bool      True if the GPU has a display attached
-    gpu_frac:               float     Ratio of GPUs in the offer to gpus in the system
-    gpu_max_power:          float     GPU power limit in watts
-    gpu_max_temp:           float     GPU temperature limit in Celsius
-    gpu_mem_bw:             float     GPU memory bandwidth in GB/s
-    gpu_name:               string    GPU model name (no quotes, replace spaces with underscores, ie: RTX_3090 rather than 'RTX 3090')
-    gpu_ram:                float     per GPU RAM in GB
-    gpu_frac:               float     Ratio of GPUs in the offer to gpus in the system
-    gpu_display_active:     bool      True if the GPU has a display attached
-    gpu_total_ram:          float     total GPU RAM in GB
-    has_avx:                bool      CPU supports AVX instruction set.
-    id:                     int       instance unique ID
-    inet_down:              float     internet download speed in Mb/s
-    inet_down_cost:         float     internet download bandwidth cost in $/GB
-    inet_up:                float     internet upload speed in Mb/s
-    inet_up_cost:           float     internet upload bandwidth cost in $/GB
-    machine_id              int       machine id of instance
-    min_bid:                float     current minimum bid price in $/hr for interruptible
-    num_gpus:               int       # of GPUs
-    pci_gen:                float     PCIE generation
-    pcie_bw:                float     PCIE bandwidth (CPU to GPU)
-    reliability:            float     machine reliability score (see FAQ for explanation)
-    rentable:               bool      is the instance currently rentable
-    rented:                 bool      allow/disallow duplicates and potential conflicts with existing stopped instances
-    storage_cost:           float     storage cost in $/GB/month
-    static_ip:              bool      is the IP addr static/stable
-    total_flops:            float     total TFLOPs from all GPUs
-    ubuntu_version          string    host machine ubuntu OS version
-    verified:               bool      is the machine verified
-    vms_enabled:            bool      is the machine a VM instance
-
-```
-
-## set api-key
-
-Set api-key (get your api-key from the console/CLI)
-
-```text Text  
-usage: vastai set api-key APIKEY
-
-positional arguments:
-  new_api_key        Api key to set as currently logged in user
-
-options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-```
-
-## show api-key
-
-Show an api-key
-
-```text Text
-usage: vastai show api-key
-
-positional arguments:
-  id                 id of apikey to get
-
-options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-```
-
-## show api-keys
-
-List your api-keys associated with your account
-
-```text
-usage: vastai show api-keys
-
-options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-```
-
-## show autoscalers
-
-Display user's current autoscaler groups
-
-```text Text
-usage: vastai show autoscalers [--api-key API_KEY]
-
-options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-Example: vastai show autoscalers
-
-```
-
-## show connections
-
-Displays user's cloud connections
-
-```text Text
-usage: vastai show connections [--api-key API_KEY] [--raw]
-
-options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-```
-
-## show earnings
-
-Get machine earning history reports
-
-```text Text
-usage: vastai show earnings [OPTIONS]
-
-options:
-  -h, --help            show this help message and exit
-  -q, --quiet           only display numeric ids
-  -s START_DATE, --start_date START_DATE
-                        start date and time for report. Many formats accepted
-  -e END_DATE, --end_date END_DATE
-                        end date and time for report. Many formats accepted
-  -m MACHINE_ID, --machine_id MACHINE_ID
-                        Machine id (optional)
-  --url URL             server REST api url
-  --retry RETRY         retry limit
-  --raw                 output machine-readable json
-  --explain             output verbose explanation of mapping of CLI calls to
-                        HTTPS API endpoints
-  --api-key API_KEY     api key. defaults to using the one stored in
-                        ~/.vast_api_key
-
-```
-
-## show instance
-
-Display user's current instances
-
-```text Text
-usage: vastai show instance [--api-key API_KEY] [--raw]
-
-positional arguments:
-  id                 id of instance to get
-
-options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-```
-
-## show instances
-
-Display user's current instances
-
-```text Text
-usage: vastai show instances [OPTIONS] [--api-key API_KEY] [--raw]
-
-options:
-  -h, --help         show this help message and exit
-  -q, --quiet        only display numeric ids
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-```
-
-## show invoices
-
-Get billing history reports
-
-```text Text
-usage: vastai show invoices [OPTIONS]
-
-options:
-  -h, --help            show this help message and exit
-  -q, --quiet           only display numeric ids
-  -s START_DATE, --start_date START_DATE
-                        start date and time for report. Many formats accepted
-                        (optional)
-  -e END_DATE, --end_date END_DATE
-                        end date and time for report. Many formats accepted
-                        (optional)
-  -c, --only_charges    Show only charge items.
-  -p, --only_credits    Show only credit items.
-  --instance_label INSTANCE_LABEL
-                        Filter charges on a particular instance label (useful
-                        for autoscaler groups)
-  --url URL             server REST api url
-  --retry RETRY         retry limit
-  --raw                 output machine-readable json
-  --explain             output verbose explanation of mapping of CLI calls to
-                        HTTPS API endpoints
-  --api-key API_KEY     api key. defaults to using the one stored in
-                        ~/.vast_api_key
-
-```
-
-Deprecated: use `vastai show invoices-v1` for the current invoices API (date range required, pagination supported).
-
-Date formats:
-  `--start_date` and `--end_date` accept most human-readable formats. If you do not include a timezone,
-  dates are parsed in your local timezone. The CLI converts them to UTC epoch seconds before calling the API.
-
-Examples:
-    # Show invoice items for January 2026
-    vastai show invoices --start_date 2026-01-01 --end_date 2026-01-31
-
-    # Same range using UTC epoch seconds
-    vastai show invoices --start_date 1767225600 --end_date 1769903999
-
-    # Credits only, with a single-ended range
-    vastai show invoices --only_credits --start_date 2026-01-01
-
-## show invoices-v1
-
-Get billing (invoices/charges) history reports with advanced filtering and pagination
-
-```text Text
-usage: vastai show invoices-v1 [OPTIONS]
-
-options:
-  -h, --help            show this help message and exit
-  -i, --invoices        Show invoices instead of charges
-  -it, --invoice-type type [type ...]
-                        Filter which types of invoices to show: {transfers, stripe, bitpay, coinbase, crypto.com, reserved, payout_paypal, payout_wise}
-  -c, --charges         Show charges instead of invoices
-  -ct, --charge-type type [type ...]
-                        Filter which types of charges to show: {i|instance, v|volume, s|serverless}
-  -s, --start-date START_DATE
-                        Start date (YYYY-MM-DD or timestamp)
-  -e, --end-date END_DATE
-                        End date (YYYY-MM-DD or timestamp)
-  -l, --limit LIMIT     Number of results per page (default: 20, max: 100)
-  -t, --next-token NEXT_TOKEN
-                        Pagination token for next page
-  -f, --format {table,tree}
-                        Output format for charges (default: table)
-  -v, --verbose         Include full Instance Charge details and Invoice Metadata (tree view only)
-  --latest-first        Sort by latest first
-  --url URL             server REST api url
-  --retry RETRY         retry limit
-  --raw                 output machine-readable json
-  --explain             output verbose explanation of mapping of CLI calls to
-                        HTTPS API endpoints
-  --api-key API_KEY     api key. defaults to using the one stored in
-                        ~/.vast_api_key
-
-```
-
-Date handling:
-  `--start-date` and `--end-date` accept `YYYY-MM-DD` (interpreted as UTC) or Unix epoch seconds.
-  If both are omitted, the CLI defaults to a 7-day window ending now. Use epoch seconds for exact time-of-day filtering.
-
-Examples:
-    # Show the first 20 invoices from the last 7 days (default window)
-    vastai show invoices-v1 --invoices
-
-    # Show invoices for January 2026
-    vastai show invoices-v1 -i --start-date 2026-01-01 --end-date 2026-01-31
-
-    # Show the first 50 volume+serverless charges with full details
-    vastai show invoices-v1 -c -ct v s -s 2026-01-01 -e 2026-01-05 --format tree --verbose -l 50
-
-    # Fetch the next page of invoices
-    vastai show invoices-v1 --invoices --limit 50 --next-token eyJ2YWx1ZXMiOiB7ImlkIjog....
-
-## show ipaddrs
-
-Display user's history of ip addresses
-
-```text Text
-usage: vastai show ipaddrs [--api-key API_KEY] [--raw]
-
-options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-```
-
-## show overlays
-
-Shows the client's created overlay networks
-
-
-
-```none
-usage: vastai show overlays
+ id                 id of instance to recycle
 
 options:
  -h, --help         show this help message and exit
- --url URL          server REST api url
- --retry RETRY      retry limit
- --raw              output machine-readable json
- --explain          output verbose explanation of mapping of CLI calls to HTTPS API endpoints
- --curl             show a curl equivalency to the call
- --api-key API_KEY  api key. defaults to using the one stored in /home/edgarlin/.config/vastai/vast_api_key
- --version          show version
-
-Show overlays associated with your account.
-
 ```
 
-## show subaccounts
+## update instance
 
-Get current subaccounts
-
-```text Text
-usage: vastai show subaccounts [OPTIONS]
-
-options:
-  -h, --help         show this help message and exit
-  -q, --quiet        display subaccounts from current user
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-```
-
-## show team-members
-
-Show your team members
+Update recreate an instance from a new/updated template
 
 ```text Text
-usage: vastai show team-members
-
-options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-```
-
-## show team-role
-
-Show your team role
-
-```text Text
-usage: vastai show team-role NAME
+usage: vastai update instance ID [OPTIONS]
 
 positional arguments:
-  NAME               name of the role
+ id                                   id of instance to update
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
+ -h, --help                           show this help message and exit
+ --template_id TEMPLATE_ID            new template ID to associate with the instance
+ --template_hash_id TEMPLATE_HASH_ID  new template hash ID to associate with the instance
+ --image IMAGE                        new image UUID for the instance
+ --args ARGS                          new arguments for the instance
+ --env ENV                            new environment variables for the instance
+ --onstart ONSTART                    new onstart script for the instance
 ```
 
-## show team-roles
+## label instance
 
-Show roles for a team
-
-```text Text  
-usage: vastai show team-roles
-
-options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-```
-
-## show user
-
-Get current user data
+Assign a string label to an instance
 
 ```text Text
-usage: vastai show user [OPTIONS]
+usage: vastai label instance <id> <label>
+
+positional arguments:
+ id                 id of instance to label
+ label              label to set
 
 options:
-  -h, --help         show this help message and exit
-  -q, --quiet        display information about user
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
+ -h, --help         show this help message and exit
+```
 
-Shows stats for logged-in user. These include user balance, email, and ssh key. Does not show API key.
+## prepay instance
 
+Deposit credits into reserved instance
+
+```text Text
+usage: vastai prepay instance ID AMOUNT
+
+positional arguments:
+ id                 id of instance to prepay for
+ amount             amount of instance credit prepayment (default discount func of 0.2 for 1 month, 0.3 for 3 months)
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## change bid
+
+Change the bid price for a spot/interruptible instance
+
+```text Text
+usage: vastai change bid id [--price PRICE]
+
+positional arguments:
+ id                                id of instance type to change bid
+
+options:
+ -h, --help                        show this help message and exit
+ --price PRICE                     per machine bid price in $/hour
+ --schedule {HOURLY,DAILY,WEEKLY}  try to schedule a command to run hourly, daily, or weekly. Valid values are HOURLY, DAILY, WEEKLY  For ex. --schedule DAILY
+ --start_date START_DATE           Start date/time in format 'YYYY-MM-DD HH:MM:SS PM' (UTC). Default is now. (optional)
+ --end_date END_DATE               End date/time in format 'YYYY-MM-DD HH:MM:SS PM' (UTC). Default is 7 days from now. (optional)
+ --day DAY                         Day of week you want scheduled job to run on (0-6, where 0=Sunday) or "*". Default will be 0. For ex. --day 0
+ --hour HOUR                       Hour of day you want scheduled job to run on (0-23) or "*" (UTC). Default will be 0. For ex. --hour 16
+```
+
+## launch instance
+
+Launch the top instance from the search offers based on the given parameters
+
+```text Text
+usage: vastai launch instance [--help] [--api-key API_KEY] <gpu_name> <num_gpus> <image> [geolocation] [disk_space]
+
+options:
+ -h, --help                                       show this help message and exit
+ -g {A10,A100_PCIE,A100_SXM4,A100X,A10g,A40,A800_PCIE,B200,GTX_1050,GTX_1050_Ti,GTX_1060,GTX_1070,GTX_1070_Ti,GTX_1080,GTX_1080_Ti,GTX_1650,GTX_1650_S,GTX_1660,GTX_1660_S,GTX_1660_Ti,H100_NVL,H100_PCIE,H100_SXM,H200,H200_NVL,L4,L40,L40S,Q_RTX_4000,Q_RTX_5000,Q_RTX_6000,Q_RTX_8000,Quadro_P2000,Quadro_P4000,RTX_2000Ada,RTX_2060,RTX_2060S,RTX_2070,RTX_2070S,RTX_2080,RTX_2080S,RTX_2080_Ti,RTX_3050,RTX_3060,RTX_3060_laptop,RTX_3060_Ti,RTX_3070,RTX_3070_laptop,RTX_3070_Ti,RTX_3080,RTX_3080_Ti,RTX_3090,RTX_3090_Ti,RTX_4000Ada,RTX_4060,RTX_4060_Ti,RTX_4070,RTX_4070S,RTX_4070S_Ti,RTX_4070_Ti,RTX_4080,RTX_4080S,RTX_4090,RTX_4090D,RTX_4500Ada,RTX_5000Ada,RTX_5060,RTX_5060_Ti,RTX_5070,RTX_5070_Ti,RTX_5080,RTX_5090,RTX_5880Ada,RTX_6000Ada,RTX_A2000,RTX_A4000,RTX_A4500,RTX_A5000,RTX_A6000,RTX_PRO_4000,RTX_PRO_4500,RTX_PRO_5000,RTX_PRO_6000_S,RTX_PRO_6000_WS,RX_6900_XT,Tesla_M40,Tesla_P100,Tesla_P4,Tesla_P40,Tesla_T4,Tesla_V100,Titan_RTX,Titan_V,Titan_Xp}, --gpu-name {A10,A100_PCIE,A100_SXM4,A100X,A10g,A40,A800_PCIE,B200,GTX_1050,GTX_1050_Ti,GTX_1060,GTX_1070,GTX_1070_Ti,GTX_1080,GTX_1080_Ti,GTX_1650,GTX_1650_S,GTX_1660,GTX_1660_S,GTX_1660_Ti,H100_NVL,H100_PCIE,H100_SXM,H200,H200_NVL,L4,L40,L40S,Q_RTX_4000,Q_RTX_5000,Q_RTX_6000,Q_RTX_8000,Quadro_P2000,Quadro_P4000,RTX_2000Ada,RTX_2060,RTX_2060S,RTX_2070,RTX_2070S,RTX_2080,RTX_2080S,RTX_2080_Ti,RTX_3050,RTX_3060,RTX_3060_laptop,RTX_3060_Ti,RTX_3070,RTX_3070_laptop,RTX_3070_Ti,RTX_3080,RTX_3080_Ti,RTX_3090,RTX_3090_Ti,RTX_4000Ada,RTX_4060,RTX_4060_Ti,RTX_4070,RTX_4070S,RTX_4070S_Ti,RTX_4070_Ti,RTX_4080,RTX_4080S,RTX_4090,RTX_4090D,RTX_4500Ada,RTX_5000Ada,RTX_5060,RTX_5060_Ti,RTX_5070,RTX_5070_Ti,RTX_5080,RTX_5090,RTX_5880Ada,RTX_6000Ada,RTX_A2000,RTX_A4000,RTX_A4500,RTX_A5000,RTX_A6000,RTX_PRO_4000,RTX_PRO_4500,RTX_PRO_5000,RTX_PRO_6000_S,RTX_PRO_6000_WS,RX_6900_XT,Tesla_M40,Tesla_P100,Tesla_P4,Tesla_P40,Tesla_T4,Tesla_V100,Titan_RTX,Titan_V,Titan_Xp}
+                                                  Name of the GPU model, replace spaces with underscores
+ -n {1,2,4,8,12,14}, --num-gpus {1,2,4,8,12,14}   Number of GPUs required
+ -r REGION, --region REGION                       Geographical location of the instance
+ -i IMAGE, --image IMAGE                          Name of the image to use for instance
+ -d DISK, --disk DISK                             Disk space required in GB
+ --limit LIMIT
+ -o ORDER, --order ORDER                          Comma-separated list of fields to sort on. postfix field with - to sort desc. ex: -o 'num_gpus,total_flops-'.  default='score-'
+ --login LOGIN                                    docker login arguments for private repo authentication, surround with '' 
+ --label LABEL                                    label to set on the instance
+ --onstart ONSTART                                filename to use as onstart script
+ --onstart-cmd ONSTART_CMD                        contents of onstart script as single argument
+ --entrypoint ENTRYPOINT                          override entrypoint for args launch instance
+ --ssh                                            Launch as an ssh instance type
+ --jupyter                                        Launch as a jupyter instance instead of an ssh instance
+ --direct                                         Use (faster) direct connections for jupyter & ssh
+ --jupyter-dir JUPYTER_DIR                        For runtype 'jupyter', directory in instance to use to launch jupyter. Defaults to image's working directory
+ --jupyter-lab                                    For runtype 'jupyter', Launch instance with jupyter lab
+ --lang-utf8                                      Workaround for images with locale problems: install and generate locales before instance launch, and set locale to C.UTF-8
+ --python-utf8                                    Workaround for images with locale problems: set python's locale to C.UTF-8
+ --env ENV                                        env variables and port mapping options, surround with '' 
+ --args ...                                       list of arguments passed to container ENTRYPOINT. Onstart is recommended for this purpose. (must be last argument)
+ --force                                          Skip sanity checks when creating from an existing instance
+ --cancel-unavail                                 Return error if scheduling fails (rather than creating a stopped instance)
+ --template_hash TEMPLATE_HASH                    template hash which contains all relevant information about an instance. This can be used as a replacement for other parameters describing the instance configuration
+```
+
+## execute
+
+Execute a (constrained) remote command on a machine
+
+```text Text
+usage: vastai execute id COMMAND
+
+positional arguments:
+ id                                id of instance to execute on
+ COMMAND                           bash command surrounded by single quotes
+
+options:
+ -h, --help                        show this help message and exit
+ --schedule {HOURLY,DAILY,WEEKLY}  try to schedule a command to run hourly, daily, or weekly. Valid values are HOURLY, DAILY, WEEKLY  For ex. --schedule DAILY
+ --start_date START_DATE           Start date/time in format 'YYYY-MM-DD HH:MM:SS PM' (UTC). Default is now. (optional)
+ --end_date END_DATE               End date/time in format 'YYYY-MM-DD HH:MM:SS PM' (UTC). Default is 7 days from now. (optional)
+ --day DAY                         Day of week you want scheduled job to run on (0-6, where 0=Sunday) or "*". Default will be 0. For ex. --day 0
+ --hour HOUR                       Hour of day you want scheduled job to run on (0-23) or "*" (UTC). Default will be 0. For ex. --hour 16
+```
+
+## logs
+
+Get the logs for an instance
+
+```text Text
+usage: vastai logs INSTANCE_ID [OPTIONS] 
+
+positional arguments:
+ INSTANCE_ID        id of instance
+
+options:
+ -h, --help         show this help message and exit
+ --tail TAIL        Number of lines to show from the end of the logs (default '1000')
+ --filter FILTER    Grep filter for log entries
+ --daemon-logs      Fetch daemon system logs instead of container logs
+```
+
+## attach ssh
+
+Attach an ssh key to an instance. This will allow you to connect to the instance with the ssh key
+
+```text Text
+usage: vastai attach ssh instance_id ssh_key
+
+positional arguments:
+ instance_id        id of instance to attach to
+ ssh_key            ssh key to attach to instance
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## detach ssh
+
+Detach an ssh key from an instance
+
+```text Text
+usage: vastai detach instance_id ssh_key_id
+
+positional arguments:
+ instance_id        id of the instance
+ ssh_key_id         id of the key to detach from the instance
+
+options:
+ -h, --help         show this help message and exit
 ```
 
 ## ssh-url
@@ -1534,194 +627,769 @@ ssh url helper
 usage: vastai ssh-url ID
 
 positional arguments:
-  id                 id of instance
+ id                 id of instance
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
+ -h, --help         show this help message and exit
 ```
 
-## start instance
+## scp-url
 
-Start a stopped instance
+scp url helper
 
 ```text Text
-usage: vastai start instance <id> [--raw]
+usage: vastai scp-url ID
 
 positional arguments:
-  id                 id of instance to start/restart
+ id                 id
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-This command attempts to bring an instance from the "stopped" state into the "running" state. This is subject to resource availability on the machine that the instance is located on.
-If your instance is stuck in the "scheduling" state for more than 30 seconds after running this, it likely means that the required resources on the machine to run your instance are currently unavailable.
-Examples:
-    vastai start instances $(vastai show instances -q)
-    vastai start instance 329838
-
+ -h, --help         show this help message and exit
 ```
 
-## start instances
+## copy
 
-Start a list of instances
+Copy directories between instances and/or local
 
 ```text Text
-usage: vastai start instances [--raw] ID0 ID1 ID2...
+usage: vastai copy SRC DST
 
 positional arguments:
-  ids                ids of instance to start
+ src                               Source location for copy operation (supports multiple formats)
+ dst                               Target location for copy operation (supports multiple formats)
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
+ -h, --help                        show this help message and exit
+ -i IDENTITY, --identity IDENTITY  Location of ssh private key
 ```
 
-## stop instance
+## cloud copy
 
-Stop a running instance
+Copy files/folders to and from cloud providers
 
 ```text Text
-usage: vastai stop instance [--raw] ID
-
-positional arguments:
-  id                 id of instance to stop
+usage: vastai cloud copy --src SRC --dst DST --instance INSTANCE_ID --connection CONNECTION_ID --transfer TRANSFER_TYPE
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-This command brings an instance from the "running" state into the "stopped" state. When an instance is "stopped" all of your data on the instance is preserved,
-and you can resume use of your instance by starting it again. Once stopped, starting an instance is subject to resource availability on the machine that the instance is located on.
-There are ways to move data off of a stopped instance, which are described here: [Data Movement](/documentation/instances/data-movement)
-
+ -h, --help                        show this help message and exit
+ --src SRC                         path to source of object to copy
+ --dst DST                         path to target of copy operation
+ --instance INSTANCE               id of the instance
+ --connection CONNECTION           id of cloud connection on your account (get from calling 'vastai show connections')
+ --transfer TRANSFER               type of transfer, possible options include Instance To Cloud and Cloud To Instance
+ --dry-run                         show what would have been transferred
+ --size-only                       skip based on size only, not mod-time or checksum
+ --ignore-existing                 skip all files that exist on destination
+ --update                          skip files that are newer on the destination
+ --delete-excluded                 delete files on dest excluded from transfer
+ --schedule {HOURLY,DAILY,WEEKLY}  try to schedule a command to run hourly, daily, or weekly. Valid values are HOURLY, DAILY, WEEKLY  For ex. --schedule DAILY
+ --start_date START_DATE           Start date/time in format 'YYYY-MM-DD HH:MM:SS PM' (UTC). Default is now. (optional)
+ --end_date END_DATE               End date/time in format 'YYYY-MM-DD HH:MM:SS PM' (UTC). Default is contract's end. (optional)
+ --day DAY                         Day of week you want scheduled job to run on (0-6, where 0=Sunday) or "*". Default will be 0. For ex. --day 0
+ --hour HOUR                       Hour of day you want scheduled job to run on (0-23) or "*" (UTC). Default will be 0. For ex. --hour 16
 ```
 
-## stop instances
+## cancel copy
 
-Stop a list of instances
+Cancel a remote copy in progress, specified by DST id
 
 ```text Text
-usage: vastai stop instances [--raw] ID0 ID1 ID2...
+usage: vastai cancel copy DST
 
 positional arguments:
-  ids                ids of instance to stop
+ dst                instance_id:/path to target of copy operation
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-Examples:
-    vastai stop instances $(vastai show instances -q)
-    vastai stop instances 329838 984849
-
+ -h, --help         show this help message and exit
 ```
 
-## transfer credit
+## cancel sync
 
-Transfer credits to another account
+Cancel a remote copy in progress, specified by DST id
 
 ```text Text
-usage: vastai transfer credit RECIPIENT AMOUNT
+usage: vastai cancel sync DST
 
 positional arguments:
-  recipient          email of recipient account
-  amount             $dollars of credit to transfer
+ dst                instance_id:/path to target of sync operation
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-Transfer (amount) credits to account with email (recipient).
-
+ -h, --help         show this help message and exit
 ```
 
-## update autoscaler
+## show connections
+
+Display user's cloud connections
+
+```text Text
+usage: vastai show connections [--api-key API_KEY] [--raw]
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## take snapshot
+
+Schedule a snapshot of a running container and push it to your repo in a container registry
+
+```text Text
+usage: vastai take snapshot INSTANCE_ID --repo REPO --docker_login_user USER --docker_login_pass PASS[--container_registry REGISTRY] [--pause true|false]
+
+positional arguments:
+ instance_id                              instance_id of the container instance to snapshot
+
+options:
+ -h, --help                               show this help message and exit
+ --container_registry CONTAINER_REGISTRY  Container registry to push the snapshot to. Default will be docker.io
+ --repo REPO                              repo to push the snapshot to
+ --docker_login_user DOCKER_LOGIN_USER    Username for container registry with repo
+ --docker_login_pass DOCKER_LOGIN_PASS    Password or token for container registry with repo
+ --pause PAUSE                            Pause container's processes being executed by the CPU to take snapshot (true/false). Default will be true
+```
+
+
+## Search & Templates
+
+## search offers
+
+Search for instance types using custom query
+
+```text Text
+usage: vastai search offers [--help] [--api-key API_KEY] [--raw] <query>
+
+positional arguments:
+ query                    Query to search for. default: 'external=false rentable=true verified=true', pass -n to ignore default
+
+options:
+ -h, --help               show this help message and exit
+ -t TYPE, --type TYPE     Show 'on-demand', 'reserved', or 'bid'(interruptible) pricing. default: on-demand
+ -i, --interruptible      Alias for --type=bid
+ -b, --bid                Alias for --type=bid
+ -r, --reserved           Alias for --type=reserved
+ -d, --on-demand          Alias for --type=on-demand
+ -n, --no-default         Disable default query
+ --new                    New search exp
+ --limit LIMIT
+ --storage STORAGE        Amount of storage to use for pricing, in GiB. default=5.0GiB
+ -o ORDER, --order ORDER  Comma-separated list of fields to sort on. postfix field with - to sort desc. ex: -o 'num_gpus,total_flops-'.  default='score-'
+```
+
+## search benchmarks
+
+Search for benchmark results using custom query
+
+```text Text
+usage: vastai search benchmarks [--help] [--api-key API_KEY] [--raw] <query>
+
+positional arguments:
+ query              Search query in simple query syntax (see below)
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## search templates
+
+Search for template results using custom query
+
+```text Text
+usage: vastai search templates [--help] [--api-key API_KEY] [--raw] <query>
+
+positional arguments:
+ query              Search query in simple query syntax (see below)
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## search invoices
+
+Search for invoices using custom query
+
+```text Text
+usage: vastai search invoices [--help] [--api-key API_KEY] [--raw] <query>
+
+positional arguments:
+ query              Search query in simple query syntax (see below)
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## search volumes
+
+Search for volume offers using custom query
+
+```text Text
+usage: vastai search volumes [--help] [--api-key API_KEY] [--raw] <query>
+
+positional arguments:
+ query                    Query to search for. default: 'external=false verified=true disk_space>=1', pass -n to ignore default
+
+options:
+ -h, --help               show this help message and exit
+ -n, --no-default         Disable default query
+ --limit LIMIT
+ --storage STORAGE        Amount of storage to use for pricing, in GiB. default=1.0GiB
+ -o ORDER, --order ORDER  Comma-separated list of fields to sort on. postfix field with - to sort desc. ex: -o 'disk_space,inet_up-'.  default='score-'
+```
+
+## search network-volumes
+
+Search for network volume offers using custom query
+
+```text Text
+usage: vastai search network volumes [--help] [--api-key API_KEY] [--raw] <query>
+
+positional arguments:
+ query                    Query to search for. default: 'external=false verified=true disk_space>=1', pass -n to ignore default
+
+options:
+ -h, --help               show this help message and exit
+ -n, --no-default         Disable default query
+ --limit LIMIT
+ --storage STORAGE        Amount of storage to use for pricing, in GiB. default=1.0GiB
+ -o ORDER, --order ORDER  Comma-separated list of fields to sort on. postfix field with - to sort desc. ex: -o 'disk_space,inet_up-'.  default='score-'
+```
+
+## create template
+
+Create a new template
+
+```text Text
+usage: vastai create template
+
+options:
+ -h, --help                     show this help message and exit
+ --name NAME                    name of the template
+ --image IMAGE                  docker container image to launch
+ --image_tag IMAGE_TAG          docker image tag
+ --href HREF                    link you want to provide
+ --repo REPO                    link to repository
+ --login LOGIN                  docker login arguments for private repo authentication, surround with ''
+ --env ENV                      Contents of the 'Docker options' field
+ --ssh                          Launch as an ssh instance type
+ --jupyter                      Launch as a jupyter instance instead of an ssh instance
+ --direct                       Use (faster) direct connections for jupyter & ssh
+ --jupyter-dir JUPYTER_DIR      For runtype 'jupyter', directory in instance to use to launch jupyter
+ --jupyter-lab                  For runtype 'jupyter', Launch instance with jupyter lab
+ --onstart-cmd ONSTART_CMD      contents of onstart script as single argument
+ --search_params SEARCH_PARAMS  search offers filters
+ -n, --no-default               Disable default search param query args
+ --disk_space DISK_SPACE        disk storage space, in GB
+ --readme README                readme string
+ --hide-readme                  hide the readme from users
+ --desc DESC                    description string
+ --public                       make template available to public
+```
+
+## update template
+
+Update an existing template
+
+```text Text
+usage: vastai update template HASH_ID
+
+positional arguments:
+ HASH_ID                        hash id of the template
+
+options:
+ -h, --help                     show this help message and exit
+ --name NAME                    name of the template
+ --image IMAGE                  docker container image to launch
+ --image_tag IMAGE_TAG          docker image tag
+ --href HREF                    link you want to provide
+ --repo REPO                    link to repository
+ --login LOGIN                  docker login arguments for private repo authentication, surround with ''
+ --env ENV                      Contents of the 'Docker options' field
+ --ssh                          Launch as an ssh instance type
+ --jupyter                      Launch as a jupyter instance instead of an ssh instance
+ --direct                       Use (faster) direct connections for jupyter & ssh
+ --jupyter-dir JUPYTER_DIR      For runtype 'jupyter', directory in instance to use to launch jupyter
+ --jupyter-lab                  For runtype 'jupyter', Launch instance with jupyter lab
+ --onstart-cmd ONSTART_CMD      contents of onstart script as single argument
+ --search_params SEARCH_PARAMS  search offers filters
+ -n, --no-default               Disable default search param query args
+ --disk_space DISK_SPACE        disk storage space, in GB
+ --readme README                readme string
+ --hide-readme                  hide the readme from users
+ --desc DESC                    description string
+ --public                       make template available to public
+```
+
+## delete template
+
+Delete a Template
+
+```text Text
+usage: vastai delete template [--template-id <id> | --hash-id <hash_id>]
+
+options:
+ -h, --help                 show this help message and exit
+ --template-id TEMPLATE_ID  Template ID of Template to Delete
+ --hash-id HASH_ID          Hash ID of Template to Delete
+```
+
+
+## Volumes
+
+## create volume
+
+Create a new volume
+
+```text Text
+usage: vastai create volume ID [options]
+
+positional arguments:
+ id                    id of volume offer
+
+options:
+ -h, --help            show this help message and exit
+ -s SIZE, --size SIZE  size in GB of volume. Default 15 GB.
+ -n NAME, --name NAME  Optional name of volume.
+```
+
+## create network-volume
+
+Create a new network volume
+
+```text Text
+usage: vastai create network volume ID [options]
+
+positional arguments:
+ id                    id of network volume offer
+
+options:
+ -h, --help            show this help message and exit
+ -s SIZE, --size SIZE  size in GB of network volume. Default 15 GB.
+ -n NAME, --name NAME  Optional name of network volume.
+```
+
+## delete volume
+
+Delete a volume
+
+```text Text
+usage: vastai delete volume ID
+
+positional arguments:
+ id                 id of volume contract
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## clone volume
+
+Clone an existing volume
+
+```text Text
+usage: vastai clone volume <source_id> <dest_id> [options]
+
+positional arguments:
+ source                     id of volume contract being cloned
+ dest                       id of volume offer volume is being copied to
+
+options:
+ -h, --help                 show this help message and exit
+ -s SIZE, --size SIZE       Size of new volume contract, in GB. Must be greater than or equal to the source volume, and less than or equal to the destination offer.
+ -d, --disable_compression  Do not compress volume data before copying.
+```
+
+## show volumes
+
+Show stats on owned volumes.
+
+```text Text
+usage: vastai show volumes [OPTIONS]
+
+options:
+ -h, --help            show this help message and exit
+ -t TYPE, --type TYPE  volume type to display. Default to all. Possible values are "local", "all", "network"
+```
+
+## list volume
+
+[Host] list disk space for rent as a volume on a machine
+
+```text Text
+usage: vastai list volume ID [options]
+
+positional arguments:
+ id                                      id of machine to list
+
+options:
+ -h, --help                              show this help message and exit
+ -p PRICE_DISK, --price_disk PRICE_DISK  storage price in $/GB/month, default: $0.10/GB/month
+ -e END_DATE, --end_date END_DATE        contract offer expiration - the available until date (optional, in unix float timestamp or MM/DD/YYYY format), default 3 months
+ -s SIZE, --size SIZE                    size of disk space allocated to offer in GB, default 15 GB
+```
+
+## list volumes
+
+[Host] list disk space for rent as a volume on machines
+
+```text Text
+usage: vastai list volume IDs [options]
+
+positional arguments:
+ ids                                     id of machines list
+
+options:
+ -h, --help                              show this help message and exit
+ -p PRICE_DISK, --price_disk PRICE_DISK  storage price in $/GB/month, default: $0.10/GB/month
+ -e END_DATE, --end_date END_DATE        contract offer expiration - the available until date (optional, in unix float timestamp or MM/DD/YYYY format), default 3 months
+ -s SIZE, --size SIZE                    size of disk space allocated to offer in GB, default 15 GB
+```
+
+## list network-volume
+
+[Host] list disk space for rent as a network volume
+
+```text Text
+usage: vastai list network volume DISK_ID [options]
+
+positional arguments:
+ disk_id                                 id of network disk to list
+
+options:
+ -h, --help                              show this help message and exit
+ -p PRICE_DISK, --price_disk PRICE_DISK  storage price in $/GB/month, default: $0.15/GB/month
+ -e END_DATE, --end_date END_DATE        contract offer expiration - the available until date (optional, in unix float timestamp or MM/DD/YYYY format), default 1 month
+ -s SIZE, --size SIZE                    size of disk space allocated to offer in GB, default 15 GB
+```
+
+## unlist volume
+
+[Host] unlist volume offer
+
+```text Text
+usage: vastai unlist volume ID
+
+positional arguments:
+ id                 volume ID you want to unlist
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## unlist network-volume
+
+[Host] Unlists network volume offer
+
+```text Text
+usage: vastai unlist network volume OFFER_ID
+
+positional arguments:
+ id                 id of network volume offer to unlist
+
+options:
+ -h, --help         show this help message and exit
+```
+
+
+## Serverless
+
+## create endpoint
+
+Create a new endpoint group
+
+```text Text
+usage: vastai create endpoint [OPTIONS]
+
+options:
+ -h, --help                               show this help message and exit
+ --min_load MIN_LOAD                      minimum floor load in perf units/s  (token/s for LLms)
+ --min_cold_load MIN_COLD_LOAD            minimum floor load in perf units/s (token/s for LLms), but allow handling with cold workers
+ --target_util TARGET_UTIL                target capacity utilization (fraction, max 1.0, default 0.9)
+ --cold_mult COLD_MULT                    cold/stopped instance capacity target as multiple of hot capacity target (default 2.5)
+ --cold_workers COLD_WORKERS              min number of workers to keep 'cold' when you have no load (default 5)
+ --max_workers MAX_WORKERS                max number of workers your endpoint group can have (default 20)
+ --endpoint_name ENDPOINT_NAME            deployment endpoint name (allows multiple autoscale groups to share same deployment endpoint)
+ --max_queue_time MAX_QUEUE_TIME          maximum seconds requests may be queued on each worker (default 30.0)
+ --target_queue_time TARGET_QUEUE_TIME    target seconds for the queue to be cleared (default 10.0)
+ --inactivity_timeout INACTIVITY_TIMEOUT  seconds of no traffic before the endpoint can scale to zero active workers
+```
+
+## show endpoints
+
+Display user's current endpoint groups
+
+```text Text
+usage: vastai show endpoints [--api-key API_KEY]
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## update endpoint
+
+Update an existing endpoint group
+
+```text Text
+usage: vastai update endpoint ID [OPTIONS]
+
+positional arguments:
+ id                                       id of endpoint group to update
+
+options:
+ -h, --help                               show this help message and exit
+ --min_load MIN_LOAD                      minimum floor load in perf units/s  (token/s for LLms)
+ --min_cold_load MIN_COLD_LOAD            minimum floor load in perf units/s  (token/s for LLms), but allow handling with cold workers
+ --endpoint_state ENDPOINT_STATE          active, suspended, or stopped
+ --target_util TARGET_UTIL                target capacity utilization (fraction, max 1.0, default 0.9)
+ --cold_mult COLD_MULT                    cold/stopped instance capacity target as multiple of hot capacity target (default 2.5)
+ --cold_workers COLD_WORKERS              min number of workers to keep 'cold' when you have no load (default 5)
+ --max_workers MAX_WORKERS                max number of workers your endpoint group can have (default 20)
+ --endpoint_name ENDPOINT_NAME            deployment endpoint name (allows multiple workergroups to share same deployment endpoint)
+ --max_queue_time MAX_QUEUE_TIME          maximum seconds requests may be queued on each worker (default 30.0)
+ --target_queue_time TARGET_QUEUE_TIME    target seconds for the queue to be cleared (default 10.0)
+ --inactivity_timeout INACTIVITY_TIMEOUT  seconds of no traffic before the endpoint can scale to zero active workers
+```
+
+## delete endpoint
+
+Delete an endpoint group
+
+```text Text
+usage: vastai delete endpoint ID 
+
+positional arguments:
+ id                 id of endpoint group to delete
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## get endpt-logs
+
+Fetch logs for a specific serverless endpoint group
+
+```text Text
+usage: vastai get endpt-logs ID [--api-key API_KEY]
+
+positional arguments:
+ id                 id of endpoint group to fetch logs from
+
+options:
+ -h, --help         show this help message and exit
+ --level LEVEL      log detail level (0 to 3)
+ --tail TAIL
+```
+
+## create workergroup
+
+Create a new autoscale group
+
+```text Text
+usage: vastai create workergroup [OPTIONS]
+
+options:
+ -h, --help                     show this help message and exit
+ --template_hash TEMPLATE_HASH  template hash (required, but **Note**: if you use this field, you can skip search_params, as they are automatically inferred from the template)
+ --template_id TEMPLATE_ID      template id (optional)
+ -n, --no-default               Disable default search param query args
+ --launch_args LAUNCH_ARGS      launch args  string for create instance  ex: "--onstart onstart_wget.sh  --env '-e ONSTART_PATH=https://s3.amazonaws.com/vast.ai/onstart_OOBA.sh' --image atinoda/text-generation-webui:default-nightly --disk 64"
+ --endpoint_name ENDPOINT_NAME  deployment endpoint name (allows multiple workergroups to share same deployment endpoint)
+ --endpoint_id ENDPOINT_ID      deployment endpoint id (allows multiple workergroups to share same deployment endpoint)
+ --test_workers TEST_WORKERS    number of workers to create to get an performance estimate for while initializing workergroup (default 3)
+ --gpu_ram GPU_RAM              estimated GPU RAM req  (independent of search string)
+ --search_params SEARCH_PARAMS  search param string for search offers    ex: "gpu_ram>=23 num_gpus=2 gpu_name=RTX_4090 inet_down>200 direct_port_count>2 disk_space>=64"
+ --min_load MIN_LOAD            [NOTE: this field isn't currently used at the workergroup level] minimum floor load in perf units/s  (token/s for LLms)
+ --target_util TARGET_UTIL      [NOTE: this field isn't currently used at the workergroup level] target capacity utilization (fraction, max 1.0, default 0.9)
+ --cold_mult COLD_MULT          [NOTE: this field isn't currently used at the workergroup level]cold/stopped instance capacity target as multiple of hot capacity target (default 2.0)
+ --cold_workers COLD_WORKERS    min number of workers to keep 'cold' for this workergroup
+```
+
+## show workergroups
+
+Display user's current workergroups
+
+```text Text
+usage: vastai show workergroups [--api-key API_KEY]
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## update workergroup
 
 Update an existing autoscale group
 
 ```text Text
-usage: vastai update autoscaler ID [OPTIONS]
+usage: vastai update workergroup WORKERGROUP_ID --endpoint_id ENDPOINT_ID [options]
 
 positional arguments:
-  ID                    id of autoscale group to update
+ id                             id of autoscale group to update
 
 options:
-  -h, --help            show this help message and exit
-  --min_load MIN_LOAD   minimum floor load in perf units/s (token/s for LLms)
-  --target_util TARGET_UTIL
-                        target capacity utilization (fraction, max 1.0,
-                        default 0.9)
-  --cold_mult COLD_MULT
-                        cold/stopped instance capacity target as multiple of
-                        hot capacity target (default 2.5)
-  --gpu_ram GPU_RAM     estimated GPU RAM req (independent of search string)
-  --template_hash TEMPLATE_HASH
-                        template hash
-  --template_id TEMPLATE_ID
-                        template id
-  --search_params SEARCH_PARAMS
-                        search param string for search offers ex: "gpu_ram>=23
-                        num_gpus=2 gpu_name=RTX_4090 inet_down>200
-                        direct_port_count>2 disk_space>=64"
-  --launch_args LAUNCH_ARGS
-                        launch args string for create instance ex: "--onstart
-                        onstart_wget.sh --env '-e ONSTART_PATH=https://s3.amaz
-                        onaws.com/vast.ai/onstart_OOBA.sh' --image
-                        atinoda/text-generation-webui:default-nightly --disk
-                        64"
-  --endpoint_name ENDPOINT_NAME
-                        deployment endpoint name (allows multiple autoscale
-                        groups to share same deployment endpoint)
-  --url URL             server REST api url
-  --retry RETRY         retry limit
-  --raw                 output machine-readable json
-  --explain             output verbose explanation of mapping of CLI calls to
-                        HTTPS API endpoints
-  --api-key API_KEY     api key. defaults to using the one stored in
-                        ~/.vast_api_key
+ -h, --help                     show this help message and exit
+ --min_load MIN_LOAD            minimum floor load in perf units/s  (token/s for LLms)
+ --target_util TARGET_UTIL      target capacity utilization (fraction, max 1.0, default 0.9)
+ --cold_mult COLD_MULT          cold/stopped instance capacity target as multiple of hot capacity target (default 2.5)
+ --cold_workers COLD_WORKERS    min number of workers to keep 'cold' for this workergroup
+ --test_workers TEST_WORKERS    number of workers to create to get an performance estimate for while initializing workergroup (default 3)
+ --gpu_ram GPU_RAM              estimated GPU RAM req  (independent of search string)
+ --template_hash TEMPLATE_HASH  template hash (**Note**: if you use this field, you can skip search_params, as they are automatically inferred from the template)
+ --template_id TEMPLATE_ID      template id
+ --search_params SEARCH_PARAMS  search param string for search offers    ex: "gpu_ram>=23 num_gpus=2 gpu_name=RTX_4090 inet_down>200 direct_port_count>2 disk_space>=64"
+ -n, --no-default               Disable default search param query args
+ --launch_args LAUNCH_ARGS      launch args  string for create instance  ex: "--onstart onstart_wget.sh  --env '-e ONSTART_PATH=https://s3.amazonaws.com/public.vast.ai/onstart_OOBA.sh' --image atinoda/text-generation-webui:default-nightly --disk 64"
+ --endpoint_name ENDPOINT_NAME  deployment endpoint name (allows multiple workergroups to share same deployment endpoint)
+ --endpoint_id ENDPOINT_ID      deployment endpoint id (allows multiple workergroups to share same deployment endpoint)
+```
 
-Example: vastai update autoscaler 4242 --min_load 100 --target_util 0.9 --cold_mult 2.0 --search_params "gpu_ram>=23 num_gpus=2 gpu_name=RTX_4090 inet_down>200 direct_port_count>2 disk_space>=64" --launch_args "--onstart onstart_wget.sh  --env '-e ONSTART_PATH=https://s3.amazonaws.com/vast.ai/onstart_OOBA.sh' --image atinoda/text-generation-webui:default-nightly --disk 64" --gpu_ram 32.0 --endpoint_name "LLama"
+## update workers
 
+Trigger a rolling update of all workers in a workergroup, or cancel an in-progress update
+
+```text Text
+usage: vastai update workers WORKERGROUP_ID [--cancel]
+
+positional arguments:
+ id                 id of workergroup to update workers for
+
+options:
+ -h, --help         show this help message and exit
+ --cancel           cancel an in-progress update for the workergroup
+```
+
+## delete workergroup
+
+Delete a workergroup group
+
+```text Text
+usage: vastai delete workergroup ID 
+
+positional arguments:
+ id                 id of group to delete
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## get wrkgrp-logs
+
+Fetch logs for a specific serverless worker group
+
+```text Text
+usage: vastai get wrkgrp-logs ID [--api-key API_KEY]
+
+positional arguments:
+ id                 id of workergroup to fetch logs from
+
+options:
+ -h, --help         show this help message and exit
+ --level LEVEL      log detail level (0 to 3)
+ --tail TAIL
+```
+
+## show deployments
+
+Display user's current deployments
+
+```text Text
+usage: vastai show deployments [OPTIONS]
+
+options:
+ -h, --help         show this help message and exit
+ -q, --quiet        only display numeric ids
+```
+
+## show deployment
+
+Display a single deployment
+
+```text Text
+usage: vastai show deployment ID [OPTIONS]
+
+positional arguments:
+ id                 id of deployment to show info for
+
+options:
+ -h, --help         show this help message and exit
+ -q, --quiet        only display numeric id
+```
+
+## delete deployment
+
+Delete a deployment by id, or by name and optional tag
+
+```text Text
+usage: vastai delete deployment [ID | --name NAME [--tag TAG]]
+
+positional arguments:
+ id                 id of deployment to delete
+
+options:
+ -h, --help         show this help message and exit
+ --name NAME        name of deployment to delete (deletes all tags unless --tag is specified)
+ --tag TAG          tag to filter by when deleting by name
+```
+
+
+## Teams
+
+## create team
+
+Create a new team
+
+```text Text
+usage: vastai create-team --team-name TEAM_NAME [--transfer-credit AMOUNT]
+
+options:
+ -h, --help                         show this help message and exit
+ --team-name TEAM_NAME              name of the team
+ --transfer-credit TRANSFER_CREDIT  amount of personal credit to transfer to the new team
+```
+
+## destroy team
+
+Destroy your team
+
+```text Text
+usage: vastai destroy team
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## create team-role
+
+Add a new role to your team
+
+```text Text
+usage: vastai create team-role --name NAME --permissions PERMISSIONS
+
+options:
+ -h, --help                 show this help message and exit
+ --name NAME                name of the role
+ --permissions PERMISSIONS  file path for json encoded permissions, look in the docs for more information
+```
+
+## show team-role
+
+Show your team role
+
+```text Text
+usage: vastai show team-role NAME
+
+positional arguments:
+ NAME               name of the role
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## show team-roles
+
+Show roles for a team
+
+```text Text
+usage: vastai show team-roles
+
+options:
+ -h, --help         show this help message and exit
 ```
 
 ## update team-role
@@ -1732,343 +1400,867 @@ Update an existing team role
 usage: vastai update team-role ID --name NAME --permissions PERMISSIONS
 
 positional arguments:
-  ID                    id of the role
+ id                         id of the role
 
 options:
-  -h, --help            show this help message and exit
-  --name NAME           name of the template
-  --permissions PERMISSIONS
-                        file path for json encoded permissions, look in the
-                        docs for more information
-  --url URL             server REST api url
-  --retry RETRY         retry limit
-  --raw                 output machine-readable json
-  --explain             output verbose explanation of mapping of CLI calls to
-                        HTTPS API endpoints
-  --api-key API_KEY     api key. defaults to using the one stored in
-                        ~/.vast_api_key
-
+ -h, --help                 show this help message and exit
+ --name NAME                name of the role
+ --permissions PERMISSIONS  file path for json encoded permissions, look in the docs for more information
 ```
 
-# Host Commands
+## remove team-role
 
-## create cluster
+Remove a role from your team
 
-Registers a new locally-networked cluster with the Vast.&#x20;
-
-
-
-```none
-usage: vastai create cluster SUBNET MANAGER_ID
+```text Text
+usage: vastai remove team-role NAME
 
 positional arguments:
- subnet             local subnet for cluster, ex: '0.0.0.0/24'
- manager_id         Machine ID of manager node in cluster. Must exist already.
+ NAME               name of the role
 
 options:
  -h, --help         show this help message and exit
- --url URL          server REST api url
- --retry RETRY      retry limit
- --raw              output machine-readable json
- --explain          output verbose explanation of mapping of CLI calls to HTTPS API endpoints
- --curl             show a curl equivalency to the call
- --api-key API_KEY  api key. defaults to using the one stored in /home/edgarlin/.config/vastai/vast_api_key
- --version          show version
-
-Create Vast Cluster by defining a local subnet and manager id.
-
 ```
 
-## delete cluster
+## invite member
 
-Deregisters a cluster
+Invite a team member
 
-```none
-usage: vastai delete cluster CLUSTER_ID
-
-positional arguments:
- cluster_id         ID of cluster to delete
+```text Text
+usage: vastai invite member --email EMAIL --role ROLE
 
 options:
  -h, --help         show this help message and exit
- --url URL          server REST api url
- --retry RETRY      retry limit
- --raw              output machine-readable json
- --explain          output verbose explanation of mapping of CLI calls to HTTPS API endpoints
- --curl             show a curl equivalency to the call
- --api-key API_KEY  api key. defaults to using the one stored in /home/edgarlin/.config/vastai/vast_api_key
- --version          show version
-
-Delete Vast Cluster
-
+ --email EMAIL      email of user to be invited
+ --role ROLE        role of user to be invited
 ```
 
-## join cluster
+## show members
 
-Registers a machine or list of machines as a member of a cluster.&#x20;
+Show your team members
 
-```none
-usage: vastai join cluster CLUSTER_ID MACHINE_IDS
-
-positional arguments:
- cluster_id         ID of cluster to add machine to
- machine_ids        machine id(s) to join cluster
+```text Text
+usage: vastai show members
 
 options:
  -h, --help         show this help message and exit
- --url URL          server REST api url
- --retry RETRY      retry limit
- --raw              output machine-readable json
- --explain          output verbose explanation of mapping of CLI calls to HTTPS API endpoints
- --curl             show a curl equivalency to the call
- --api-key API_KEY  api key. defaults to using the one stored in /home/edgarlin/.config/vastai/vast_api_key
- --version          show version
-
-Join's Machine to Vast Cluster
-
 ```
 
-## list machine
+## remove member
 
-\[Host] list a machine for rent
+Remove a team member
 
 ```text Text
-usage: vastai list machine id [--price_gpu PRICE_GPU] [--price_inetu PRICE_INETU] [--price_inetd PRICE_INETD] [--api-key API_KEY]
+usage: vastai remove member ID
 
 positional arguments:
-  id                    id of machine to list
-
-options:
-  -h, --help            show this help message and exit
-  -g PRICE_GPU, --price_gpu PRICE_GPU
-                        per gpu rental price in $/hour (price for active
-                        instances)
-  -s PRICE_DISK, --price_disk PRICE_DISK
-                        storage price in $/GB/month (price for inactive
-                        instances), default: $0.15/GB/month
-  -u PRICE_INETU, --price_inetu PRICE_INETU
-                        price for internet upload bandwidth in $/GB
-  -d PRICE_INETD, --price_inetd PRICE_INETD
-                        price for internet download bandwidth in $/GB
-  -r DISCOUNT_RATE, --discount_rate DISCOUNT_RATE
-                        Max long term prepay discount rate fraction, default:
-                        0.4
-  -m MIN_CHUNK, --min_chunk MIN_CHUNK
-                        minimum amount of gpus
-  -e END_DATE, --end_date END_DATE
-                        unix timestamp of the available until date (optional)
-  --url URL             server REST api url
-  --retry RETRY         retry limit
-  --raw                 output machine-readable json
-  --explain             output verbose explanation of mapping of CLI calls to
-                        HTTPS API endpoints
-  --api-key API_KEY     api key. defaults to using the one stored in
-                        ~/.vast_api_key
-
-Performs the same action as pressing the "LIST" button on the site https://cloud.vast.ai/host/machines.
-On the end date the listing will expire and your machine will unlist. However any existing client jobs will still remain until ended by their owners.
-Once you list your machine and it is rented, it is extremely important that you don't interfere with the machine in any way.
-If your machine has an active client job and then goes offline, crashes, or has performance problems, this could permanently lower your reliability rating.
-We strongly recommend you test the machine first and only list when ready.
-
-```
-
-## remove-machine-from-cluster
-
-Deregisters a machine from a cluster, changing the manager node if the machine removed is the only manager.&#x20;
-
-
-
-```none
-usage: vastai remove-machine-from-cluster CLUSTER_ID MACHINE_ID NEW_MANAGER_ID
-
-positional arguments:
- cluster_id         ID of cluster you want to remove machine from.
- machine_id         ID of machine to remove from cluster.
- new_manager_id     ID of machine to promote to manager. Must already be in cluster
+ id                 id of user to remove
 
 options:
  -h, --help         show this help message and exit
- --url URL          server REST api url
- --retry RETRY      retry limit
- --raw              output machine-readable json
- --explain          output verbose explanation of mapping of CLI calls to HTTPS API endpoints
- --curl             show a curl equivalency to the call
- --api-key API_KEY  api key. defaults to using the one stored in /home/edgarlin/.config/vastai/vast_api_key
- --version          show version
-
-Removes machine from cluster and also reassigns manager ID,
-if we're removing the manager node
-
 ```
 
-## remove defjob
 
-\[Host] Delete default jobs
+## Accounts & Keys
+
+## create api-key
+
+Create a new api-key with restricted permissions. Can be sent to other users and teammates
 
 ```text Text
-usage: vastai remove defjob id
-
-positional arguments:
-  id                 id of machine to remove default instance from
+usage: vastai create api-key --name NAME --permission_file PERMISSIONS
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
+ -h, --help                         show this help message and exit
+ --name NAME                        name of the api-key
+ --permission_file PERMISSION_FILE  file path for json encoded permissions, see https://vast.ai/docs/cli/roles-and-permissions for more information
+ --key_params KEY_PARAMS            optional wildcard key params for advanced keys
 ```
 
-## schedule maint
+## show api-keys
 
-\[Host] Schedule upcoming maint window
+List your api-keys associated with your account
 
 ```text Text
-usage: vastai schedule maintenance id [--sdate START_DATE --duration DURATION]
-
-positional arguments:
-  id                   id of machine to schedule maintenance for
-
-options:
-  -h, --help           show this help message and exit
-  --sdate SDATE        maintenance start date in unix epoch time (UTC seconds)
-  --duration DURATION  maintenance duration in hours
-  --url URL            server REST api url
-  --retry RETRY        retry limit
-  --raw                output machine-readable json
-  --explain            output verbose explanation of mapping of CLI calls to
-                       HTTPS API endpoints
-  --api-key API_KEY    api key. defaults to using the one stored in
-                       ~/.vast_api_key
-
-The proper way to perform maintenance on your machine is to wait until all active contracts have expired or the machine is vacant.
-For unplanned or unscheduled maintenance, use this schedule maint command. That will notify the client that you have to take the machine down and that they should save their work.
-You can specify a date and duration.
-Example: vastai schedule maint 8207 --sdate 1677562671 --duration 0.5
-
-```
-
-## set defjob
-
-\[Host] Create default jobs for a machine
-
-```text Text
-usage: vastai set defjob id [--api-key API_KEY] [--price_gpu PRICE_GPU] [--price_inetu PRICE_INETU] [--price_inetd PRICE_INETD] [--image IMAGE] [--args ...]
-
-positional arguments:
-  id                    id of machine to launch default instance on
-
-options:
-  -h, --help            show this help message and exit
-  --price_gpu PRICE_GPU
-                        per gpu rental price in $/hour
-  --price_inetu PRICE_INETU
-                        price for internet upload bandwidth in $/GB
-  --price_inetd PRICE_INETD
-                        price for internet download bandwidth in $/GB
-  --image IMAGE         docker container image to launch
-  --args ...            list of arguments passed to container launch
-  --url URL             server REST api url
-  --retry RETRY         retry limit
-  --raw                 output machine-readable json
-  --explain             output verbose explanation of mapping of CLI calls to
-                        HTTPS API endpoints
-  --api-key API_KEY     api key. defaults to using the one stored in
-                        ~/.vast_api_key
-
-Performs the same action as creating a background job at https://cloud.vast.ai/host/create.
-
-```
-
-## set min-bid
-
-\[Host] Set the minimum bid/rental price for a machine
-
-```text Text
-usage: vastai set min_bid id [--price PRICE]
-
-positional arguments:
-  id                 id of machine to set min bid price for
-
-options:
-  -h, --help         show this help message and exit
-  --price PRICE      per gpu min bid price in $/hour
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
-Change the current min bid price of machine id to PRICE.
-
-```
-
-## show clusters
-
-Shows information about the host's clusters
-
-```none
-usage: vastai show clusters
+usage: vastai show api-keys
 
 options:
  -h, --help         show this help message and exit
- --url URL          server REST api url
- --retry RETRY      retry limit
- --raw              output machine-readable json
- --explain          output verbose explanation of mapping of CLI calls to HTTPS API endpoints
- --curl             show a curl equivalency to the call
- --api-key API_KEY  api key. defaults to using the one stored in /home/edgarlin/.config/vastai/vast_api_key
- --version          show version
+```
 
-Show clusters associated with your account.
+## delete api-key
 
+Remove an api-key
+
+```text Text
+usage: vastai delete api-key ID
+
+positional arguments:
+ id                 id of apikey to remove
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## set api-key
+
+Set api-key (get your api-key from the console/CLI)
+
+```text Text
+usage: vastai set api-key APIKEY
+
+positional arguments:
+ new_api_key        Api key to set as currently logged in user
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## create ssh-key
+
+Create a new ssh-key
+
+```text Text
+usage: vastai create ssh-key [ssh_public_key] [-y]
+
+positional arguments:
+ ssh_key            add your existing ssh public key to your account (from the .pub file). If no public key is provided, a new key pair will be generated.
+
+options:
+ -h, --help         show this help message and exit
+ -y, --yes          automatically answer yes to prompts
+```
+
+## show ssh-keys
+
+List your ssh keys associated with your account
+
+```text Text
+usage: vastai show ssh-keys
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## delete ssh-key
+
+Remove an ssh-key
+
+```text Text
+usage: vastai delete ssh-key ID
+
+positional arguments:
+ id                 id ssh key to delete
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## update ssh-key
+
+Update an existing SSH key
+
+```text Text
+usage: vastai update ssh-key ID SSH_KEY
+
+positional arguments:
+ id                 id of the ssh key to update
+ ssh_key            new public key value
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## show user
+
+Get current user data
+
+```text Text
+usage: vastai show user [OPTIONS]
+
+options:
+ -h, --help         show this help message and exit
+ -q, --quiet        display information about user
+```
+
+## set user
+
+Update user data from json file
+
+```text Text
+usage: vastai set user --file FILE
+
+options:
+ -h, --help         show this help message and exit
+ --file FILE        file path for params in json format
+```
+
+## show subaccounts
+
+Get current subaccounts
+
+```text Text
+usage: vastai show subaccounts [OPTIONS]
+
+options:
+ -h, --help         show this help message and exit
+ -q, --quiet        display subaccounts from current user
+```
+
+## create subaccount
+
+Create a subaccount
+
+```text Text
+usage: vastai create subaccount --email EMAIL --username USERNAME --password PASSWORD --type TYPE
+
+options:
+ -h, --help           show this help message and exit
+ --email EMAIL        email address to use for login
+ --username USERNAME  username to use for login
+ --password PASSWORD  password to use for login
+ --type TYPE          host/client
+```
+
+## show ipaddrs
+
+Display user's history of ip addresses
+
+```text Text
+usage: vastai show ipaddrs [--api-key API_KEY] [--raw]
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## show audit-logs
+
+Display account's history of important actions
+
+```text Text
+usage: vastai show audit-logs [--api-key API_KEY] [--raw]
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## show env-vars
+
+Show user environment variables
+
+```text Text
+usage: vastai show env-vars [-s]
+
+options:
+ -h, --help         show this help message and exit
+ -s, --show-values  Show the values of environment variables
+```
+
+## create env-var
+
+Create a new user environment variable
+
+```text Text
+usage: vastai create env-var <name> <value>
+
+positional arguments:
+ name               Environment variable name
+ value              Environment variable value
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## update env-var
+
+Update an existing user environment variable
+
+```text Text
+usage: vastai update env-var <name> <value>
+
+positional arguments:
+ name               Environment variable name to update
+ value              New environment variable value
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## delete env-var
+
+Delete a user environment variable
+
+```text Text
+usage: vastai delete env-var <name>
+
+positional arguments:
+ name               Environment variable name to delete
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## transfer credit
+
+Transfer credits to another account
+
+```text Text
+usage: vastai transfer credit RECIPIENT AMOUNT
+
+positional arguments:
+ recipient          email (or id) of recipient account
+ amount             $dollars of credit to transfer 
+
+options:
+ -h, --help         show this help message and exit
+ --skip             skip confirmation
+```
+
+## show scheduled-jobs
+
+Display the list of scheduled jobs
+
+```text Text
+usage: vastai show scheduled-jobs [--api-key API_KEY] [--raw]
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## delete scheduled-job
+
+Delete a scheduled job
+
+```text Text
+usage: vastai delete scheduled-job ID
+
+positional arguments:
+ id                 id of scheduled job to remove
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## tfa activate
+
+Activate a new 2FA method by verifying the code
+
+```text Text
+usage: vastai tfa activate CODE --secret SECRET [--method-type METHOD_TYPE] [--phone-number PHONE_NUMBER] [--label LABEL]
+
+positional arguments:
+ code                                     6-digit verification code from SMS or Authenticator app
+
+options:
+ -h, --help                               show this help message and exit
+ -t {sms,totp}, --method-type {sms,totp}  New 2FA Method type to activate
+ --secret SECRET                          Secret token from setup process (required)
+ --phone-number PHONE_NUMBER              Phone number for SMS method (E.164 format)
+ -l LABEL, --label LABEL                  Label for the new 2FA method
+```
+
+## tfa delete
+
+Remove a 2FA method from your account
+
+```text Text
+usage: vastai tfa delete [--id-to-delete ID] [--code CODE] [--method-type METHOD_TYPE] [--secret SECRET] [--backup-code BACKUP_CODE] [--method-id ID]
+
+options:
+ -h, --help                                       show this help message and exit
+ -id ID_TO_DELETE, --id-to-delete ID_TO_DELETE    ID of the 2FA method to delete (see `vastai tfa status`)
+ -c CODE, --code CODE                             2FA code from your Authenticator app, SMS, or Email to authorize deletion
+ -t {email,sms,totp}, --method-type {email,sms,totp}
+                                                  2FA Method type. Only use when you only have one method of this type
+ -s SECRET, --secret SECRET                       Secret token (required for SMS or Email 2FA)
+ -bc BACKUP_CODE, --backup-code BACKUP_CODE       One-time backup code (alternative to regular 2FA code)
+ --method-id METHOD_ID                            2FA Method ID to use if you have more than one of the same type ('id' from `tfa status`)
+```
+
+## tfa login
+
+Complete 2FA login by verifying code
+
+```text Text
+usage: vastai tfa login [--code CODE] [--method-type METHOD_TYPE] [--secret SECRET] [--backup-code BACKUP_CODE]
+
+options:
+ -h, --help                                       show this help message and exit
+ -c CODE, --code CODE                             2FA code from Authenticator app, SMS, or Email
+ -t {email,sms,totp}, --method-type {email,sms,totp}
+                                                  2FA Method type. Only use when you only have one method of this type
+ -s SECRET, --secret SECRET                       Secret token from previous login step (required for SMS or Email 2FA)
+ -bc BACKUP_CODE, --backup-code BACKUP_CODE       One-time backup code (alternative to regular 2FA code)
+ -id METHOD_ID, --method-id METHOD_ID             2FA Method ID if you have more than one of the same type ('id' from `tfa status`)
+```
+
+## tfa resend-sms
+
+Resend SMS 2FA code
+
+```text Text
+usage: vastai tfa resend-sms --secret SECRET [--phone-number PHONE_NUMBER]
+
+options:
+ -h, --help                                    show this help message and exit
+ -p PHONE_NUMBER, --phone-number PHONE_NUMBER  Phone number to receive SMS code (E.164 format, e.g., +1234567890)
+ -s SECRET, --secret SECRET                    Secret token from the original 2FA login attempt
+```
+
+## tfa regen-codes
+
+Regenerate backup codes for 2FA
+
+```text Text
+usage: vastai tfa regen-codes [--code CODE] [--method-type METHOD_TYPE] [--secret SECRET] [--backup-code BACKUP_CODE] [--method-id ID]
+
+options:
+ -h, --help                                       show this help message and exit
+ -c CODE, --code CODE                             2FA code from Authenticator app, SMS, or Email
+ -t {email,sms,totp}, --method-type {email,sms,totp}
+                                                  2FA Method type. Only use when you only have one method of this type
+ -s SECRET, --secret SECRET                       Secret token from previous login step (required for SMS or Email 2FA)
+ -bc BACKUP_CODE, --backup-code BACKUP_CODE       One-time backup code (alternative to regular 2FA code)
+ -id METHOD_ID, --method-id METHOD_ID             2FA Method ID if you have more than one of the same type ('id' from `tfa status`)
+```
+
+## tfa send-sms
+
+Request a 2FA SMS verification code
+
+```text Text
+usage: vastai tfa send-sms [--phone-number PHONE_NUMBER]
+
+options:
+ -h, --help                                    show this help message and exit
+ -p PHONE_NUMBER, --phone-number PHONE_NUMBER  Phone number to receive SMS code (E.164 format, e.g., +1234567890)
+```
+
+## tfa send-email
+
+Request a 2FA Email verification code
+
+```text Text
+usage: vastai tfa send-email
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## tfa auth-new
+
+Authorize your account to add a new 2FA method
+
+```text Text
+usage: vastai tfa auth-new {[--method-type METHOD_TYPE | --method-id ID | --backup-code BACKUP_CODE] | [--secret SECRET --code CODE]}
+
+options:
+ -h, --help                                       show this help message and exit
+ -c CODE, --code CODE                             2FA code from Authenticator app, SMS, or Email
+ -s SECRET, --secret SECRET                       Secret token from previous auth step
+ -t {email,sms,totp}, --method-type {email,sms,totp}
+                                                  2FA Method type. Only use when you only have one method of this type
+ -bc BACKUP_CODE, --backup-code BACKUP_CODE       One-time backup code (alternative to regular 2FA code)
+ -id METHOD_ID, --method-id METHOD_ID             2FA Method ID if you have more than one of the same type ('id' from `tfa status`)
+```
+
+## tfa status
+
+Shows the current 2FA status and configured methods
+
+```text Text
+usage: vastai tfa status [-h] [--url URL] [--retry RETRY] [--explain] [--raw] [--full] [--curl] [--api-key API_KEY] [--version]
+                         [--no-color]
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## tfa totp-setup
+
+Generate TOTP secret and QR code for Authenticator app setup
+
+```text Text
+usage: vastai tfa totp-setup
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## tfa update
+
+Update a 2FA method's settings
+
+```text Text
+usage: vastai tfa update METHOD_ID [--label LABEL] [--set-primary]
+
+positional arguments:
+ METHOD_ID                                  ID of the 2FA method to update (see `vastai tfa status`)
+
+options:
+ -h, --help                                 show this help message and exit
+ -l LABEL, --label LABEL                    New label/name for this 2FA method
+ -p SET_PRIMARY, --set-primary SET_PRIMARY  Set this method as the primary/default 2FA method
+```
+
+
+## Billing
+
+## show invoices
+
+Get billing (invoices/charges) history reports with advanced filtering and pagination
+
+```text Text
+usage: vastai show invoices [OPTIONS]
+
+options:
+ -h, --help                                       show this help message and exit
+ -i, --invoices                                   Show invoices instead of charges
+ -it type [type ...], --invoice-type type [type ...]
+                                                  Filter which types of invoices to show: {transfers, stripe, bitpay, coinbase, crypto.com, reserved, payout_paypal, payout_wise}
+ -c, --charges                                    Show charges instead of invoices
+ -ct type [type ...], --charge-type type [type ...]
+                                                  Filter which types of charges to show: {i|instance, v|volume, s|serverless}
+ -s START_DATE, --start-date START_DATE           Start date (YYYY-MM-DD or timestamp)
+ -e END_DATE, --end-date END_DATE                 End date (YYYY-MM-DD or timestamp)
+ -l LIMIT, --limit LIMIT                          Number of results per page (default: 20, max: 100)
+ -t NEXT_TOKEN, --next-token NEXT_TOKEN           Pagination token for next page
+ -f {table,tree}, --format {table,tree}           Output format for charges (default: table)
+ -v, --verbose                                    Include full Instance Charge details and Invoice Metadata (tree view only)
+ --latest-first                                   Sort by latest first
+```
+
+## show earnings
+
+Get machine earning history reports
+
+```text Text
+usage: vastai show earnings [OPTIONS]
+
+options:
+ -h, --help                              show this help message and exit
+ -q, --quiet                             only display numeric ids
+ -s START_DATE, --start_date START_DATE  start date and time for report. Many formats accepted
+ -e END_DATE, --end_date END_DATE        end date and time for report. Many formats accepted 
+ -m MACHINE_ID, --machine_id MACHINE_ID  Machine id (optional)
+```
+
+## show deposit
+
+Display reserve deposit info for an instance
+
+```text Text
+usage: vastai show deposit ID [options]
+
+positional arguments:
+ id                 id of instance to get info for
+
+options:
+ -h, --help         show this help message and exit
+```
+
+
+## Host
+
+## show machine
+
+[Host] Show hosted machines
+
+```text Text
+usage: vastai show machine ID [OPTIONS]
+
+positional arguments:
+ Machine            id of machine to display
+
+options:
+ -h, --help         show this help message and exit
+ -q, --quiet        only display numeric ids
 ```
 
 ## show machines
 
-\[Host] Show hosted machines
+[Host] Show hosted machines
 
 ```text Text
 usage: vastai show machines [OPTIONS]
 
 options:
-  -h, --help         show this help message and exit
-  -q, --quiet        only display numeric ids
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
+ -h, --help         show this help message and exit
+ -q, --quiet        only display numeric ids
+```
 
+## show maints
+
+[Host] Show maintenance information for host machines
+
+```text Text
+usage: 
+vastai show maints -ids 'machine_id_1' [OPTIONS]
+vastai show maints -ids 'machine_id_1, machine_id_2' [OPTIONS]
+
+options:
+ -h, --help         show this help message and exit
+ -ids IDS           comma separated string of machine_ids for which to get maintenance information
+ -q, --quiet        only display numeric ids of the machines in maintenance
+```
+
+## show network-disks
+
+[Host] Show network disks associated with your account.
+
+```text Text
+usage: vastai show network-disks
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## list machine
+
+[Host] list a machine for rent
+
+```text Text
+usage: vastai list machine ID [options]
+
+positional arguments:
+ id                                               id of machine to list
+
+options:
+ -h, --help                                       show this help message and exit
+ -g PRICE_GPU, --price_gpu PRICE_GPU              per gpu rental price in $/hour  (price for active instances)
+ -s PRICE_DISK, --price_disk PRICE_DISK           storage price in $/GB/month (price for inactive instances), default: $0.10/GB/month
+ -u PRICE_INETU, --price_inetu PRICE_INETU        price for internet upload bandwidth in $/GB
+ -d PRICE_INETD, --price_inetd PRICE_INETD        price for internet download bandwidth in $/GB
+ -b PRICE_MIN_BID, --price_min_bid PRICE_MIN_BID  per gpu minimum bid price floor in $/hour
+ -r DISCOUNT_RATE, --discount_rate DISCOUNT_RATE  Max long term prepay discount rate fraction, default: 0.4 
+ -m MIN_CHUNK, --min_chunk MIN_CHUNK              minimum amount of gpus
+ -e END_DATE, --end_date END_DATE                 contract offer expiration - the available until date (optional, in unix float timestamp or MM/DD/YYYY format)
+ -l DURATION, --duration DURATION                 Updates end_date daily to be duration from current date. Cannot be combined with end_date. Format is: `n days`, `n weeks`, `n months`, `n years`, or total intended duration in seconds.
+ -v VOL_SIZE, --vol_size VOL_SIZE                 Size for volume contract offer. Defaults to half of available disk. Set 0 to not create a volume contract offer.
+ -z VOL_PRICE, --vol_price VOL_PRICE              Price for disk on volume contract offer. Defaults to price_disk. Invalid if vol_size is 0.
+```
+
+## list machines
+
+[Host] list machines for rent
+
+```text Text
+usage: vastai list machines IDs [options]
+
+positional arguments:
+ ids                                              ids of machines to list
+
+options:
+ -h, --help                                       show this help message and exit
+ -g PRICE_GPU, --price_gpu PRICE_GPU              per gpu on-demand rental price in $/hour (base price for active instances)
+ -s PRICE_DISK, --price_disk PRICE_DISK           storage price in $/GB/month (price for inactive instances), default: $0.10/GB/month
+ -u PRICE_INETU, --price_inetu PRICE_INETU        price for internet upload bandwidth in $/GB
+ -d PRICE_INETD, --price_inetd PRICE_INETD        price for internet download bandwidth in $/GB
+ -b PRICE_MIN_BID, --price_min_bid PRICE_MIN_BID  per gpu minimum bid price floor in $/hour
+ -r DISCOUNT_RATE, --discount_rate DISCOUNT_RATE  Max long term prepay discount rate fraction, default: 0.4 
+ -m MIN_CHUNK, --min_chunk MIN_CHUNK              minimum amount of gpus
+ -e END_DATE, --end_date END_DATE                 contract offer expiration - the available until date (optional, in unix float timestamp or MM/DD/YYYY format)
+ -l DURATION, --duration DURATION                 Updates end_date daily to be duration from current date. Cannot be combined with end_date. Format is: `n days`, `n weeks`, `n months`, `n years`, or total intended duration in seconds.
+ -v VOL_SIZE, --vol_size VOL_SIZE                 Size for volume contract offer. Defaults to half of available disk. Set 0 to not create a volume contract offer.
+ -z VOL_PRICE, --vol_price VOL_PRICE              Price for disk on volume contract offer. Defaults to price_disk. Invalid if vol_size is 0.
 ```
 
 ## unlist machine
 
-\[Host] Unlist a listed machine
+[Host] Unlist a listed machine
 
-```text Text    
+```text Text
 usage: vastai unlist machine <id>
 
 positional arguments:
-  id                 id of machine to unlist
+ id                 id of machine to unlist
 
 options:
-  -h, --help         show this help message and exit
-  --url URL          server REST api url
-  --retry RETRY      retry limit
-  --raw              output machine-readable json
-  --explain          output verbose explanation of mapping of CLI calls to
-                     HTTPS API endpoints
-  --api-key API_KEY  api key. defaults to using the one stored in
-                     ~/.vast_api_key
-
+ -h, --help         show this help message and exit
 ```
+
+## delete machine
+
+[Host] Delete machine if the machine is not being used by clients. host jobs on their own machines are disregarded and machine is force deleted.
+
+```text Text
+usage: vastai delete machine <id>
+
+positional arguments:
+ id                 id of machine to delete
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## cleanup machine
+
+[Host] Remove all expired storage instances from the machine, freeing up space
+
+```text Text
+usage: vastai cleanup machine ID [options]
+
+positional arguments:
+ id                 id of machine to cleanup
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## defrag machines
+
+[Host] Defragment machines
+
+```text Text
+usage: vastai defragment machines IDs 
+
+positional arguments:
+ IDs                ids of machines
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## set min-bid
+
+[Host] Set the minimum bid/rental price for a machine
+
+```text Text
+usage: vastai set min_bid id [--price PRICE]
+
+positional arguments:
+ id                 id of machine to set min bid price for
+
+options:
+ -h, --help         show this help message and exit
+ --price PRICE      per gpu min bid price in $/hour
+```
+
+## set defjob
+
+[Host] Create default jobs for a machine
+
+```text Text
+usage: vastai set defjob id [--api-key API_KEY] [--price_gpu PRICE_GPU] [--price_inetu PRICE_INETU] [--price_inetd PRICE_INETD] [--image IMAGE] [--args ...]
+
+positional arguments:
+ id                         id of machine to launch default instance on
+
+options:
+ -h, --help                 show this help message and exit
+ --price_gpu PRICE_GPU      per gpu rental price in $/hour
+ --price_inetu PRICE_INETU  price for internet upload bandwidth in $/GB
+ --price_inetd PRICE_INETD  price for internet download bandwidth in $/GB
+ --image IMAGE              docker container image to launch
+ --args ...                 list of arguments passed to container launch
+```
+
+## remove defjob
+
+[Host] Delete default jobs
+
+```text Text
+usage: vastai remove defjob id
+
+positional arguments:
+ id                 id of machine to remove default instance from
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## schedule maint
+
+[Host] Schedule upcoming maint window
+
+```text Text
+usage: vastai schedule maintenance id [--sdate START_DATE --duration DURATION --maintenance_category MAINTENANCE_CATEGORY]
+
+positional arguments:
+ id                                           id of machine to schedule maintenance for
+
+options:
+ -h, --help                                   show this help message and exit
+ --sdate SDATE                                maintenance start date in unix epoch time (UTC seconds)
+ --duration DURATION                          maintenance duration in hours
+ --maintenance_category MAINTENANCE_CATEGORY  (optional) can be one of [power, internet, disk, gpu, software, other]
+```
+
+## cancel maint
+
+[Host] Cancel maint window
+
+```text Text
+usage: vastai cancel maint id
+
+positional arguments:
+ id                 id of machine to cancel maintenance(s) for
+
+options:
+ -h, --help         show this help message and exit
+```
+
+## add network-disk
+
+[Host] Add Network Disk to Physical Cluster.
+
+```text Text
+usage: vastai add network-disk MACHINES MOUNT_PATH [options]
+
+positional arguments:
+ machines                           ids of machines to add disk to, that is networked to be on the same LAN as machine
+ mount_point                        mount path of disk to add
+
+options:
+ -h, --help                         show this help message and exit
+ -d [DISK_ID], --disk_id [DISK_ID]  id of network disk to attach to machines in the cluster
+```
+
+## self-test machine
+
+[Host] Perform a self-test on the specified machine
+
+```text Text
+usage: vastai self-test machine <machine_id> [--debugging] [--ignore-requirements]
+
+positional arguments:
+ machine_id             Machine ID
+
+options:
+ -h, --help             show this help message and exit
+ --debugging            Enable debugging output
+ --ignore-requirements  Ignore the minimum system requirements and run the self test regardless
+```
+
+## reports
+
+Get the user reports for a given machine
+
+```text Text
+usage: vastai reports ID
+
+positional arguments:
+ id                 machine id
+
+options:
+ -h, --help         show this help message and exit
+```
+
+
+## Misc
+
+## benchmark
+
+Compare GPU perf/cost using live marketplace data
+
+```text Text
+usage: vastai benchmark [--gpus 3090,4090,...] [--num-gpus N] [--json]
+
+options:
+ -h, --help                 show this help message and exit
+ --gpus GPUS                Comma-separated GPU names. default: RTX 3090,RTX 4090,RTX 5090,RTX A4000,RTX A5000,H100 SXM,H100 NVL,H200
+ --num-gpus NUM_GPUS        Bucket to benchmark (e.g. 1, 2, 4, 8). default: 1
+ --min-samples MIN_SAMPLES  Minimum offers per GPU before reporting without a warning. default: 3
+ --json                     Emit JSON instead of a text table.
+```
+
