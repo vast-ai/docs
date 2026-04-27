@@ -1,0 +1,485 @@
+---
+title: Two-Factor Authentication Endpoints
+createdAt: Mon Apr 21 2025 00:00:00 GMT+0000 (Coordinated Universal Time)
+updatedAt: Mon Apr 21 2025 00:00:00 GMT+0000 (Coordinated Universal Time)
+---
+
+This document describes all 2FA API endpoints. Base URL: `https://console.vast.ai`.
+
+---
+
+## Authentication
+
+All 2FA endpoints require a valid authentication token. Tokens are passed as a Bearer token in the `Authorization` header, or as the `api_key` query parameter.
+
+Two authentication contexts are supported:
+
+- **Session context** — standard UI login session (cookie-based or bearer token)
+- **CLI context** — an API key used as a Bearer token; only the login endpoint (`POST /api/v0/tfa/`) is called with this context for SMS 2FA flows
+
+Email verification (`email_verified_at`) is required before using any 2FA endpoint that sends codes (SMS or email).
+
+---
+
+## Status
+
+### Get 2FA status
+
+```
+GET /api/v0/tfa/status/
+```
+
+Returns the current 2FA configuration for the authenticated user.
+
+**Response**
+
+```json
+{
+  "success": true,
+  "tfa_enabled": true,
+  "methods": [
+    {
+      "id": 42,
+      "method": "sms",
+      "label": "My Phone",
+      "phone_number": "******1234",
+      "is_primary": true,
+      "created_at": 1700000000.0,
+      "last_used": 1700000000.0
+    }
+  ],
+  "backup_codes_remaining": 8,
+  "new_method_authorized": false
+}
+```
+
+Fields:
+- `tfa_enabled` — whether 2FA is active on the account
+- `methods` — list of configured 2FA methods; phone numbers are masked (last 4 digits shown); TOTP secrets are never returned
+- `backup_codes_remaining` — count of unused backup codes
+- `new_method_authorized` — whether the user has completed the authorization step to add a new method (short-lived, 30-minute window)
+
+---
+
+## Login
+
+### Complete 2FA login
+
+```
+POST /api/v0/tfa/
+```
+
+Verifies a 2FA code to complete login. Called after passing username/password authentication.
+
+**Request body**
+
+```json
+{
+  "tfa_method": "sms",
+  "code": "123456",
+  "secret": "<tfa_secret>",
+  "tfa_method_id": 42
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tfa_method` | string | yes | `"sms"`, `"totp"`, or `"email"` |
+| `code` | string | yes | 6-digit code |
+| `secret` | string | yes | `tfa_secret` returned from the send-code endpoint |
+| `tfa_method_id` | integer | no | ID of a specific method; required when user has multiple methods of the same type |
+| `backup_code` | string | no | One-time backup code (format: `XXXX-XXXX-XXXX`); bypasses normal code verification |
+| `admin` | boolean | no | Request an admin session (default: false) |
+
+**Response**
+
+```json
+{
+  "success": true,
+  "bearer_token": "<session_key>",
+  "path": "/"
+}
+```
+
+CLI callers (Bearer token auth) receive `session_key` in the response for subsequent requests.
+
+---
+
+### Remove a 2FA method
+
+```
+DELETE /api/v0/tfa/
+```
+
+Removes a configured 2FA method after verifying the request.
+
+**Request body**
+
+```json
+{
+  "tfa_method": "sms",
+  "code": "123456",
+  "secret": "<tfa_secret>",
+  "target_id": 42
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tfa_method` | string | conditionally | Method used to verify (`"sms"`, `"totp"`, `"email"`); not needed when using `backup_code` |
+| `code` | string | conditionally | 6-digit code; required if not using `backup_code` |
+| `secret` | string | no | `tfa_secret` for SMS or email verification |
+| `tfa_method_id` | integer | no | Method used for verification |
+| `target_id` | integer | no | ID of method to remove; defaults to the method used for verification |
+| `backup_code` | string | no | Backup code to authorize the removal (requires `target_id`) |
+
+**Response**
+
+```json
+{"msg": "2FA method removed", "remaining_methods": 1}
+```
+
+If the last method is removed: `{"msg": "2FA Successfully Disabled"}` — `tfa_enabled` is set to `false` and all backup codes are soft-deleted.
+
+---
+
+## Sending Codes
+
+### Send email verification code
+
+```
+POST /api/v0/tfa/email/
+```
+
+Sends a 6-digit 2FA code to the user's verified email address. Used for email login verification and for the authorize-new-method flow.
+
+**Request body**
+
+```json
+{
+  "secret": "<optional_existing_tfa_secret>"
+}
+```
+
+**Response**
+
+```json
+{"success": true, "msg": "2FA code sent to your email address.", "secret": "<tfa_secret>"}
+```
+
+The `secret` must be passed to `POST /api/v0/tfa/` as the `secret` field when verifying.
+
+---
+
+### Send SMS verification code
+
+```
+POST /api/v0/tfa/sms/
+```
+
+Sends a 6-digit 2FA code via SMS (Twilio). Used both for login and for adding an SMS method.
+
+**Request body**
+
+```json
+{
+  "phone_number": "+12125551234",
+  "tfa_method_id": 42
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `phone_number` | string | conditionally | E.164 phone number; required if no `tfa_method_id` and no number on the account |
+| `tfa_method_id` | integer | no | ID of existing SMS method; uses that method's number |
+
+**Response**
+
+```json
+{"msg": "2FA Sent", "secret": "<tfa_secret>"}
+```
+
+Returns `tfa_challenge_exists` (HTTP 400) if a recent code was already sent; call the resend endpoint instead.
+
+---
+
+### Resend SMS verification code
+
+```
+POST /api/v0/tfa/sms/resend/
+```
+
+Resends the SMS code for an existing challenge. Required if the original code was not received.
+
+**Request body**
+
+```json
+{
+  "phone_number": "+12125551234",
+  "secret": "<tfa_secret>"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `phone_number` | string | conditionally | Must match the phone number of the original challenge |
+| `tfa_method_id` | integer | no | ID of SMS method |
+| `secret` | string | no | Original `tfa_secret`; if omitted and a valid challenge exists, a new secret is issued |
+
+**Response**
+
+```json
+{"msg": "A 6-digit code has been sent to your phone", "secret": "<tfa_secret>"}
+```
+
+---
+
+## Adding Methods
+
+Adding a new 2FA method requires completing a two-step authorization flow first.
+
+### Step 1 — Request authorization
+
+```
+POST /api/v0/tfa/authorize-new-method/
+```
+
+Starts the authorization flow to add a new method. For users with no existing methods, forces `tfa_method = "email"` automatically.
+
+**Request body**
+
+```json
+{
+  "tfa_method": "email",
+  "tfa_method_id": 42
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tfa_method` | string | conditionally | Method to verify with (`"sms"`, `"totp"`, `"email"`); required unless using `backup_code` |
+| `tfa_method_id` | integer | no | ID of specific method for SMS or TOTP |
+| `backup_code` | string | no | Backup code to authorize directly (skips send/verify round-trip) |
+
+**Response (code flow)**
+
+```json
+{"success": true, "secret": "<tfa_secret>"}
+```
+
+**Response (backup code flow)**
+
+```json
+{"success": true, "msg": "Authorization successful."}
+```
+
+---
+
+### Step 2 — Confirm authorization
+
+```
+PUT /api/v0/tfa/authorize-new-method/
+```
+
+Verifies the code sent in Step 1 and grants a 30-minute window to add a new method.
+
+**Request body**
+
+```json
+{
+  "code": "123456",
+  "secret": "<tfa_secret>"
+}
+```
+
+**Response**
+
+```json
+{"success": true, "msg": "Authorization successful."}
+```
+
+After this call succeeds, `GET /api/v0/tfa/status/` returns `new_method_authorized: true`.
+
+---
+
+### Set up TOTP (Authenticator app)
+
+```
+POST /api/v0/tfa/totp-setup/
+```
+
+Generates a TOTP secret and provisioning URI for an authenticator app (Google Authenticator, Authy, etc.).
+
+Requires active authorization (`new_method_authorized: true`).
+
+**Response**
+
+```json
+{
+  "secret": "<base32_totp_secret>",
+  "provisioning_uri": "otpauth://totp/vast.ai%3Auser%40example.com?secret=...&issuer=vast.ai"
+}
+```
+
+Display the `provisioning_uri` as a QR code for the user to scan. Then call `POST /api/v0/tfa/confirm-new/` with `tfa_method: "totp"` and the 6-digit code from the app.
+
+---
+
+### Confirm and activate new method
+
+```
+POST /api/v0/tfa/confirm-new/
+```
+
+Verifies the code for a newly configured method and activates it.
+
+**Request body**
+
+```json
+{
+  "tfa_method": "sms",
+  "code": "123456",
+  "secret": "<tfa_secret>",
+  "phone_number": "+12125551234",
+  "label": "Work Phone"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tfa_method` | string | yes | `"sms"` or `"totp"` (email cannot be added as a persistent method) |
+| `code` | string | yes | 6-digit code |
+| `secret` | string | yes | `tfa_secret` from the send-code step (SMS) or from `POST /api/v0/tfa/totp-setup/` (TOTP) |
+| `phone_number` | string | SMS only | E.164 phone number |
+| `label` | string | no | Display label for the method (max 30 characters) |
+
+**Response**
+
+```json
+{"success": true, "msg": "SMS 2FA method added successfully."}
+```
+
+If this is the first 2FA method, the response also includes:
+
+```json
+{
+  "success": true,
+  "msg": "SMS 2FA method added successfully.",
+  "backup_codes": ["XXXX-XXXX-XXXX", "..."]
+}
+```
+
+Backup codes are returned once, in plaintext. They cannot be retrieved again.
+
+---
+
+### Update a method
+
+```
+PUT /api/v0/tfa/update/
+```
+
+Updates the label or primary status of a 2FA method. Does not apply to email (email is not stored as a method).
+
+**Request body**
+
+```json
+{
+  "tfa_method_id": 42,
+  "label": "Personal Phone",
+  "is_primary": true
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tfa_method_id` | integer | conditionally | ID of method to update; or use `tfa_method` |
+| `tfa_method` | string | conditionally | `"sms"` or `"totp"` |
+| `label` | string | no | New label (max 30 characters) |
+| `is_primary` | boolean | no | Mark as primary method |
+
+**Response**
+
+```json
+{"success": true, "msg": "2FA method updated", "method": {...}}
+```
+
+---
+
+## Backup Codes
+
+### Regenerate backup codes
+
+```
+PUT /api/v0/tfa/regen-backup-codes/
+```
+
+Replaces all existing backup codes with a fresh set of 10. Requires verification with an active 2FA method or an existing backup code.
+
+This endpoint also handles the legacy account migration case: if the user has `tfa_enabled=true` but no `user_tfa_methods` rows, it backfills an SMS method using the phone number on file before generating codes.
+
+**Request body**
+
+```json
+{
+  "tfa_method": "sms",
+  "code": "123456",
+  "secret": "<tfa_secret>"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tfa_method` | string | conditionally | `"sms"`, `"totp"`, or `"email"` |
+| `code` | string | conditionally | 6-digit code; required unless using `backup_code` |
+| `secret` | string | no | `tfa_secret` for SMS or email |
+| `tfa_method_id` | integer | no | ID of specific method |
+| `backup_code` | string | no | Existing backup code to authorize the regeneration |
+
+**Response**
+
+```json
+{"msg": "success", "backup_codes": ["XXXX-XXXX-XXXX", "..."]}
+```
+
+Returns 10 new backup codes in plaintext. They are returned once only.
+
+---
+
+## Error Codes
+
+| Error | HTTP Status | Description |
+|-------|-------------|-------------|
+| `invalid_tfa_method` | 400 | Unsupported `tfa_method` value |
+| `missing_auth_value` | 400 | Required `code` or `backup_code` not provided |
+| `missing_params` | 400 | Required `code` and `secret` not provided |
+| `email_not_verified` | 400 | Account email is not verified |
+| `2fa_expired` | 400 | Verification challenge has expired (10-minute window) |
+| `challenge_not_found` | 400 | No matching challenge found for the provided `secret` |
+| `tfa_challenge_exists` | 400 | A recent SMS code was already sent; use the resend endpoint |
+| `authorization_required` | 403 | Add-method authorization window has not been granted or has expired |
+| `no_pending_authorization` | 400 | No pending authorization log found for the PUT authorize step |
+| `invalid_backup_code` | 401 | Backup code is invalid or already used |
+| `untracked_2fa_found` | 400 | Legacy account state — regenerate backup codes before adding a method (deprecated path only) |
+| `duplicate_tfa_method` | 400 | This method type is already configured for the account |
+| `twilio_error` | 400 | SMS delivery failed |
+| `preauth_phone_cap` | 429 | Phone number has been used in too many authorization attempts; the pre-authorization phone-cap limit has been reached |
+| `sms_rate_limited` | 429 | Too many SMS codes requested; rate limit exceeded. Wait before retrying. |
+| `tfa_locked` | 429 | Account temporarily locked after too many failed 2FA attempts (15-minute lockout) |
+| `service_unavailable` | 503 | Redis unavailable during an authorization gate check; retry the request |
+
+### `untracked_2fa_found` detail
+
+This error is returned only when a legacy TFA user calls the deprecated `/api/v0/tfa/test-submit/` endpoint. Users accessing the current UI call `/api/v0/tfa/confirm-new/` and are not affected. Legacy users are identified by a "migrate your 2FA" banner in Account Settings and should call `PUT /api/v0/tfa/regen-backup-codes/` to complete migration before adding a new method.
+
+---
+
+## Deprecated Endpoints
+
+These paths remain active for backwards compatibility but should not be used in new integrations:
+
+| Method | Path | Replaced by |
+|--------|------|-------------|
+| POST | `/api/v0/tfa/test/` | `POST /api/v0/tfa/sms/` |
+| POST | `/api/v0/tfa/test-submit/` | `POST /api/v0/tfa/confirm-new/` |
+| POST | `/api/v0/tfa/resend/` | `POST /api/v0/tfa/sms/resend/` |
