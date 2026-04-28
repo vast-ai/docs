@@ -4,21 +4,21 @@ sidebarTitle: "API"
 ---
 
 <Warning>
-  The raw REST API is intended for advanced users only. These endpoints offer maximum flexibility but require you to manage all aspects of integration yourself. Most users will have a significantly better experience using the [CLI](/cli/hello-world) or the [Python SDK](/sdk/python/quickstart), which handle these details for you. If you are not sure whether you need direct API access, you almost certainly don't — start with the CLI or SDK instead.
+  The raw REST API is intended for advanced users only. These endpoints offer maximum flexibility but require you to manage all aspects of integration yourself. Most users will have a significantly better experience using the [CLI](/cli/hello-world) or the [SDK](/sdk/python/quickstart), which handle these details for you. If you are not sure whether you need direct API access, you almost certainly don't, start with the CLI or SDK instead.
 </Warning>
 
-The Vast.ai REST API gives you programmatic control over GPU instances — useful for automation, CI/CD pipelines, or building your own tooling on top of Vast.
+The Vast.ai REST API gives you programmatic control over GPU instances, useful for automation, CI/CD pipelines, or building your own tooling on top of Vast.
 
 This guide walks through the complete instance lifecycle: authenticate, search for a GPU, rent it, wait for it to boot, connect to it, and clean up. By the end you'll understand the core API calls needed to manage instances without touching the web console.
 
 ## Prerequisites
 
-- A Vast.ai account with credit (~$0.01–0.05, depending on test instance run time)
+- A Vast.ai account with credit (~$0.01-0.05, depending on test instance run time)
 - `curl` installed
 
 ## 1. Get Your API Key
 
-Generate an API key from the [Keys page](https://cloud.vast.ai/manage-keys/) by clicking **+New**. Copy the key — you'll need it for your API calls, and you'll only see it once.
+Generate an API key from the [Keys page](https://cloud.vast.ai/manage-keys/) by clicking **+New**. Copy the key, you'll need it for your API calls, and you'll only see it once.
 
 Export it as an environment variable:
 
@@ -79,7 +79,7 @@ Each parameter in the query above controls a different filter:
 | `type` | `"on-demand"` | On-demand pricing (vs. interruptible spot/bid) |
 | `limit` | `5` | Return at most 5 results |
 
-The response contains an `offers` array. Note the `id` of the offer you want — you'll use it in the next step. If no offers are returned, try relaxing your filters (e.g. a different GPU model or removing `direct_port_count`).
+The response contains an `offers` array. Note the `id` of the offer you want, you'll use it in the next step. If no offers are returned, try relaxing your filters (e.g. a different GPU model or removing `direct_port_count`).
 
 <Tip>
 See the [Search Offers](/api-reference/search/search-offers) reference for the full list of filter parameters and operators.
@@ -109,7 +109,7 @@ curl -s -H "Authorization: Bearer $VAST_API_KEY" \
 }
 ```
 
-Save the `new_contract` value — this is your instance ID. The `instance_api_key` is a restricted key injected into the container as `CONTAINER_API_KEY` — it can only start, stop, or destroy that specific instance.
+Save the `new_contract` value, this is your instance ID. The `instance_api_key` is a restricted key injected into the container as `CONTAINER_API_KEY`, it can only start, stop, or destroy that specific instance.
 
 ## 5. Wait Until Ready
 
@@ -140,7 +140,7 @@ The `actual_status` field progresses through these states:
 | `"loading"` | Docker image is downloading |
 | `"running"` | Ready to use |
 
-Poll every 10 seconds. Boot time is typically 1–5 minutes depending on the Docker image size. You can also use the `onstart` script to send a callback when the instance is ready, instead of polling.
+Poll every 10 seconds. Boot time is typically 1-5 minutes depending on the Docker image size. You can also use the `onstart` script to send a callback when the instance is ready, instead of polling.
 
 <Warning>
 Always handle non-happy-path statuses in your poll loop. If `actual_status` becomes `"exited"` (container crashed), `"unknown"` (no heartbeat from host), or `"offline"` (host disconnected), it will never reach `"running"`. Without a timeout or error check, your script will loop forever while the instance continues accruing disk charges. Destroy the instance and retry with a different offer if you see these states.
@@ -186,7 +186,7 @@ Both return `{"success": true}`.
 
 You've now completed the full instance lifecycle through the API: authentication, search, creation, polling, and teardown. From here:
 
-- **Full endpoint reference** — Every REST endpoint is documented in the [API reference](/api-reference/authentication), organized under the Reference tab.
-- **Authentication & permissions** — Create scoped API keys for CI/CD or shared tooling. See [API authentication](/api-reference/authentication) and [permissions](/api-reference/permissions).
-- **SSH setup** — See the [SSH guide](/documentation/instances/connect/ssh) for key configuration and advanced connection options.
-- **Use templates** — Avoid repeating image and config parameters on every create call. The [Templates API guide](/api-reference/creating-and-using-templates-with-api) covers creating, sharing, and launching from templates.
+- **Full endpoint reference**, Every REST endpoint is documented in the [API reference](/api-reference/authentication), organized under the Reference tab.
+- **Authentication & permissions**, Create scoped API keys for CI/CD or shared tooling. See [API authentication](/api-reference/authentication) and [permissions](/api-reference/permissions).
+- **SSH setup**, See the [SSH guide](/guides/instances/connect/ssh) for key configuration and advanced connection options.
+- **Use templates**, Avoid repeating image and config parameters on every create call. The [Templates API guide](/api-reference/creating-and-using-templates-with-api) covers creating, sharing, and launching from templates.
