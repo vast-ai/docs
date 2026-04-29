@@ -226,11 +226,13 @@ Most TFA endpoints call `handle_if_team_user()` to reject team account requests 
 
 Three distinct things share the `tfa_status` / `tfa_enabled` naming and are easy to confuse. They are NOT interchangeable.
 
-### `tfa_enabled` (users table column — DB-only, NOT returned by any API)
+### `tfa_enabled` (users table column)
 
-The `tfa_enabled` boolean in the `users` database table indicates whether 2FA is active for the account. **This field is NOT returned by any API endpoint** — not by `show user`, not by `tfa/status/`, not by login. It exists only on the DB row and is consumed internally by backend logic.
+The `tfa_enabled` boolean in the `users` database table indicates whether 2FA is active for the account.
 
-If you need to inspect this value, query the database directly. Application code and CLI tools should use the `tfa_status` field on the user object (see below).
+**Returned by:** `GET /api/v0/tfa/status/` — exposes this DB value as a `tfa_enabled` boolean alongside `methods[]`, `backup_codes_remaining`, and `new_method_authorized`. The boolean is binary — it does NOT distinguish `enabled` from `legacy`; for that distinction, use the `tfa_status` enum on the user object (see below).
+
+**NOT returned by:** `show user` / `GET /api/v0/users/current/`, the login response, or any other endpoint. The user object exposes the `tfa_status` enum (below) instead — which is the field application code should consume to determine 2FA state, since it carries the `legacy` distinction.
 
 ### `tfa_status` field on the user object (returned by show user / get_current_user)
 
@@ -242,22 +244,24 @@ The user object returned by `GET /api/v0/users/current/` (i.e., `show user`) inc
 
 This is the field application code should consume to determine 2FA state for a user.
 
-### `GET /api/v0/tfa/status/` endpoint (does NOT return enabled/disabled/legacy)
+### `GET /api/v0/tfa/status/` endpoint (does NOT return enabled/disabled/legacy enum)
 
-The `tfa/status/` endpoint returns a different shape than the `tfa_status` field above. It returns the user's configured methods, backup code count, and whether they are currently authorized to add a new method:
+The `tfa/status/` endpoint returns a different shape than the `tfa_status` field on the user object. It returns: `tfa_enabled` (boolean), `methods[]`, `backup_codes_remaining`, and `new_method_authorized`:
 
 ```json
 {
-  "tfa_methods": [
+  "success": true,
+  "tfa_enabled": true,
+  "methods": [
     {"id": 1, "method": "sms", "label": "Primary phone", "is_primary": true},
     {"id": 2, "method": "totp", "label": "Authenticator", "is_primary": false}
   ],
   "backup_codes_remaining": 8,
-  "authorized_to_add_method": false
+  "new_method_authorized": false
 }
 ```
 
-It does **not** return the `enabled|disabled|legacy` enum — that comes from the `tfa_status` field on the user object (above), not from this endpoint.
+The `tfa_enabled` here is a **boolean** — it does NOT carry the three-value `enabled|disabled|legacy` enum. To distinguish `enabled` from `legacy`, use the `tfa_status` field on the user object (above).
 
 ### Note on `get_tfa_status` (internal function vs API endpoint — unrelated)
 

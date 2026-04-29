@@ -31,7 +31,7 @@ CLI callers authenticate with their normal API Key as a Bearer token. The 2FA en
 | `POST /api/v0/tfa/` (login) | ✅ secret only | ✅ secret + bearer | ✅ bearer (returns new session_key) |
 | `POST /api/v0/tfa/email/` | ✅ secret only | ✅ secret + bearer | ✅ bearer + secret |
 | `POST /api/v0/tfa/sms/` | ✅ secret only | ✅ secret + bearer | ✅ bearer |
-| `POST /api/v0/tfa/sms/resend/` | ✅ secret only (recovers lost UI tfa_secret if missing) | ✅ secret + bearer | — |
+| `POST /api/v0/tfa/sms/resend/` | ✅ secret only (recovers lost UI tfa_secret if missing) | ✅ secret + bearer | ✅ bearer (less common, but accepted) |
 | `GET /api/v0/tfa/status/` | — | ✅ bearer | ✅ bearer |
 | `POST/PUT /api/v0/tfa/authorize-new-method/` | — | ✅ bearer (+ secret on PUT) | ✅ bearer (+ secret on PUT) |
 | `POST /api/v0/tfa/totp-setup/` | — | ✅ bearer | ✅ bearer |
@@ -62,7 +62,9 @@ Returns the current 2FA configuration for the authenticated user.
 
 ```json
 {
-  "tfa_methods": [
+  "success": true,
+  "tfa_enabled": true,
+  "methods": [
     {
       "id": 42,
       "user_id": 12345,
@@ -82,7 +84,9 @@ Returns the current 2FA configuration for the authenticated user.
 ```
 
 Fields:
-- `tfa_methods[]` — list of configured 2FA methods. Each entry includes:
+- `success` — request status flag
+- `tfa_enabled` — boolean reflecting the `users.tfa_enabled` DB column. This is a boolean only — it does NOT distinguish `enabled` from `legacy`. To get that enum, use the `tfa_status` field on the user object returned by `show user` / `GET /api/v0/users/current/`.
+- `methods[]` — list of configured 2FA methods. Each entry includes:
   - `id` — method ID (use as `tfa_method_id` when disambiguating multiple methods of the same type)
   - `user_id` — owning user
   - `method` — `"sms"` or `"totp"`
@@ -95,7 +99,7 @@ Fields:
 - `backup_codes_remaining` — count of unused backup codes
 - `new_method_authorized` — whether the user has completed the authorization step to add a new method (short-lived, 30-minute window)
 
-This endpoint does **not** return the `enabled|disabled|legacy` state. To check whether 2FA is active for the account, read the `tfa_status` field on the user object returned by `show user` / `GET /api/v0/users/current/` instead.
+This endpoint does **not** return the `enabled|disabled|legacy` enum — the `tfa_enabled` boolean above is a binary flag. To distinguish `enabled` from `legacy`, read the `tfa_status` field on the user object returned by `show user` / `GET /api/v0/users/current/`.
 
 ---
 
@@ -131,7 +135,7 @@ Verifies a 2FA code to complete login. Called after passing username/password au
 
 **Response**
 
-Returns the full authenticated user object — the same shape as the `show user` endpoint — with a `session_key` field included for use as a Bearer token on subsequent requests.
+Returns the full authenticated user object — the same shape as the `show user` endpoint.
 
 ```json
 {
@@ -139,12 +143,14 @@ Returns the full authenticated user object — the same shape as the `show user`
   "email": "user@example.com",
   "full_name": "User Name",
   "tfa_status": "enabled",
-  "session_key": "<session-key>",
   "...": "additional user fields per show user"
 }
 ```
 
-The `session_key` value is what callers pass as `Authorization: Bearer <session_key>` for authenticated requests after login.
+**`session_key` placement depends on caller flow:**
+
+- **CLI flow** (request authenticated via API key as Bearer): the response body **includes** a `session_key` field. CLI callers use this value as `Authorization: Bearer <session_key>` for subsequent authenticated requests.
+- **UI logged-out flow** (request authenticated via username/password + `tfa_secret`): the session is set as a **cookie/header** via the `remember()` mechanism and is **NOT** included in the response body. The browser automatically uses cookie auth for subsequent requests; no client-side session_key handling is needed.
 
 ---
 
@@ -521,7 +527,7 @@ Returns 10 new backup codes in plaintext. They are returned once only.
 | `team_user_forbidden` | 403 | Endpoint called by a team account where 2FA is not applicable; team users are routed differently |
 | `missing_email` | 400 | Email address required for the operation is missing or unset on the account |
 
-> Note: `missing_auth_value` (HTTP 401) is also returned by the `verify_user_via_secret_or_auth` path when both `tfa_secret` and Bearer token are missing — the request has no usable authentication context. Same error code as the standard 400 case but at HTTP 401 to signal the auth-context mismatch.
+> Note: the same `missing_auth_value` error code is also returned with HTTP 401 by `verify_user_via_secret_or_auth` when both `tfa_secret` and Bearer token are missing — the request has no usable authentication context.
 
 ### `untracked_2fa_found` detail
 
