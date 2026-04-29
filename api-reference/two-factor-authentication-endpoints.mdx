@@ -65,10 +65,13 @@ Returns the current 2FA configuration for the authenticated user.
   "tfa_methods": [
     {
       "id": 42,
+      "user_id": 12345,
       "method": "sms",
       "label": "My Phone",
       "phone_number": "******1234",
       "is_primary": true,
+      "fail_count": 0,
+      "locked_until": null,
       "created_at": 1700000000.0,
       "last_used": 1700000000.0
     }
@@ -79,7 +82,16 @@ Returns the current 2FA configuration for the authenticated user.
 ```
 
 Fields:
-- `tfa_methods` — list of configured 2FA methods; phone numbers are masked (last 4 digits shown); TOTP secrets are never returned
+- `tfa_methods[]` — list of configured 2FA methods. Each entry includes:
+  - `id` — method ID (use as `tfa_method_id` when disambiguating multiple methods of the same type)
+  - `user_id` — owning user
+  - `method` — `"sms"` or `"totp"`
+  - `label` — user-set display label
+  - `phone_number` — masked (last 4 digits shown) for SMS; TOTP secrets are never returned
+  - `is_primary` — whether this is the user's primary method
+  - `fail_count` — current failed-attempt count for the method
+  - `locked_until` — Unix timestamp when this method's lockout expires, or `null` if not locked
+  - `created_at` / `last_used` — timestamps
 - `backup_codes_remaining` — count of unused backup codes
 - `new_method_authorized` — whether the user has completed the authorization step to add a new method (short-lived, 30-minute window)
 
@@ -159,8 +171,8 @@ Removes a configured 2FA method after verifying the request.
 |-------|------|----------|-------------|
 | `tfa_method` | string | conditionally | Method used to verify (`"sms"`, `"totp"`, `"email"`); not needed when using `backup_code` |
 | `code` | string | conditionally | 6-digit code; required if not using `backup_code` |
-| `secret` | string | no | `tfa_secret` for SMS or email verification |
-| `tfa_method_id` | integer | no | Method used for verification |
+| `secret` | string | conditionally | `tfa_secret` for SMS or email verification (required for those code-flows) |
+| `tfa_method_id` | integer | conditionally | Method ID used for verification; required when user has multiple methods of the same type to disambiguate |
 | `target_id` | integer | no | ID of method to remove; defaults to the method used for verification |
 | `backup_code` | string | no | Backup code to authorize the removal (requires `target_id`) |
 
@@ -171,6 +183,8 @@ Removes a configured 2FA method after verifying the request.
 ```
 
 If the last method is removed: `{"msg": "2FA Successfully Disabled"}` — `tfa_enabled` is set to `false` and all backup codes are soft-deleted.
+
+> The same `"2FA Successfully Disabled"` message is also returned when a **legacy 2FA** account calls `DELETE /api/v0/tfa/`. In that case, no backup codes are soft-deleted because legacy users do not have any backup codes stored.
 
 ---
 
@@ -198,7 +212,9 @@ Sends a 6-digit 2FA code to the user's verified email address. Used for email lo
 {"success": true, "msg": "2FA code sent to your email address.", "secret": "<tfa_secret>"}
 ```
 
-The `secret` must be passed to `POST /api/v0/tfa/` as the `secret` field when verifying.
+The *returned* `secret` (`tfa_secret` from this response) must then be passed to `POST /api/v0/tfa/` as the `secret` field when the user submits the email code to complete login or first-method authorization.
+
+When the request includes a Bearer token but is missing a UI-side `tfa_secret` (e.g., the page refreshed mid-flow and the client lost the secret), this endpoint can recover the lost secret — it returns a fresh `tfa_secret` tied to the same authenticated session, so the user can resume the flow without restarting from login.
 
 ---
 
@@ -288,9 +304,9 @@ Starts the authorization flow to add a new method. For users with no existing me
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `tfa_method` | string | conditionally | Method to verify with (`"sms"`, `"totp"`, `"email"`); required unless using `backup_code` |
-| `tfa_method_id` | integer | no | ID of specific method for SMS or TOTP |
-| `backup_code` | string | no | Backup code to authorize directly (skips send/verify round-trip) |
+| `tfa_method` | string | conditionally | Method to verify with (`"sms"`, `"totp"`, `"email"`); not required if `backup_code` is provided OR if `tfa_method_id` alone unambiguously identifies the method |
+| `tfa_method_id` | integer | conditionally | ID of specific method; required when user has multiple methods of the same type to disambiguate which method to verify with |
+| `backup_code` | string | no | Backup code to authorize directly (skips send/verify round-trip); when provided, `tfa_method` is not required |
 
 **Response (code flow)**
 
@@ -461,10 +477,10 @@ This endpoint also handles the legacy account migration case: if the user has `t
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `tfa_method` | string | conditionally | `"sms"`, `"totp"`, or `"email"` |
+| `tfa_method` | string | conditionally | `"sms"`, `"totp"`, or `"email"`; required when verifying with a code (and the user has only one method of that type), not required when using `backup_code` |
 | `code` | string | conditionally | 6-digit code; required unless using `backup_code` |
-| `secret` | string | no | `tfa_secret` for SMS or email |
-| `tfa_method_id` | integer | no | ID of specific method |
+| `secret` | string | conditionally | `tfa_secret` for SMS or email; required for those code-flows, not for TOTP or `backup_code` |
+| `tfa_method_id` | integer | conditionally | ID of specific method; required when user has multiple methods of the same type |
 | `backup_code` | string | no | Existing backup code to authorize the regeneration |
 
 **Response**
