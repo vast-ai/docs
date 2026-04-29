@@ -116,15 +116,13 @@ For users who already have at least one SMS or TOTP method configured, email is 
 
 A legacy TFA account is one where `tfa_enabled = true` AND `phone_number` is non-null AND no rows exist in `user_tfa_methods` for this user. These accounts predate the `user_tfa_methods` table.
 
-**Source:** `web/views/auth.py:1555` — `get_tfa_status(request, user)` returns `"legacy"` when this condition is met.
+**Source:** `get_tfa_status(request, user)` in `auth.py` returns `"legacy"` when this condition is met.
 
 The frontend identifies legacy status via `currentUser.tfa_status === "legacy"` and renders a migration banner in Account Settings prompting the user to regenerate recovery codes.
 
 ### How legacy users log in
 
 Legacy users log in via the SMS fallback path. After passing username/password, the backend detects legacy status and forces `tfa_method = "sms"`. The login response includes `legacy_tfa_user: true` to signal the frontend.
-
-**Source:** `web/views/auth.py:1619-1620`
 
 ### Adding a new method — legacy path error
 
@@ -136,29 +134,23 @@ When a legacy user attempts to add a new 2FA method via the deprecated `/api/v0/
 
 **Important:** This error only occurs on the deprecated `test-submit` path. Modern UI users (those whose browser calls the current `/api/v0/tfa/confirm-new/` path via the `authorize_new_method` flow) are not affected.
 
-**Source:** `web/views/auth.py:823-826`
-
 ### Resolution flow for legacy accounts
 
 To resolve legacy status and migrate a user to the current 2FA system:
 
-1. The user logs in via SMS (legacy path) to obtain a valid `tfa_secret`.
-2. Send an SMS challenge: `POST /api/v0/tfa/sms/` with `{phone_number: "<user's number>"}`. Returns a `secret`.
+1. The user logs in via SMS (legacy path).
+2. Send an SMS challenge: `POST /api/v0/tfa/sms/` with `{phone_number: "<user's number>"}`. Returns a `secret`. Note: in the UI, clicking the **Regenerate** button calls this send-SMS endpoint automatically; only CLI callers need to invoke it manually.
 3. Call `PUT /api/v0/tfa/regen-backup-codes/` with `{tfa_method: "sms", code: "<6-digit>", secret: "<secret>"}`.
    - The backend detects `num_tfa_methods == 0` and `tfa_enabled == true` with a phone number.
    - It backfills a new `user_tfa_methods` row with `method="sms"`.
    - Generates and returns 10 new backup codes.
-   - The account is now fully migrated — `get_tfa_status` returns `"enabled"`.
-
-**Source:** `web/views/auth.py:1272-1280`
+   - The account is now fully migrated — the `tfa_status` field on the user object becomes `"enabled"`.
 
 ### Disabling legacy TFA
 
 When a legacy user calls `DELETE /api/v0/tfa/`, `_handle_legacy_tfa_deletion` runs:
 - Sets `users.tfa_enabled = false` and clears `users.phone_number`.
 - No `user_tfa_methods` rows are affected (there are none).
-
-**Source:** `web/views/auth.py:2148-2161`
 
 ---
 
@@ -195,12 +187,14 @@ Deprecated paths (kept for backwards compatibility; not to be used in new integr
 
 ### Lockout
 
+Lockout applies **per-method**, not to the account as a whole. If a user has multiple 2FA methods (e.g., SMS + TOTP) and one method's attempt counter exceeds its threshold, only that method becomes temporarily unavailable; the user can still authenticate with another method or a backup code.
+
 | Method | Failed attempts before lockout | Lockout duration |
 |--------|-------------------------------|-----------------|
 | SMS | 3 failed | 15 minutes (900 seconds) |
 | TOTP | 5 failed | 15 minutes (900 seconds) |
 
-**Source:** `web/views/auth.py:1309-1313`
+Backend constants (in `auth.py`):
 
 ```python
 TFA_LOCKOUT_THRESHOLDS = {"sms": 3, "totp": 5}
@@ -218,13 +212,13 @@ After a user successfully authorizes adding a new method, the backend sets a Red
 ### Backup codes
 
 - 10 backup codes are generated when a user activates their first 2FA method.
-- Each code is one-time use. Format: `XXXX-XXXX-XXXX`.
+- Each code is one-time use. Format: `XXXX-XXXX-XXXX` — the hyphens are part of the code and **must be included** when passing the value as a request parameter (do not strip them).
 - Backup codes are soft-deleted when all 2FA methods are removed (2FA fully disabled).
 - Backup codes can be regenerated via `PUT /api/v0/tfa/regen-backup-codes/`, which requires a valid 2FA code or an existing backup code.
 
 ### Team user handling
 
-All TFA endpoints call `handle_if_team_user()` to reject team account requests where applicable.
+Most TFA endpoints call `handle_if_team_user()` to reject team account requests where applicable. The login endpoint (`POST /api/v0/tfa/`) is a notable exception — it does not invoke this gate, since team accounts use a different authentication path entirely.
 
 ---
 
