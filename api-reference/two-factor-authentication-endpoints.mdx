@@ -46,6 +46,8 @@ Email verification (`email_verified_at` non-null on the user record) is required
 - Using any 2FA endpoint that sends codes (SMS or email)
 - Configuring a new 2FA method in the first place
 
+Admin users (`is_admin=True`) are exempt from the email-verified prerequisite on the SMS send endpoints (`POST /api/v0/tfa/sms/`, `POST /api/v0/tfa/sms/resend/`) — useful for support and testing flows. The exemption does not apply to other endpoints.
+
 ---
 
 ## Status
@@ -126,7 +128,7 @@ Verifies a 2FA code to complete login. Called after passing username/password au
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `tfa_method` | string | conditionally | `"sms"`, `"totp"`, or `"email"`; required unless `backup_code` is provided |
+| `tfa_method` | string | conditionally | `"sms"`, `"totp"`, or `"email"`; required unless `backup_code` is provided. **Defaults to `"sms"`** when omitted. |
 | `code` | string | conditionally | 6-digit code; required unless `backup_code` is provided |
 | `secret` | string | conditionally | `tfa_secret` returned from the send-code endpoint; required unless `backup_code` is provided |
 | `tfa_method_id` | integer | conditionally | ID of a specific method; required when user has multiple methods of the same type (e.g., two SMS methods) |
@@ -523,14 +525,21 @@ Returns 10 new backup codes in plaintext. They are returned once only.
 | `twilio_error` | 400 | SMS delivery failed |
 | `preauth_phone_cap` | 429 | Phone number has been used in too many authorization attempts; the pre-authorization phone-cap limit has been reached |
 | `sms_rate_limited` | 429 | Too many SMS codes requested; rate limit exceeded. Wait before retrying. |
-| `tfa_locked` | 429 | Account temporarily locked after too many failed 2FA attempts (15-minute lockout) |
+| `tfa_locked` | 429 | Specific 2FA method temporarily locked after too many failed attempts (15-minute lockout per method, NOT account-wide). **Body includes `fail_count` and `locked_until`**: `{"error": "tfa_locked", "msg": "...", "fail_count": <int>, "locked_until": <epoch_seconds>}` |
 | `service_unavailable` | 503 | Redis unavailable during an authorization gate check; retry the request |
 | `no_challenge_found` | 400 | No active 2FA challenge found for the provided context (e.g., calling verify after the challenge expired or was cleared) |
 | `phone_number_mismatch` | 400 | Phone number provided does not match the number associated with the existing challenge or method |
-| `2fa_login_failed` | 400 | Generic 2FA login verification failure (e.g., invalid code) at the login step |
-| `2fa_verification_failed` | 400 | Verification step failed for an existing challenge (other than wrong code) |
-| `team_user_forbidden` | 403 | Endpoint called by a team account where 2FA is not applicable; team users are routed differently |
+| `2fa_login_failed` | 400 | Generic 2FA login verification failure (e.g., SMS 2FA configured without a valid phone number on the account or method) |
+| `2fa_verification_failed` | 400 | Verification step failed (invalid code, Twilio verification rejected). **Body includes `fail_count` and `locked_until`** when the failure was on a configured method (so the client can show retry-budget feedback): `{"error": "2fa_verification_failed", "msg": "...", "fail_count": <int>, "locked_until": <epoch_or_null>}` |
+| `team_user_forbidden` | 403 | Endpoint called from a Team Context (override). 2FA actions must be performed in the personal context. |
 | `missing_email` | 400 | Email address required for the operation is missing or unset on the account |
+| `missing_phone_number` | 400 | Phone number required for SMS verification was not provided and not derivable from the user record or method row |
+| `not_found` | 404 | Specified `tfa_method_id` does not match a 2FA method row for this user |
+| `tfa_method_not_configured` | 400 | The TOTP method exists but its encrypted secret is missing or undecryptable; the user must reconfigure 2FA |
+| `challenge_creation_failed` | 500 | Server failed to create a 2FA challenge during the authorize-new-method flow; retry the request |
+| `sms_blocked_number` | 400 | Twilio Lookup flagged this phone number as a high SMS-pumping risk (or explicitly blocked). The request is rejected before the SMS is sent. Use a different phone number. |
+| `sms_fraud_detected` | 403 | Account is permanently flagged for SMS pumping fraud (`billing_blacklisted=1`). SMS sending is disabled on the account. Contact support. |
+| `twilio_rate_limited` | 429 | Twilio's verification API returned its own rate limit. Wait briefly and retry. |
 
 > Note: the same `missing_auth_value` error code is also returned with HTTP 401 by `verify_user_via_secret_or_auth` when both `tfa_secret` and Bearer token are missing — the request has no usable authentication context.
 
