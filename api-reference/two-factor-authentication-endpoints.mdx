@@ -14,7 +14,7 @@ The 2FA endpoints accept different authentication shapes depending on whether th
 
 ### UI flow (logged out — login path)
 
-When a user is logged out and entering credentials in the UI, the regular login endpoint returns a `tfa_secret`. The client then calls 2FA endpoints (`tfa/`, `tfa/sms/`, `tfa/email/`, `tfa/sms/resend/`) using **only that `tfa_secret`** — no Bearer token is required. The endpoint completes the 2FA challenge and returns the user object including `session_key` (used as the Bearer token for subsequent authenticated requests).
+When a user is logged out and entering credentials in the UI, the regular login endpoint returns a `tfa_secret`. The client then calls 2FA endpoints (`tfa/`, `tfa/sms/`, `tfa/email/`, `tfa/sms/resend/`) using **only that `tfa_secret`** — no Bearer token is required. The login endpoint completes the 2FA challenge and returns the user object; for this UI flow, the session is established via cookie/header (the `remember()` mechanism on the backend) — `session_key` is **not** returned in the response body. See the per-endpoint Login section below for the CLI-vs-UI distinction on `session_key` placement.
 
 ### UI flow (logged in — adding/removing methods)
 
@@ -151,6 +151,11 @@ Returns the full authenticated user object — the same shape as the `show user`
 
 - **CLI flow** (request authenticated via API key as Bearer): the response body **includes** a `session_key` field. CLI callers use this value as `Authorization: Bearer <session_key>` for subsequent authenticated requests.
 - **UI logged-out flow** (request authenticated via username/password + `tfa_secret`): the session is set as a **cookie/header** via the `remember()` mechanism and is **NOT** included in the response body. The browser automatically uses cookie auth for subsequent requests; no client-side session_key handling is needed.
+
+**Conditional fields on the login response:**
+
+- `backup_codes_remaining` — only included when the caller authenticated using a `backup_code` (i.e., a recovery code consumed this login). The value is the count of remaining unused backup codes after this consumption. Useful for prompting the user to regenerate codes when the count is low.
+- `legacy_tfa_user: true` — only included when the user's account is in legacy 2FA state (signals the frontend to show a migration banner).
 
 ---
 
