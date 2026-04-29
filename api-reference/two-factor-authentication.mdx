@@ -1,0 +1,268 @@
+---
+title: Two-Factor Authentication — Developer Reference
+createdAt: Mon Apr 21 2026 00:00:00 GMT+0000 (Coordinated Universal Time)
+updatedAt: Mon Apr 21 2026 00:00:00 GMT+0000 (Coordinated Universal Time)
+---
+
+This guide covers the 2FA system for support engineers and internal developers. It documents active authentication methods, the setup flow, API surface, security model, legacy account state, and field behavior.
+
+---
+
+## Overview
+
+### Prerequisite: SMS or TOTP method first
+
+To use 2FA, a user must configure **at least one SMS or TOTP method**. Email 2FA is **backup-only** — it is not a primary method, is **not auto-triggered at login**, and cannot be the user's only configured method.
+
+The single exception: when a user is setting up their **first** 2FA method, the backend uses email automatically as the verification channel for the authorize-new-method step (since no other method exists yet to verify with). After that first setup, email is never auto-triggered — it is not the default at login or for adding/removing methods. However, the frontend always offers email as an explicit verification choice in the method selector (because email is never stored in `user_tfa_methods`, the verify flow synthetically appends it as an option), so users can still pick email manually.
+
+### Methods
+
+| Method | Status | Configured via | Role |
+|--------|--------|----------------|------|
+| SMS | Active — user-configurable | Account Settings UI | Primary |
+| TOTP (Authenticator app) | Active — user-configurable (recommended method) | Account Settings UI | Primary |
+| Email | Active — auto-triggered only for first-method setup; explicit-choice otherwise | Not user-configured | First-setup verification + explicit-choice option afterwards |
+
+The set of valid `tfa_method` values accepted by the backend is `{"sms", "totp", "email"}` (defined in `auth.py` as `VALID_TFA_METHODS`).
+
+Email 2FA is not stored in `user_tfa_methods`. It is used automatically only during the first-method-setup verification step, and is **not** triggered automatically at login.
+
+---
+
+## SMS Setup Flow (5 Steps)
+
+This is the standard flow for a user adding their first SMS 2FA method. Triggered from Account Settings → Security → Two-Factor Authentication.
+
+**Step 1 — Authorize identity**
+- API: `POST /api/v0/tfa/authorize-new-method/`
+- For first-time setup (no existing methods), the backend forces `tfa_method = "email"` and sends a verification code to the user's email automatically.
+- For users with existing methods, they choose an existing method (SMS, TOTP, email, or a backup code) and verify it.
+
+**Step 2 — Confirm authorization**
+- API: `PUT /api/v0/tfa/authorize-new-method/`
+- The user submits the code from Step 1 along with the `secret` returned in Step 1.
+- On success, the backend sets a Redis key (`new_method_preauth_success:{user_id}`) with a 30-minute TTL — this is what causes `new_method_authorized` to return `true` in the next `GET /api/v0/tfa/status/` response.
+
+**Step 3 — Select method and enter phone number**
+- UI: User selects SMS, enters country code and phone number.
+- API: `POST /api/v0/tfa/sms/` — sends a 6-digit SMS code via Twilio to the provided phone number.
+- Returns: `{"msg": "2FA Sent", "secret": "<tfa_secret>"}` — the `secret` is required in Step 5.
+- Requires a verified email address (`email_verified_at` non-null) and passes SMS fraud/pumping checks.
+
+**Step 4 — Receive SMS code**
+- The user receives a 6-digit code on their phone. Code is valid for 10 minutes (`TFA_CHALLENGE_EXPIRY_SECONDS = 600`).
+- If the code is not received, the user can resend via `POST /api/v0/tfa/sms/resend/` after a 30-second cooldown (enforced by the UI).
+
+**Step 5 — Verify code and activate method**
+- API: `POST /api/v0/tfa/confirm-new/`
+- Params: `{tfa_method: "sms", code: "<6-digit>", secret: "<tfa_secret>", phone_number: "<E.164>", label: "<optional display label>"}`
+- On success:
+  - A new row is inserted into `user_tfa_methods` with `method="sms"`.
+  - `users.tfa_enabled` is set to `true`.
+  - If this is the user's first 2FA method, 10 backup codes are generated and returned in the response.
+
+---
+
+## TOTP Setup Flow (5 Steps)
+
+TOTP setup follows the same authorization pattern as SMS. Triggered from Account Settings → Security → Two-Factor Authentication → Authenticator App.
+
+**Step 1 — Authorize identity**
+- API: `POST /api/v0/tfa/authorize-new-method/`
+- For first-time setup (no existing methods), the backend forces `tfa_method = "email"` and sends a verification code to the user's email automatically.
+- For users with existing methods, they choose an existing method (SMS, TOTP, email, or a backup code) and verify it.
+
+**Step 2 — Confirm authorization**
+- API: `PUT /api/v0/tfa/authorize-new-method/`
+- Same as SMS setup Step 2 — submitting the code grants the 30-minute Redis preauth window.
+
+**Step 3 — Select TOTP method**
+- UI: User selects **Authenticator App (Recommended)** from the method list.
+- API: `POST /api/v0/tfa/totp-setup/`
+- Returns: `{"secret": "<totp_secret>", "provisioning_uri": "otpauth://totp/..."}` — the provisioning URI encodes the TOTP secret and is displayed as a QR code in the UI.
+- Compatible with Google Authenticator, Authy, Microsoft Authenticator, and any RFC 6238-compliant app.
+
+**Step 4 — Scan QR code**
+- The user scans the QR code with their authenticator app (or enters the setup key manually).
+- The app begins generating 6-digit TOTP codes that rotate every 30 seconds.
+
+**Step 5 — Verify and activate**
+- API: `POST /api/v0/tfa/confirm-new/`
+- Params: `{tfa_method: "totp", code: "<6-digit TOTP code>", secret: "<totp_secret>", label: "<optional display label>"}`
+- On success: A new row is inserted into `user_tfa_methods` with `method="totp"`. `users.tfa_enabled` is set to `true`. Backup codes returned if this is the first method.
+
+---
+
+## Email 2FA — First-Method Setup Verification
+
+Email 2FA is **not a login flow** in the sense of being auto-triggered. It is used as the verification channel during the **authorize-new-method** step of first-time 2FA setup, when the user has no other 2FA method configured yet. Once at least one SMS or TOTP method exists, email is no longer auto-triggered for verification — the default verification path uses the user's existing primary methods (SMS, TOTP) or a backup code. However, the frontend's method selector still surfaces email as an explicit choice, so users can pick it manually if they wish.
+
+For first-method setup specifically:
+
+1. User initiates 2FA setup from Account Settings.
+2. Client calls `POST /api/v0/tfa/authorize-new-method/`. With no existing method, the backend forces `tfa_method = "email"` and sends a verification code to the user's verified email address.
+3. The email contains a 6-digit code (valid for 10 minutes). The subject line reads "2FA Verification Code".
+4. User submits the code via `PUT /api/v0/tfa/authorize-new-method/` with `{tfa_method: "email", code: "...", secret: "..."}`.
+5. On success, the backend sets a 30-minute Redis preauth window; the user can then proceed to add their actual SMS or TOTP method via the confirm-new endpoint.
+
+For users who already have at least one SMS or TOTP method configured, email is never **auto-triggered** for any subsequent operation. The default verification path for login, adding additional methods, deleting methods, and regenerating backup codes uses the user's existing primary methods. However, the frontend's method selector always includes email as an option (because it's never stored in `user_tfa_methods`, the verify flow appends it synthetically), so users can still explicitly choose email if they wish.
+
+---
+
+## Legacy TFA Users
+
+### What is a legacy TFA user?
+
+A legacy TFA account is one where `tfa_enabled = true` AND `phone_number` is non-null AND **no rows of any kind** exist in `user_tfa_methods` for this user — including soft-deleted rows. A user who once had a method, deleted it, and still has `tfa_enabled = true` is NOT classified as legacy (the soft-deleted row still counts). These accounts predate the `user_tfa_methods` table.
+
+**Source:** `get_tfa_status(request, user)` in `auth.py` returns `"legacy"` when this condition is met.
+
+The frontend identifies legacy status via `currentUser.tfa_status === "legacy"` and renders a migration banner in Account Settings prompting the user to regenerate recovery codes.
+
+### How legacy users log in
+
+Legacy users log in via the SMS fallback path. After passing username/password, the backend detects legacy status and forces `tfa_method = "sms"`. The login response includes `legacy_tfa_user: true` to signal the frontend.
+
+### Adding a new method — legacy path error
+
+When a legacy user attempts to add a new 2FA method via the deprecated `/api/v0/tfa/test-submit/` endpoint (old UI path), the backend returns:
+
+```json
+{"error": "untracked_2fa_found", "msg": "Your account has an untracked 2FA method. Please Regenerate your backup codes using that method before attempting to add a new 2FA method."}
+```
+
+**Important:** This error only occurs on the deprecated `test-submit` path. Modern UI users (those whose browser calls the current `/api/v0/tfa/confirm-new/` path via the `authorize_new_method` flow) are not affected.
+
+### Resolution flow for legacy accounts
+
+To resolve legacy status and migrate a user to the current 2FA system:
+
+1. The user logs in via SMS (legacy path).
+2. Send an SMS challenge: `POST /api/v0/tfa/sms/` with `{phone_number: "<user's number>"}`. Returns a `secret`. Note: in the UI, clicking the **Regenerate** button calls this send-SMS endpoint automatically; only CLI callers need to invoke it manually.
+3. Call `PUT /api/v0/tfa/regen-backup-codes/` with `{tfa_method: "sms", code: "<6-digit>", secret: "<secret>"}`.
+   - The backend detects `num_tfa_methods == 0` and `tfa_enabled == true` with a phone number.
+   - It backfills a new `user_tfa_methods` row with `method="sms"`.
+   - Generates and returns 10 new backup codes.
+   - The account is now fully migrated — the `tfa_status` field on the user object becomes `"enabled"`.
+
+### Disabling legacy TFA
+
+When a legacy user calls `DELETE /api/v0/tfa/`, `_handle_legacy_tfa_deletion` runs:
+- Sets `users.tfa_enabled = false` and clears `users.phone_number`.
+- No `user_tfa_methods` rows are affected (there are none).
+
+---
+
+## API Endpoints
+
+All 12 non-deprecated route+method combinations:
+
+| Method | Path | Route Name | Purpose |
+|--------|------|-----------|---------|
+| GET | `/api/v0/tfa/status/` | `api.tfa.status` | Get current 2FA status, configured methods, backup code count |
+| POST | `/api/v0/tfa/` | `api.tfa.login` | Verify 2FA code to complete login |
+| DELETE | `/api/v0/tfa/` | `api.tfa.login` | Remove a 2FA method |
+| POST | `/api/v0/tfa/email/` | `api.tfa.email` | Send a 2FA code via email |
+| POST | `/api/v0/tfa/sms/` | `api.tfa.sms` | Send a 2FA code via SMS (also initiates SMS setup) |
+| POST | `/api/v0/tfa/sms/resend/` | `api.tfa.sms.resend` | Resend an SMS 2FA code |
+| POST | `/api/v0/tfa/totp-setup/` | `api.tfa.totp_setup` | Generate TOTP secret + provisioning URI |
+| POST | `/api/v0/tfa/authorize-new-method/` | `api.tfa.authorize_new_method` | Step 1: Request authorization to add a new method |
+| PUT | `/api/v0/tfa/authorize-new-method/` | `api.tfa.authorize_new_method` | Step 2: Verify authorization code |
+| POST | `/api/v0/tfa/confirm-new/` | `api.tfa.confirm_new` | Confirm and activate a new 2FA method |
+| PUT | `/api/v0/tfa/update/` | `api.tfa.update` | Update a method's label or primary status |
+| PUT | `/api/v0/tfa/regen-backup-codes/` | `api.tfa.regen_backup_codes` | Regenerate backup codes |
+
+Deprecated paths (kept for backwards compatibility; not to be used in new integrations):
+
+| Method | Path | Maps to |
+|--------|------|---------|
+| POST | `/api/v0/tfa/test/` | `api_tfa_send_sms` |
+| POST | `/api/v0/tfa/test-submit/` | `api_tfa_confirm_new_method` (still has the legacy `untracked_2fa_found` check — see Legacy TFA Users) |
+| POST | `/api/v0/tfa/resend/` | `api_tfa_resend_sms` |
+
+---
+
+## Security Model
+
+### Lockout
+
+Lockout applies **per-method**, not to the account as a whole. If a user has multiple 2FA methods (e.g., SMS + TOTP) and one method's attempt counter exceeds its threshold, only that method becomes temporarily unavailable; the user can still authenticate with another method or a backup code.
+
+| Method | Failed attempts before lockout | Lockout duration |
+|--------|-------------------------------|-----------------|
+| SMS | 3 failed | 15 minutes (900 seconds) |
+| TOTP | 5 failed | 15 minutes (900 seconds) |
+
+Backend constants (in `auth.py`):
+
+```python
+TFA_LOCKOUT_THRESHOLDS = {"sms": 3, "totp": 5}
+TFA_LOCKOUT_DURATION_SECONDS = 900
+```
+
+### Challenge expiry
+
+2FA challenges expire after 10 minutes (`TFA_CHALLENGE_EXPIRY_SECONDS = 600`). Expired challenges result in a `2fa_expired` or `challenge_not_found` error from the login endpoint.
+
+### Pre-authorization window
+
+After a user successfully authorizes adding a new method, the backend sets a Redis key with a 30-minute TTL (`AUTHORIZE_NEW_METHOD_EXPIRY_SECONDS = 1800`). This window is consumed on `POST /api/v0/tfa/confirm-new/` and cannot be reused.
+
+### Backup codes
+
+- 10 backup codes are generated when a user activates their first 2FA method.
+- Each code is one-time use. Format: `XXXX-XXXX-XXXX` — the hyphens are part of the code and **must be included** when passing the value as a request parameter (do not strip them).
+- Backup codes are soft-deleted when all 2FA methods are removed (2FA fully disabled).
+- Backup codes can be regenerated via `PUT /api/v0/tfa/regen-backup-codes/`, which requires a valid 2FA code or an existing backup code.
+
+### Team user handling
+
+Most TFA endpoints call `handle_if_team_user()` to reject team account requests where applicable. The login endpoint (`POST /api/v0/tfa/`) is a notable exception — it does not invoke this gate, since team accounts use a different authentication path entirely.
+
+---
+
+## Field Reference
+
+Three distinct things share the `tfa_status` / `tfa_enabled` naming and are easy to confuse. They are NOT interchangeable.
+
+### `tfa_enabled` (users table column)
+
+The `tfa_enabled` boolean in the `users` database table indicates whether 2FA is active for the account.
+
+**Returned by:** `GET /api/v0/tfa/status/` — exposes this DB value as a `tfa_enabled` boolean alongside `methods[]`, `backup_codes_remaining`, and `new_method_authorized`. The boolean is binary — it does NOT distinguish `enabled` from `legacy`; for that distinction, use the `tfa_status` enum on the user object (see below).
+
+**NOT returned by:** `show user` / `GET /api/v0/users/current/`, the login response, or any other endpoint. The user object exposes the `tfa_status` enum (below) instead — which is the field application code should consume to determine 2FA state, since it carries the `legacy` distinction.
+
+### `tfa_status` field on the user object (returned by show user / get_current_user)
+
+The user object returned by `GET /api/v0/users/current/` (i.e., `show user`) includes a `tfa_status` field with one of three string values:
+
+- `"enabled"` — active 2FA with at least one configured method
+- `"disabled"` — 2FA not active
+- `"legacy"` — legacy account state (see Legacy TFA Users section)
+
+This is the field application code should consume to determine 2FA state for a user.
+
+### `GET /api/v0/tfa/status/` endpoint (does NOT return enabled/disabled/legacy enum)
+
+The `tfa/status/` endpoint returns a different shape than the `tfa_status` field on the user object. It returns: `tfa_enabled` (boolean), `methods[]`, `backup_codes_remaining`, and `new_method_authorized`:
+
+```json
+{
+  "success": true,
+  "tfa_enabled": true,
+  "methods": [
+    {"id": 1, "method": "sms", "label": "Primary phone", "is_primary": true},
+    {"id": 2, "method": "totp", "label": "Authenticator", "is_primary": false}
+  ],
+  "backup_codes_remaining": 8,
+  "new_method_authorized": false
+}
+```
+
+The `tfa_enabled` here is a **boolean** — it does NOT carry the three-value `enabled|disabled|legacy` enum. To distinguish `enabled` from `legacy`, use the `tfa_status` field on the user object (above).
+
+### Note on `get_tfa_status` (internal function vs API endpoint — unrelated)
+
+There is also an internal Python function `get_tfa_status(request, user)` in `auth.py` that returns the `enabled|disabled|legacy` enum and feeds the `tfa_status` field on the user object. This function is **not** what `GET /api/v0/tfa/status/` calls — despite the matching name, the function and the endpoint do different things.
