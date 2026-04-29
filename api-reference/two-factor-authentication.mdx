@@ -1,7 +1,7 @@
 ---
 title: Two-Factor Authentication — Developer Reference
-createdAt: Mon Apr 21 2025 00:00:00 GMT+0000 (Coordinated Universal Time)
-updatedAt: Mon Apr 21 2025 00:00:00 GMT+0000 (Coordinated Universal Time)
+createdAt: Mon Apr 21 2026 00:00:00 GMT+0000 (Coordinated Universal Time)
+updatedAt: Mon Apr 21 2026 00:00:00 GMT+0000 (Coordinated Universal Time)
 ---
 
 This guide covers the 2FA system for support engineers and internal developers. It documents active authentication methods, the setup flow, API surface, security model, legacy account state, and field behavior.
@@ -10,17 +10,23 @@ This guide covers the 2FA system for support engineers and internal developers. 
 
 ## Overview
 
-Three 2FA methods are active in the system:
+### Prerequisite: SMS or TOTP method first
 
-| Method | Status | Configured via |
-|--------|--------|----------------|
-| SMS | Active — user-configurable | Account Settings UI |
-| Email | Active — auto-triggered at login | Automatic (no user setup) |
-| TOTP (Authenticator app) | Active — user-configurable via Account Settings (recommended method) | Account Settings UI |
+To use 2FA, a user must configure **at least one SMS or TOTP method**. Email 2FA is **backup-only** — it is not a primary method, is **not auto-triggered at login**, and cannot be the user's only configured method.
 
-**Source:** `web/views/auth.py:1317` — `VALID_TFA_METHODS = {"sms", "totp", "email"}`
+The single exception: when a user is setting up their **first** 2FA method, the backend uses email automatically as the verification channel for the authorize-new-method step (since no other method exists yet to verify with). After that first setup, email is never used as a primary verification path.
 
-Email 2FA is not stored in `user_tfa_methods`. It is triggered automatically during login when no other method is configured, using the user's verified email address.
+### Methods
+
+| Method | Status | Configured via | Role |
+|--------|--------|----------------|------|
+| SMS | Active — user-configurable | Account Settings UI | Primary |
+| TOTP (Authenticator app) | Active — user-configurable (recommended method) | Account Settings UI | Primary |
+| Email | Active — automatic only for first-method setup; backup-only otherwise | Not user-configured | Backup-only / first-setup verification |
+
+The set of valid `tfa_method` values accepted by the backend is `{"sms", "totp", "email"}` (defined in `auth.py` as `VALID_TFA_METHODS`).
+
+Email 2FA is not stored in `user_tfa_methods`. It is used automatically only during the first-method-setup verification step, and is **not** triggered automatically at login.
 
 ---
 
@@ -88,17 +94,19 @@ TOTP setup follows the same authorization pattern as SMS. Triggered from Account
 
 ---
 
-## Email 2FA Login Flow
+## Email 2FA — First-Method Setup Verification
 
-Email 2FA is triggered automatically at login when the user has no configured 2FA methods but has `tfa_enabled=true`. It is also used in the authorization step for first-time SMS/TOTP setup.
+Email 2FA is **not a login flow**. It is used as the verification channel during the **authorize-new-method** step of first-time 2FA setup, when the user has no other 2FA method configured yet. Once at least one SMS or TOTP method exists, email is no longer used as a verification path; subsequent operations require the user to verify with one of their configured primary methods (SMS, TOTP) or a backup code.
 
-1. User submits username/password at login. Backend returns a `tfa_secret` for the session.
-2. Client calls `POST /api/v0/tfa/email/` with the `secret` to send a verification email.
+For first-method setup specifically:
+
+1. User initiates 2FA setup from Account Settings.
+2. Client calls `POST /api/v0/tfa/authorize-new-method/`. With no existing method, the backend forces `tfa_method = "email"` and sends a verification code to the user's verified email address.
 3. The email contains a 6-digit code (valid for 10 minutes). The subject line reads "2FA Verification Code".
-4. User submits the code via `POST /api/v0/tfa/` (login endpoint) with `{tfa_method: "email", code: "...", secret: "..."}`.
-5. On success, a new 2FA session API key is created with a 24-hour expiry.
+4. User submits the code via `PUT /api/v0/tfa/authorize-new-method/` with `{tfa_method: "email", code: "...", secret: "..."}`.
+5. On success, the backend sets a 30-minute Redis preauth window; the user can then proceed to add their actual SMS or TOTP method via the confirm-new endpoint.
 
-The `TfaEmailLogin.tsx` component handles the email link verification path — when a user clicks a verification link in their email, the component calls `api.vast.verify.tfaEmail(verification_code, currentApiKey)` and updates the session on success.
+For users who already have at least one SMS or TOTP method configured, email is never automatically triggered for any subsequent operation — including login, adding additional methods, deleting methods, or regenerating backup codes. Those operations verify against the user's existing primary methods.
 
 ---
 
@@ -222,19 +230,41 @@ All TFA endpoints call `handle_if_team_user()` to reject team account requests w
 
 ## Field Reference
 
-### `tfa_enabled` (users table)
+Three distinct things share the `tfa_status` / `tfa_enabled` naming and are easy to confuse. They are NOT interchangeable.
 
-The `tfa_enabled` boolean in the `users` table indicates whether 2FA is active for the account. This field is included in the user API schema but is not shown in the formatted `vastai show user` output — it is absent from the `user_fields` display tuple in `vast-cli/vast.py:897-926`.
+### `tfa_enabled` (users table column — DB-only, NOT returned by any API)
 
-To retrieve `tfa_enabled`, use the `--raw` flag:
+The `tfa_enabled` boolean in the `users` database table indicates whether 2FA is active for the account. **This field is NOT returned by any API endpoint** — not by `show user`, not by `tfa/status/`, not by login. It exists only on the DB row and is consumed internally by backend logic.
 
-```bash
-vastai show user --raw | python3 -c "import json,sys; u=json.load(sys.stdin); print(u.get('tfa_enabled'))"
-```
+If you need to inspect this value, query the database directly. Application code and CLI tools should use the `tfa_status` field on the user object (see below).
 
-### `tfa_status` (user API response field)
+### `tfa_status` field on the user object (returned by show user / get_current_user)
 
-Available via `GET /api/v0/tfa/status/`. Returns one of:
+The user object returned by `GET /api/v0/users/current/` (i.e., `show user`) includes a `tfa_status` field with one of three string values:
+
 - `"enabled"` — active 2FA with at least one configured method
 - `"disabled"` — 2FA not active
 - `"legacy"` — legacy account state (see Legacy TFA Users section)
+
+This is the field application code should consume to determine 2FA state for a user.
+
+### `GET /api/v0/tfa/status/` endpoint (does NOT return enabled/disabled/legacy)
+
+The `tfa/status/` endpoint returns a different shape than the `tfa_status` field above. It returns the user's configured methods, backup code count, and whether they are currently authorized to add a new method:
+
+```json
+{
+  "tfa_methods": [
+    {"id": 1, "method": "sms", "label": "Primary phone", "is_primary": true},
+    {"id": 2, "method": "totp", "label": "Authenticator", "is_primary": false}
+  ],
+  "backup_codes_remaining": 8,
+  "authorized_to_add_method": false
+}
+```
+
+It does **not** return the `enabled|disabled|legacy` enum — that comes from the `tfa_status` field on the user object (above), not from this endpoint.
+
+### Note on `get_tfa_status` (internal function vs API endpoint — unrelated)
+
+There is also an internal Python function `get_tfa_status(request, user)` in `auth.py` that returns the `enabled|disabled|legacy` enum and feeds the `tfa_status` field on the user object. This function is **not** what `GET /api/v0/tfa/status/` calls — despite the matching name, the function and the endpoint do different things.
