@@ -1,0 +1,34 @@
+---
+title: Managing Scale
+description: Learn how to configure your Serverless endpoint for different load scenarios
+"canonical": "/guides/serverless/managing-scale"
+---
+
+
+## Managing for Bursty Load
+
+- **Adjust** `min_workers`: This will change the number of managed inactive workers, and increase capacity for high peak
+- **Check** `max_workers`: Ensure this parameter is set high enough for the serverless engine to create the necessary number of workers
+
+## Managing for Low Demand or Idle Periods
+
+- **Adjust** `min_load`: Reducing `min_load` will reduce the minimum number of active workers. Set to `1` to reduce the number to its minimum value of 1 worker, or set to `0` to put all workers into inactive states.
+- **Adjust** `min_workers`: This will change the number of managed inactive workers
+
+## Scaling to Zero
+
+To allow your endpoint to fully scale to zero during idle periods, configure `inactivity_timeout` alongside your other scaling parameters. The `inactivity_timeout` value (in seconds) determines how long the endpoint must be idle before scaling down is permitted.
+
+- To scale to **zero active workers** (while keeping cold workers available): set `min_load = 0` and configure a positive `inactivity_timeout`. Workers in the `cold_workers` pool will remain available for fast reactivation.
+- To scale to **zero total workers**: set `min_load = 0`, `cold_workers = 0`, and configure a positive `inactivity_timeout`. This minimizes cost during extended idle periods but incurs cold-start latency when traffic resumes.
+- To **prevent** scaling to zero regardless of other settings: set `inactivity_timeout` to a negative value (e.g., `-1`).
+
+A value of `0` for `inactivity_timeout` disables inactivity-based gating entirely, the endpoint will rely solely on normal autoscaling decisions.
+
+## Managing Queue Time
+
+Use `max_queue_time` and `target_queue_time` to control how the autoscaler responds to request queuing:
+
+- **Increase** `max_queue_time` to allow more requests to buffer on each worker before the system holds them in the global queue. This is useful for workloads with predictable, longer processing times.
+- **Decrease** `target_queue_time` to trigger more aggressive scale-up when queue times rise, reducing latency at the cost of potentially higher worker counts.
+- **Increase** `target_queue_time` to tolerate higher queue times before scaling up, reducing costs when some latency is acceptable.

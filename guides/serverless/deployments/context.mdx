@@ -1,0 +1,101 @@
+---
+title: "@context Classes"
+description: Load models and heavy resources once at worker startup and share them across all remote function calls.
+---
+
+The `@context` decorator registers an async context manager class whose lifecycle is tied to the GPU worker. Use it to load models, initialize engines, allocate GPU memory, and set up connections once at startup rather than on every request.
+
+## Defining a Context
+
+A context class must implement the async context manager protocol, `__aenter__` and `__aexit__`:
+
+```python
+@app.context()
+class MyModel:
+    async def __aenter__(self):
+        import torch
+        self.model = torch.load("model.pt").cuda()
+        self.device = torch.device("cuda")
+        return self
+
+    async def __aexit__(self, *exc):
+        del self.model  # Cleanup on shutdown
+```
+
+- **`__aenter__`** runs once when the worker starts, before it enters "ready" state. Use it to load models, allocate resources, and perform any one-time setup. It must return `self` (or whatever object you want `get_context` to return).
+- **`__aexit__`** runs when the worker shuts down. Use it to close connections, free resources, or flush buffers.
+
+### Passing Arguments to Context
+
+You can pass arguments to the context class constructor via the decorator:
+
+```python
+@app.context("Qwen/Qwen3-0.6B", max_len=512)
+class LLMEngine:
+    def __init__(self, model_name, max_len=1024):
+        self.model_name = model_name
+        self.max_len = max_len
+
+    async def __aenter__(self):
+        from vllm import AsyncLLMEngine, AsyncEngineArgs
+        args = AsyncEngineArgs(model=self.model_name, max_model_len=self.max_len)
+        self.engine = AsyncLLMEngine.from_engine_args(args)
+        return self
+
+    async def __aexit__(self, *exc):
+        self.engine.shutdown_background_loop()
+```
+
+## Accessing Context in @remote Functions
+
+Use `app.get_context(ContextClass)` inside a remote function to retrieve the initialized context instance:
+
+```python
+@app.remote(benchmark_dataset=[{"prompt": "Hello"}])
+async def generate(prompt: str, max_tokens: int = 128) -> str:
+    engine = app.get_context(LLMEngine)
+    # Use engine.engine to generate text...
+```
+
+`get_context` returns the object that `__aenter__` returned. If the context class hasn't been registered or hasn't been entered yet, it raises a `KeyError`.
+
+## Multiple Contexts
+
+You can register multiple context classes. They are all entered **in parallel** at startup:
+
+```python
+@app.context()
+class Tokenizer:
+    async def __aenter__(self):
+        from transformers import AutoTokenizer
+        self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
+        return self
+    async def __aexit__(self, *exc):
+        pass
+
+@app.context()
+class Model:
+    async def __aenter__(self):
+        from transformers import AutoModelForCausalLM
+        self.model = AutoModelForCausalLM.from_pretrained("gpt2").cuda()
+        return self
+    async def __aexit__(self, *exc):
+        pass
+
+@app.remote(benchmark_dataset=[{"text": "Hello"}])
+async def generate(text: str) -> str:
+    tok = app.get_context(Tokenizer)
+    model = app.get_context(Model)
+    inputs = tok.tokenizer(text, return_tensors="pt").to("cuda")
+    outputs = model.model.generate(**inputs)
+    return tok.tokenizer.decode(outputs[0])
+```
+
+Since contexts are entered in parallel via `asyncio.gather()`, independent resources (like a tokenizer and a model) load concurrently, reducing total startup time.
+
+## Lifecycle
+
+1. **Registration** (deploy time): `@app.context()` decorators execute and register context classes
+2. **Startup** (serve time): All registered contexts' `__aenter__()` methods are awaited in parallel
+3. **Serving**: Remote functions access contexts via `app.get_context()`
+4. **Shutdown**: All contexts' `__aexit__()` methods are awaited in parallel
