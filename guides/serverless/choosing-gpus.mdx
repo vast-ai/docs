@@ -1,49 +1,36 @@
 ---
 title: Choosing GPUs for Your Workload
-description: How Vast Serverless evaluates GPUs for cost-efficiency, both automatically once your Workergroup is running and on-demand from the CLI.
+description: Use the Vast CLI to compare measured performance and cost-efficiency across GPU classes for a given template.
 "canonical": "/guides/serverless/choosing-gpus"
 ---
 
 
-Picking the right GPU mix for a serverless workload is a performance-per-dollar problem, not a spec-sheet problem. A cheaper GPU is only a win if it can keep up with your workload, and a faster GPU is only a win if the extra throughput pays for the extra hourly rate. Without measured numbers on your actual template, the only ways to find the optimum are guesswork or production trial-and-error.
+Picking the right GPU for a workload is a performance-per-dollar problem, not a spec-sheet problem. A cheaper GPU is only a win if it can keep up; a faster GPU is only a win if the extra throughput pays for the extra hourly rate. Without measured numbers on your actual template, the only ways to find the optimum are guesswork or production trial-and-error.
 
-Vast Serverless solves this in two complementary ways:
-
-- **Automatically**, while your Workergroup runs. The serverless engine continuously benchmarks workers and uses the results to decide which to recruit, route to, and release.
-- **On-demand**, before you commit. The `vastai run benchmark` CLI command rents one instance per GPU class, runs the same benchmark workload, and reports performance per dollar so you can compare options up front.
-
-Both mechanisms exercise the same workload: the benchmark that the template's PyWorker already has baked in. You don't need to write or modify it; pre-built templates (vLLM, TGI, ComfyUI, etc.) ship with one. If you're authoring a new template, see [Creating PyWorkers](/guides/serverless/creating-new-pyworkers).
-
-## Automatic GPU Selection
-
-When a new Workergroup is created, the serverless engine enters a **learning phase**. During this phase, it recruits a variety of machine types from those allowed by your `search_params`. Each new worker runs the template's benchmark and reports `measured_perf` back to the engine.
-
-As traffic scales up and down, the engine builds an **application-specific model of cost vs. performance**, which it then uses to make informed decisions about future worker recruitment, request routing, and worker release. The result is that, over time, your Workergroup converges on the cheapest mix of GPUs that can actually serve your traffic, without you having to hand-pick them.
-
-For tips on accelerating that convergence in the first day of operation, see [Managing Scale → Initial Rollout](/guides/serverless/managing-scale).
-
-## On-Demand Benchmarking with the CLI
-
-The `vastai run benchmark` command lets you do the same evaluation yourself, before (or independent of) any Workergroup. You give it a template and a list of GPU classes; for each GPU, the CLI rents one instance, runs the template's benchmark workload, records the measured performance, looks up the rental's hourly price, and reports performance per dollar. Multiple GPUs run in parallel and tear themselves down when finished.
+The `vastai run benchmark` CLI command closes that gap. You give it a template (vLLM, TGI, ComfyUI, a custom PyWorker, etc.) and a list of GPU classes; for each GPU, the CLI rents one instance, runs the template's built-in benchmark workload, records the measured performance, looks up the rental's hourly price, and reports performance per dollar. Multiple GPUs run in parallel and tear themselves down when finished.
 
 <Note>
   This is a CLI-only tool today. There is no SDK equivalent in the `vastai` Python package. Run it from your terminal or a CI job; consume the results via `--raw` for scripting.
 </Note>
 
-### When to Use It
+<Note>
+  If you're operating a Serverless Workergroup, the autoscaler already runs this same benchmark on every worker it recruits and uses the results to drive its own GPU choices. See [Automated Performance Testing](/guides/serverless/automated-performance-testing) for how that works.
+</Note>
+
+## When to Use It
 
 - Choosing the GPU classes to allow in a new Workergroup's `search_params`.
 - Comparing two templates (for example, vLLM vs. TGI for the same model) on the same hardware.
 - Validating that a template fits and runs correctly on a GPU before allowing it into production.
 - Producing a perf/dollar number for capacity planning or budget conversations.
 
-### Prerequisites
+## Prerequisites
 
 - A Vast.ai account with a positive balance. Each benchmark run rents real instances; budget accordingly.
 - An API key configured (see [Authentication](/cli/authentication)).
 - The template's hash or ID. You can find these on the [Templates dashboard](https://cloud.vast.ai/templates/) or via `vastai search templates`.
 
-### Quickstart
+## Quickstart
 
 Benchmark a template against the default GPU set (RTX 5090, RTX 4090, RTX 3090, RTX A6000):
 
@@ -67,9 +54,9 @@ vastai run benchmark \
   --gpus "2x RTX_4090, 2x RTX_3090"
 ```
 
-The CLI prints a confirmation prompt with the worst-case cost before any rental is created. Pass `-y` to skip it in scripts.
+The CLI prints a confirmation prompt summarizing the GPU mix and per-rental timeout before any rental is created. Pass `-y` to skip it in scripts.
 
-### How It Works
+## How It Works
 
 For each GPU in your list, the runner:
 
@@ -82,14 +69,14 @@ For each GPU in your list, the runner:
 
 The rentals run in parallel, with a small stagger between submits to stay under the autoscaler's create rate limit.
 
-### Reading the Output
+## Reading the Output
 
 While the run is in progress, the CLI renders a live table:
 
 | Column | Meaning |
 |--------|---------|
 | **GPU** | The GPU class being benchmarked. |
-| **Status** | Current worker state: `provisioning`, `waiting_for_worker`, `loading`, `idle`, `done`, `failed`, `timeout`, `no_worker`, `skipped`. |
+| **Status** | Current worker state: `queued`, `provisioning`, `waiting_for_worker`, `loading`, `idle`, `done`, `failed`, `timeout`, `no_worker`, `skipped`, `aborted`, `error`. |
 | **Endpoint** | The ephemeral endpoint ID created for this run. |
 | **Worker** | The worker (instance) ID, once one has been recruited. |
 | **Elapsed** | Time since the worker started running. Freezes on terminal status. |
@@ -111,9 +98,9 @@ After the run, the CLI prints a sorted summary by `Perf/$/hr`, so the most cost-
 ]
 ```
 
-### Cost and Timeout
+## Cost and Timeout
 
-Each GPU rental runs for up to `--timeout` seconds (default 3600). The pre-flight estimate shown in the confirmation prompt is a worst-case upper bound: `sum(median_price * timeout_hours)` across all GPUs. Real runs almost always finish well before the ceiling because the runner exits as soon as it reads a valid `measured_perf`.
+Each GPU rental runs for up to `--timeout` seconds (default 3600). The CLI prints what it's about to do, the number of configurations, the GPU mix, and the per-rental timeout, then asks for confirmation. Pass `-y` to skip the prompt in scripts. Real runs almost always finish well before the timeout because the runner exits as soon as it reads a valid `measured_perf`.
 
 You can tighten the ceiling for cheaper runs:
 
@@ -127,7 +114,7 @@ vastai run benchmark \
   If you `Ctrl+C` mid-run, the CLI installs a SIGINT handler that finishes deleting in-flight endpoints and Workergroups before exiting. Do not kill the process again during cleanup, otherwise you may need to manually remove the leftovers with `vastai delete endpoint` and `vastai delete workergroup`.
 </Warning>
 
-### Common Outcomes
+## Common Outcomes
 
 | Status | What it means | What to do |
 |--------|---------------|------------|
@@ -137,6 +124,6 @@ vastai run benchmark \
 | `failed` | Workers reached a terminal state (`stopped`, `destroying`, `unavail`) without ever becoming idle. | Inspect worker logs in the dashboard. Common causes are model download failure or an OOM during load. |
 | `timeout` | The worker was still loading or running when `--timeout` elapsed. | Increase `--timeout`, or check whether the host is unusually slow (Docker pull stalls are the typical culprit). |
 
-### Full Flag Reference
+## Full Flag Reference
 
 See the [`vastai run benchmark`](/cli/reference/run-benchmark) reference for every flag and its default.

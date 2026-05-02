@@ -1,0 +1,22 @@
+---
+title: Automated Performance Testing
+description: How the Vast Serverless engine continuously benchmarks workers to make cost-aware recruitment and release decisions.
+"canonical": "/guides/serverless/automated-performance-testing"
+---
+
+
+Vast Serverless relies on **benchmark testing** to figure out the most cost-effective GPU for your workload. The benchmark workload is baked into the PyWorker that ships with each template (vLLM, TGI, ComfyUI, and so on), and the autoscaler uses the results to decide which offers to recruit and which workers to release as traffic changes.
+
+## How Benchmark Testing Works
+
+When you create a Workergroup, the autoscaler observes each worker as it boots. The PyWorker runs its built-in benchmark workload and reports `measured_perf` back, which the autoscaler stores per machine. From then on, every offer the autoscaler considers is scored by `pred_value`, a function of measured performance, on-demand price, and reliability, and the highest-scoring offers are recruited first. The same score also drives which workers get released when load drops.
+
+There is no separate "learning phase" and no explicit logic to maintain diversity across GPU types. Over time the Workergroup gravitates toward the GPU class (or classes) with the best perf-per-dollar for your specific template, without you having to hand-pick them.
+
+For tips on accelerating that convergence in the first day of operation, see [Managing Scale → Initial Rollout](/guides/serverless/managing-scale).
+
+## Running the Same Benchmark Yourself
+
+The same benchmark workload that the engine uses can be invoked on demand from the CLI, against a list of GPU classes you specify, before (or independent of) any Workergroup. This is useful for picking the GPUs you want to allow in `search_params`, for comparing two templates on the same hardware, or for producing a perf/dollar number for capacity planning.
+
+See [Choosing GPUs for Your Workload](/guides/serverless/choosing-gpus) for the walkthrough.
