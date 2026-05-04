@@ -3,7 +3,7 @@ title: "vastai run benchmarks"
 sidebarTitle: "run benchmarks"
 ---
 
-Compare measured performance and cost-efficiency across GPU classes.
+Benchmark a template against one or more GPUs and report performance per dollar.
 
 ## Usage
 
@@ -37,64 +37,21 @@ vastai run benchmarks [OPTIONS]
   Skip the cost confirmation prompt.
 </ParamField>
 
-## Description
-
-For each GPU in the list, rents one instance, runs the template's built-in benchmark workload, records the measured performance, looks up the rental's hourly price, and reports performance per dollar. GPUs run in parallel and tear themselves down when finished.
-
-Each rental owns its own ephemeral endpoint and Workergroup so runs can proceed in parallel safely. GPUs whose marketplace offers do not match the template's `extra_filters` are skipped at pre-flight, with a message explaining which filter excluded them.
-
-The pre-flight cost estimate shown in the confirmation prompt is a worst-case upper bound (`sum(median_price * timeout_hours)`); real runs almost always finish well before the timeout because the command exits as soon as a worker reports `status=idle` with a positive `measured_perf`.
-
-For a full walkthrough including how to interpret the live table and the JSON output, see the [Choosing GPUs for Your Workload](/guides/serverless/choosing-gpus) guide.
-
 ## Examples
 
 ```bash
-# auto-sweep the default GPUs against TGI
+# auto-sweep the default GPUs
 vastai run benchmarks --template_hash 79ebdd2ebfb9d42cedf7a221c42d37a5
 
-# specific GPUs against vLLM
-vastai run benchmarks \
-  --template_hash 393fa8572e6c73c927c8275fe4dffd53 \
-  --gpus RTX_4090,RTX_3090
+# specific GPUs
+vastai run benchmarks --template_hash 393fa8572e6c73c927c8275fe4dffd53 --gpus RTX_4090,RTX_3090
 
-# multi-GPU configurations via inline Nx prefix against ComfyUI
-vastai run benchmarks \
-  --template_hash 40ef49becc953aa910ee05bd4653b9b3 \
-  --gpus "2x RTX_4090, 2x RTX_3090"
-
-# default count for tokens without an Nx prefix
-vastai run benchmarks \
-  --template_hash 79ebdd2ebfb9d42cedf7a221c42d37a5 \
-  --gpus RTX_4090,RTX_3090 \
-  --num_gpus 2
-
-# shorter timeout, skipping the cost prompt
-vastai run benchmarks \
-  --template_hash 393fa8572e6c73c927c8275fe4dffd53 \
-  --timeout 600 -y
+# multi-GPU configurations via inline Nx prefix
+vastai run benchmarks --template_hash 40ef49becc953aa910ee05bd4653b9b3 --gpus "2x RTX_4090, 2x RTX_3090"
 
 # raw JSON output for piping into another tool
-vastai run benchmarks \
-  --template_hash 40ef49becc953aa910ee05bd4653b9b3 --raw
+vastai run benchmarks --template_hash 40ef49becc953aa910ee05bd4653b9b3 --raw
 ```
-
-## Output
-
-The live table shows per-GPU progress:
-
-| Column | Meaning |
-|--------|---------|
-| `GPU` | GPU class being benchmarked |
-| `Status` | Current worker state |
-| `Endpoint` | Ephemeral endpoint ID |
-| `Worker` | Rented worker (instance) ID |
-| `Elapsed` | Time since the worker started; freezes on terminal status |
-| `Perf` | Measured performance reported by the template's benchmark |
-| `$/hr` | On-demand `dph_total` for the rented worker |
-| `Perf/$/hr` | Cost-effectiveness ratio; higher is better |
-
-With `--raw`, the post-run summary is emitted as JSON with one row per GPU containing `gpu_name`, `rental_dph`, `measured_perf`, `status`, and `perf_per_dollar`.
 
 ## Global Options
 

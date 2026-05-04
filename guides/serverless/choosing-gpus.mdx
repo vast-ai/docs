@@ -8,7 +8,7 @@ description: Use the Vast CLI to compare measured performance and cost-efficienc
 The `vastai run benchmarks` CLI command rents one instance of each GPU class you give it, runs the template's built-in benchmark workload, and reports performance per dollar. Multiple GPUs run in parallel and tear themselves down when finished.
 
 <Warning>
-  Each run rents real instances and consumes a small amount of account credit for the duration of the benchmark. Costs scale with the number of GPU classes and the per-rental timeout.
+  Each run rents real instances and consumes account credit; cost scales with the GPU class count and per-rental timeout.
 </Warning>
 
 ## When to Use It
@@ -20,11 +20,11 @@ The `vastai run benchmarks` CLI command rents one instance of each GPU class you
 
 ## Prerequisites
 
-- A Vast.ai account with a positive balance. Each benchmark run rents real instances; budget accordingly.
+- A Vast.ai account with credits.
 - An API key configured (see [Authentication](/cli/authentication)).
-- The template's hash or ID. You can find these on the [Templates dashboard](https://cloud.vast.ai/templates/) or via `vastai search templates`.
+- The template's hash or ID, from the [Templates dashboard](https://cloud.vast.ai/templates/) or `vastai search templates`.
 
-## Quickstart
+## Basic Usage
 
 If you don't pass `--gpus`, the CLI sweeps a built-in default set (RTX 5090, RTX 4090, RTX 3090, RTX A6000), which is a reasonable starting point if you're not sure which classes to compare:
 
@@ -48,20 +48,11 @@ vastai run benchmarks \
   --gpus "2x RTX_4090, 2x RTX_3090"
 ```
 
-The CLI prints a confirmation prompt summarizing the GPU mix and per-rental timeout before any rental is created. Pass `-y` to skip it in scripts.
-
 ## How It Works
 
-For each GPU in your list, the runner:
+For each GPU in your list, the CLI pre-flights the marketplace against the template's `extra_filters` (skipping GPUs with no matching offers and reporting which filter excluded them), creates a scratch endpoint and one-worker Workergroup, polls until the worker reaches `status=idle` with a positive `measured_perf`, then records the result and tears the rental down. The rental's actual `dph_total` is fetched at idle so perf/dollar reflects the real run, not a marketplace estimate.
 
-1. **Resolves the GPU count.** If a token has an `Nx` prefix, that wins. Otherwise, if `--num_gpus` is set, it is used. Otherwise, the runner auto-sizes from the template's `gpu_total_ram` filter so VRAM fits.
-2. **Pre-flights the marketplace.** Counts matching offers using the template's `extra_filters` plus the GPU and `num_gpus`. GPUs with zero matching offers are skipped, and the CLI explains which filter excluded them.
-3. **Creates an ephemeral endpoint and Workergroup.** Each GPU gets its own scratch endpoint named `benchmark Nx <GPU> (<uuid>)`, scoped to one worker (`cold_workers=1`, `max_workers=1`).
-4. **Polls for an idle worker.** The PyWorker boots, runs the template's built-in benchmark workload, and reports `measured_perf`. The runner waits for `status=idle` and `measured_perf > 0`.
-5. **Reads the rental price.** Once the worker reaches idle, the CLI fetches the instance's `dph_total` (the hourly rate Vast actually charged for that contract) so the perf/dollar ratio reflects the real run, not a marketplace estimate.
-6. **Records the result and tears down.** The Workergroup is deleted first, then the endpoint. An `atexit` handler sweeps anything left if the process dies unexpectedly.
-
-The rentals run in parallel, with a small stagger between submits to stay under the autoscaler's create rate limit.
+GPU count per rental comes from the `Nx` token prefix if set, otherwise `--num_gpus`, otherwise auto-sized from the template's `gpu_total_ram` filter.
 
 ## Reading the Output
 
@@ -74,7 +65,7 @@ While the run is in progress, the CLI renders a live table:
 | **Endpoint** | The ephemeral endpoint ID created for this run. |
 | **Worker** | The worker (instance) ID, once one has been recruited. |
 | **Elapsed** | Time since the worker started running. Freezes on terminal status. |
-| **Perf** | The template's `measured_perf` value: completed workload per second, where the workload unit is whatever the template's benchmark counts (token count for typical LLM templates, request count when no custom workload calculator is set). Use it to rank GPUs against each other on the same template, not as an absolute throughput claim across templates. |
+| **Perf** | The template's `measured_perf` (workload-units per second; tokens/sec for typical LLMs, requests/sec when the template has no custom workload calculator). Useful for ranking GPUs on the same template, not for cross-template comparison. |
 | **$/hr** | The rented worker's `dph_total`, the hourly rate the contract is being billed at. |
 | **Perf/$/hr** | Cost-efficiency score: measured performance divided by hourly price. Higher is better. |
 
