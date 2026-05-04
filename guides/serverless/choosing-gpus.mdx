@@ -1,28 +1,22 @@
 ---
 title: Choosing GPUs for Your Workload
-description: Use the Vast CLI to compare measured performance and cost-efficiency across GPU classes for a given template.
+description: Use the Vast CLI to compare measured performance and cost-efficiency across GPU classes.
 "canonical": "/guides/serverless/choosing-gpus"
 ---
 
 
-Picking the right GPU for a workload is a performance-per-dollar problem, not a spec-sheet problem. A cheaper GPU is only a win if it can keep up; a faster GPU is only a win if the extra throughput pays for the extra hourly rate. Without measured numbers on your actual template, the only ways to find the optimum are guesswork or production trial-and-error.
+The `vastai run benchmarks` CLI command rents one instance of each GPU class you give it, runs the template's built-in benchmark workload, and reports performance per dollar. Multiple GPUs run in parallel and tear themselves down when finished.
 
-The `vastai run benchmark` CLI command closes that gap. You give it a template (vLLM, TGI, ComfyUI, a custom PyWorker, etc.) and a list of GPU classes; for each GPU, the CLI rents one instance, runs the template's built-in benchmark workload, records the measured performance, looks up the rental's hourly price, and reports performance per dollar. Multiple GPUs run in parallel and tear themselves down when finished.
-
-<Note>
-  This is a CLI-only tool today. There is no SDK equivalent in the `vastai` Python package. Run it from your terminal or a CI job; consume the results via `--raw` for scripting.
-</Note>
-
-<Note>
-  If you're operating a Serverless Workergroup, the autoscaler already runs this same benchmark on every worker it recruits and uses the results to drive its own GPU choices. See [Automated Performance Testing](/guides/serverless/automated-performance-testing) for how that works.
-</Note>
+<Warning>
+  Each run rents real instances and consumes a small amount of account credit for the duration of the benchmark. Costs scale with the number of GPU classes and the per-rental timeout.
+</Warning>
 
 ## When to Use It
 
-- Choosing the GPU classes to allow in a new Workergroup's `search_params`.
+- Picking which GPU class to rent for an on-demand instance, or which classes to allow in a Serverless Workergroup's `search_params`.
 - Comparing two templates (for example, vLLM vs. TGI for the same model) on the same hardware.
-- Validating that a template fits and runs correctly on a GPU before allowing it into production.
-- Producing a perf/dollar number for capacity planning or budget conversations.
+- Validating that a template fits and runs correctly on a GPU before committing to longer rentals or production traffic.
+- Producing a perf/dollar number for capacity planning or budgeting.
 
 ## Prerequisites
 
@@ -32,16 +26,16 @@ The `vastai run benchmark` CLI command closes that gap. You give it a template (
 
 ## Quickstart
 
-Benchmark a template against the default GPU set (RTX 5090, RTX 4090, RTX 3090, RTX A6000):
+If you don't pass `--gpus`, the CLI sweeps a built-in default set (RTX 5090, RTX 4090, RTX 3090, RTX A6000), which is a reasonable starting point if you're not sure which classes to compare:
 
 ```bash
-vastai run benchmark --template_hash 79ebdd2ebfb9d42cedf7a221c42d37a5
+vastai run benchmarks --template_hash 79ebdd2ebfb9d42cedf7a221c42d37a5
 ```
 
-Benchmark a template against an explicit list of GPUs:
+Otherwise, pass an explicit list of GPUs:
 
 ```bash
-vastai run benchmark \
+vastai run benchmarks \
   --template_hash 393fa8572e6c73c927c8275fe4dffd53 \
   --gpus RTX_4090,RTX_3090
 ```
@@ -49,7 +43,7 @@ vastai run benchmark \
 Use the `Nx` prefix to request multi-GPU configurations on a per-token basis:
 
 ```bash
-vastai run benchmark \
+vastai run benchmarks \
   --template_hash 40ef49becc953aa910ee05bd4653b9b3 \
   --gpus "2x RTX_4090, 2x RTX_3090"
 ```
@@ -80,7 +74,7 @@ While the run is in progress, the CLI renders a live table:
 | **Endpoint** | The ephemeral endpoint ID created for this run. |
 | **Worker** | The worker (instance) ID, once one has been recruited. |
 | **Elapsed** | Time since the worker started running. Freezes on terminal status. |
-| **Perf** | Measured performance from the template's benchmark workload. Units are template-specific (tokens/second for LLMs, etc.). |
+| **Perf** | The template's `measured_perf` value: completed workload per second, where the workload unit is whatever the template's benchmark counts (token count for typical LLM templates, request count when no custom workload calculator is set). Use it to rank GPUs against each other on the same template, not as an absolute throughput claim across templates. |
 | **$/hr** | The rented worker's `dph_total`, the hourly rate the contract is being billed at. |
 | **Perf/$/hr** | Cost-efficiency score: measured performance divided by hourly price. Higher is better. |
 
@@ -105,7 +99,7 @@ Each GPU rental runs for up to `--timeout` seconds (default 3600). The CLI print
 You can tighten the ceiling for cheaper runs:
 
 ```bash
-vastai run benchmark \
+vastai run benchmarks \
   --template_hash 393fa8572e6c73c927c8275fe4dffd53 \
   --timeout 600 -y
 ```
@@ -126,4 +120,8 @@ vastai run benchmark \
 
 ## Full Flag Reference
 
-See the [`vastai run benchmark`](/cli/reference/run-benchmark) reference for every flag and its default.
+See the [`vastai run benchmarks`](/cli/reference/run-benchmarks) reference for every flag and its default.
+
+<Note>
+  If you're operating a Serverless Workergroup, the autoscaler already runs this same benchmark on every worker it recruits and uses the results to drive its own GPU choices. See [Automated Performance Testing](/guides/serverless/automated-performance-testing) for how that works.
+</Note>
