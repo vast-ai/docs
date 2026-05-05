@@ -77,11 +77,15 @@ The 3B model with LoRA uses only ~14 GB of VRAM, so it fits comfortably on GPUs 
 
 ## Find and Rent a GPU
 
-Search for a GPU instance with at least 24 GB VRAM and CUDA 12.4+:
+<Warning>
+The Axolotl Docker image is large (~15 GB). On slower connections, the image pull can take 30+ minutes. To filter for hosts with fast network downlinks, include `inet_down >= 5000` (Mbps) in your search query below.
+</Warning>
+
+Search for a GPU instance with at least 24 GB VRAM, CUDA 12.4+, and a fast network downlink:
 
 ```bash
 vastai search offers \
-  "gpu_ram >= 24 num_gpus = 1 cuda_vers >= 12.4 disk_space >= 100 reliability > 0.98" \
+  "gpu_ram >= 24 num_gpus = 1 cuda_vers >= 12.4 disk_space >= 100 reliability > 0.98 inet_down >= 5000" \
   --order "dph_base" --limit 10
 ```
 
@@ -98,23 +102,22 @@ You can also skip the CLI and create the instance directly from the [Axolotl tem
 
 The command returns a contract ID (e.g., `new_contract: 33402620`). Use this `<CONTRACT_ID>` for all subsequent commands.
 
-<Warning>
-The Axolotl Docker image is large (~15 GB). On slower connections, the image pull can take 30+ minutes. To filter for faster instances, add `inet_down >= 5000` to your search query.
-</Warning>
-
-Wait for the instance to reach `running` status. Look for `Status: running` in the output:
+Instances typically reach `running` status in 2–5 minutes (not counting Docker image pull time). Poll with the following loop, which exits automatically once the status is `running`:
 
 ```bash
-vastai show instance <CONTRACT_ID>
+until vastai show instance <CONTRACT_ID> --raw | grep -q '"actual_status": "running"'; do
+  echo "Waiting for instance to start..."; sleep 10
+done
+echo "Instance is running"
 ```
 
-Once running, get the SSH connection command:
+Once running, extract the SSH host and port into shell variables — every later `ssh` and `scp` command in this guide reuses them:
 
 ```bash
-vastai ssh-url <CONTRACT_ID>
+SSH_URL=$(vastai ssh-url <CONTRACT_ID>)
+SSH_HOST=$(echo "$SSH_URL" | sed -E 's|ssh://root@([^:]+):.*|\1|')
+SSH_PORT=$(echo "$SSH_URL" | sed -E 's|.*:||')
 ```
-
-This returns a URL like `ssh://root@<SSH_HOST>:<SSH_PORT>`. Use the host and port for all subsequent SSH and SCP commands.
 
 ## Configure Training
 
@@ -171,7 +174,7 @@ weight_decay: 0.0
 Copy it to your instance:
 
 ```bash
-scp -P <SSH_PORT> config.yml root@<SSH_HOST>:/workspace/config.yml
+scp -P "$SSH_PORT" config.yml root@"$SSH_HOST":/workspace/config.yml
 ```
 
 You can also create the file directly on the instance using `nano` or `vim` if you prefer.
@@ -198,10 +201,12 @@ To train on your own dataset, replace the `datasets` section. Axolotl supports A
 SSH into your instance and launch the training run:
 
 ```bash
-ssh -p <SSH_PORT> root@<SSH_HOST>
+ssh -p "$SSH_PORT" root@"$SSH_HOST"
 cd /workspace
 WANDB_MODE=disabled axolotl train config.yml
 ```
+
+Training this config (~10K examples, 1 epoch) takes approximately 15–30 minutes on an RTX 3090 or 4090. Progress is logged every step (see metrics below), so you should see output within the first minute — if not, check the Docker pull and dataset download have completed.
 
 <Note>
 [Weights & Biases](https://wandb.ai) (W&B) is an experiment tracking platform. Setting `WANDB_MODE=disabled` skips it so you are not prompted for a login. To enable tracking, set `wandb_project` in your config and run `wandb login` first.
@@ -270,8 +275,8 @@ print(response)
 Copy it to the instance and run it:
 
 ```bash
-scp -P <SSH_PORT> test_inference.py root@<SSH_HOST>:/workspace/test_inference.py
-ssh -p <SSH_PORT> root@<SSH_HOST> "cd /workspace && python test_inference.py"
+scp -P "$SSH_PORT" test_inference.py root@"$SSH_HOST":/workspace/test_inference.py
+ssh -p "$SSH_PORT" root@"$SSH_HOST" "cd /workspace && python test_inference.py"
 ```
 
 You should see output similar to the following:
@@ -293,7 +298,7 @@ def is_prime(n: int) -> bool:
 Before destroying the instance, download the LoRA adapter to your local machine:
 
 ```bash
-scp -P <SSH_PORT> -r root@<SSH_HOST>:/workspace/outputs/qwen25-3b-lora ./qwen25-3b-lora
+scp -P "$SSH_PORT" -r root@"$SSH_HOST":/workspace/outputs/qwen25-3b-lora ./qwen25-3b-lora
 ```
 
 This downloads the ~80 MB adapter. To use it later, you also need the base model (`Qwen/Qwen2.5-3B`), which can be re-downloaded from HuggingFace.
