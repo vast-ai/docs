@@ -1,0 +1,44 @@
+name: OpenAPI spec check
+
+on:
+  pull_request:
+    paths:
+      - 'api-reference/openapi/**'
+      - 'api-reference/openapi.yaml'
+      - '.github/workflows/openapi.yml'
+
+jobs:
+  verify-openapi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Rebuild openapi.yaml from sources
+        run: python3 api-reference/openapi/build.py
+
+      - name: Fail if openapi.yaml is out of sync
+        run: |
+          if ! git diff --quiet api-reference/openapi.yaml; then
+            echo "::error::api-reference/openapi.yaml is out of sync with the source YAMLs in api-reference/openapi/yaml/."
+            echo "::error::Run 'npm run build-openapi' (or 'python3 api-reference/openapi/build.py') and commit the result."
+            git diff --stat api-reference/openapi.yaml
+            exit 1
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Mintlify CLI
+        run: npm install -g mint
+
+      - name: Validate OpenAPI spec
+        run: mint openapi-check api-reference/openapi.yaml
