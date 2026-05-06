@@ -1,8 +1,22 @@
 # Vast.ai Docs: Pages
 
-This directory contains the docs pages shown at [docs.vast.ai](https://docs.vast.ai).
+This directory contains the docs pages shown at [docs.vast.ai](https://docs.vast.ai), including the API reference.
 
-(API Docs are in this [separate repo](https://github.com/vast-ai/vast-cli/blob/master/openapi/readme.md))
+## Updating the API reference
+
+API endpoint specs live in `api-reference/openapi/yaml/` (one file per endpoint). The combined spec consumed by Mintlify is `api-reference/openapi.yaml`.
+
+1. Edit the relevant file in `api-reference/openapi/yaml/`.
+2. Rebuild the combined spec: `npm run build-openapi`.
+3. Validate: `npm run check-openapi`.
+4. Preview locally: `mint dev`.
+5. Open a PR. CI rebuilds the spec and fails if `openapi.yaml` is out of sync with the sources.
+
+To have the rebuild happen automatically on every commit, enable the local hook once per clone:
+
+```
+git config core.hooksPath .githooks
+```
 
 ## Mintlify Information
 
