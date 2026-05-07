@@ -1,0 +1,214 @@
+---
+title: Configuring Deployments
+description: How to configure your deployment's image, packages, GPU requirements, autoscaling, environment variables, and more.
+---
+
+A deployment's configuration covers everything needed to run your code on remote GPU workers: the Docker image, installed packages, hardware requirements, environment variables, startup scripts, and autoscaling behavior.
+
+## The Deployment Object
+
+```python
+from vastai import Deployment
+
+app = Deployment(
+    name="my-deployment",       # Deployment name (auto-detected from module if omitted)
+    tag="default",              # Version tag for routing (changing triggers a Tier 4 redeploy)
+    version_label=None,         # Optional semantic version label
+    api_key=...,                # Vast API key (uses $VAST_API_KEY env var if omitted)
+    ttl=None,                   # Auto-teardown after N seconds of no client connections (None = live forever)
+)
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `name` | `str \| None` | `None` | Deployment name. Auto-set from the module name of the first `@remote` function if omitted. |
+| `tag` | `str` | `"default"` | Version tag. Changing this triggers a full redeploy (Tier 4) with a new endpoint. |
+| `version_label` | `str \| None` | `None` | Optional semantic version label for tracking. |
+| `api_key` | `str` | env var | Your Vast API key. Reads from `$VAST_API_KEY` if not provided. |
+| `ttl` | `float \| None` | `None` | Seconds of inactivity before auto-teardown. `None` means the deployment lives indefinitely. |
+
+## Image Configuration
+
+`app.image()` returns an `Image` object for configuring the Docker image, packages, and hardware requirements. All methods return `self` for chaining.
+
+```python
+image = app.image(from_image, storage)
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `from_image` | `str` | required | Docker image URI (e.g. `"vastai/pytorch:@vastai-automatic-tag"`) |
+| `storage` | `float` | `50` | Storage allocation in GB |
+
+### Installing Packages
+
+```python
+image.pip_install("torch==2.0.0", "transformers", "accelerate")
+image.apt_get("ffmpeg", "libsndfile1")
+```
+
+### Environment Variables
+
+```python
+image.env(MODEL_NAME="Qwen/Qwen3-0.6B", DEBUG="true")
+```
+
+### Startup Scripts and Commands
+
+```python
+# Run a shell script string
+image.run_script("echo 'Starting up...' && mkdir -p /data")
+
+# Run a command with arguments
+image.run_cmd("wget", "-O", "/data/model.bin", "https://example.com/model.bin")
+```
+
+### Copying Local Files
+
+```python
+image.copy("./local_config.json", "/app/config.json")
+```
+
+Files added with `.copy()` are bundled into the deployment tarball and placed at the specified destination path on workers.
+
+### Python Environment
+
+By default, the SDK manages its own virtual environment on workers. You can override this:
+
+```python
+# Use an existing venv from the Docker image
+image.venv("/venv/main")
+
+# Use the image's system Python directly
+image.use_system_python()
+```
+
+### Publishing Additional Ports
+
+```python
+image.publish_port(8080, "tcp")
+image.publish_port(8443, "tcp")
+```
+
+### Image Methods Reference
+
+| Method | Description |
+|--------|-------------|
+| `pip_install(*packages)` | Install pip packages on worker startup |
+| `apt_get(*packages)` | Install apt packages on worker startup |
+| `env(**kwargs)` | Set environment variables |
+| `run_script(script_str)` | Run a shell script on startup |
+| `run_cmd(*args)` | Run a command on startup |
+| `copy(src, dst)` | Copy local files into the deployment bundle |
+| `venv(path)` | Use an existing venv at the given path |
+| `use_system_python()` | Use the image's system Python instead of a venv |
+| `publish_port(number, type_)` | Publish additional ports on the worker |
+| `require(*queries)` | Set GPU/hardware search requirements |
+
+## GPU and Hardware Requirements
+
+Hardware requirements are specified using the query builder from `vastai.data.query`. Pass `Query` objects to `image.require()`:
+
+```python
+from vastai.data.query import gpu_name, gpu_ram, cpu_cores, RTX_4090, RTX_5090, H100_SXM
+
+# Require specific GPUs
+image.require(gpu_name.in_([RTX_4090, RTX_5090]))
+
+# Require minimum specs
+image.require(gpu_ram >= 48, cpu_cores >= 16)
+
+# Exact match
+image.require(gpu_name == H100_SXM)
+```
+
+### Query Operators
+
+| Operator | Example | Description |
+|----------|---------|-------------|
+| `==` | `gpu_name == RTX_4090` | Equals |
+| `!=` | `gpu_name != RTX_3090` | Not equals |
+| `<` | `dph_total < 2.0` | Less than |
+| `<=` | `gpu_ram <= 24` | Less than or equal |
+| `>` | `inet_down > 500` | Greater than |
+| `>=` | `cpu_cores >= 16` | Greater than or equal |
+| `.in_()` | `gpu_name.in_([RTX_4090, H100_SXM])` | Value in list |
+| `.notin_()` | `gpu_name.notin_([RTX_3060])` | Value not in list |
+
+### Queryable Columns
+
+**GPU**: `gpu_name`, `gpu_ram`, `gpu_total_ram`, `gpu_max_power`, `gpu_max_temp`, `gpu_arch`, `gpu_mem_bw`, `gpu_lanes`, `gpu_frac`, `gpu_display_active`, `num_gpus`, `compute_cap`, `cuda_max_good`, `bw_nvlink`, `total_flops`
+
+**CPU**: `cpu_name`, `cpu_cores`, `cpu_cores_effective`, `cpu_ghz`, `cpu_ram`, `cpu_arch`
+
+**Storage & Disk**: `disk_space`, `disk_bw`, `disk_name`, `allocated_storage`
+
+**Network**: `inet_up`, `inet_down`, `inet_up_cost`, `inet_down_cost`, `direct_port_count`, `pcie_bw`, `pci_gen`
+
+**Pricing**: `dph_base`, `dph_total`, `storage_cost`, `storage_total_cost`, `vram_costperhour`, `min_bid`, `credit_discount_max`, `flops_per_dphtotal`, `dlperf_per_dphtotal`
+
+**Machine & Host**: `host_id`, `machine_id`, `hostname`, `public_ipaddr`, `reliability`, `expected_reliability`, `os_version`, `driver_vers`, `mobo_name`, `has_avx`, `static_ip`, `external`, `verification`, `hosting_type`, `vms_enabled`, `resource_type`, `cluster_id`
+
+**Virtual Columns** (convenience aliases resolved by the API): `geolocation`, `datacenter`, `duration`, `verified`, `allocated_storage`, `target_reliability`
+
+### GPU Name Constants
+
+Import GPU name constants from `vastai.data.query`. A selection of commonly used ones:
+
+**NVIDIA Data Center**: `A100_PCIE`, `A100_SXM4`, `H100_PCIE`, `H100_SXM`, `H100_NVL`, `H200`, `H200_NVL`, `B200`, `GH200_SXM`, `L4`, `L40`, `L40S`, `A10`, `A30`, `A40`, `Tesla_T4`, `Tesla_V100`
+
+**NVIDIA Consumer**: `RTX_5090`, `RTX_5080`, `RTX_5070_Ti`, `RTX_5070`, `RTX_4090`, `RTX_4080S`, `RTX_4080`, `RTX_4070_Ti`, `RTX_4070S`, `RTX_3090`, `RTX_3090_Ti`, `RTX_3080_Ti`, `RTX_3080`
+
+**NVIDIA Professional**: `RTX_A6000`, `RTX_6000Ada`, `RTX_5880Ada`, `RTX_5000Ada`, `RTX_PRO_6000`
+
+**AMD**: `InstinctMI250X`, `InstinctMI210`, `InstinctMI100`, `RX_7900_XTX`, `PRO_W7900`, `PRO_W7800`
+
+## Autoscaling Configuration
+
+These parameters control how your deployment scales workers up and down in response to load. For a detailed explanation of how each parameter affects scaling behavior, see [Serverless Parameters](/guides/serverless/serverless-parameters).
+
+```python
+app.configure_autoscaling(
+    cold_workers=2,          # Idle workers to keep ready
+    max_workers=10,          # Maximum concurrent workers
+    min_load=100,            # Minimum load threshold to trigger scaling
+    min_cold_load=50,        # Load threshold for cold workers
+    target_util=0.8,         # Target utilization ratio (0-1)
+    cold_mult=2,             # Cold worker multiplier
+    max_queue_time=30.0,     # Maximum seconds a request can wait in queue
+    target_queue_time=5.0,   # Target queue wait time in seconds
+    inactivity_timeout=300,  # Seconds of inactivity before scaling down
+)
+```
+
+All parameters are optional. You can call `configure_autoscaling()` multiple times, later calls update (not replace) previously set values.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `cold_workers` | `int` | Number of idle workers to keep ready |
+| `max_workers` | `int` | Maximum concurrent workers |
+| `min_load` | `int` | Minimum load threshold to trigger scaling |
+| `min_cold_load` | `int` | Load threshold for maintaining cold workers |
+| `target_util` | `float` | Target utilization ratio (0.0 to 1.0) |
+| `cold_mult` | `int` | Cold worker multiplier |
+| `max_queue_time` | `float` | Maximum seconds a request can wait in queue |
+| `target_queue_time` | `float` | Target queue wait time in seconds |
+| `inactivity_timeout` | `int` | Seconds of inactivity before scaling down |
+
+## Deploying with ensure_ready()
+
+After defining your remote functions, image configuration, and autoscaling settings, call `ensure_ready()` to deploy:
+
+```python
+app.ensure_ready()
+```
+
+This is a synchronous, blocking call that:
+
+1. Packages your deployment code and configuration into a tarball
+2. Computes a content hash to determine if anything has changed
+3. Registers the deployment with the Vast API
+4. Uploads the tarball to cloud storage (if the code has changed)
+5. Triggers the appropriate [update tier](/guides/serverless/deployments/architecture#update-tiers) if workers are already running
+
+You must call `ensure_ready()` before invoking any `@remote` functions.
