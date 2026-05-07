@@ -1,0 +1,71 @@
+---
+title: "vastai tfa delete"
+sidebarTitle: "tfa delete"
+---
+
+Remove a 2FA method from your account. Requires 2FA verification to authorize the deletion.
+
+## Usage
+
+```bash
+vastai tfa delete [--id-to-delete ID] [--code CODE] [--method-type METHOD_TYPE] [--secret SECRET] [--backup-code BACKUP_CODE] [--method-id ID]
+```
+
+## Options
+
+<ParamField path="--id-to-delete" type="integer">
+  ID of the 2FA method to delete. Get the ID from `vastai tfa status`. If omitted, the system attempts to delete the method you are using to authenticate — specify this flag explicitly when you have multiple methods to avoid ambiguity.
+</ParamField>
+
+<ParamField path="--code" type="string">
+  2FA code from your Authenticator app, SMS, or Email to authorize the deletion. Mutually exclusive with `--backup-code`.
+</ParamField>
+
+<ParamField path="--backup-code" type="string">
+  One-time backup code to authorize the deletion. Mutually exclusive with `--code`.
+</ParamField>
+
+<ParamField path="--method-type" type="string">
+  2FA method type to use for authorization. Choices: `email`, `sms`, `totp`. Only use when you have exactly one method of this type.
+</ParamField>
+
+<ParamField path="--secret" type="string">
+  Secret token required when authorizing with `--method-type sms` or `--method-type email`. Obtain from `vastai tfa send-sms` or `vastai tfa send-email`.
+</ParamField>
+
+<ParamField path="--method-id" type="string">
+  ID of the 2FA method to use for authorization if you have more than one of the same type. Get the ID from `vastai tfa status`.
+</ParamField>
+
+## Examples
+
+```bash
+# Delete method #123, authorize with TOTP
+vastai tfa delete --id-to-delete 123 --method-type totp --code 456789
+
+# Delete method #123, authorize with backup code
+vastai tfa delete --id-to-delete 123 --backup-code ABCD-EFGH-IJKL
+
+# Delete method #123, authorize with SMS (get secret from send-sms first)
+vastai tfa delete --id-to-delete 123 --method-type sms --secret abc123def456 --code 456789
+
+# Delete method #123, authorize with Email (get secret from send-email first)
+vastai tfa delete --id-to-delete 123 --method-type email --secret abc123def456 --code 456789
+
+# Specify which TOTP method to use for authorization if you have multiple
+vastai tfa delete --id-to-delete 123 --method-id 456 --code 456789
+```
+
+**Warning:** Deleting your last 2FA method fully disables 2FA and invalidates all backup codes.
+
+## Global Options
+
+The following options are available for all commands:
+
+| Option | Description |
+| --- | --- |
+| `--url URL` | Server REST API URL |
+| `--retry N` | Retry limit |
+| `--raw` | Output machine-readable JSON |
+| `--explain` | Verbose explanation of API calls |
+| `--api-key KEY` | API key (defaults to `~/.config/vastai/vast_api_key`) |

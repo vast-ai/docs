@@ -1,0 +1,184 @@
+---
+title: Two-Factor Authentication
+sidebarTitle: Two-Factor Authentication
+---
+
+Two-factor authentication (2FA) adds a second layer of security to your account. After logging in with your API key, CLI commands that require sensitive actions verify your identity using a code from your phone or email.
+
+---
+
+## Supported Methods
+
+| Method | Description |
+| --- | --- |
+| **Authenticator App (TOTP)** | Time-based one-time passwords from apps like Google Authenticator, Authy, or Microsoft Authenticator |
+| **SMS** | A 6-digit code sent to your mobile phone |
+| **Email** | A 6-digit code sent to your registered email address (used as the verification channel when setting up your *first* 2FA method) |
+
+---
+
+## Setting Up 2FA
+
+Setting up 2FA requires three steps: authorize the addition of a new method, configure the method, then activate it with a verification code.
+
+### Step 1: Authorize a new method
+
+Before adding any 2FA method, authorize your account. For your first method, authorization uses email by default. For subsequent methods, use an existing 2FA method.
+
+```bash
+# Default (email authorization — use for first method)
+vastai tfa auth-new
+
+# Use an existing TOTP method
+vastai tfa auth-new --method-type totp
+
+# Use a backup code (skips interactive prompt)
+vastai tfa auth-new --backup-code ABCD-EFGH-IJKL
+```
+
+When prompted, enter the code sent to your email (or existing 2FA method). If you exit before completing, resume with:
+
+```bash
+vastai tfa auth-new --secret <SECRET> --code <CODE>
+```
+
+### Step 2: Configure the method
+
+**For Authenticator App (TOTP):**
+
+```bash
+vastai tfa totp-setup
+```
+
+This displays a QR code and a manual entry key. Scan the QR code or type the key into your authenticator app.
+
+**For SMS:**
+
+```bash
+vastai tfa send-sms --phone-number +12345678901
+```
+
+A 6-digit code is sent to the specified phone number, and a secret token is returned. If the code expires, use `vastai tfa resend-sms --secret <SECRET>`.
+
+**For Email:**
+
+```bash
+# (No setup step — proceed directly to activate)
+```
+
+### Step 3: Activate the method
+
+```bash
+# TOTP (use the 6-digit code from your authenticator app and the secret from totp-setup)
+vastai tfa activate --method-type totp --secret <SECRET> <CODE>
+
+# SMS (use the code received via SMS and the secret from send-sms)
+vastai tfa activate --method-type sms --secret <SECRET> --phone-number +12345678901 <CODE>
+
+# Optional: add a label
+vastai tfa activate --method-type totp --secret <SECRET> --label "Work Authenticator" <CODE>
+```
+
+After activating your **first** 2FA method, backup codes are generated and displayed. **Save these backup codes in a secure location** — they are the only way to recover access if you lose your 2FA device.
+
+---
+
+## Logging In with 2FA
+
+If your account has 2FA enabled and your session key has expired, use `tfa login` to re-authenticate:
+
+```bash
+# TOTP (Authenticator app)
+vastai tfa login --method-type totp --code 123456
+
+# SMS (get a new code with send-sms first)
+vastai tfa login --method-type sms --code 123456 --secret <SECRET>
+
+# Email
+vastai tfa login --method-type email --code 123456 --secret <SECRET>
+
+# Backup code (one-time use)
+vastai tfa login --backup-code ABCD-EFGH-IJKL
+```
+
+On success, the session key is saved to `~/.config/vastai/vast_tfa_key`. The CLI uses this session key for subsequent authenticated requests. If this file is deleted or the session expires (returns a 404), run `tfa login` again.
+
+---
+
+## Managing Methods
+
+### View current status
+
+```bash
+vastai tfa status
+```
+
+Shows whether 2FA is enabled, lists all active methods with their IDs, and shows the number of remaining backup codes.
+
+### Update a method
+
+```bash
+# Rename a method
+vastai tfa update 123 --label "Personal Phone"
+
+# Set as primary/default
+vastai tfa update 123 --set-primary t
+```
+
+Use the method ID from `vastai tfa status`.
+
+### Delete a method
+
+```bash
+# Delete method #123, verify with TOTP
+vastai tfa delete --id-to-delete 123 --method-type totp --code 456789
+
+# Verify with backup code
+vastai tfa delete --id-to-delete 123 --backup-code ABCD-EFGH-IJKL
+
+# Verify with SMS (requires secret from send-sms)
+vastai tfa delete --id-to-delete 123 --method-type sms --secret <SECRET> --code 456789
+```
+
+**Warning:** Deleting your last 2FA method fully disables 2FA and invalidates all backup codes.
+
+---
+
+## Backup Codes
+
+Backup codes let you log in if you lose access to your 2FA device. Each code is one-time use.
+
+### Regenerate backup codes
+
+```bash
+# Verify with TOTP
+vastai tfa regen-codes --code 123456 --method-type totp
+
+# Verify with backup code
+vastai tfa regen-codes --backup-code ABCD-EFGH-IJKL
+```
+
+**Warning:** Regenerating codes invalidates all existing backup codes immediately. Save the new codes in a secure location — they are not shown again.
+
+---
+
+## Session Key Lifecycle
+
+After a successful `tfa login`, a session key is saved to `~/.config/vastai/vast_tfa_key`. The CLI automatically uses this key for authenticated requests. The session key expires after inactivity. When it expires, affected CLI commands return a 404 error. Run `vastai tfa login` to get a new session key.
+
+---
+
+## Error Reference
+
+| Error Code | Meaning | Action |
+| --- | --- | --- |
+| `2fa_verification_failed` | Incorrect code entered | Check the code and retry; check `fail_count` in output |
+| `tfa_locked` | Too many failed attempts | Wait for the lock to expire (`locked_until` shown in output) |
+| `2fa_expired` | SMS code has expired | Run `vastai tfa send-sms` again to get a new code |
+
+---
+
+## See Also
+
+- [API Reference: Two-Factor Authentication endpoints](/api-reference/two-factor-authentication-endpoints) — REST API 2FA documentation
+- [Authentication](/cli/authentication) — API key setup and management
