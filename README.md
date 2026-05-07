@@ -10,13 +10,7 @@ API endpoint specs live in `api-reference/openapi/yaml/` (one file per endpoint)
 2. Rebuild the combined spec: `npm run build-openapi`.
 3. Validate: `npm run check-openapi`.
 4. Preview locally: `mint dev`.
-5. Open a PR. CI rebuilds the spec and fails if `openapi.yaml` is out of sync with the sources.
-
-To have the rebuild happen automatically on every commit, enable the local hook once per clone:
-
-```
-git config core.hooksPath .githooks
-```
+5. Commit both your YAML edit AND the regenerated `api-reference/openapi.yaml`, then open a PR. CI re-runs the build and fails if `openapi.yaml` is out of sync with the sources.
 
 ## Mintlify Information
 

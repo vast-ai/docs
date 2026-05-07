@@ -15,13 +15,7 @@ npm run check-openapi   # mint openapi-check
 mint dev                # preview at http://localhost:3000
 ```
 
-A pre-commit hook in `.githooks/pre-commit` will run the rebuild automatically when any source YAML is staged. Enable once per clone:
-
-```
-git config core.hooksPath .githooks
-```
-
-CI runs the same rebuild on every PR and fails if `openapi.yaml` is out of sync.
+Commit the regenerated `../openapi.yaml` along with your YAML edits. CI re-runs the build on every PR and fails if `openapi.yaml` is out of sync — this is the safety net if you forget to rebuild.
 
 ## Notes
 
