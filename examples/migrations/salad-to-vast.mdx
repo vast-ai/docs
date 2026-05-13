@@ -1,51 +1,8 @@
 ---
 title: "Migrate from Salad Cloud to Vast.ai"
-slug: "migrate-from-salad"
 createdAt: "Sun Mar 29 2026 16:00:00 GMT+0000 (Coordinated Universal Time)"
 updatedAt: "Mon Mar 30 2026 16:00:00 GMT+0000 (Coordinated Universal Time)"
 ---
-
-<script type="application/ld+json" dangerouslySetInnerHTML={{
-  __html: JSON.stringify({
-    "@context": "https://schema.org",
-    "@type": "HowTo",
-    "name": "Migrate from Salad Cloud to Vast.ai",
-    "description": "A complete guide for moving GPU workloads from Salad Cloud to Vast.ai, covering concept mapping, account setup, container migration, serverless inference, storage, networking, and cost optimization.",
-    "step": [
-      {
-        "@type": "HowToStep",
-        "name": "Set up your Vast.ai account",
-        "text": "Create a Vast.ai account, generate an API key, install the CLI, and add your SSH public key."
-      },
-      {
-        "@type": "HowToStep",
-        "name": "Find and rent a GPU instance",
-        "text": "Search the Vast.ai marketplace for GPU instances matching your requirements using filters for GPU type, VRAM, price, and reliability."
-      },
-      {
-        "@type": "HowToStep",
-        "name": "Migrate your container workloads",
-        "text": "Deploy your existing Salad Docker containers on Vast.ai with environment variables, startup scripts, and port mappings."
-      },
-      {
-        "@type": "HowToStep",
-        "name": "Set up storage",
-        "text": "Use Vast persistent volumes and built-in cloud sync for model weights, datasets, and checkpoints."
-      },
-      {
-        "@type": "HowToStep",
-        "name": "Migrate autoscaling workloads",
-        "text": "Move Salad Job Queue workloads to Vast Serverless with benchmark-driven GPU selection and autoscaling inference endpoints."
-      }
-    ],
-    "author": {
-      "@type": "Organization",
-      "name": "Vast.ai Team"
-    },
-    "datePublished": "2026-03-29",
-    "dateModified": "2026-03-30"
-  })
-}} />
 
 A guide for users moving GPU workloads from Salad Cloud to Vast.ai. Whether you use Salad's Container Engine for long-running containers or Job Queues for autoscaling inference, this guide maps every concept to its Vast.ai equivalent and walks you through the transition.
 
@@ -54,12 +11,12 @@ A guide for users moving GPU workloads from Salad Cloud to Vast.ai. Whether you 
 <Note>
 **What Salad Cloud users need to know about Vast.ai:**
 
-1. **Your existing Docker images work as-is.** Salad requires AMD64/Linux containers — the same format Vast uses. No rebuilds needed, and there's no image size limit (Salad caps at 35GB compressed).
-2. **Persistent storage that survives restarts.** Stop an instance and resume later with all your data — models, checkpoints, datasets — still there. Plus built-in Cloud Sync to S3, Google Drive, Backblaze, and Dropbox.
-3. **Consumer and datacenter GPUs, including multi-GPU.** Access A100s, H100s, and multi-GPU configurations alongside the same consumer GPUs you use today — unlocking workloads that need more than 32GB VRAM or more than one GPU.
+1. **Your existing Docker images work as-is.** Salad requires AMD64/Linux containers -- the same format Vast uses. No rebuilds needed, and there's no image size limit (Salad caps at 35GB compressed).
+2. **Persistent storage that survives restarts.** Stop an instance and resume later with all your data -- models, checkpoints, datasets -- still there. Plus built-in Cloud Sync to S3, Google Drive, Backblaze, and Dropbox.
+3. **Consumer and datacenter GPUs, including multi-GPU.** Access A100s, H100s, and multi-GPU configurations alongside the same consumer GPUs you use today -- unlocking workloads that need more than 32GB VRAM or more than one GPU.
 4. **Full visibility into every machine before you rent.** Each offer shows reliability score, network speed, CPU specs, and location, so you can pick the exact machine that fits your workload.
-5. **Reserved instances for up to 50% savings.** Lock in discounted rates for long-running workloads — a pricing option not available on Salad.
-6. **Direct SSH, built-in Jupyter, and up to 64 ports.** Key-based SSH, Jupyter with TLS, VS Code Remote-SSH, and multi-port support — all out of the box.
+5. **Reserved instances for up to 50% savings.** Lock in discounted rates for long-running workloads -- a pricing option not available on Salad.
+6. **Direct SSH, built-in Jupyter, and up to 64 ports.** Key-based SSH, Jupyter with TLS, VS Code Remote-SSH, and multi-port support -- all out of the box.
 </Note>
 
 ## In This Guide
@@ -106,7 +63,7 @@ The core workflow is the same (pick a GPU, choose an image, launch), but how you
 
 ### Finding and Creating Instances
 
-On Salad, you specify hardware requirements and the platform allocates available nodes. On Vast.ai, you search a marketplace of available offers with full transparency into each machine's specs, reliability, network speed, and location — then choose the one that best fits your workload.
+On Salad, you specify hardware requirements and the platform allocates available nodes. On Vast.ai, you search a marketplace of available offers with full transparency into each machine's specs, reliability, network speed, and location -- then choose the one that best fits your workload.
 
 **Always check these before renting:**
 - **Reliability score**: historical uptime percentage. Look for 0.95+ for production workloads. If reliability is critical, filter for Secure Cloud machines only.
@@ -157,10 +114,11 @@ On Salad, you specify hardware requirements and the platform allocates available
     Common GPU searches:
 
     ```bash Vast CLI
-    # RTX 4090 (24GB) — popular for inference
+    # RTX 4090 (24GB) -- popular for inference
     vastai search offers 'gpu_name = RTX_4090' --order "dph_base" --limit 5
 
-    # Multi-GPU for distributed training
+    # Multi-GPU for distributed training. Note: gpu_ram is per-GPU, not total --
+    # this query matches 4+ GPUs with at least 80 GB each (e.g., 4x A100/H100 80GB).
     vastai search offers 'num_gpus >= 4 gpu_ram >= 80' --order "dph_base" --limit 5
 
     # US only (similar to Salad's country targeting)
@@ -177,7 +135,7 @@ On Salad, you specify hardware requirements and the platform allocates available
 
 #### Images
 
-Your existing Salad Docker images work on Vast with no modification. Salad requires AMD64/Linux containers — the same format Vast uses. Just specify the image in the `--image` flag.
+Your existing Salad Docker images work on Vast with no modification. Salad requires AMD64/Linux containers -- the same format Vast uses. Just specify the image in the `--image` flag.
 
 To minimize cold start times:
 - Use [**Vast base images**](https://github.com/vast-ai/base-image/) (also on [DockerHub](https://hub.docker.com/u/vastai)), which are pre-cached on many hosts
@@ -185,7 +143,7 @@ To minimize cold start times:
 - For very large images, build on top of a pre-cached base
 
 <Note>
-**Set your disk size right at launch.** Resizing disk requires recreating the container. Storage is cheap, so err on the side of more space — especially if you plan to download large models or datasets after launch.
+**Set your disk size right at launch.** Resizing disk requires recreating the container. Storage is cheap, so err on the side of more space -- especially if you plan to download large models or datasets after launch.
 </Note>
 
 #### Environment Variables
@@ -281,12 +239,16 @@ On Salad, the container command is configured in the container group settings. O
     ```
 
     </CodeGroup>
+
+    <Note>
+    Use `--args` when your image's entrypoint already accepts the flags you need (as vLLM does here). For anything more complex -- pip installs, multi-step boot, conditional launch -- use `--onstart-cmd` instead (see [Startup Scripts](#startup-scripts) below). The two are not interchangeable: `--args` replaces the container CMD; `--onstart-cmd` runs alongside it.
+    </Note>
   </Tab>
 </Tabs>
 
 #### Startup Scripts
 
-Vast has an on-start script that runs a shell command *after* the container starts — useful for installing dependencies, pulling model weights, or starting services without modifying your Docker image. Salad has no equivalent.
+Vast has an on-start script that runs a shell command *after* the container starts -- useful for installing dependencies, pulling model weights, or starting services without modifying your Docker image. Salad has no equivalent.
 
 <Tabs>
   <Tab title="Console">
@@ -296,7 +258,7 @@ Vast has an on-start script that runs a shell command *after* the container star
     <CodeGroup>
 
     ```bash Salad
-    # No equivalent — Salad does not support on-start scripts
+    # No equivalent -- Salad does not support on-start scripts
     # Use your Docker entrypoint or CMD instead
     ```
 
@@ -312,15 +274,15 @@ Vast has an on-start script that runs a shell command *after* the container star
   </Tab>
 </Tabs>
 
-Once you have a working configuration, save it as a reusable **Vast template** in the [console](https://cloud.vast.ai/templates/). See the [Templates guide](/documentation/templates/introduction) for details.
+Once you have a working configuration, save it as a reusable **Vast template** in the [console](https://cloud.vast.ai/templates/). See the [Templates guide](/guides/templates/introduction) for details.
 
 ### Storage
 
-Salad provides only ephemeral container storage — all data is lost when a container is reallocated. Vast gives you multiple storage tiers:
+Salad provides only ephemeral container storage -- all data is lost when a container is reallocated. Vast gives you multiple storage tiers:
 
 - **Container storage**: Temporary, same as Salad. Deleted when the instance is destroyed.
 - **Persistent volumes**: Local storage that survives container restarts on the same machine. Ideal for model weights, datasets, and training checkpoints.
-- **[Cloud Sync](/documentation/instances/storage/cloud-sync)**: Vast's built-in sync tool supports S3, Google Drive, Backblaze, and Dropbox. Access it via the console or `vastai cloud copy`.
+- **[Cloud Sync](/guides/instances/storage/cloud-sync)**: Vast's built-in sync tool supports S3, Google Drive, Backblaze, and Dropbox. Access it via the console or `vastai cloud copy`.
 
 For model weights and datasets, the recommended approach is to pull from object storage on boot. This works across any host and keeps your instance stateless.
 
@@ -332,7 +294,7 @@ For model weights and datasets, the recommended approach is to pull from object 
     <CodeGroup>
 
     ```bash Salad
-    # No equivalent — Salad provides only ephemeral storage
+    # No equivalent -- Salad provides only ephemeral storage
     # Use S4 (100MB limit, 30-day expiry) or external object storage
     ```
 
@@ -358,7 +320,7 @@ Vast local volumes are tied to the physical machine they were created on. For da
 
 On Salad, the **Container Gateway** provides a managed URL with load balancing for one inbound HTTP/HTTPS port. On Vast, there are two proxy mechanisms:
 
-- **HTTP/HTTPS proxy**: Instances using [Vast base images](https://github.com/vast-ai/base-image/) get auto-generated Cloudflare tunnel URLs (`https://four-random-words.trycloudflare.com`) per open port via the [Instance Portal](/documentation/instances/connect/instance-portal).
+- **HTTP/HTTPS proxy**: Instances using [Vast base images](https://github.com/vast-ai/base-image/) get auto-generated Cloudflare tunnel URLs (`https://four-random-words.trycloudflare.com`) per open port via the [Instance Portal](/guides/instances/connect/instance-portal).
 - **SSH proxy**: Instances using SSH-compatible images support proxy SSH through Vast's proxy server, which works even on machines without open ports.
 
 Instances also have direct access via a **random external port** on the host's public IP, which you discover after launch.
@@ -424,7 +386,7 @@ Instances also have direct access via a **random external port** on the host's p
     ```bash Salad
     # Container Gateway provides a static URL with a random subdomain
     # e.g., https://tomato-navybean-pm82t0txwjyus8yy.salad.cloud
-    # No port discovery needed — Gateway maps to your configured port
+    # No port discovery needed -- Gateway maps to your configured port
     ```
 
     ```bash Vast CLI
@@ -542,10 +504,10 @@ Both VS Code and Cursor are supported via Remote-SSH.
     ```
 
     ```bash Vast CLI
-    # Stop — pauses compute, storage keeps billing
+    # Stop -- pauses compute, storage keeps billing
     vastai stop instance <INSTANCE_ID>
 
-    # Destroy — stops all charges, deletes all data
+    # Destroy -- stops all charges, deletes all data
     vastai destroy instance <INSTANCE_ID>
     ```
 
@@ -553,7 +515,7 @@ Both VS Code and Cursor are supported via Remote-SSH.
   </Tab>
 </Tabs>
 
-**On Vast**, stopped instances retain their data — unlike Salad, where stopping a container group loses everything:
+**On Vast**, stopped instances retain their data -- unlike Salad, where stopping a container group loses everything:
 
 | Vast Action | Compute Charges | Storage Charges | Data Preserved |
 |---|---|---|---|
@@ -602,10 +564,10 @@ Salad uses a priority tier system (High, Medium, Low, Batch) where higher-priori
     ```
 
     ```bash Vast CLI
-    # On-demand — guaranteed, higher price
+    # On-demand -- guaranteed, higher price
     vastai search offers 'gpu_ram >= 24' --type=on-demand --order "dph_base" --limit 10
 
-    # Interruptible — cheapest, may be interrupted
+    # Interruptible -- cheapest, may be interrupted
     vastai search offers 'gpu_ram >= 24' --type=bid --order "dph_base" --limit 10
     ```
 
@@ -627,7 +589,7 @@ Salad has no equivalent to reserved instances. On Vast, if you run an on-demand 
     <CodeGroup>
 
     ```bash Salad
-    # No equivalent — Salad does not offer reserved pricing
+    # No equivalent -- Salad does not offer reserved pricing
     ```
 
     ```bash Vast CLI
@@ -640,11 +602,11 @@ Salad has no equivalent to reserved instances. On Vast, if you run an on-demand 
 
 ## Migrating from Job Queues
 
-Salad **Job Queues** let you distribute discrete tasks across container replicas — you push work items to a queue, and Salad distributes them across nodes with auto-retry (up to 3 retries) and autoscaling (up to 500 replicas).
+Salad **Job Queues** let you distribute discrete tasks across container replicas -- you push work items to a queue, and Salad distributes them across nodes with auto-retry (up to 3 retries) and autoscaling up to 250 replicas.
 
-Vast **Serverless** is request-based rather than queue-based: you send requests to an endpoint, and Vast routes them to autoscaling workers. The key difference is that you don't manage a queue — Vast handles routing, queueing, and scaling automatically.
+Vast **Serverless** is request-based rather than queue-based: you send requests to an endpoint, and Vast routes them to autoscaling workers. The key difference is that you don't manage a queue -- Vast handles routing, queueing, and scaling automatically.
 
-**Pricing:** Serverless workers run on the same marketplace instances you'd rent directly — you pay the same per-second rate, just with autoscaling on top.
+**Pricing:** Serverless workers run on the same marketplace instances you'd rent directly -- you pay the same per-second rate, just with autoscaling on top.
 
 ### Vast Serverless Architecture
 
@@ -656,7 +618,7 @@ Vast **Serverless** is request-based rather than queue-based: you send requests 
 
 ### Deployment Options
 
-**PyWorker (Custom Handlers)** is the core framework for building serverless workers. You implement a handler function in Python, with full control over request preprocessing, model loading, and response formatting. Most production deployments use custom PyWorker handlers. See the [PyWorker documentation](/documentation/serverless/creating-new-pyworkers) to get started.
+**PyWorker (Custom Handlers)** is the core framework for building serverless workers. You implement a handler function in Python, with full control over request preprocessing, model loading, and response formatting. Most production deployments use custom PyWorker handlers. See the [PyWorker documentation](/guides/serverless/creating-new-pyworkers) to get started.
 
 **Pre-built Templates** serve as ready-to-use starting points. Vast provides templates for common frameworks (vLLM, TGI, ComfyUI) that you can deploy directly or use as a reference for building your own handlers.
 
@@ -787,12 +749,12 @@ asyncio.run(main())
 | Cloud sync | *(S4 or DIY)* | `vastai cloud copy` |
 | Reserve | *(not available)* | `vastai prepay instance <ID> <AMOUNT>` |
 
-For programmatic usage, the Vast CLI supports `--raw` for JSON output that can be parsed in scripts. See the [CLI Reference](/cli/commands) for full documentation.
+For programmatic usage, the Vast CLI supports `--raw` for JSON output that can be parsed in scripts. See the [CLI Reference](/cli/hello-world) for full documentation.
 
 ## Next Steps
 
-- [CLI Reference](/cli/commands): full command reference for the `vastai` CLI
-- [Templates](/documentation/templates/introduction): save your configuration as a reusable template
-- [Storage Types](/documentation/instances/storage/types): persistent volumes, cloud sync, and data movement
-- [Finding & Renting Instances](/documentation/instances/choosing/find-and-rent): marketplace filters, reliability scores, and offer details
+- [CLI Reference](/cli/hello-world): full command reference for the `vastai` CLI
+- [Templates](/guides/templates/introduction): save your configuration as a reusable template
+- [Storage Types](/guides/instances/storage/types): persistent volumes, cloud sync, and data movement
+- [Finding & Renting Instances](/guides/instances/choosing/find-and-rent): marketplace filters, reliability scores, and offer details
 
