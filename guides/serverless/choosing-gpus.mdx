@@ -1,0 +1,118 @@
+---
+title: Choosing GPUs for Your Workload
+description: Use the Vast CLI to compare measured performance and cost-efficiency across GPU classes.
+"canonical": "/guides/serverless/choosing-gpus"
+---
+
+
+The `vastai run benchmarks` CLI command rents one instance of each GPU class you give it, runs the template's built-in benchmark workload, and reports performance per dollar. Multiple GPUs run in parallel and tear themselves down when finished.
+
+<Warning>
+  Each run rents real instances and consumes account credit; cost scales with the GPU class count and per-rental timeout.
+</Warning>
+
+## When to Use It
+
+- Picking which GPU class to rent for an on-demand instance, or which classes to allow in a Serverless Workergroup's `search_params`.
+- Comparing two templates (for example, vLLM vs. TGI for the same model) on the same hardware.
+- Validating that a template fits and runs correctly on a GPU before committing to longer rentals or production traffic.
+- Producing a perf/dollar number for capacity planning or budgeting.
+
+## Prerequisites
+
+- A Vast.ai account with credits.
+- An API key configured (see [Authentication](/cli/authentication)).
+- The template's hash or ID, from the [Templates dashboard](https://cloud.vast.ai/templates/) or `vastai search templates`.
+
+## Basic Usage
+
+If you don't pass `--gpus`, the CLI sweeps a built-in default set (RTX 5090, RTX 4090, RTX 3090, RTX A6000), which is a reasonable starting point if you're not sure which classes to compare:
+
+```bash
+vastai run benchmarks --template_hash 79ebdd2ebfb9d42cedf7a221c42d37a5
+```
+
+Otherwise, pass an explicit list of GPUs:
+
+```bash
+vastai run benchmarks \
+  --template_hash 393fa8572e6c73c927c8275fe4dffd53 \
+  --gpus RTX_4090,RTX_3090
+```
+
+Use the `Nx` prefix to request multi-GPU configurations on a per-token basis:
+
+```bash
+vastai run benchmarks \
+  --template_hash 40ef49becc953aa910ee05bd4653b9b3 \
+  --gpus "2x RTX_4090, 2x RTX_3090"
+```
+
+## How It Works
+
+For each GPU in your list, the CLI pre-flights the marketplace against the template's `extra_filters` (skipping GPUs with no matching offers and reporting which filter excluded them), creates a scratch endpoint and one-worker Workergroup, polls until the worker reaches `status=idle` with a positive `measured_perf`, then records the result and tears the rental down. The rental's actual `dph_total` is fetched at idle so perf/dollar reflects the real run, not a marketplace estimate.
+
+GPU count per rental comes from the `Nx` token prefix if set, otherwise `--num_gpus`, otherwise auto-sized from the template's `gpu_total_ram` filter.
+
+## Reading the Output
+
+While the run is in progress, the CLI renders a live table:
+
+| Column | Meaning |
+|--------|---------|
+| **GPU** | The GPU class being benchmarked. |
+| **Status** | Current worker state: `queued`, `provisioning`, `waiting_for_worker`, `loading`, `idle`, `done`, `failed`, `timeout`, `no_worker`, `skipped`, `aborted`, `error`. |
+| **Endpoint** | The ephemeral endpoint ID created for this run. |
+| **Worker** | The worker (instance) ID, once one has been recruited. |
+| **Elapsed** | Time since the worker started running. Freezes on terminal status. |
+| **Perf** | The template's `measured_perf` (workload-units per second; tokens/sec for typical LLMs, requests/sec when the template has no custom workload calculator). Useful for ranking GPUs on the same template, not for cross-template comparison. |
+| **$/hr** | The rented worker's `dph_total`, the hourly rate the contract is being billed at. |
+| **Perf/$/hr** | Cost-efficiency score: measured performance divided by hourly price. Higher is better. |
+
+After the run, the CLI prints a sorted summary by `Perf/$/hr`, so the most cost-efficient GPU for your workload is at the top. With `--raw`, the same data is emitted as JSON for scripting:
+
+```json
+[
+  {
+    "gpu_name": "RTX 4090",
+    "rental_dph": 0.428,
+    "measured_perf": 142.3,
+    "status": "ok",
+    "perf_per_dollar": 332.5
+  }
+]
+```
+
+## Cost and Timeout
+
+Each GPU rental runs for up to `--timeout` seconds (default 3600). The CLI prints what it's about to do, the number of configurations, the GPU mix, and the per-rental timeout, then asks for confirmation. Pass `-y` to skip the prompt in scripts. Real runs almost always finish well before the timeout because the runner exits as soon as it reads a valid `measured_perf`.
+
+You can tighten the ceiling for cheaper runs:
+
+```bash
+vastai run benchmarks \
+  --template_hash 393fa8572e6c73c927c8275fe4dffd53 \
+  --timeout 600 -y
+```
+
+<Warning>
+  If you `Ctrl+C` mid-run, the CLI installs a SIGINT handler that finishes deleting in-flight endpoints and Workergroups before exiting. Do not kill the process again during cleanup, otherwise you may need to manually remove the leftovers with `vastai delete endpoint` and `vastai delete workergroup`.
+</Warning>
+
+## Common Outcomes
+
+| Status | What it means | What to do |
+|--------|---------------|------------|
+| `ok` | Benchmark completed and reported `measured_perf`. | Use the result. |
+| `skipped` | No marketplace offer matched after applying the template's filters. | The CLI prints which filter blocked the GPU. Loosen `extra_filters` on the template, or pick a different GPU. |
+| `no_worker` | The autoscaler did not rent any instance within 120 seconds. | Often a scoring or template+GPU mismatch the pre-flight missed. Try a different GPU or relax filters. |
+| `failed` | Workers reached a terminal state (`stopped`, `destroying`, `unavail`) without ever becoming idle. | Inspect worker logs in the dashboard. Common causes are model download failure or an OOM during load. |
+| `timeout` | The worker was still loading or running when `--timeout` elapsed. | Increase `--timeout`, or check whether the host is unusually slow (Docker pull stalls are the typical culprit). |
+
+## Full Flag Reference
+
+See the [`vastai run benchmarks`](/cli/reference/run-benchmarks) reference for every flag and its default.
+
+<Note>
+  If you're operating a Serverless Workergroup, the autoscaler already runs this same benchmark on every worker it recruits and uses the results to drive its own GPU choices. See [Automated Performance Testing](/guides/serverless/automated-performance-testing) for how that works.
+</Note>

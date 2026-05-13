@@ -1,0 +1,71 @@
+---
+title: Architecture Overview
+description: Understand how Vast Deployments work under the hood, including deploy mode, serve mode, and update tiers.
+---
+
+Vast Deployments operate in two distinct modes depending on where the code is running. On your local machine, the SDK runs in **deploy mode**, packaging, uploading, and orchestrating. On remote GPU workers, it runs in **serve mode**, loading contexts, running benchmarks, and executing your functions.
+
+## Deploy Mode
+
+When you import and call a function from your deployment file, the SDK handles everything needed to get your code running on remote GPUs:
+
+1. **Packaging**: All files, secrets, and scripts associated with your deployment are bundled into a tarball
+2. **Hashing**: A SHA-256 content hash determines whether anything has changed since the last deploy
+3. **Registration**: The deployment configuration is sent to the Vast API
+4. **Uploading**: If the code has changed, the tarball is uploaded to cloud storage
+5. **Provisioning**: A managed Serverless endpoint and workergroup are created according to your autoscaling settings
+
+This all happens automatically when you call `app.ensure_ready()`.
+
+## Serve Mode
+
+When your Serverless workers start up, they enter serve mode:
+
+1. **Download**: Workers pull your deployment code from cloud storage
+2. **Install**: Pip packages, apt packages, and startup scripts are executed
+3. **Context loading**: All `@context` classes have their `__aenter__()` methods called in parallel
+4. **Benchmarking**: The worker runs the benchmark defined on your `@remote` function to produce a performance score
+5. **Ready**: The worker begins accepting and executing remote function calls
+
+## Calling @remote Functions
+
+When you call a `@remote` function from your client code:
+
+1. The SDK waits for the deployment to be set up and for workers to be ready
+2. Function arguments are serialized and routed to the quickest available worker
+3. The worker deserializes the arguments, executes the function with full GPU access and loaded contexts
+4. The return value is serialized and sent back to your local function call
+
+A full round-trip HTTP request to a load-balanced, distributed GPU endpoint is abstracted into a single `await` call.
+
+## Update Tiers
+
+Whenever you make changes to your deployment, the SDK determines the minimal update required to get your latest code onto your live endpoint.
+
+### Tier 0: No Changes
+
+If your deployment is identical to the last time you ran it, no changes are needed and you connect to your endpoint immediately.
+
+### Tier 1: Autoscaling Changes
+
+If the deployed code and settings are the same but you are tweaking autoscaling parameters, the SDK updates your endpoint and workergroup settings without re-uploading code or restarting workers.
+
+### Tier 2: Code Changes
+
+If you change the contents of code, scripts, or package requirements, but don't change the image, environment variables, search filters, or secrets, a **soft-update** is issued. This uploads the updated code and signals your endpoint to pull the latest version and reinstall requirements, without destroying existing workers.
+
+### Tier 3: Image Changes
+
+If your Docker image has changed, or you need to run fresh with new environment variables, the SDK issues a **hard-update**. This re-uses the same workers but updates their image. It takes longer than a soft-update since it may require pulling a new Docker image and re-populating worker storage.
+
+### Tier 4: Forced Redeploy
+
+This happens when the **tag** of your Deployment changes. It creates an entirely new Serverless endpoint and workergroup with separate routing. Use this when a new version of your deployment is not backwards compatible with workers serving an older version. It requires recruiting entirely new workers.
+
+## Deployment Lifecycle
+
+By default, deployments and their endpoints exist indefinitely after a client first sets them up. You can configure automatic teardown after a specified number of seconds since the last client connection using the `ttl` parameter:
+
+```python
+app = Deployment(name="my-app", ttl=3600)  # Tear down after 1 hour of inactivity
+```

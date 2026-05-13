@@ -1,8 +1,16 @@
-# Vast.ai Docs: Pages
+# Vast.ai Documentation
 
-This directory contains the docs pages shown at [docs.vast.ai](https://docs.vast.ai).
+Source for [docs.vast.ai](https://docs.vast.ai), the official documentation for the Vast.ai GPU cloud marketplace. Covers renting or hosting GPU instances, deploying serverless inference workloads, and using the CLI, SDK, and REST API.
 
-(API Docs are in this [separate repo](https://github.com/vast-ai/vast-cli/blob/master/openapi/readme.md))
+## Updating the API reference
+
+API endpoint specs live in `api-reference/openapi/yaml/` (one file per endpoint). The combined spec consumed by Mintlify is `api-reference/openapi.yaml`.
+
+1. Edit the relevant file in `api-reference/openapi/yaml/`.
+2. Rebuild the combined spec: `npm run build-openapi`.
+3. Validate: `npm run check-openapi`.
+4. Preview locally: `mint dev`.
+5. Commit both your YAML edit AND the regenerated `api-reference/openapi.yaml`, then open a PR. CI re-runs the build and fails if `openapi.yaml` is out of sync with the sources.
 
 ## Mintlify Information
 
