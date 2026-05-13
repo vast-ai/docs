@@ -1,0 +1,112 @@
+---
+title: "Agent skills for AI coding tools"
+sidebarTitle: "Agent skills"
+description: "Manage Vast.ai GPU instances, serverless endpoints, volumes, and billing from coding agents like Claude Code and Cursor."
+"canonical": "/guides/get-started/agent-skills"
+---
+
+The `vastai` agent skill lets AI coding assistants drive Vast.ai on your behalf — create instances, deploy endpoints, manage SSH keys, check balances, and more — by calling the [Vast CLI](/cli/hello-world) under the hood.
+
+It works with [Claude Code](https://claude.com/claude-code), Cursor, GitHub Copilot, Windsurf, Cline, and any other agent that supports the [skills.sh](https://www.skills.sh) framework.
+
+## Installation
+
+Install the skill into your coding agent with one command:
+
+```bash
+npx skills add https://github.com/vast-ai/vast-cli --skill vastai
+```
+
+Restart your coding tool after installing so it picks up the new skill.
+
+<Note>
+  The skill wraps the `vastai` CLI. If you don't already have it on your machine, install it from PyPI so the skill has something to call:
+
+  ```bash
+  pip install vastai
+  ```
+
+  See the [CLI getting-started guide](/cli/hello-world) for alternative install methods.
+</Note>
+
+### Authenticate
+
+The skill needs an API key to act on your account. Generate one on the [API keys page](https://cloud.vast.ai/account/) and set it once:
+
+```bash
+vastai set api-key <YOUR_API_KEY>
+```
+
+See [API keys](/guides/reference/api-keys) for scoping and rotation guidance.
+
+## What you can do
+
+Ask your agent in natural language — it will pick the right `vastai` command and run it for you.
+
+| Task                | Example prompt                                                                 |
+| ------------------- | ------------------------------------------------------------------------------ |
+| Find GPUs           | "Find the cheapest 4× H100 offers with at least 200 GB disk."                  |
+| Launch an instance  | "Rent the first matching offer and start it with the PyTorch template."        |
+| Manage instances    | "List my running instances and stop anything idle for more than an hour."      |
+| SSH access          | "Upload my `~/.ssh/id_ed25519.pub` public key to my account."                  |
+| Templates           | "Show my templates and create a new one for vLLM with port 8000 exposed."      |
+| Volumes             | "List my network volumes and delete the one named `scratch-old`."              |
+| Serverless          | "Create an autoscaler endpoint for my llama-3 worker group."                   |
+| Billing             | "How much credit do I have left and what did I spend last week?"               |
+| Account             | "Show my current user, then list my API keys."                                 |
+
+## Quick start
+
+After installing the skill and authenticating, try these prompts in your agent:
+
+```text
+Show my Vast account and current credit balance.
+```
+
+```text
+Find an offer with 1× RTX 4090, at least 100 GB disk, under $0.40/hr,
+and launch it with the PyTorch 2 template.
+```
+
+```text
+List my instances in JSON, then destroy any that have been stopped for over 24 hours.
+```
+
+The agent will translate each request into the appropriate `vastai` commands — for example:
+
+```bash
+vastai show user
+vastai search offers 'gpu_name=RTX_4090 num_gpus=1 disk_space>=100 dph<0.4' --raw
+vastai create instance <offer_id> --template_hash <hash>
+```
+
+<Note>
+  When asking the agent to parse or filter results, suggest the `--raw` flag so output comes back as JSON. The skill defaults to this where possible.
+</Note>
+
+## How the skill is structured
+
+The skill is published from the [`vast-ai/vast-cli`](https://github.com/vast-ai/vast-cli) repository. It bundles:
+
+- Command reference for every `vastai` subcommand (create, search, show, destroy, set, attach, …).
+- Guidance on common workflows like provisioning an instance, attaching SSH keys, and deploying serverless endpoints.
+- Output-format hints so agents return structured data your tools can act on.
+
+Because the skill is a thin layer over the CLI, anything documented in the [CLI reference](/cli/hello-world) is also available to your agent.
+
+## Learn more
+
+<CardGroup cols={2}>
+  <Card title="vast-cli on GitHub" href="https://github.com/vast-ai/vast-cli" icon="github">
+    Source for the CLI and the skill manifest.
+  </Card>
+  <Card title="CLI reference" href="/cli/hello-world" icon="terminal">
+    Every `vastai` command, flag, and example.
+  </Card>
+  <Card title="Python SDK reference" href="/sdk/python/reference/vastai" icon="python">
+    Call the same operations from Python via the `vastai-sdk` package.
+  </Card>
+  <Card title="API keys" href="/guides/reference/api-keys" icon="key">
+    Create, scope, and rotate the keys the skill uses to authenticate.
+  </Card>
+</CardGroup>
