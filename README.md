@@ -1,6 +1,6 @@
-# Vast.ai Docs: Pages
+# Vast.ai Documentation
 
-This directory contains the docs pages shown at [docs.vast.ai](https://docs.vast.ai), including the API reference.
+Source for [docs.vast.ai](https://docs.vast.ai), the official documentation for the Vast.ai GPU cloud marketplace. Covers renting or hosting GPU instances, deploying serverless inference workloads, and using the CLI, SDK, and REST API.
 
 ## Updating the API reference
 
