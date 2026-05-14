@@ -1,0 +1,279 @@
+---
+title: Fine-Tune LLMs with Axolotl
+createdAt: Sun Mar 23 2026 20:00:00 GMT+0000 (Coordinated Universal Time)
+updatedAt: Sun Mar 23 2026 20:00:00 GMT+0000 (Coordinated Universal Time)
+---
+
+[Axolotl](https://github.com/axolotl-ai-cloud/axolotl) is an open-source fine-tuning toolkit. You configure a training job in YAML — model, dataset, method — and Axolotl runs it, no custom training code required. It supports 60+ model architectures and multiple training methods, including LoRA (which trains a small set of adapter parameters instead of the full model, significantly reducing GPU memory) and QLoRA (which adds 4-bit quantization on top of LoRA to reduce memory even further).
+
+This guide fine-tunes [Qwen2.5-3B](https://huggingface.co/Qwen/Qwen2.5-3B) with LoRA on a Vast.ai GPU. We chose this model because it is ungated (no HuggingFace account needed), small enough to train on a single 24GB GPU, and widely used for fine-tuning. The same workflow applies to any Axolotl-supported model. By the end, you will have a working fine-tuned model.
+
+## Prerequisites
+
+- A [Vast.ai account](https://cloud.vast.ai/) with credits
+- The Vast.ai CLI installed locally:
+  ```bash
+  pip install vastai
+  vastai set api-key YOUR_API_KEY
+  ```
+  You can find your API key at [cloud.vast.ai/cli](https://cloud.vast.ai/cli/).
+- An SSH key added to your Vast.ai account (see [SSH setup guide](/guides/instances/connect/ssh))
+
+## Hardware Requirements
+
+- **GPU VRAM**: 16 GB minimum — training peaks at ~14 GB with LoRA and gradient checkpointing. A 24 GB card (RTX 3090/4090, A5000, A100) gives enough headroom to raise the batch size or sequence length.
+- **Disk**: 100 GB (model weights ~6 GB, plus dataset cache and checkpoints)
+- **CUDA**: 12.4+
+
+## Find and Rent a GPU
+
+<Warning>
+The Axolotl Docker image is large (~15 GB). On slower connections, the image pull can take 30+ minutes. To filter for hosts with fast network downlinks, include `inet_down >= 5000` (Mbps) in your search query below.
+</Warning>
+
+Search for a GPU instance with at least 16 GB VRAM, CUDA 12.4+, and a fast network downlink:
+
+```bash
+vastai search offers \
+  "gpu_ram >= 16 num_gpus = 1 cuda_vers >= 12.4 disk_space >= 100 reliability > 0.98 inet_down >= 5000" \
+  --order "dph_base" --limit 10
+```
+
+Create an instance using the Axolotl template, which includes Axolotl, PyTorch, Flash Attention, and all core dependencies. You can find the template hash by searching for "Axolotl" on the [Vast.ai templates page](https://cloud.vast.ai/templates/) and copying the hash from the template details. Replace `<OFFER_ID>` with an ID from the search results:
+
+```bash
+vastai create instance <OFFER_ID> \
+  --template_hash 43e16621b7e24ec58a340f33a6afd3ef \
+  --disk 100 \
+  --ssh --direct
+```
+
+You can also skip the CLI and create the instance directly from the [Axolotl template page](https://cloud.vast.ai?ref_id=62897&template_id=43e16621b7e24ec58a340f33a6afd3ef) in the web UI.
+
+The command returns a contract ID (e.g., `new_contract: 33402620`). Use this `<CONTRACT_ID>` for all subsequent commands.
+
+Instances typically reach `running` status in 2–5 minutes (not counting Docker image pull time). Poll with the following loop, which exits automatically once the status is `running`:
+
+```bash
+until vastai show instance <CONTRACT_ID> --raw | grep -q '"actual_status": "running"'; do
+  echo "Waiting for instance to start..."; sleep 10
+done
+echo "Instance is running"
+```
+
+Once running, extract the SSH host and port into shell variables — every later `ssh` and `scp` command in this guide reuses them:
+
+```bash
+SSH_URL=$(vastai ssh-url <CONTRACT_ID>)
+SSH_HOST=$(echo "$SSH_URL" | sed -E 's|ssh://root@([^:]+):.*|\1|')
+SSH_PORT=$(echo "$SSH_URL" | sed -E 's|.*:||')
+```
+
+## Configure Training
+
+Axolotl uses a single YAML file to configure the entire training job. Save the following as `config.yml` on your local machine:
+
+```yaml
+base_model: Qwen/Qwen2.5-3B
+
+# Use the model's built-in chat template for formatting conversations
+chat_template: tokenizer_default
+datasets:
+  - path: mlabonne/FineTome-100k
+    type: chat_template
+    split: train[:10%]  # 10% = ~10K examples, keeps training fast
+    field_messages: conversations
+    message_property_mappings:
+      role: from
+      content: value
+val_set_size: 0.05
+output_dir: ./outputs/qwen25-3b-lora
+
+sequence_len: 2048
+sample_packing: true  # Packs multiple examples into each sequence to avoid wasted padding
+
+# LoRA: train small adapter layers instead of the full model
+adapter: lora
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+lora_target_linear: true  # Apply LoRA to all linear layers
+
+gradient_accumulation_steps: 4
+micro_batch_size: 2
+num_epochs: 1
+optimizer: adamw_torch
+lr_scheduler: cosine
+learning_rate: 0.0002
+
+bf16: auto  # Use 16-bit precision to halve memory vs 32-bit
+tf32: true
+
+gradient_checkpointing: true  # Saves ~30% VRAM at the cost of ~20% slower training
+gradient_checkpointing_kwargs:
+  use_reentrant: false
+logging_steps: 1
+flash_attention: true
+
+warmup_ratio: 0.1  # Gradually increase learning rate for first 10% of training
+evals_per_epoch: 4
+saves_per_epoch: 1
+weight_decay: 0.0
+```
+
+Copy it to your instance:
+
+```bash
+scp -P "$SSH_PORT" config.yml root@"$SSH_HOST":/workspace/config.yml
+```
+
+You can also create the file directly on the instance using `nano` or `vim` if you prefer.
+
+The following table explains the key settings:
+
+| Setting | Purpose |
+|---------|---------|
+| `base_model` | The pre-trained model to start from (downloaded automatically from HuggingFace) |
+| `adapter: lora` | Trains small adapter layers alongside the frozen base model instead of updating all parameters, keeping peak VRAM at ~14 GB instead of the ~24 GB a full fine-tune would need |
+| `lora_r: 16` | Controls LoRA capacity — higher rank means more trainable parameters but more VRAM |
+| `lora_alpha: 32` | Scaling factor for LoRA updates, typically set to 2x the rank |
+| `datasets` | [FineTome-100k](https://huggingface.co/datasets/mlabonne/FineTome-100k) — 100K instruction-response pairs covering coding, writing, and reasoning. We use 10% to keep training fast |
+| `sample_packing` | Combines multiple short training examples into a single sequence to maximize GPU utilization |
+| `gradient_checkpointing` | Recomputes activations during the backward pass instead of storing them, trading ~20% speed for ~30% less memory |
+| `micro_batch_size: 2` | Number of sequences processed per step. Combined with `gradient_accumulation_steps: 4`, each optimization step uses 8 sequences |
+
+<Tip>
+To train on your own dataset, replace the `datasets` section. Axolotl supports Alpaca format (`instruction`/`input`/`output` fields), conversation format (OpenAI-style `messages`), and many others. See the [Axolotl dataset docs](https://docs.axolotl.ai/docs/dataset_loading.html) for all supported formats.
+</Tip>
+
+## Run Training
+
+SSH into your instance and launch the training run:
+
+```bash
+ssh -p "$SSH_PORT" root@"$SSH_HOST"
+cd /workspace
+WANDB_MODE=disabled axolotl train config.yml
+```
+
+Training this config (~10K examples, 1 epoch) takes approximately 15–30 minutes on an RTX 3090 or 4090. Progress is logged every step (see metrics below), so you should see output within the first minute — if not, check the Docker pull and dataset download have completed.
+
+<Note>
+[Weights & Biases](https://wandb.ai) (W&B) is an experiment tracking platform. Setting `WANDB_MODE=disabled` skips it so you are not prompted for a login. To enable tracking, set `wandb_project` in your config and run `wandb login` first.
+</Note>
+
+Axolotl downloads the model weights, preprocesses the dataset, and begins training. You should see output confirming LoRA is active:
+
+```text
+trainable params: 29,933,568 || all params: 3,115,872,256 || trainable%: 0.9607
+```
+
+This means only ~30M parameters are being trained instead of the full 3B.
+
+Training progress is logged every step. The key metrics are `loss` (how wrong the model's predictions are — lower is better), `grad_norm` (magnitude of parameter updates), and `epoch` (progress through the dataset, where 1.0 = one full pass):
+
+```text
+{'loss': '0.82', 'grad_norm': '0.21', 'learning_rate': '0.0',      'epoch': '0.003'}
+{'loss': '0.67', 'grad_norm': '0.05', 'learning_rate': '0.000186', 'epoch': '0.254'}
+...
+{'loss': '0.60', 'grad_norm': '0.05', 'learning_rate': '2.67e-08', 'epoch': '0.994'}
+```
+
+When training completes, you will see:
+
+```text
+Training completed! Saving trained model to ./outputs/qwen25-3b-lora
+```
+
+The LoRA adapter is saved to `./outputs/qwen25-3b-lora/`. The adapter is approximately 80 MB, compared to the 6 GB base model.
+
+## Test the Fine-Tuned Model
+
+Verify the fine-tuned model by running inference. Save the following as `test_inference.py` on your local machine:
+
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from peft import PeftModel
+import torch
+
+# Load the base model (uses the HuggingFace cache from training — no re-download)
+model = AutoModelForCausalLM.from_pretrained(
+    "Qwen/Qwen2.5-3B",
+    torch_dtype=torch.bfloat16,
+    device_map="auto"
+)
+tokenizer = AutoTokenizer.from_pretrained("./outputs/qwen25-3b-lora")
+
+# Load the LoRA adapter on top of the base model
+model = PeftModel.from_pretrained(model, "./outputs/qwen25-3b-lora")
+
+# Generate a response
+messages = [{"role": "user", "content": "Write a Python function to check if a number is prime."}]
+text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+inputs = tokenizer(text, return_tensors="pt").to(model.device)
+
+with torch.no_grad():
+    outputs = model.generate(
+        **inputs, max_new_tokens=256,
+        do_sample=True, temperature=0.7, top_p=0.9
+    )
+
+response = tokenizer.decode(outputs[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
+print(response)
+```
+
+Copy it to the instance and run it:
+
+```bash
+scp -P "$SSH_PORT" test_inference.py root@"$SSH_HOST":/workspace/test_inference.py
+ssh -p "$SSH_PORT" root@"$SSH_HOST" "cd /workspace && python test_inference.py"
+```
+
+You should see output similar to the following:
+
+```text
+def is_prime(n: int) -> bool:
+    """Check if a number is prime."""
+    if n <= 1:
+        return False
+    if n <= 3:
+        return True
+    if n % 2 == 0 or n % 3 == 0:
+        return False
+    ...
+```
+
+## Download Your Model
+
+Before destroying the instance, download the LoRA adapter to your local machine:
+
+```bash
+scp -P "$SSH_PORT" -r root@"$SSH_HOST":/workspace/outputs/qwen25-3b-lora ./qwen25-3b-lora
+```
+
+This downloads the ~80 MB adapter. To use it later, you also need the base model (`Qwen/Qwen2.5-3B`), which can be re-downloaded from HuggingFace.
+
+## Cleanup
+
+Destroy the instance to stop billing:
+
+```bash
+vastai destroy instance <CONTRACT_ID>
+```
+
+## Next Steps
+
+- **Train longer**: Increase `num_epochs` to 3–4 or use the full 100K dataset (`split: train`) for better results
+- **Try QLoRA**: Add `load_in_4bit: true` and change `adapter: qlora` to reduce VRAM further — useful for larger models like Qwen2.5-72B
+- **Merge the adapter**: Run `axolotl merge-lora config.yml` to combine the LoRA weights into the base model for faster inference without the PEFT library
+- **Use your own data**: Replace the dataset with your own JSONL file in [Alpaca](https://docs.axolotl.ai/docs/dataset-formats/inst_tune.html) or [conversation](https://docs.axolotl.ai/docs/dataset-formats/conversation.html) format
+- **Scale to multi-GPU**: Add a `deepspeed` or `fsdp` config section for distributed training across multiple GPUs — see the [multi-node training guide](/multi-node-training-using-torch-nccl)
+
+## Additional Resources
+
+- [Axolotl Documentation](https://docs.axolotl.ai)
+- [Axolotl GitHub](https://github.com/axolotl-ai-cloud/axolotl)
+- [Qwen2.5 Model Collection](https://huggingface.co/collections/Qwen/qwen25)
+- [FineTome-100k Dataset](https://huggingface.co/datasets/mlabonne/FineTome-100k)
+- [Axolotl Example Configs](https://github.com/axolotl-ai-cloud/axolotl/tree/main/examples)
+- [LoRA Paper (Hu et al., 2021)](https://arxiv.org/abs/2106.09685)
