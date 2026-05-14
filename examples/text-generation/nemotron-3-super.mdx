@@ -38,13 +38,13 @@ Key capabilities:
 
 The FP8 variant requires:
 
-- **GPUs**: 2× H100 SXM (80GB each) with NVLink for tensor parallelism
+- **GPUs**: 2× H100-80GB. NVIDIA's [model card](https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8) lists H100, H200, and GB200 as supported.
 - **Disk Space**: 200GB minimum (model is ~120GB)
 - **CUDA Version**: 12.4 or higher
-- **Docker Image**: `lmsysorg/sglang:v0.5.9`
+- **Docker Image**: `lmsysorg/sglang:v0.5.11` (Nemotron-3-Super support landed in [v0.5.10](https://github.com/sgl-project/sglang/releases/tag/v0.5.10))
 
 <Note>
-  H100 SXM GPUs are required (not PCIe) because NVLink is needed for efficient tensor parallelism across 2 GPUs.
+  Prefer H100 SXM variants when available — NVLink improves multi-GPU throughput over PCIe — but the FP8 model works on any Hopper-class or newer GPU pair with ≥80 GB VRAM each.
 </Note>
 
 ## Instance Configuration
@@ -72,7 +72,7 @@ Select an instance ID from the search results and deploy:
 
 ```bash Bash
 vastai create instance <INSTANCE_ID> \
-  --image lmsysorg/sglang:v0.5.9 \
+  --image lmsysorg/sglang:v0.5.11 \
   --env '-p 5000:5000' \
   --disk 200 \
   --onstart-cmd "python3 -m sglang.launch_server \
@@ -82,17 +82,20 @@ vastai create instance <INSTANCE_ID> \
     --port 5000 \
     --trust-remote-code \
     --tp 2 \
+    --ep 2 \
     --kv-cache-dtype fp8_e4m3 \
-    --reasoning-parser nano_v3"
+    --tool-call-parser qwen3_coder \
+    --reasoning-parser nemotron_3"
 ```
 
 **Key parameters explained**:
-- `--image lmsysorg/sglang:v0.5.9` — SGLang stable release with Nemotron 3 Super support
+- `--image lmsysorg/sglang:v0.5.11` — first stable SGLang line that ships Nemotron-3-Super support (added in v0.5.10)
 - `--env '-p 5000:5000'` — Expose port 5000 for the API endpoint
 - `--disk 200` — 200GB for the ~120GB model weights plus overhead
-- `--tp 2` — Tensor parallelism across both H100 GPUs
+- `--tp 2 --ep 2` — Tensor and expert parallelism across both GPUs (NVIDIA's reference command uses `--tp 4 --ep 4` on 4 GPUs; scale these together with the GPU count)
 - `--kv-cache-dtype fp8_e4m3` — FP8 KV cache for efficient memory usage
-- `--reasoning-parser nano_v3` — Enables reasoning content parsing for thinking mode
+- `--tool-call-parser qwen3_coder` — Parses tool-call output (Nemotron 3 Super uses the Qwen3-Coder tool-call format)
+- `--reasoning-parser nemotron_3` — Parses the model's thinking-vs-answer split when reasoning is enabled
 - `--trust-remote-code` — Required for the custom Nemotron architecture
 
 ## Monitoring Deployment
@@ -206,13 +209,8 @@ response = client.chat.completions.create(
 )
 
 msg = response.choices[0].message
-# With reasoning OFF, the answer is in reasoning_content
-print("Answer:", msg.reasoning_content)
+print("Answer:", msg.content)
 ```
-
-<Note>
-  When reasoning is disabled via SGLang's `nano_v3` parser, the response text is returned in `reasoning_content` instead of `content` (which will be `None`). Make sure to read from the correct field based on the mode you're using.
-</Note>
 
 ### Low-Effort Reasoning
 
