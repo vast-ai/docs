@@ -3,50 +3,70 @@ title: "VastAI.create_endpoint"
 sidebarTitle: "create_endpoint"
 ---
 
-Create a new serverless endpoint group.
+Create a new serverless endpoint.
 
 ## Signature
 
 ```python
 VastAI.create_endpoint(
-    min_load: float = 0.0,
-    target_util: float = 0.9,
-    cold_mult: float = 2.5,
-    cold_workers: int = 5,
-    max_workers: int = 20,
-    endpoint_name: Optional[str] = None
-) -> str
+    min_load: Optional[float] = 0.0,
+    min_cold_load: Optional[float] = 0.0,
+    target_util: Optional[float] = 0.9,
+    cold_mult: Optional[float] = 2.5,
+    cold_workers: Optional[int] = 5,
+    max_workers: Optional[int] = 20,
+    endpoint_name: Optional[str] = None,
+    max_queue_time: Optional[float] = None,
+    target_queue_time: Optional[float] = None,
+    inactivity_timeout: Optional[int] = None
+) -> dict
 ```
 
 ## Parameters
 
-<ParamField path="min_load" type="float" default="0.0">
-  Minimum load (requests/sec) below which idle workers are scaled down.
+<ParamField path="min_load" type="Optional[float]" default="0.0">
+  minimum floor load in perf units/s  (token/s for LLms)
 </ParamField>
 
-<ParamField path="target_util" type="float" default="0.9">
-  Target worker utilization ratio (0.0-1.0); workers are added to stay at this level.
+<ParamField path="min_cold_load" type="Optional[float]" default="0.0">
+  minimum floor load in perf units/s (token/s for LLms), but allow handling with cold workers
 </ParamField>
 
-<ParamField path="cold_mult" type="float" default="2.5">
-  Multiplier applied to warm worker count for pre-warming cold workers.
+<ParamField path="target_util" type="Optional[float]" default="0.9">
+  target capacity utilization (fraction, max 1.0, default 0.9)
 </ParamField>
 
-<ParamField path="cold_workers" type="int" default="5">
-  Number of pre-warmed (cold) workers to keep ready.
+<ParamField path="cold_mult" type="Optional[float]" default="2.5">
+  cold/stopped instance capacity target as multiple of hot capacity target (default 2.5)
 </ParamField>
 
-<ParamField path="max_workers" type="int" default="20">
-  Maximum number of workers allowed in this endpoint.
+<ParamField path="cold_workers" type="Optional[int]" default="5">
+  min number of workers to keep 'cold' when you have no load (default 5)
+</ParamField>
+
+<ParamField path="max_workers" type="Optional[int]" default="20">
+  max number of workers your endpoint group can have (default 20)
 </ParamField>
 
 <ParamField path="endpoint_name" type="Optional[str]">
-  Human-readable name for the endpoint.
+  deployment endpoint name (allows multiple autoscale groups to share same deployment endpoint)
+</ParamField>
+
+<ParamField path="max_queue_time" type="Optional[float]">
+  maximum seconds requests may be queued on each worker (default 30.0)
+</ParamField>
+
+<ParamField path="target_queue_time" type="Optional[float]">
+  target seconds for the queue to be cleared (default 10.0)
+</ParamField>
+
+<ParamField path="inactivity_timeout" type="Optional[int]">
+  seconds of no traffic before the endpoint can scale to zero active workers
 </ParamField>
 
 ## Returns
 
-`str`, Result from the API call.
+`dict`
 
 ## Example
 
