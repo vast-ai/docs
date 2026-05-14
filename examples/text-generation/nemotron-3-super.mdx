@@ -1,0 +1,275 @@
+---
+title: NVIDIA Nemotron 3 Super
+slug: nemotron-3-super-deployment-vast
+createdAt: Wed Mar 12 2026 20:00:00 GMT+0000 (Coordinated Universal Time)
+updatedAt: Wed Mar 12 2026 20:00:00 GMT+0000 (Coordinated Universal Time)
+---
+
+NVIDIA Nemotron 3 Super is a 120B parameter model that only activates 12B parameters per token, which means you get the quality of a much larger model at a fraction of the compute. It uses a novel hybrid architecture — Mamba-2 for fast sequence processing, Transformer attention where precision matters, and a Latent Mixture-of-Experts layer for efficient routing — and supports context windows up to 1M tokens.
+
+The model is particularly interesting because it ships with a built-in reasoning toggle. You can turn reasoning on for complex tasks like math and coding, switch to a low-effort mode for lighter thinking, or turn it off entirely for fast direct answers — all from the same deployment, controlled per request. It also supports Multi-Token Prediction for faster inference through speculative decoding, and performs well on agentic benchmarks involving tool use and multi-step task execution.
+
+This guide deploys the FP8 variant on Vast.ai using SGLang and queries it via the OpenAI-compatible API.
+
+## Prerequisites
+
+Before getting started, you'll need:
+
+- A Vast.ai account with credits ([Sign up here](https://cloud.vast.ai))
+- Vast.ai CLI installed (`pip install vastai`)
+- Your Vast.ai API key configured
+- Python 3.8+ (for the OpenAI SDK examples)
+
+<Note>
+  Get your API key from the [Vast.ai account page](https://cloud.vast.ai/account/) and set it with `vastai set api-key YOUR_API_KEY`.
+</Note>
+
+## Understanding Nemotron 3 Super
+
+Key capabilities:
+
+- **Efficient MoE Architecture**: 120B total parameters, only 12B active per token
+- **Hybrid Layers**: Mamba-2 (linear-time) + Transformer attention + Latent MoE
+- **Reasoning Toggle**: On, off, or low-effort modes via `chat_template_kwargs`
+- **Long Context**: Up to 1M tokens (256K default)
+- **Commercial License**: NVIDIA Nemotron Open Model License
+
+## Hardware Requirements
+
+The FP8 variant requires:
+
+- **GPUs**: 2× H100-80GB. NVIDIA's [model card](https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8) lists H100, H200, and GB200 as supported.
+- **Disk Space**: 200GB minimum (model is ~120GB)
+- **CUDA Version**: 12.4 or higher
+- **Docker Image**: `lmsysorg/sglang:v0.5.11` (Nemotron-3-Super support landed in [v0.5.10](https://github.com/sgl-project/sglang/releases/tag/v0.5.10))
+
+<Note>
+  Prefer H100 SXM variants when available — NVLink improves multi-GPU throughput over PCIe — but the FP8 model works on any Hopper-class or newer GPU pair with ≥80 GB VRAM each.
+</Note>
+
+## Instance Configuration
+
+### Step 1: Search for Suitable Instances
+
+```bash Bash
+vastai search offers \
+  "gpu_name=H100_SXM num_gpus=2 gpu_ram>=80 cuda_vers>=12.4 \
+   disk_space>=200 direct_port_count>1 inet_down>=500 rentable=true" \
+  --order "dph_base" --limit 10
+```
+
+This searches for:
+- 2× H100 SXM GPUs with at least 80GB VRAM each
+- CUDA 12.4 or higher
+- At least 200GB disk space
+- Direct port access for the API endpoint
+- High download speed for faster model loading
+- Sorted by price (lowest first)
+
+### Step 2: Create the Instance
+
+Select an instance ID from the search results and deploy:
+
+```bash Bash
+vastai create instance <INSTANCE_ID> \
+  --image lmsysorg/sglang:v0.5.11 \
+  --env '-p 5000:5000' \
+  --disk 200 \
+  --onstart-cmd "python3 -m sglang.launch_server \
+    --model-path nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8 \
+    --served-model-name nvidia/nemotron-3-super \
+    --host 0.0.0.0 \
+    --port 5000 \
+    --trust-remote-code \
+    --tp 2 \
+    --ep 2 \
+    --kv-cache-dtype fp8_e4m3 \
+    --tool-call-parser qwen3_coder \
+    --reasoning-parser nemotron_3"
+```
+
+**Key parameters explained**:
+- `--image lmsysorg/sglang:v0.5.11` — first stable SGLang line that ships Nemotron-3-Super support (added in v0.5.10)
+- `--env '-p 5000:5000'` — Expose port 5000 for the API endpoint
+- `--disk 200` — 200GB for the ~120GB model weights plus overhead
+- `--tp 2 --ep 2` — Tensor and expert parallelism across both GPUs (NVIDIA's reference command uses `--tp 4 --ep 4` on 4 GPUs; scale these together with the GPU count)
+- `--kv-cache-dtype fp8_e4m3` — FP8 KV cache for efficient memory usage
+- `--tool-call-parser qwen3_coder` — Parses tool-call output (Nemotron 3 Super uses the Qwen3-Coder tool-call format)
+- `--reasoning-parser nemotron_3` — Parses the model's thinking-vs-answer split when reasoning is enabled
+- `--trust-remote-code` — Required for the custom Nemotron architecture
+
+## Monitoring Deployment
+
+### Check Deployment Status
+
+```bash Bash
+vastai logs <INSTANCE_ID>
+```
+
+Look for this message indicating the server is ready:
+
+```text Text
+The server is fired up and ready to roll!
+```
+
+### Get Your Endpoint
+
+Once deployment completes, get your instance details:
+
+```bash Bash
+vastai show instance <INSTANCE_ID> --raw
+```
+
+Look for the `ports` field — it maps internal port 5000 to an external port. Your API endpoint will be:
+
+```text Text
+http://<PUBLIC_IP>:<EXTERNAL_PORT>/v1
+```
+
+## Using the Nemotron 3 Super API
+
+### Quick Test with cURL
+
+Verify the server is responding:
+
+```bash Bash
+curl -X POST http://<IP>:<PORT>/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "nvidia/nemotron-3-super",
+    "messages": [{"role": "user", "content": "What is 25 * 37?"}],
+    "max_tokens": 500,
+    "temperature": 1.0,
+    "top_p": 0.95
+  }'
+```
+
+<Note>
+  NVIDIA requires `temperature=1.0` and `top_p=0.95` for all inference with this model.
+</Note>
+
+### Python Integration
+
+Using the OpenAI Python SDK:
+
+```python icon="python" Python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://<IP>:<PORT>/v1",
+    api_key="EMPTY"  # SGLang doesn't require an API key
+)
+
+response = client.chat.completions.create(
+    model="nvidia/nemotron-3-super",
+    messages=[{"role": "user", "content": "Explain quantum entanglement in 2 sentences."}],
+    max_tokens=300,
+    temperature=1.0,
+    top_p=0.95
+)
+
+print(response.choices[0].message.content)
+```
+
+## Reasoning Modes
+
+Nemotron 3 Super supports three reasoning modes, controlled via `chat_template_kwargs`. By default, reasoning is enabled.
+
+### Reasoning ON (Default)
+
+The model shows its thinking in `reasoning_content` before giving the final answer in `content`:
+
+```python icon="python" Python
+response = client.chat.completions.create(
+    model="nvidia/nemotron-3-super",
+    messages=[{"role": "user", "content": "Explain quantum entanglement in 2 sentences."}],
+    max_tokens=300,
+    temperature=1.0,
+    top_p=0.95,
+    extra_body={"chat_template_kwargs": {"enable_thinking": True}}
+)
+
+msg = response.choices[0].message
+print("Thinking:", msg.reasoning_content)
+print("Answer:", msg.content)
+```
+
+### Reasoning OFF
+
+Disable reasoning for faster, direct responses:
+
+```python icon="python" Python
+response = client.chat.completions.create(
+    model="nvidia/nemotron-3-super",
+    messages=[{"role": "user", "content": "Explain quantum entanglement in 2 sentences."}],
+    max_tokens=300,
+    temperature=1.0,
+    top_p=0.95,
+    extra_body={"chat_template_kwargs": {"enable_thinking": False}}
+)
+
+msg = response.choices[0].message
+print("Answer:", msg.content)
+```
+
+### Low-Effort Reasoning
+
+A middle ground — brief reasoning with fast responses:
+
+```python icon="python" Python
+response = client.chat.completions.create(
+    model="nvidia/nemotron-3-super",
+    messages=[{"role": "user", "content": "What is 25 * 37?"}],
+    max_tokens=300,
+    temperature=1.0,
+    top_p=0.95,
+    extra_body={"chat_template_kwargs": {"enable_thinking": True, "low_effort": True}}
+)
+
+msg = response.choices[0].message
+print("Thinking:", msg.reasoning_content)  # Brief reasoning
+print("Answer:", msg.content)
+```
+
+### Reasoning with cURL
+
+Pass `chat_template_kwargs` at the top level of the JSON body:
+
+```bash Bash
+curl -X POST http://<IP>:<PORT>/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "nvidia/nemotron-3-super",
+    "messages": [{"role": "user", "content": "What is 25 * 37?"}],
+    "max_tokens": 500,
+    "temperature": 1.0,
+    "top_p": 0.95,
+    "chat_template_kwargs": {"enable_thinking": false}
+  }'
+```
+
+## Cleanup
+
+When you're done, destroy the instance to stop billing:
+
+```bash Bash
+vastai destroy instance <INSTANCE_ID>
+```
+
+<Note>
+  Always destroy your instance when you're finished to avoid unnecessary charges.
+</Note>
+
+## Additional Resources
+
+- [NVIDIA Nemotron 3 Super Blog Post](https://developer.nvidia.com/blog/introducing-nemotron-3-super-an-open-hybrid-mamba-transformer-moe-for-agentic-reasoning/) — Architecture details and benchmarks
+- [HuggingFace Model Card (FP8)](https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8) — Model card and usage instructions
+- [SGLang Documentation](https://docs.sglang.ai/) — SGLang configuration and usage
+- [Vast.ai CLI Guide](/cli/get-started) — Learn more about the Vast.ai CLI
+- [GPU Instance Guide](/guides/instances/overview) — Understanding Vast.ai instances
+
+## Conclusion
+
+Nemotron 3 Super delivers frontier-class reasoning performance by activating only 12B of its 120B parameters per token. With SGLang and Vast.ai, you can deploy the model on 2× H100 GPUs and start querying it via the OpenAI-compatible API.
+
+The reasoning toggle is particularly useful: enable it for complex tasks like math, coding, and analysis, or disable it for fast direct answers in production pipelines.
