@@ -4,52 +4,6 @@ createdAt: Sun Mar 23 2026 20:00:00 GMT+0000 (Coordinated Universal Time)
 updatedAt: Sun Mar 23 2026 20:00:00 GMT+0000 (Coordinated Universal Time)
 ---
 
-<script type="application/ld+json" dangerouslySetInnerHTML={{
-  __html: JSON.stringify({
-    "@context": "https://schema.org",
-    "@type": "HowTo",
-    "name": "Fine-Tune LLMs with Axolotl on Vast.ai",
-    "description": "Step-by-step guide to fine-tuning Qwen2.5-3B using LoRA with the Axolotl toolkit on a Vast.ai GPU instance",
-    "totalTime": "PT45M",
-    "supply": [
-      { "@type": "HowToSupply", "name": "Vast.ai Account with Credits" }
-    ],
-    "tool": [
-      { "@type": "HowToTool", "name": "Vast.ai CLI" },
-      { "@type": "HowToTool", "name": "SSH Client" }
-    ],
-    "step": [
-      {
-        "@type": "HowToStep",
-        "name": "Find and Rent a GPU",
-        "text": "Search for a GPU instance with at least 24GB VRAM and create it with the Axolotl template",
-        "url": "https://docs.vast.ai/examples/ai-ml-frameworks/axolotl-fine-tuning#find-and-rent-a-gpu"
-      },
-      {
-        "@type": "HowToStep",
-        "name": "Configure Training",
-        "text": "Create a YAML configuration file specifying the model, dataset, and training hyperparameters",
-        "url": "https://docs.vast.ai/examples/ai-ml-frameworks/axolotl-fine-tuning#configure-training"
-      },
-      {
-        "@type": "HowToStep",
-        "name": "Run Training",
-        "text": "Launch fine-tuning with axolotl train and monitor loss metrics",
-        "url": "https://docs.vast.ai/examples/ai-ml-frameworks/axolotl-fine-tuning#run-training"
-      },
-      {
-        "@type": "HowToStep",
-        "name": "Test the Fine-Tuned Model",
-        "text": "Run inference to verify the model produces coherent responses",
-        "url": "https://docs.vast.ai/examples/ai-ml-frameworks/axolotl-fine-tuning#test-the-fine-tuned-model"
-      }
-    ],
-    "author": { "@type": "Organization", "name": "Vast.ai Team" },
-    "datePublished": "2026-03-23",
-    "dateModified": "2026-03-23"
-  })
-}} />
-
 [Axolotl](https://github.com/axolotl-ai-cloud/axolotl) is an open-source fine-tuning toolkit. You configure a training job in YAML — model, dataset, method — and Axolotl runs it, no custom training code required. It supports 60+ model architectures and multiple training methods, including LoRA (which trains a small set of adapter parameters instead of the full model, significantly reducing GPU memory) and QLoRA (which adds 4-bit quantization on top of LoRA to reduce memory even further).
 
 This guide fine-tunes [Qwen2.5-3B](https://huggingface.co/Qwen/Qwen2.5-3B) with LoRA on a Vast.ai GPU. We chose this model because it is ungated (no HuggingFace account needed), small enough to train on a single 24GB GPU, and widely used for fine-tuning. The same workflow applies to any Axolotl-supported model. By the end, you will have a working fine-tuned model.
@@ -63,17 +17,13 @@ This guide fine-tunes [Qwen2.5-3B](https://huggingface.co/Qwen/Qwen2.5-3B) with 
   vastai set api-key YOUR_API_KEY
   ```
   You can find your API key at [cloud.vast.ai/cli](https://cloud.vast.ai/cli/).
-- An SSH key added to your Vast.ai account (see [SSH setup guide](/documentation/instances/connect/ssh))
+- An SSH key added to your Vast.ai account (see [SSH setup guide](/guides/instances/connect/ssh))
 
 ## Hardware Requirements
 
-- **GPU VRAM**: 24 GB minimum (training peaks at ~14 GB with LoRA and gradient checkpointing)
+- **GPU VRAM**: 16 GB minimum — training peaks at ~14 GB with LoRA and gradient checkpointing. A 24 GB card (RTX 3090/4090, A5000, A100) gives enough headroom to raise the batch size or sequence length.
 - **Disk**: 100 GB (model weights ~6 GB, plus dataset cache and checkpoints)
 - **CUDA**: 12.4+
-
-<Note>
-The 3B model with LoRA uses only ~14 GB of VRAM, so it fits comfortably on GPUs like the RTX 3090, RTX 4090, A5000, or A100. The remaining headroom means you can increase the batch size or sequence length if needed.
-</Note>
 
 ## Find and Rent a GPU
 
@@ -81,11 +31,11 @@ The 3B model with LoRA uses only ~14 GB of VRAM, so it fits comfortably on GPUs 
 The Axolotl Docker image is large (~15 GB). On slower connections, the image pull can take 30+ minutes. To filter for hosts with fast network downlinks, include `inet_down >= 5000` (Mbps) in your search query below.
 </Warning>
 
-Search for a GPU instance with at least 24 GB VRAM, CUDA 12.4+, and a fast network downlink:
+Search for a GPU instance with at least 16 GB VRAM, CUDA 12.4+, and a fast network downlink:
 
 ```bash
 vastai search offers \
-  "gpu_ram >= 24 num_gpus = 1 cuda_vers >= 12.4 disk_space >= 100 reliability > 0.98 inet_down >= 5000" \
+  "gpu_ram >= 16 num_gpus = 1 cuda_vers >= 12.4 disk_space >= 100 reliability > 0.98 inet_down >= 5000" \
   --order "dph_base" --limit 10
 ```
 
@@ -184,7 +134,7 @@ The following table explains the key settings:
 | Setting | Purpose |
 |---------|---------|
 | `base_model` | The pre-trained model to start from (downloaded automatically from HuggingFace) |
-| `adapter: lora` | Trains small adapter layers alongside the frozen base model instead of updating all parameters, reducing VRAM from ~24 GB to ~14 GB |
+| `adapter: lora` | Trains small adapter layers alongside the frozen base model instead of updating all parameters, keeping peak VRAM at ~14 GB instead of the ~24 GB a full fine-tune would need |
 | `lora_r: 16` | Controls LoRA capacity — higher rank means more trainable parameters but more VRAM |
 | `lora_alpha: 32` | Scaling factor for LoRA updates, typically set to 2x the rank |
 | `datasets` | [FineTome-100k](https://huggingface.co/datasets/mlabonne/FineTome-100k) — 100K instruction-response pairs covering coding, writing, and reasoning. We use 10% to keep training fast |
