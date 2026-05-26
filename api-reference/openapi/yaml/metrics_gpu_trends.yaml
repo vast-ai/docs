@@ -1,0 +1,198 @@
+openapi: 3.0.0
+info:
+  title: Metrics GPU Trends API
+  description: Show historical GPU market trends
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/metrics/gpu/history/:
+    get:
+      summary: show gpu trends
+      description: |
+        Returns time-series data for GPU supply, demand, and pricing. By default queries the last 24 hours and returns a sampled set of roughly 20 data points. Use start/end/step for custom time ranges.
+
+        CLI Usage: `vastai metrics gpu-trends [GPU_NAMES] [options]`
+      security:
+      - BearerAuth: []
+      parameters:
+      - name: gpu_name
+        in: query
+        required: false
+        description: Comma-separated GPU names (e.g. "RTX 4090, H100_SXM") or "all".
+          Defaults to RTX 5090, 4090, and 3090.
+        schema:
+          type: string
+          example: RTX 4090
+      - name: verified
+        in: query
+        required: false
+        description: Filter by verification status
+        schema:
+          type: string
+          enum:
+          - 'yes'
+          - 'no'
+          - all
+          default: 'yes'
+      - name: hosting_type
+        in: query
+        required: false
+        description: Filter by hosting type
+        schema:
+          type: string
+          enum:
+          - all
+          - secure_cloud
+          - community
+          default: all
+      - name: num_gpus
+        in: query
+        required: false
+        description: GPU count bucket or "all"
+        schema:
+          type: string
+          default: all
+      - name: start
+        in: query
+        required: false
+        description: Unix timestamp for range start
+        schema:
+          type: integer
+      - name: end
+        in: query
+        required: false
+        description: Unix timestamp for range end
+        schema:
+          type: integer
+      - name: step
+        in: query
+        required: false
+        description: Seconds between data points (e.g. 3600 for hourly)
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Success response
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Keyed by GPU name. Each GPU contains stats and a time-series
+                  rows array.
+                additionalProperties:
+                  type: object
+                  properties:
+                    stats:
+                      type: object
+                      properties:
+                        tflops:
+                          type: number
+                          example: 82.6
+                        dlperf:
+                          type: number
+                          example: 97.5
+                        tflops_per_dollar:
+                          type: number
+                          example: 127.1
+                        dlperf_per_dollar:
+                          type: number
+                          example: 150.0
+                    rows:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          date:
+                            type: string
+                            description: Human-readable UTC date
+                            example: '2026-05-25 19:08:36'
+                          timestamp:
+                            type: integer
+                            description: Unix timestamp
+                            example: 1779736116
+                          rented_verified:
+                            type: integer
+                            example: 3804
+                          avail_verified:
+                            type: integer
+                            example: 150
+                          rented_unverified:
+                            type: integer
+                            example: 383
+                          avail_unverified:
+                            type: integer
+                            example: 109
+                          total:
+                            type: integer
+                            example: 4446
+                          rented_p10:
+                            type: number
+                            description: 10th percentile rented price
+                            example: 0.246
+                          rented_median:
+                            type: number
+                            description: Median rented price
+                            example: 0.39
+                          rented_p90:
+                            type: number
+                            description: 90th percentile rented price
+                            example: 0.599
+                          avail_p10:
+                            type: number
+                            description: 10th percentile available price
+                            example: 0.25
+                          avail_median:
+                            type: number
+                            description: Median available price
+                            example: 0.5
+                          avail_p90:
+                            type: number
+                            description: 90th percentile available price
+                            example: 1.0
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: API requests too frequent endpoint threshold=3.0
+      tags:
+      - Machines
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: API key must be provided in the Authorization header
+  schemas:
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+        msg:
+          type: string
+x-rate-limit:
+  threshold: 3.0
+  per: request
+  description: Maximum request frequency per IP address for this endpoint
+x-cli-commands:
+- name: metrics gpu-trends
+  description: Show GPU market trends
+  endpoint: /api/v0/metrics/gpu/history/
+  method: GET
+  example: vastai metrics gpu-trends "RTX 4090"
