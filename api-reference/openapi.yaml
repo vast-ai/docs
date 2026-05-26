@@ -4644,27 +4644,51 @@ paths:
                         available:
                           type: integer
                           description: Available machines
+                        rented_verified:
+                          type: integer
+                          description: Rented verified machines
+                        avail_verified:
+                          type: integer
+                          description: Available verified machines
+                        rented_unverified:
+                          type: integer
+                          description: Rented unverified machines
+                        avail_unverified:
+                          type: integer
+                          description: Available unverified machines
                         usage:
                           type: number
-                          description: Current utilization ratio
-                        price_median:
+                          description: Current utilization percentage
+                        usage_30d:
                           type: number
-                          description: Median rental price per GPU per hour
-                        price_p10:
-                          type: number
-                          description: 10th percentile price
-                        price_p90:
-                          type: number
-                          description: 90th percentile price
-                        tflops:
-                          type: number
-                          description: GPU TFLOPS rating
+                          description: 30-day average utilization percentage
                         dlperf:
                           type: number
                           description: Deep learning performance score
+                        tflops:
+                          type: number
+                          description: GPU TFLOPS rating
+                        price_p10:
+                          type: number
+                          description: 10th percentile price per GPU per hour
+                        price_p25:
+                          type: number
+                          description: 25th percentile price
+                        price_median:
+                          type: number
+                          description: Median price per GPU per hour
+                        price_p75:
+                          type: number
+                          description: 75th percentile price
+                        price_p90:
+                          type: number
+                          description: 90th percentile price
                         tflops_per_dollar:
                           type: number
                           description: TFLOPS per dollar
+                        dlperf_per_dollar:
+                          type: number
+                          description: Deep learning performance per dollar
         '401':
           description: Unauthorized
           content:
@@ -4826,78 +4850,131 @@ paths:
             application/json:
               schema:
                 type: object
-                description: Keyed by GPU name. Each GPU contains stats and a time-series
-                  rows array.
-                additionalProperties:
-                  type: object
-                  properties:
-                    stats:
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  gpus:
+                    type: object
+                    description: Keyed by GPU name
+                    additionalProperties:
                       type: object
                       properties:
-                        tflops:
-                          type: number
-                          example: 82.6
-                        dlperf:
-                          type: number
-                          example: 97.5
-                        tflops_per_dollar:
-                          type: number
-                          example: 127.1
-                        dlperf_per_dollar:
-                          type: number
-                          example: 150.0
-                    rows:
-                      type: array
-                      items:
-                        type: object
-                        properties:
-                          date:
-                            type: string
-                            description: Human-readable UTC date
-                            example: '2026-05-25 19:08:36'
-                          timestamp:
-                            type: integer
-                            description: Unix timestamp
-                            example: 1779736116
-                          rented_verified:
-                            type: integer
-                            example: 3804
-                          avail_verified:
-                            type: integer
-                            example: 150
-                          rented_unverified:
-                            type: integer
-                            example: 383
-                          avail_unverified:
-                            type: integer
-                            example: 109
-                          total:
-                            type: integer
-                            example: 4446
-                          rented_p10:
-                            type: number
-                            description: 10th percentile rented price
-                            example: 0.246
-                          rented_median:
-                            type: number
-                            description: Median rented price
-                            example: 0.39
-                          rented_p90:
-                            type: number
-                            description: 90th percentile rented price
-                            example: 0.599
-                          avail_p10:
-                            type: number
-                            description: 10th percentile available price
-                            example: 0.25
-                          avail_median:
-                            type: number
-                            description: Median available price
-                            example: 0.5
-                          avail_p90:
-                            type: number
-                            description: 90th percentile available price
-                            example: 1.0
+                        supply_demand:
+                          type: object
+                          description: Time-series arrays of supply and demand counts
+                          properties:
+                            timestamps:
+                              type: array
+                              items:
+                                type: integer
+                              example:
+                              - 1779736460
+                              - 1779736632
+                            rented_verified:
+                              type: array
+                              items:
+                                type: integer
+                              example:
+                              - 3789
+                              - 3756
+                            avail_verified:
+                              type: array
+                              items:
+                                type: integer
+                              example:
+                              - 165
+                              - 200
+                            rented_unverified:
+                              type: array
+                              items:
+                                type: integer
+                              example:
+                              - 385
+                              - 390
+                            avail_unverified:
+                              type: array
+                              items:
+                                type: integer
+                              example:
+                              - 107
+                              - 100
+                            total:
+                              type: array
+                              items:
+                                type: integer
+                              example:
+                              - 4446
+                              - 4446
+                        pricing:
+                          type: object
+                          description: Time-series arrays of pricing percentiles
+                          properties:
+                            timestamps:
+                              type: array
+                              items:
+                                type: integer
+                              example:
+                              - 1779736460
+                              - 1779736632
+                            rented_p10:
+                              type: array
+                              items:
+                                type: number
+                              example:
+                              - 0.246
+                              - 0.246
+                            rented_median:
+                              type: array
+                              items:
+                                type: number
+                              example:
+                              - 0.39
+                              - 0.38
+                            rented_p90:
+                              type: array
+                              items:
+                                type: number
+                              example:
+                              - 0.599
+                              - 0.55
+                            avail_p10:
+                              type: array
+                              items:
+                                type: number
+                              example:
+                              - 0.254
+                              - 0.289
+                            avail_median:
+                              type: array
+                              items:
+                                type: number
+                              example:
+                              - 0.5
+                              - 0.5
+                            avail_p90:
+                              type: array
+                              items:
+                                type: number
+                              example:
+                              - 0.973
+                              - 0.85
+                        stats:
+                          type: object
+                          description: Static performance metrics for this GPU
+                          properties:
+                            tflops:
+                              type: number
+                              example: 82.6
+                            dlperf:
+                              type: number
+                              example: 97.5
+                            tflops_per_dollar:
+                              type: number
+                              example: 127.1
+                            dlperf_per_dollar:
+                              type: number
+                              example: 150.0
         '401':
           description: Unauthorized
           content:
@@ -6808,6 +6885,10 @@ paths:
                         nullable: true
                         description: Current state of the endpoint
                         example: active
+                      env:
+                        type: string
+                        nullable: true
+                        description: Environment variables and port mappings
                       s3_key:
                         type: string
                         nullable: true
@@ -6816,6 +6897,10 @@ paths:
                         type: string
                         nullable: true
                         description: Content hash of the deployed code
+                      search_params:
+                        type: string
+                        nullable: true
+                        description: Search query for instance selection
                       current_version_id:
                         type: integer
                         nullable: true
@@ -6828,6 +6913,10 @@ paths:
                       ttl:
                         type: number
                         nullable: true
+                      last_client_heartbeat:
+                        type: number
+                        nullable: true
+                        description: Unix timestamp of last client heartbeat
                       created_at:
                         type: number
                         description: Unix timestamp
@@ -6899,10 +6988,22 @@ paths:
                           type: integer
                           nullable: true
                           example: 25121
+                        env:
+                          type: string
+                          nullable: true
+                          description: Environment variables and port mappings
                         file_hash:
                           type: string
                           nullable: true
                           description: Content hash of the deployed code
+                        s3_key:
+                          type: string
+                          nullable: true
+                          description: S3 object key for the current code version
+                        search_params:
+                          type: string
+                          nullable: true
+                          description: Search query for instance selection
                         current_version_id:
                           type: integer
                           nullable: true
@@ -6915,6 +7016,10 @@ paths:
                         ttl:
                           type: number
                           nullable: true
+                        last_client_heartbeat:
+                          type: number
+                          nullable: true
+                          description: Unix timestamp of last client heartbeat
                         created_at:
                           type: number
                           description: Unix timestamp
