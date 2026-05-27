@@ -1,0 +1,120 @@
+---
+title: "GPU Market Metrics"
+sidebarTitle: "Market Metrics"
+description: "Track GPU supply, demand, pricing, and locations across the Vast marketplace"
+---
+
+Vast provides real-time and historical data on GPU supply, demand, pricing, and geographic distribution across the marketplace. You can use this data to make informed decisions about pricing your machines and understanding demand for specific GPU types.
+
+## Accessing the data
+
+There are three ways to access market metrics:
+
+1. **Dashboards** at [cloud.vast.ai/host/market/](https://cloud.vast.ai/host/market/)
+2. **CLI** via `vastai metrics` subcommands (requires `pip install vastai`, v1.0.4+)
+3. **REST API** endpoints (see [API reference](#api-endpoints) below)
+
+All three require a **host API key**. Regular client keys will receive a `401` error.
+
+## Dashboards
+
+Three views are available at [cloud.vast.ai/host/market/](https://cloud.vast.ai/host/market/):
+
+- **Availability & Pricing** — Historical supply/demand counts and P10/median/P90 pricing over time
+- **GPU Overview** — Current supply/demand counts, pricing, and stats for each GPU type
+- **GPU Locations** — Geographic distribution of GPUs across the platform
+
+## CLI commands
+
+Install or upgrade the CLI:
+
+```bash
+pip install --upgrade vastai
+```
+
+### Current snapshot — `vastai metrics gpu`
+
+Returns current supply, demand, and pricing for all GPU types.
+
+```bash
+vastai metrics gpu                                # all GPU types
+vastai metrics gpu --verified true --datacenter true
+vastai metrics gpu --raw                          # JSON output
+```
+
+See [full reference](/host/cli/metrics-gpu).
+
+### Historical trends — `vastai metrics gpu-trends`
+
+Returns time-series data for supply, demand, and pricing. Defaults to RTX 5090, 4090, and 3090 over the last 24 hours.
+
+```bash
+vastai metrics gpu-trends                              # defaults
+vastai metrics gpu-trends "RTX 4090"                   # single GPU
+vastai metrics gpu-trends "RTX 4090, H100_SXM"          # multiple GPUs
+vastai metrics gpu-trends all                          # all GPU types
+vastai metrics gpu-trends "RTX 4090" --full            # all data points (vs sampled ~20)
+vastai metrics gpu-trends "RTX 4090" --raw             # JSON output
+vastai metrics gpu-trends "RTX 4090" --start 1773298800 --end 1773817200 --step 3600
+```
+
+See [full reference](/host/cli/metrics-gpu-trends).
+
+### Location data — `vastai metrics gpu-locations`
+
+Returns geographic distribution of GPUs.
+
+```bash
+vastai metrics gpu-locations                                     # unfiltered
+vastai metrics gpu-locations --verified true --datacenter true   # datacenter-verified only
+vastai metrics gpu-locations --gpu "RTX 4090, H100_SXM"           # specific GPU types
+vastai metrics gpu-locations --rented false                      # only unrented
+vastai metrics gpu-locations --raw                               # JSON output
+```
+
+See [full reference](/host/cli/metrics-gpu-locations).
+
+## API endpoints
+
+You can also query the data directly via the REST API. Pass your host API key as a Bearer token.
+
+| Endpoint | Description |
+| --- | --- |
+| `GET /api/v0/metrics/gpu/current/` | Current snapshot of all GPU types |
+| `GET /api/v0/metrics/gpu/history/` | Time-series supply/demand and pricing |
+| `GET /api/v0/metrics/gpu/locations/` | Geographic distribution |
+
+### Query parameters
+
+| Parameter | Applies to | Description |
+| --- | --- | --- |
+| `verified` | current, history | `yes`, `no`, or `all` |
+| `hosting_type` | current, history | `secure_cloud`, `community`, or `all` |
+| `gpu_name` | history | GPU name (e.g. `RTX 4090`) |
+| `start` | history | Unix timestamp for range start |
+| `end` | history | Unix timestamp for range end |
+| `step` | history | Seconds between data points (e.g. `3600` for hourly) |
+
+### Examples
+
+```bash
+# Current snapshot — verified datacenter GPUs
+curl -H "Authorization: Bearer $API_KEY" \
+  "https://console.vast.ai/api/v0/metrics/gpu/current/?verified=yes&hosting_type=secure_cloud"
+
+# Historical trends — RTX 4090, hourly steps
+curl -H "Authorization: Bearer $API_KEY" \
+  "https://console.vast.ai/api/v0/metrics/gpu/history/?gpu_name=RTX+4090&verified=yes&start=1773298800&end=1773817200&step=3600"
+
+# Locations
+curl -H "Authorization: Bearer $API_KEY" \
+  "https://console.vast.ai/api/v0/metrics/gpu/locations/"
+```
+
+## Data freshness
+
+Market metrics data is updated every 5 minutes. Location data is cached for up to 2 hours since it changes less frequently.
+
+### Rate limits
+
+Each endpoint allows up to **5 requests per second** per user. For large historical queries, the backend automatically adjusts the resolution to keep response sizes reasonable.
