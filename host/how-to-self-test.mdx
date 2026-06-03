@@ -34,6 +34,8 @@ During the self-test, the following components and conditions are verified:
 
 A short test workload will be executed to assess actual runtime performance.
 
+For the exact thresholds, runtime stages, failure codes, and diagnostic bundle behavior, see the [Self-test Reference](/host/self-test-reference).
+
 <Tip>
 **Tip:** Ensure no other jobs or instances are running during the self-test for the most accurate results.
 </Tip>
@@ -90,11 +92,25 @@ If the test fails:
 
 * The CLI will display detailed reasons for failure.
 * Apply the suggested fixes and rerun the test.
+* Review the [Self-test Reference](/host/self-test-reference) for the failed check or failure code.
 
 If the test says the machine is "not found or not rentable":
 
-* Try un-listing your machine, then listing it again.
-* Ensure your machine has no missing data in your machines page, such as upload and download speed, RAM, or ports.
+* Check whether the machine is currently rented, offline, unlisted, below the reliability threshold, missing active offers, or hidden from the API key you are using.
+* Inspect all offers for the machine:
+
+```bash
+vastai search offers 'machine_id=<machine_id> rentable=any rented=any'
+```
+
+* Review the [Self-test Reference](/host/self-test-reference#not-found-or-not-rentable) for the specific root states the CLI can report.
+
+If the test reports no response or a progress timeout:
+
+* Check the external IP and port printed by the CLI, if present.
+* Confirm your router/firewall forwards that external port to the host's LAN IP.
+* If you are running the CLI from the same LAN as the host, retest from another network to rule out NAT hairpinning.
+* Review the diagnostic bundle path printed by the CLI after failure.
 
 ### Optional: Ignore Requirements Mode
 
@@ -118,3 +134,5 @@ Even if the test passes in this mode, your machine does not meet the minimum ver
 <Warning>
 **Important:** Even with `--ignore-requirements`, your machine must have at least three direct open ports, otherwise, the self-test will fail.
 </Warning>
+
+With `--ignore-requirements`, a passing result means the internal runtime workload passed. It does not mean the machine passed the minimum verification requirements.
