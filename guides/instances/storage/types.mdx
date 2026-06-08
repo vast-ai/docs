@@ -18,8 +18,8 @@ Container storage is the default storage allocated to every instance when it's c
 
 ### Key Characteristics
 
-- **Size is fixed at creation**: You must specify the disk size when creating the instance
-- **Cannot be resized**: Once created, the allocation cannot be changed
+- **Initial size set at creation**: You specify the disk size when creating the instance
+- **Can be grown later**: Disk can be expanded in place on a running or stopped instance (see [Resizing container storage](#resizing-container-storage)). Disk cannot be shrunk.
 - **Persists while instance exists**: Data remains even when instance is stopped
 - **Deleted with instance**: All data is permanently lost when instance is destroyed
 - **Charged continuously**: Storage costs apply even when instance is stopped
@@ -33,6 +33,20 @@ Container storage is the default storage allocated to every instance when it's c
 <Warning>
 Storage charges continue even when instances are stopped. To stop storage billing, you must destroy the instance completely.
 </Warning>
+
+### Resizing container storage
+
+You can grow an instance's container disk in place without recreating the instance or losing data. Pass the new total size in GB to `vastai update instance`:
+
+```bash
+vastai update instance <ID> --disk 80
+```
+
+Notes:
+
+- Disk can only be grown, not shrunk.
+- The new size must fit within the disk space available on the host machine. If the host doesn't have enough free space, the update will fail and you'll need to migrate to an instance with more available capacity.
+- Storage is billed at the host's per-GB rate against the new size from the time the resize completes.
 
 ### Best Practices
 
@@ -96,7 +110,9 @@ Use volumes or cloud sync for:
 ## Common Questions
 
 ### Can I increase storage after instance creation?
-No, container storage size is fixed at creation. You can:
+Yes. Run `vastai update instance <ID> --disk <new_size_gb>` to grow the container disk in place — your data is preserved. Disk can only be grown, not shrunk, and the new size must fit within the host machine's available capacity. See [Resizing container storage](#resizing-container-storage).
+
+If the host can't accommodate the size you need, you can also:
 - Create a new instance with more storage and [transfer your data](/guides/instances/storage/data-movement)
 - Attach a volume for additional space
 - Use cloud storage for overflow
