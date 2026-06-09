@@ -3,7 +3,7 @@ title: "vastai show instances-v1"
 sidebarTitle: "show instances-v1"
 ---
 
-Show instances with pagination and filtering (v1).
+List instances with filtering, sorting, and pagination
 
 ## Usage
 
@@ -13,84 +13,66 @@ vastai show instances-v1 [OPTIONS]
 
 ## Options
 
-<ParamField path="-q" type="boolean">
-  Only print instance IDs, one per line (alias: `--quiet`)
+<ParamField path="--quiet" type="boolean">
+  only print instance IDs, one per line
 </ParamField>
 
-<ParamField path="-v" type="boolean">
-  Show additional columns (SSH, location, template, etc.) (alias: `--verbose`)
+<ParamField path="--verbose" type="boolean">
+  show additional columns (SSH, location, template, etc.)
 </ParamField>
 
-<ParamField path="-a" type="boolean">
-  Fetch all pages automatically and send to pager (alias: `--all`)
+<ParamField path="--all" type="boolean">
+  fetch all pages automatically; useful for scripting
 </ParamField>
 
 <ParamField path="--status" type="string">
-  Filter by container status. Choices: `running`, `loading`, `exited`
+  filter by container status: running loading exited
 </ParamField>
 
 <ParamField path="--label" type="string">
-  Filter by instance label; pass empty string to match unlabeled
+  filter by instance label; pass empty string '' for unlabeled
 </ParamField>
 
 <ParamField path="--gpu-name" type="string">
-  Filter by GPU model name (e.g. `RTX A5000`)
+  filter by GPU model name
 </ParamField>
 
 <ParamField path="--verification" type="string">
-  Filter by machine verification. Choices: `verified`, `unverified`, `deverified`
+  filter by verification status
+  Allowed values: verified, unverified, deverified
 </ParamField>
 
-<ParamField path="--limit" type="integer">
-  Max instances per page (1-25, default 25)
+<ParamField path="--limit" type="integer" default="25">
+  max instances per page (1-25, default 25)
 </ParamField>
 
 <ParamField path="--next-token" type="string">
-  Resume from a pagination token from a previous page
+  resume from a pagination token
 </ParamField>
 
 <ParamField path="--order-by" type="string">
-  Sort column with optional direction, e.g. `start_date desc`
+  sort by column; repeat for multiple keys
 </ParamField>
 
 <ParamField path="--cols" type="string">
-  Override displayed columns with a comma-separated list
+  override displayed columns (available: id,status,label,gpu,disk,volumes,dph,image,age,verified,machine,net,location,template,ssh,msg)
 </ParamField>
 
 ## Description
 
-Returns a paginated list of instance objects. Key status fields per instance:
-
-**actual_status**, current container state:
-
-| Value | Meaning |
-|-------|---------|
-| `null` | Instance is being provisioned |
-| `loading` | Docker image is downloading or container is starting up |
-| `running` | Container is actively executing. GPU charges apply. |
-| `stopped` | Container is halted. Disk charges continue; no GPU charges. |
-| `frozen` | Container is paused with memory preserved. GPU charges apply. |
-| `exited` | Container process exited unexpectedly |
-| `rebooting` | Container is restarting (transient) |
-| `unknown` | No recent heartbeat from the host |
-| `offline` | Host machine disconnected from Vast servers (computed, not stored in DB) |
-
-**intended_status**, user's desired target state: `running`, `stopped`, or `frozen`.
-
-**cur_state**, machine contract / hardware allocation state: `running`, `stopped`, or `unloaded` (released on destroy).
-
-**status_msg**, human-readable detail on the current status.
+Displays your instances in a table with auto-sizing columns. Narrow terminals
+drop lower-priority columns automatically; use --cols to override.
 
 ## Examples
 
 ```bash
 vastai show instances-v1
-
-vastai show instances-v1 --status running --limit 10
-
-vastai show instances-v1 --all --verbose
-
-vastai show instances-v1 --next-token <token_from_previous_page>
+    vastai show instances-v1 -v
+    vastai show instances-v1 --status running loading
+    vastai show instances-v1 --gpu-name 'RTX A5000' 'GTX 1070'
+    vastai show instances-v1 --label training --order-by start_date desc
+    vastai show instances-v1 --cols id,status,gpu,dph
+    vastai show instances-v1 --next-token eyJ2YWx1ZXMi...
 ```
 
 ## Global Options

@@ -3,7 +3,7 @@ title: "vastai run benchmarks"
 sidebarTitle: "run benchmarks"
 ---
 
-Benchmark a template against one or more GPUs and report performance per dollar.
+Benchmark a template against one or more GPUs
 
 ## Usage
 
@@ -14,43 +14,54 @@ vastai run benchmarks [OPTIONS]
 ## Options
 
 <ParamField path="--template_hash" type="string">
-  Template hash to benchmark. One of `--template_hash` or `--template_id` is required.
+  (required, one of --template_hash or --template_id) template hash to benchmark
 </ParamField>
 
 <ParamField path="--template_id" type="integer">
-  Template ID to benchmark. Wins over `--template_hash` if both are passed. One of `--template_hash` or `--template_id` is required.
+  (required, one of --template_hash or --template_id) template id
 </ParamField>
 
 <ParamField path="--gpus" type="string">
-  Comma-separated GPU names, same format as `vastai search offers` (e.g. `RTX_4090,RTX_3090`). An optional `Nx` prefix per token requests a multi-GPU configuration (e.g. `"2x RTX_4090"`). Defaults to `RTX_5090,RTX_4090,RTX_3090,RTX_A6000`.
+  comma-separated GPU names (e.g. RTX_4090,RTX_3090); optional Nx prefix takes precedence over --num_gpus (e.g. "2x RTX_4090")
 </ParamField>
 
 <ParamField path="--num_gpus" type="integer">
-  GPUs per instance for tokens without an `Nx` prefix. If omitted, the count is auto-sized from the template's `gpu_total_ram` filter so VRAM fits.
+  GPUs per instance for tokens without an Nx prefix (default 1); overridden by inline Nx in --gpus
 </ParamField>
 
 <ParamField path="--timeout" type="integer" default="3600">
-  Per-GPU safety ceiling in seconds. Each rental is torn down at this point even if no `measured_perf` was reported.
+  max seconds to wait for a benchmark before giving up (default 3600)
 </ParamField>
 
-<ParamField path="-y, --yes" type="flag">
-  Skip the cost confirmation prompt.
+<ParamField path="--yes" type="boolean">
+  Skip confirmation prompt
 </ParamField>
+
+## Description
+
+Rents one instance per GPU in parallel, measures perf, tears down.
+Each rental runs for up to --timeout seconds and costs real money.
 
 ## Examples
 
 ```bash
-# auto-sweep the default GPUs
-vastai run benchmarks --template_hash 79ebdd2ebfb9d42cedf7a221c42d37a5
+# auto-sweep the default GPUs against TGI
+    vastai run benchmarks --template_hash 79ebdd2ebfb9d42cedf7a221c42d37a5
 
-# specific GPUs
-vastai run benchmarks --template_hash 393fa8572e6c73c927c8275fe4dffd53 --gpus RTX_4090,RTX_3090
+    # specific GPUs against vLLM
+    vastai run benchmarks --template_hash 393fa8572e6c73c927c8275fe4dffd53 --gpus RTX_4090,RTX_3090
 
-# multi-GPU configurations via inline Nx prefix
-vastai run benchmarks --template_hash 40ef49becc953aa910ee05bd4653b9b3 --gpus "2x RTX_4090, 2x RTX_3090"
+    # multi-GPU configurations via inline Nx prefix against ComfyUI
+    vastai run benchmarks --template_hash 40ef49becc953aa910ee05bd4653b9b3 --gpus "2x RTX_4090, 2x RTX_3090"
 
-# raw JSON output for piping into another tool
-vastai run benchmarks --template_hash 40ef49becc953aa910ee05bd4653b9b3 --raw
+    # default count for tokens without an Nx prefix
+    vastai run benchmarks --template_hash 79ebdd2ebfb9d42cedf7a221c42d37a5 --gpus RTX_4090,RTX_3090 --num_gpus 2
+
+    # shorter timeout (30 min), skipping the cost prompt
+    vastai run benchmarks --template_hash 393fa8572e6c73c927c8275fe4dffd53 --timeout 1800 -y
+
+    # raw JSON output for piping into another tool
+    vastai run benchmarks --template_hash 40ef49becc953aa910ee05bd4653b9b3 --raw
 ```
 
 ## Global Options
