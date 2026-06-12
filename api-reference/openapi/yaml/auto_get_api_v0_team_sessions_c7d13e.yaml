@@ -1,0 +1,67 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/team/sessions/:
+    get:
+      summary: Get Team Sessions
+      tags:
+      - Team
+      description: Returns all active browser sessions for team members, including IP geolocation and role information.
+      security:
+      - BearerAuth: []
+      x-scope: team_write
+      x-rateLimit: 2
+      responses:
+        '200':
+          description: '{"success": true, "sessions_found": N, "sessions": [...]} or {"success": false, "msg": "No active
+            team sessions found."}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: True if sessions were found, false if none
+                  sessions_found:
+                    type: integer
+                    description: Count of active sessions returned (present when sessions exist)
+                  sessions:
+                    type: array
+                    description: List of active session objects with added username, role_name, and IP location fields
+                    items:
+                      type: object
+                  msg:
+                    type: string
+                    description: Present when no sessions are found
+              example:
+                success: true
+                sessions_found: 2
+                sessions:
+                - id: 501
+                  user_id: 101
+                  username: alice
+                  role_name: team_manager
+                  last_ipaddr: 1.2.3.4
+        '404':
+          description: '"Cannot Retrieve Team Sessions: User is not a team account" or "Team owner not found for team"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

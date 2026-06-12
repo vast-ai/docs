@@ -1,0 +1,188 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/deployments/:
+    put:
+      summary: Create or Update Deployment
+      tags:
+      - Serverless
+      description: Creates a new deployment or updates an existing one by name/tag, returning an S3 upload URL when a new
+        file version needs to be uploaded.
+      security:
+      - BearerAuth: []
+      x-scope: instance_write
+      x-rateLimit: 2.0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Deployment name (letters, numbers, hyphens, dots, underscores; must start with letter or number;
+                    max 128 chars).
+                  example: my-model
+                tag:
+                  type: string
+                  description: Deployment tag used to differentiate variants of the same named deployment; defaults to 'default'.
+                  example: v2
+                image:
+                  type: string
+                  description: Docker image to run on worker instances; required.
+                  example: pytorch/pytorch:2.0.0
+                search_params:
+                  type: string
+                  description: GPU offer filter expression for selecting worker machines.
+                  example: gpu_ram>=16 num_gpus=1
+                file_hash:
+                  type: string
+                  description: SHA-256 (or similar) hash of the deployment artifact to upload; required and used as a cache
+                    key.
+                  example: e3b0c44298fc1c149afb
+                file_size:
+                  type: integer
+                  description: Size in bytes of the deployment artifact; required when file_hash is provided.
+                  example: 1048576
+                env:
+                  type: string
+                  description: Environment variable string to inject into workers (e.g. '-e FOO=bar').
+                  example: -e MODEL=llama
+                storage:
+                  type: number
+                  description: Disk storage to allocate per worker in GB; must be positive; defaults to 50.
+                  example: 100
+                ttl:
+                  type: number
+                  description: Seconds after the last heartbeat before the deployment is automatically deleted; negative disables
+                    auto-expiry.
+                  example: 3600
+                version_label:
+                  type: string
+                  description: Human-readable label for this artifact version; defaults to first 6 chars of file_hash.
+                  example: release-1.0
+                docker_login_user:
+                  type: string
+                  description: Docker registry username for pulling private images.
+                docker_login_pass:
+                  type: string
+                  description: Docker registry password for pulling private images.
+                docker_login_repo:
+                  type: string
+                  description: Docker registry hostname/repo to authenticate against.
+                  example: docker.io
+                cold_workers:
+                  type: integer
+                  description: Fixed number of cold standby workers for the backing endpoint.
+                  example: 2
+                max_workers:
+                  type: integer
+                  description: Maximum number of workers for the backing endpoint.
+                  example: 10
+                min_load:
+                  type: number
+                  description: Minimum load threshold for the backing endpoint.
+                  example: 0
+                min_cold_load:
+                  type: number
+                  description: Minimum cold load threshold for the backing endpoint.
+                  example: 0
+                target_util:
+                  type: number
+                  description: Target utilization ratio (0-1) for the backing endpoint.
+                  example: 0.9
+                cold_mult:
+                  type: number
+                  description: Cold-standby multiplier for the backing endpoint.
+                  example: 3
+                max_queue_time:
+                  type: number
+                  description: Maximum acceptable queue time in seconds.
+                  example: 60
+                target_queue_time:
+                  type: number
+                  description: Target queue time in seconds.
+                  example: 10
+                inactivity_timeout:
+                  type: number
+                  description: Seconds of inactivity before the endpoint may be suspended.
+                  example: 300
+                overrecruit_ratio:
+                  type: number
+                  description: Ratio by which to over-recruit workers for traffic spike absorption.
+                  example: 1.2
+                autoscaler_instance:
+                  type: string
+                  description: Autoscaler deployment environment.
+                  example: prod
+      responses:
+        '200':
+          description: 'Returns {success: true, action: ''created''|''soft_update''|''autoscale_update''|''exists'', deployment_id,
+            endpoint_id, upload_url?, upload_fields?, evicted_versions?}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success.
+                  action:
+                    type: string
+                    description: 'One of: created, soft_update, autoscale_update, exists.'
+                  deployment_id:
+                    type: integer
+                    description: ID of the deployment.
+                  endpoint_id:
+                    type: integer
+                    description: ID of the associated endpoint.
+                  upload_url:
+                    type: string
+                    description: Presigned S3 URL to upload the deployment blob (present when a new version needs to be uploaded).
+                  upload_fields:
+                    type: object
+                    description: Additional fields required for the S3 multipart POST upload (present with upload_url).
+                  evicted_versions:
+                    type: array
+                    description: List of evicted version objects ({id, file_hash, version_label, file_size}) if LRU eviction
+                      occurred.
+                    items:
+                      type: object
+              example:
+                success: true
+                action: created
+                deployment_id: 5
+                endpoint_id: 10
+                upload_url: https://s3.amazonaws.com/bucket/...
+                upload_fields:
+                  key: 1/myapp/abc123
+                  AWSAccessKeyId: '...'
+        '400':
+          description: 'Invalid or missing required params: name, tag, image, file_hash, file_size, storage; or storage limit
+            exceeded'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Host-only accounts cannot create deployments or use serverless
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

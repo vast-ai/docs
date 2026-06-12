@@ -1,0 +1,88 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/asks/bulk/:
+    post:
+      summary: Create Instances Bulk
+      tags:
+      - Instances
+      description: Creates multiple instance contracts at once by accepting a list of offer (ask) IDs with shared configuration
+        parameters.
+      security:
+      - BearerAuth: []
+      x-scope: instance_write
+      x-rateLimit: 4.5
+      responses:
+        '200':
+          description: 'Returns {success: true, results: [...], created: [contract_ids], failed: [ask_ids], elapsed} when
+            at least one instance was created; each result item contains {ask_id, success, new_contract, state} or {ask_id,
+            success, error, msg} for failures.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: True if at least one contract was created
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ask_id:
+                          type: integer
+                          description: The offer ID that was processed
+                        success:
+                          type: boolean
+                          description: True if this offer was accepted
+                        new_contract:
+                          type: integer
+                          description: New instance contract ID (on success)
+                        state:
+                          type: string
+                          description: Container state after creation (on success)
+                        error:
+                          type: string
+                          description: Error code (on failure)
+                        msg:
+                          type: string
+                          description: Error message (on failure)
+                    description: Per-offer results
+                  created:
+                    type: array
+                    items:
+                      type: integer
+                    description: List of successfully created contract IDs
+                  failed:
+                    type: array
+                    items:
+                      type: integer
+                    description: List of offer IDs that failed
+                  elapsed:
+                    type: number
+                    description: Total elapsed time in seconds
+        '400':
+          description: 'Returns {success: false, error: "invalid_args", msg: "error missings offer ''ids'' parameter"} when
+            ids is absent, {msg: "no ask ids provided"} when list is empty, or {msg: "too many ask ids provided; max is 64"}
+            when over the limit; also returned (as HTTPBadRequest) when all instances fail.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

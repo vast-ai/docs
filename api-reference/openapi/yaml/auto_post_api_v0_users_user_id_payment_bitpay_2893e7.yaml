@@ -1,0 +1,69 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/users/{user_id}/payment-bitpay/:
+    post:
+      summary: Add Credits via BitPay
+      tags:
+      - Accounts
+      description: Creates a BitPay invoice for the specified USD amount and records a pending invoice until payment is confirmed.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 3
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: The user to credit; use "current" or a numeric user ID
+      responses:
+        '200':
+          description: Returns the BitPay invoice object; frontend should redirect the user to the invoice URL to complete
+            payment
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    description: BitPay invoice ID (transfer group reference)
+                  url:
+                    type: string
+                    description: URL to redirect the user to complete BitPay payment
+                  status:
+                    type: string
+                    description: Invoice status (e.g. new)
+                  price:
+                    type: number
+                    description: Invoice price in the specified currency
+                  currency:
+                    type: string
+                    description: Invoice currency code
+                  itemDesc:
+                    type: string
+                    description: Item description on the invoice
+        '400':
+          description: 'Invalid amount: {"error": "invalid_params", "msg": "amount must be at least $5.00 USD"}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

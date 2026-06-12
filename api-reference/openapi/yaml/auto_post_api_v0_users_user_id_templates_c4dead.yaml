@@ -1,0 +1,78 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/users/{user_id}/templates/:
+    post:
+      summary: Save Templates
+      tags:
+      - Accounts
+      description: Saves one or more templates to the authenticated user's library, creating new template records or linking
+        existing ones as appropriate.
+      security:
+      - BearerAuth: []
+      x-scope: instance_write
+      x-rateLimit: 1.9
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ID of the user saving templates (URL path parameter)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                templates:
+                  type: array
+                  description: Array of template objects to save; each may include an id if updating an existing template
+                    (required)
+                referral_template_id:
+                  type: integer
+                  description: ID of a referral template to ensure remains visible at the top of the user's template list
+                  example: 999
+                is_an_edit:
+                  type: boolean
+                  description: When true, marks previous template versions as deleted in the user's library after saving new
+                    versions
+      responses:
+        '200':
+          description: 'Returns {success: true, templates: [...]} with the user''s created templates'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true
+                  templates:
+                    type: array
+                    items:
+                      type: object
+                    description: Updated list of templates created by and associated with the user
+        '400':
+          description: 'Missing templates list: {success: false, error: "invalid_args", msg: "templates cannot be null"};
+            or docker credentials missing access token: "templates with docker username must have an access token"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

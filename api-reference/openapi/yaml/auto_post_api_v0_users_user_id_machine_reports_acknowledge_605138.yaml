@@ -1,0 +1,89 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/users/{user_id}/machine-reports/acknowledge:
+    post:
+      summary: Acknowledge Machine Reports
+      tags:
+      - Accounts
+      description: Marks one or more machine reports as acknowledged for the authenticated host user, identified by a list
+        of report IDs.
+      security:
+      - BearerAuth: []
+      x-scope: machine_write
+      x-rateLimit: 2.0
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ID of the machine owner acknowledging the reports.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                report_ids:
+                  type: string
+                  description: Comma-separated string of report IDs to acknowledge, or an array of integer IDs.
+                  example: 1,2,3
+      responses:
+        '200':
+          description: 'Returns {"success": true, "acknowledged_at": <timestamp>, "acknowledged_report_ids_requested": [...],
+            "acknowledged_report_count": <int>}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success
+                  acknowledged_at:
+                    type: number
+                    description: Unix timestamp at which the acknowledgement was recorded
+                  acknowledged_report_ids_requested:
+                    type: array
+                    items:
+                      type: integer
+                    description: List of report IDs that were requested to be acknowledged
+                  acknowledged_report_count:
+                    type: integer
+                    description: Number of reports that were actually updated
+                required:
+                - success
+                - acknowledged_at
+                - acknowledged_report_ids_requested
+                - acknowledged_report_count
+              example:
+                success: true
+                acknowledged_at: 1717632100
+                acknowledged_report_ids_requested:
+                - 42
+                - 43
+                acknowledged_report_count: 2
+        '400':
+          description: 'Missing or invalid report_ids parameter: "No report IDs provided", "Invalid report IDs provided",
+            or "Invalid report IDs provided" (empty list after deduplication)'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

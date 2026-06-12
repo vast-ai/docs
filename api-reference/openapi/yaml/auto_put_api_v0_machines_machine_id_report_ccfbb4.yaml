@@ -1,0 +1,94 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/machines/{machine_id}/report:
+    put:
+      summary: Report Machine Problem
+      tags:
+      - Machines
+      description: Submits a problem report for a machine on which the authenticated user has an active instance, and notifies
+        the machine owner.
+      security:
+      - BearerAuth: []
+      x-scope: instance_write
+      x-rateLimit:
+        threshold: 1.2
+        redis_rate_limit_enabled: true
+      parameters:
+      - name: machine_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Numeric ID of the machine being reported; must match the URL path segment.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                instance_id:
+                  type: integer
+                  description: ID of the caller's active instance on this machine, used to verify the caller is a current
+                    tenant.
+                  example: 67890
+                problem:
+                  type: string
+                  description: Category of problem being reported.
+                  enum:
+                  - Unable To Start Instance
+                  - Instance Takes Too Long To Load
+                  - Instance Has Less Disk Space Than Requested
+                  - Machine Has Port Issues
+                  - Machine Performance Is Less Than Expected
+                  - Other
+                message:
+                  type: string
+                  description: Optional free-text description of the issue, truncated to 512 characters.
+                  example: GPU utilization never exceeded 20% despite benchmark workload.
+      responses:
+        '200':
+          description: 'Report submitted successfully; returns {"success": true}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success
+                required:
+                - success
+              example:
+                success: true
+        '400':
+          description: 'Missing or invalid parameters: machine_id/instance_id not valid integers ("machine_id and instance_id
+            must both be valid integers"), invalid problem category ("Problem must be one of: ..."), or report insertion failed
+            ({"success": false})'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: User does not have an active instance on the specified machine ("You can only report machines on which
+            you have an active instance")
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

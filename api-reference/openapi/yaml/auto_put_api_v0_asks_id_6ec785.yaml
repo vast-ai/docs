@@ -1,0 +1,225 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/asks/{id}/:
+    put:
+      summary: Create Instance from Offer
+      tags:
+      - Instances
+      description: Creates a new instance by accepting a host's offer (ask) identified by the given ID.
+      security:
+      - BearerAuth: []
+      x-scope: instance_write
+      x-rateLimit: 4.5
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ID of the offer to accept (ask_id)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  default: vastai/base-image:@vastai-automatic-tag
+                  description: 'Docker image to use for the instance.
+
+                    '
+                template_hash_id:
+                  type: string
+                  description: 'Content-based hash ID of a template to use as base configuration. Template values are merged
+                    with or overridden by request parameters (see precedence rules in endpoint description). When using a
+                    template, the `image` field is optional as the template provides it.
+
+
+                    Example: `4e17788f74f075dd9aab7d0d4427968f`
+
+                    '
+                label:
+                  type: string
+                  description: Custom name for the instance
+                disk:
+                  type: number
+                  format: float
+                  description: 'Size of local disk partition (in GB)
+
+                    '
+                runtype:
+                  type: string
+                  description: 'Launch mode for the instance. If omitted, defaults to ''ssh'' unless `args/args_str` is provided.
+
+                    '
+                  enum:
+                  - ssh
+                  - jupyter
+                  - args
+                  - ssh_proxy
+                  - ssh_direct
+                  - jupyter_proxy
+                  - jupyter_direct
+                target_state:
+                  type: string
+                  description: 'Desired initial state of the instance
+
+                    '
+                  enum:
+                  - running
+                  - stopped
+                price:
+                  type: number
+                  description: Bid price per machine (in $/hour). Only for interruptible instances
+                  minimum: 0.001
+                  maximum: 128.0
+                env:
+                  type: string
+                  description: 'Environment variables and port mappings in Docker flag format. When using a template, request
+                    `env` is merged with template `env` - existing keys are retained, new keys are appended, conflicting keys
+                    use the request value.
+
+
+                    Example: `"-e HF_TOKEN=hf_xxx123456789 -e MODEL_ID=TheBloke/Llama-2-7B-Chat-GPTQ -p 8000:8000"`
+
+                    '
+                cancel_unavail:
+                  type: boolean
+                  description: Whether to cancel if instance cannot start immediately. Defaults to false for interruptibles.
+                    Defaults to true for on-demand with target_state='running'
+                vm:
+                  type: boolean
+                  description: Whether this is a VM instance
+                onstart:
+                  type: string
+                  description: "Commands to run when instance starts\n\nExample : `env | grep _ >> /etc/environment; echo\
+                    \ 'starting up'` \n"
+                args:
+                  type: array
+                  items:
+                    type: string
+                  description: 'Arguments array to passed to the image entrypoint
+
+
+                    Example : `["bash", "-c", "env | grep _ >> /etc/environment; echo ''starting up''"]`
+
+                    '
+                args_str:
+                  type: string
+                  description: 'Arguments string to pass to the entrypoint (alternative to args)
+
+
+                    Example : `args_str: bash -c "env | grep _ >> /etc/environment; echo ''starting up''"`
+
+                    '
+                use_jupyter_lab:
+                  type: boolean
+                  description: Launch instance with jupyter lab instead of notebook
+                jupyter_dir:
+                  type: string
+                  description: 'Directory to launch Jupyter from
+
+
+                    Example : `/home/notebooks`
+
+                    '
+                python_utf8:
+                  type: boolean
+                  description: Set python's locale to C.UTF-8
+                lang_utf8:
+                  type: boolean
+                  description: Set locale to C.UTF-8
+                force:
+                  type: boolean
+                  description: Skip sanity checks when creating from an existing instance
+                user:
+                  type: string
+                  description: User to use with docker create (breaks some images, use with caution)
+                image_login:
+                  type: string
+                  description: Docker registry credentials if needed
+                volume_info:
+                  type: object
+                  description: Volume creation/linking information
+                  properties:
+                    create_new:
+                      type: boolean
+                      description: Set to `true` to create a new volume, `false` to link an existing volume
+                    volume_id:
+                      type: integer
+                      description: 'If `create_new` is false: existing volume ID (from `show volumes`). If `create_new` is
+                        true: volume offer ID (from `search volumes`)
+
+                        '
+                    size:
+                      type: integer
+                      description: Size of the volume in GB. Only used when `create_new` is true
+                    mount_path:
+                      type: string
+                      description: Mount path for the volume inside the container (e.g., `/workspace`)
+              required:
+              - image
+            example:
+              image: vastai/base-image:@vastai-automatic-tag
+      responses:
+        '200':
+          description: 'Returns {success: <bool>, new_contract: <contract_id>, instance_api_key: <key>}; success is true if
+            the container started running, false if it started in stopped state.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: True when the container reached running state
+                  new_contract:
+                    type: integer
+                    description: New instance contract ID
+                  instance_api_key:
+                    type: string
+                    description: API key scoped to this instance
+              example:
+                success: true
+                new_contract: 5678
+                instance_api_key: abc123xyz
+        '400':
+          description: 'Returns {success: false, error: "invalid_args"} for missing/invalid id, bad params, runtype+use_ssh
+            conflict, blacklisted host, or billing issues; includes specific messages like "''id'' is required and must be
+            a valid offer ID", "runtype and use_ssh cannot both be set", "no_ssh_key_for_vm".'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 'Returns {success: false, error: "no_such_ask", msg: "No ask by id {id} is available."} when the offer
+            is not found.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '410':
+          description: 'Returns {success: false, error: "no_such_ask", msg: "Instance type {id} is no longer available."}
+            when the offer existed but resources are unavailable and cancel_unavail is set.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

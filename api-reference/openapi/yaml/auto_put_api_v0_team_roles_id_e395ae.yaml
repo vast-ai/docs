@@ -1,0 +1,85 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/team/roles/{id}/:
+    put:
+      summary: Update Team Role
+      tags:
+      - Team
+      description: Updates the name and permissions of an existing team role.
+      security:
+      - BearerAuth: []
+      x-scope: team_write
+      x-rateLimit: 2
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ID of the role to update.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: New name for the role.
+                permissions:
+                  type: object
+                  description: JSON encoded permissions for the role.
+      responses:
+        '200':
+          description: '{"success": true, "msg": "Successfully Updated Team Role For <name>"} or no-op message if permissions
+            unchanged'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success
+                  msg:
+                    type: string
+                    description: Human-readable confirmation message
+              example:
+                success: true
+                msg: Successfully Updated Team Role For developer
+        '400':
+          description: Role id must be an integer; missing required params; role name must be 2-50 characters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Only team accounts can update roles; cannot modify current key's permissions; duplicate role name;
+            cannot update team owner role; caller lacks sufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: '"Role with id <id> not found."'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

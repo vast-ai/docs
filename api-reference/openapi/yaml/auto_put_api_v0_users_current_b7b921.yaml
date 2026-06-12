@@ -1,0 +1,87 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/users/current/:
+    put:
+      summary: Log In User
+      tags:
+      - Accounts
+      description: Authenticate with username and password (and captcha) to create a session; returns user object or 2FA challenge.
+      security:
+      - BearerAuth: []
+      x-scope: user_read
+      x-rateLimit:
+        profile: auth_burst
+        threshold: 3.1
+      responses:
+        '200':
+          description: 'Authenticated user object with API key and sid, or {"msg": "2fa_required", "secret": ..., "methods":
+            ..., "num_backup_codes": ...}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    description: User ID
+                  username:
+                    type: string
+                    description: Username
+                  email:
+                    type: string
+                    description: Email address
+                  balance:
+                    type: number
+                    description: Account credit balance (USD)
+                  api_key:
+                    type: string
+                    description: API key
+                  key_id:
+                    type: integer
+                    description: Active API key ID
+                  sid:
+                    type: string
+                    description: Server identifier
+                  msg:
+                    type: string
+                    description: Set to "2fa_required" when 2FA is needed
+                  secret:
+                    type: string
+                    description: 2FA challenge secret (present when 2FA required)
+                  methods:
+                    type: array
+                    description: Available 2FA methods (present when 2FA required)
+                    items:
+                      type: object
+                  num_backup_codes:
+                    type: integer
+                    description: Number of active backup codes (present when 2FA required)
+        '400':
+          description: 'Missing credentials: "Please provide username and password, and captcha token"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 'Invalid credentials: "Invalid username or password"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

@@ -1,0 +1,108 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/tfa/test-submit/:
+    post:
+      summary: Confirm New 2FA Method (Test)
+      tags:
+      - Accounts
+      description: Confirms a new SMS or TOTP 2FA method by verifying a code; deprecated path, equivalent to POST /api/v0/tfa/confirm-new/.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 1.1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  description: Verification code from the new 2FA method being confirmed
+                  example: '123456'
+                secret:
+                  type: string
+                  description: The tfa_secret returned when the code was sent (SMS) or the TOTP secret from the setup step
+                  example: abc123secret
+                tfa_method:
+                  type: string
+                  description: Type of two-factor authentication method being confirmed; defaults to 'sms' when a phone number
+                    is provided.
+                  example: totp
+                  enum:
+                  - sms
+                  - totp
+                phone_number:
+                  type: string
+                  description: Phone number for SMS methods; falls back to account's registered number
+                  example: '+14155550123'
+                label:
+                  type: string
+                  description: Optional display name for this method
+                  example: Personal Phone
+      responses:
+        '200':
+          description: 'Returns {success: true, msg: "{METHOD} 2FA method added successfully."} and includes backup_codes:
+            [...] if this is the user''s first 2FA method.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success
+                  msg:
+                    type: string
+                    description: Confirmation message
+                  backup_codes:
+                    type: array
+                    description: Plaintext backup codes (returned only when this is the user's first ever 2FA method); store
+                      securely — shown only once
+                    items:
+                      type: string
+              example:
+                success: true
+                msg: SMS 2FA method added successfully.
+        '400':
+          description: Missing code or secret ("missing_auth_value"), invalid tfa_method ("invalid_tfa_method"), untracked
+            legacy 2FA found ("untracked_2fa_found"), duplicate method ("duplicate_tfa_method"), or invalid 2FA code ("2fa_verification_failed").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: User is not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Authorization not completed ("authorization_required") or team user in team context ("team_user_forbidden").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Authorization service temporarily unavailable ("service_unavailable").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

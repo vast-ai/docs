@@ -1,0 +1,89 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/users/cloud/:
+    post:
+      summary: Authorize Cloud Service
+      tags:
+      - Accounts
+      description: Links a cloud storage provider (Google Drive, S3, Backblaze B2, or Dropbox) to the authenticated user's
+        account using OAuth or credentials.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 2.9
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  description: OAuth authorization code (required for Google Drive and Dropbox providers).
+                provider:
+                  type: string
+                  description: Cloud storage provider to connect.
+                  example: s3
+                  enum:
+                  - drive
+                  - s3
+                  - b2
+                  - dropbox
+                user_given_name:
+                  type: string
+                  description: User-supplied name for this connection (required for all providers except Dropbox, which uses
+                    the name from the OAuth flow).
+                secret_access_key:
+                  type: string
+                  description: AWS Secret Access Key (required for S3 provider).
+                access_key:
+                  type: string
+                  description: AWS Access Key ID (required for S3 provider).
+                application_key:
+                  type: string
+                  description: Backblaze Application Key secret (required for B2 provider).
+                key_id:
+                  type: string
+                  description: Backblaze Application Key ID (required for B2 provider).
+                state:
+                  type: string
+                  description: OAuth state parameter returned from Dropbox redirect (required for Dropbox provider).
+      responses:
+        '200':
+          description: 'Success (Dropbox): {"success": true, "msg": "Dropbox Authenticated"}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true
+                  msg:
+                    type: string
+                    description: Confirmation message (e.g. "Dropbox Authenticated")
+        '400':
+          description: 'Bad request: "Missing input: provider", "Missing input: user_given_name", "Source and Destination
+            Cannot Contain Whitespaces or Unauthorized characters", "Invalid provider", "Missing state parameter", "Invalid
+            or expired OAuth state", or "OAuth state does not match current user"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

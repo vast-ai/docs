@@ -1,0 +1,64 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/stripe/payment-intent:
+    post:
+      summary: Create Stripe Payment Intent
+      tags:
+      - Billing
+      description: Creates a Stripe PaymentIntent to charge the specified amount to a saved payment method and returns a client
+        secret for frontend confirmation.
+      security:
+      - BearerAuth: []
+      x-scope: billing_write
+      x-rateLimit: 2
+      responses:
+        '200':
+          description: 'Returns {"status": "<intent_status>", "client_secret": "<secret>"} on success'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Stripe PaymentIntent status (e.g. requires_action, succeeded)
+                  client_secret:
+                    type: string
+                    description: Client secret for confirming the payment intent on the frontend
+                required:
+                - status
+                - client_secret
+              example:
+                status: requires_action
+                client_secret: pi_abc123_secret_xyz
+        '400':
+          description: 'Card declined or payment failed; returns {"status": "error", "error_code": ..., "decline_code": ...,
+            "advice_code": ..., "msg": "..."} or {"status": "error", "msg": "Could not process payment.", "details": "..."}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 'Email not verified; returns {"success": false, "msg": "Authorization Error. Please verify your account
+            to be able to add credits."}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

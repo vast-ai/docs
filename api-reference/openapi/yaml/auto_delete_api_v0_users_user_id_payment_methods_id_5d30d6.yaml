@@ -1,0 +1,88 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/users/{user_id}/payment-methods/{id}/:
+    delete:
+      summary: Delete Payment Method
+      tags:
+      - Accounts
+      description: Deletes the specified payment method and reassigns the user's primary billing card to another active method
+        if available.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 1.5
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: The user whose payment method is being removed; use "current" or a numeric user ID
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ID of the payment method record to remove
+      responses:
+        '200':
+          description: Returns updated list of remaining active payment methods
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      description: Payment method ID
+                    added:
+                      type: number
+                      description: Unix timestamp when added
+                    type:
+                      type: string
+                      description: Payment type
+                    last4:
+                      type: string
+                      description: Last 4 digits
+                    brand:
+                      type: string
+                      description: Card brand
+                    verified:
+                      type: boolean
+                      description: Whether card is verified
+                    is_primary:
+                      type: boolean
+                      description: Whether this is the primary method
+        '400':
+          description: 'Outstanding balance owed: {"error": "money_owed", "msg": "Cannot remove payment methods while money
+            is owed."}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 'Payment method not found: {"error": "no_such_payment_method", "msg": "Payment method id <id> does
+            not exist"}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

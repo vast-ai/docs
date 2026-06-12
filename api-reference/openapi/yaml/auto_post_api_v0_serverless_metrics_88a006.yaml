@@ -1,0 +1,98 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/serverless/metrics/:
+    post:
+      summary: Get Serverless Resource Metrics
+      tags:
+      - Serverless
+      description: Retrieves time-series metrics from Prometheus for a specified serverless endpoint group or worker group
+        over a given time range.
+      security: []
+      x-rateLimit: 2
+      responses:
+        '200':
+          description: 'Returns {success: true, results: {<metric_name>: [{timestamp, value}]}} with an optional partial_data_retrieved
+            flag when only partial data was available.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success
+                  results:
+                    type: object
+                    description: Map of metric name (or 'metric_name:label' for summaries/counters) to an array of {timestamp,
+                      value} data points
+                    additionalProperties:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          timestamp:
+                            type: number
+                            description: Unix epoch timestamp
+                          value:
+                            type: string
+                            description: Metric value as a string
+                  partial_data_retrieved:
+                    type: boolean
+                    description: Present and true when only partial data was returned due to range or availability constraints
+                required:
+                - success
+                - results
+              example:
+                success: true
+                results:
+                  active_workers:
+                  - timestamp: 1700000000
+                    value: '3'
+                  - timestamp: 1700000060
+                    value: '4'
+                  request_execution_time_seconds:p50: []
+                  request_outcomes_total:completed: []
+        '400':
+          description: 'Invalid request parameters; messages include "Invalid input, following keys are not defined: ...",
+            "Invalid resource type: ...", "start_date, end_date, and step must be numeric.", "step must be positive.", or
+            "start_date must be before end_date."'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required or user is blacklisted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Resource not found ("Resource not found.") or no metrics data available for the interval ("No metrics
+            data available for this interval.").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: 'Metrics backend unavailable: "Unable to parse metrics response."'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

@@ -1,0 +1,75 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/instances/{id}/ssh/:
+    post:
+      summary: Add SSH Key to Instance
+      tags:
+      - Instances
+      description: Adds a new SSH public key to the specified instance, creating the key record if it does not already exist.
+      security:
+      - BearerAuth: []
+      x-scope: instance_write
+      x-rateLimit: 2
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ID of the instance to attach the SSH key to
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                instance_id:
+                  type: integer
+                  description: ID of the instance to attach the SSH key to; takes precedence over the id in the URL path.
+                  example: 12345
+                ssh_key:
+                  type: string
+                  description: The SSH key to attach to the instance
+                  example: ssh-rsa AAAAB3NzaC1yc2EAAA...
+      responses:
+        '200':
+          description: 'Returns {success: true, msg: "SSH key added to instance.", key} on success, or {success: false, msg:
+            "SSH key already associated with instance."} if already present.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: True when key was added
+                  msg:
+                    type: string
+                    description: Human-readable message
+                  key:
+                    type: string
+                    description: JSON-encoded SSH key object (on success)
+        '400':
+          description: 'Returns {success: false, error: "no_ssh_key", msg: "No ssh key provided to add to instance."} when
+            ssh_key param is missing.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

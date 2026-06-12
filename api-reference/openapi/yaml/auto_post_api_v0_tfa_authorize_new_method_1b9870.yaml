@@ -1,0 +1,101 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/tfa/authorize-new-method/:
+    post:
+      summary: Authorize New 2FA Method
+      tags:
+      - Accounts
+      description: Initiates authorization to add a new 2FA method by verifying identity with an existing method or backup
+        code, returning a value used in the verification step.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 2.0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tfa_method:
+                  type: string
+                  description: Existing method type to use for authorization; automatically 'email' when the account has no
+                    active methods
+                  example: email
+                  enum:
+                  - sms
+                  - totp
+                  - email
+                tfa_method_id:
+                  type: integer
+                  description: ID of an existing method to verify with; required for sms/totp when the user has multiple methods
+                    of the same type
+                  example: 3
+                backup_code:
+                  type: string
+                  description: Backup code that skips the send/verify round-trip and grants authorization directly
+                  example: ABCD-EFGH-1234
+      responses:
+        '200':
+          description: 'Returns {success: true, secret} (secret needed for PUT verify step), or {success: true, msg: "Authorization
+            successful."} when a backup code is used.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true
+                  secret:
+                    type: string
+                    description: TFA secret required for the PUT verification step (present when using a send/verify flow)
+                  msg:
+                    type: string
+                    description: '"Authorization successful." (present when backup_code is used and authorization is granted
+                      immediately)'
+              example:
+                success: true
+                secret: abc123randomtoken
+        '400':
+          description: Email not verified ("email_not_verified"), invalid tfa_method ("invalid_tfa_method"), or Twilio error
+            ("twilio_error").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Not authenticated or invalid backup code ("invalid_backup_code").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Team user in team context ("team_user_forbidden").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Authorization service temporarily unavailable ("service_unavailable").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

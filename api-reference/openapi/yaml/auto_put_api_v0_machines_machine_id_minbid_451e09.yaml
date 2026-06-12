@@ -1,0 +1,78 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/machines/{machine_id}/minbid:
+    put:
+      summary: Set Machine Minimum Bid Price
+      tags:
+      - Machines
+      description: Updates the minimum interruptible bid price for a machine owned by the authenticated host.
+      security:
+      - BearerAuth: []
+      x-scope: machine_write
+      x-rateLimit: 1.5
+      parameters:
+      - name: machine_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ID of the machine whose minimum bid price should be updated.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                price:
+                  type: number
+                  description: Minimum bid price for the machine.
+                  example: 0.5
+      responses:
+        '200':
+          description: 'Returns {success: true, you_sent} on success'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Whether the price was updated
+                  you_sent:
+                    type: object
+                    description: Echo of the request body
+              example:
+                success: true
+                you_sent:
+                  price: 0.15
+        '422':
+          description: 'Machine not found: "No such machine id"; missing price argument: "Missing argument: min_bid."; non-numeric
+            price: "min_bid must be a number."; price <= 0: "min_bid must be greater than 0."; price exceeds max: "min_bid
+            must be <= {max} (2 * 0.1 * gpu_tflops)."'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: '"error: only the owner can set a min bid price for a machine."'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
