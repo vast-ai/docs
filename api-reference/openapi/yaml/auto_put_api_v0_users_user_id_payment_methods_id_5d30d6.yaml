@@ -1,0 +1,87 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/users/{user_id}/payment-methods/{id}/:
+    put:
+      summary: Update Payment Method
+      tags:
+      - Accounts
+      description: Sets the specified payment method as the user's primary auto-billing card, provided it has been verified
+        with a prior successful payment.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 1.5
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: The user whose payment method is being updated; use "current" or a numeric user ID
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ID of the payment method record to set as primary
+      responses:
+        '200':
+          description: Returns updated list of active payment methods with the new primary highlighted
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      description: Payment method ID
+                    added:
+                      type: number
+                      description: Unix timestamp when added
+                    type:
+                      type: string
+                      description: Payment type (e.g. card, ideal)
+                    last4:
+                      type: string
+                      description: Last 4 digits
+                    brand:
+                      type: string
+                      description: Card brand
+                    verified:
+                      type: boolean
+                      description: Whether card is verified
+                    is_primary:
+                      type: boolean
+                      description: Whether this is the new primary method
+        '400':
+          description: 'Invalid request: {"error": "bad_request", "msg": "Can only set primary to true right now"}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 'Payment method not found: {"error": "no_such_payment_method", "msg": "Payment method id <id> does
+            not exist"}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

@@ -1,0 +1,74 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/auth/sessions/:
+    delete:
+      summary: Delete Sessions
+      tags:
+      - Accounts
+      description: Deletes one or all active sessions for the authenticated user by session ID, or all sessions at once.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                all:
+                  type: boolean
+                  description: Set to true to delete all active sessions at once
+                  example: true
+                key_id:
+                  type: integer
+                  description: ID of a specific session key to delete; required if all is not set
+                  example: 55
+      responses:
+        '200':
+          description: Returns {success, msg} where msg is "All active sessions deleted.", "No active sessions found.", "Session
+            {id} deleted.", or "Session {id} not found."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Whether deletion succeeded
+                  msg:
+                    type: string
+                    description: Confirmation or not-found message
+              example:
+                success: true
+                msg: All active sessions deleted.
+        '400':
+          description: No session key id provided ("No session key id provided.").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Not logged in ("You must be logged in to delete sessions.") or attempting to delete another user's
+            sessions ("You do not have permission to delete someone else's sessions.").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

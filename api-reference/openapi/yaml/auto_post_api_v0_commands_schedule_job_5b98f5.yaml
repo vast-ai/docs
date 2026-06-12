@@ -1,0 +1,70 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/commands/schedule_job/:
+    post:
+      summary: Create Scheduled Job
+      tags:
+      - Instances
+      description: Creates a new scheduled job that periodically calls a specified API endpoint on behalf of the authenticated
+        user.
+      security:
+      - BearerAuth: []
+      x-scope: instance_write
+      x-rateLimit: 3.5
+      responses:
+        '200':
+          description: 'Scheduled job created successfully; returns {success: true, scheduled_job_id: <id>, msg: <message>}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success
+                  scheduled_job_id:
+                    type: integer
+                    description: ID of the newly created scheduled job
+                  msg:
+                    type: string
+                    description: Human-readable confirmation message
+              example:
+                success: true
+                scheduled_job_id: 42
+                msg: Successfully inserted new scheduled job with ID 42 for user_id 1234 and instance_id 5678
+        '400':
+          description: Scheduled job limit exceeded or invalid/missing parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: 'A matching scheduled job already exists for this user, instance, endpoint, and method; returns {error:
+            "job_exists"}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 'Failed to create the scheduled job; returns {error: "insert_failed"}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

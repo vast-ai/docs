@@ -1,0 +1,57 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/commands/rclone/{token}/:
+    post:
+      summary: Get Rclone Auth Config
+      tags:
+      - Instances
+      description: Generates and returns an rclone configuration file for the given copy token, used to authenticate cloud
+        storage during a copy.
+      security:
+      - BearerAuth: []
+      x-scope: instance_write
+      x-rateLimit: 2
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Token identifying the pending rclone request, embedded in the URL path.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_given_name:
+                  type: string
+                  description: Name of the rclone remote (config section) to create or update in the returned rclone.conf
+                    file.
+                  example: my-gdrive
+      responses:
+        '200':
+          description: 'Returns {success: false, msg: "Invalid JSON payload"} when the request body is not valid JSON.'
+        '404':
+          description: 'Returns {error: "File not found"} when the config cannot be generated for the token.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

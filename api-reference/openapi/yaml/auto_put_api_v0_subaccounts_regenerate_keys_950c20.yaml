@@ -1,0 +1,95 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/subaccounts/regenerate_keys/:
+    put:
+      summary: Regenerate Subaccount Keys
+      tags:
+      - Accounts
+      description: Regenerate API keys for one specific subaccount or all subaccounts owned by the authenticated user.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 2.0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                subaccount_user_id:
+                  type: integer
+                  description: ID of the specific subaccount whose key should be regenerated; mutually exclusive with regenerate_all
+                  example: 56789
+                regenerate_all:
+                  type: boolean
+                  description: If true, regenerate keys for all subaccounts by rotating the owner seed; mutually exclusive
+                    with subaccount_user_id
+      responses:
+        '200':
+          description: 'Keys regenerated: {"success": true, "regenerated_keys": [{"user_id": ..., "email": ..., "derived_key":
+            ...}]}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success
+                  regenerated_keys:
+                    type: array
+                    description: One entry per regenerated subaccount
+                    items:
+                      type: object
+                      properties:
+                        user_id:
+                          type: integer
+                          description: Subaccount user ID
+                        email:
+                          type: string
+                          description: Subaccount email
+                        derived_key:
+                          type: string
+                          description: New derived API key value
+              example:
+                success: true
+                regenerated_keys:
+                - user_id: 456
+                  email: sub@example.com
+                  derived_key: abc123...
+        '400':
+          description: 'Invalid params: "Must specify subaccount_user_id or regenerate_all" or "subaccount_user_id must be
+            a valid integer"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: 'Account not subaccount-approved: "Only subaccount approved accounts may use this API"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 'Subaccount not found: "Subaccount not found" or "Active subaccount key not found to regenerate"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

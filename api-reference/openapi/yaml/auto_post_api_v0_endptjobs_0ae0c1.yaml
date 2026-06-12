@@ -1,0 +1,119 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/endptjobs/:
+    post:
+      summary: Create Endpoint
+      tags:
+      - Serverless
+      description: Creates a new serverless endpoint (endptjob) for the authenticated user with the specified autoscaling
+        configuration.
+      security: []
+      x-rateLimit: 4
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                min_load:
+                  type: number
+                  description: Minimum load for the endpoint.
+                  example: 50.0
+                min_cold_load:
+                  type: number
+                  description: Minimum cold load threshold below which cold workers are maintained.
+                  example: 0
+                target_util:
+                  type: number
+                  description: Target utilization for the endpoint.
+                  example: 0.75
+                cold_mult:
+                  type: number
+                  description: Multiplier for cold start.
+                  example: 2.0
+                cold_workers:
+                  type: integer
+                  description: Number of cold workers.
+                  example: 5
+                max_workers:
+                  type: integer
+                  description: Maximum number of workers.
+                  example: 20
+                max_queue_time:
+                  type: number
+                  description: Maximum acceptable queue time in seconds before scaling up.
+                  example: 60
+                target_queue_time:
+                  type: number
+                  description: Desired queue time in seconds that the autoscaler targets; must be <= max_queue_time.
+                  example: 10
+                autoscaler_instance:
+                  type: string
+                  description: Autoscaler deployment environment to attach this endpoint to.
+                  example: prod
+                endpoint_state:
+                  type: string
+                  description: Initial activation state of the endpoint.
+                  example: active
+                  enum:
+                  - active
+                  - suspended
+                  - stopped
+                endpoint_name:
+                  type: string
+                  description: Name of the endpoint.
+                  example: my_endpoint
+                inactivity_timeout:
+                  type: number
+                  description: Seconds of inactivity after which the autoscaler may suspend the endpoint.
+                  example: 300
+                overrecruit_ratio:
+                  type: number
+                  description: Ratio by which to over-recruit workers to absorb traffic spikes.
+                  example: 1.2
+      responses:
+        '200':
+          description: 'Returns {success: true, result: <new_endpoint_id>}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success.
+                  result:
+                    type: integer
+                    description: ID of the newly created endpoint.
+              example:
+                success: true
+                result: 15
+        '400':
+          description: Duplicate endpoint name already exists for this account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Host-only accounts cannot create endpoints or use serverless
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

@@ -1,0 +1,59 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/commands/get_copy_size/:
+    post:
+      summary: Get Copy Size
+      tags:
+      - Instances
+      description: Enqueues a task to measure the size of a copy source path or VM image and returns a result URL to poll.
+      security:
+      - BearerAuth: []
+      x-scope: instance_write
+      x-rateLimit: 3.5
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                src_id:
+                  type: string
+                  description: Source instance ID whose data size to compute.
+                  example: '12345'
+                src_path:
+                  type: string
+                  description: Path within a container instance to measure; required for containers, not applicable for VMs.
+                  example: /workspace/data
+      responses:
+        '200':
+          description: 'Returns {success: false, error: "invalid_args", msg: "Invalid src_id."}, "src_path not supported VMs.",
+            "src_path must be provided for containers", or "Invalid src_path." on validation failures.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: True when task was queued
+                  result_url:
+                    type: string
+                    description: URL to poll for the size result
+                  msg:
+                    type: string
+                    description: Human-readable status message
+                  error:
+                    type: string
+                    description: Error code if success is false
+              example:
+                success: true
+                result_url: https://...
+                msg: Command is executing, wait a few seconds and then view the result_url

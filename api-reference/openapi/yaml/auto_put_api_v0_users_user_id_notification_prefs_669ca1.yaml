@@ -1,0 +1,78 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/users/{user_id}/notification-prefs/:
+    put:
+      summary: Update Notification Preferences
+      tags:
+      - Accounts
+      description: Replaces the authenticated user's notification preferences with the provided JSON object containing host
+        and/or client preference keys.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 2
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Numeric ID of the user whose notification preferences are being updated.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notification_preferences:
+                  type: object
+                  description: JSON object with 'host' and/or 'client' top-level keys; each maps notification slugs to per-channel
+                    boolean flags.
+      responses:
+        '200':
+          description: 'Success; returns {success: true}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success.
+                  notification_preferences:
+                    type: object
+                    description: The updated notification preferences object as saved.
+              example:
+                success: true
+                notification_preferences:
+                  host:
+                    low_disk_space:
+                      email: true
+                      webhooks: true
+                  client:
+                    near_end_date:
+                      email: false
+                      webhooks: false
+        '400':
+          description: Bad request; notification_preferences must be a JSON object with 'host' and 'client' keys
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

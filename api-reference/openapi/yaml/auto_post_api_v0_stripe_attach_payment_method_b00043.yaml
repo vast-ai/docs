@@ -1,0 +1,60 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/stripe/attach-payment-method:
+    post:
+      summary: Attach Payment Method
+      tags:
+      - Billing
+      description: Attaches a Stripe payment method to the authenticated user's account, creating a Stripe customer if needed,
+        and saves the payment method for future off-session use.
+      security:
+      - BearerAuth: []
+      x-scope: billing_write
+      x-rateLimit: 2
+      responses:
+        '200':
+          description: 'Success: returns {"success": true, "id": <payment_method_id>}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    description: Error message from the Stripe API or payment processing step
+                required:
+                - error
+              example:
+                success: true
+                id: 42
+        '400':
+          description: 'Bad request: returns {"error": "conflict", "msg": "IntegrityError."} on duplicate, or {"error": "missing_client"}
+            if user cannot be found, or {"error": "<stripe error message>"} on Stripe API failure'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 'Email not verified: {"success": false, "msg": "Authorization Error. Please verify your account to
+            be able to add credits."}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

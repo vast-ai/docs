@@ -1,0 +1,92 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/tfa/resend/:
+    post:
+      summary: Resend 2FA SMS Code (Legacy)
+      tags:
+      - Accounts
+      description: Resends a 2FA SMS verification code to the same phone number as the existing challenge; deprecated path,
+        equivalent to POST /api/v0/tfa/sms/resend/.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 1.1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                secret:
+                  type: string
+                  description: The tfa_secret from the original send; required unless the user is authenticated via bearer
+                    token
+                  example: abc123secret
+                phone_number:
+                  type: string
+                  description: Phone number associated with the original challenge; must match the number the code was first
+                    sent to
+                  example: '+14155550123'
+                tfa_method_id:
+                  type: integer
+                  description: ID of the SMS 2FA method to resend to; phone number is taken from the stored method
+                  example: 3
+      responses:
+        '200':
+          description: 'Returns {msg: "A 6-digit code has been sent to your phone", secret}.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  msg:
+                    type: string
+                    description: '"A 6-digit code has been sent to your phone"'
+                  secret:
+                    type: string
+                    description: The TFA secret to use in the verification request
+              example:
+                msg: A 6-digit code has been sent to your phone
+                secret: abc123randomtoken
+        '400':
+          description: Email not verified ("email_not_verified"), no existing challenge found ("no_challenge_found"), no secret
+            or phone provided ("invalid_params"), phone number mismatch ("phone_number_mismatch"), or Twilio error ("twilio_error").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing 2FA secret or bearer token ("missing_auth_value").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: SMS sending disabled due to fraud ("sms_fraud_detected").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many SMS attempts ("sms_rate_limited" or "preauth_phone_cap").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

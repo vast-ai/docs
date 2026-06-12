@@ -1,0 +1,88 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/machines/{machine_id}/cleanup:
+    put:
+      summary: Cleanup Machine Expired Contracts
+      tags:
+      - Machines
+      description: Sends a volume cleanup task to the machine daemon and soft-deletes expired client contracts on the machine.
+      security:
+      - BearerAuth: []
+      x-scope: machine_write
+      x-rateLimit: 8
+      parameters:
+      - name: machine_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ID of the machine on which expired contracts should be cleaned up.
+      responses:
+        '200':
+          description: 'Returns {success: true, ctime, machine_id, user_id, num_deleted, msg} when contracts were deleted;
+            {success: false, msg: "No expired contracts to delete"} when nothing to clean'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Whether any contracts were deleted
+                  ctime:
+                    type: number
+                    description: Unix timestamp when cleanup ran
+                  machine_id:
+                    type: integer
+                    description: ID of the cleaned machine
+                  user_id:
+                    type: integer
+                    description: ID of the authenticated user
+                  num_deleted:
+                    type: integer
+                    description: Number of expired contracts removed
+                  msg:
+                    type: string
+                    description: Human-readable summary of the operation
+              example:
+                success: true
+                ctime: 1718000000
+                machine_id: 12345
+                user_id: 9876
+                num_deleted: 5
+                msg: deleted 5 expired contracts on machine 12345
+        '400':
+          description: '"Invalid machine_id" if machine_id is None'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: '"No such machine id" when the machine does not exist'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: '"error: only the owner can access this machine."'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

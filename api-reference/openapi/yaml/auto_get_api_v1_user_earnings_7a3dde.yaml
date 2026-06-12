@@ -1,0 +1,67 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v1/user/earnings/:
+    get:
+      summary: List Earnings (v1)
+      tags:
+      - Accounts
+      description: Returns a paginated, sortable list of earnings rows grouped by day or machine, plus a windowed total, for
+        the authenticated user.
+      security:
+      - BearerAuth: []
+      x-scope: billing_read
+      x-rateLimit: 1.9
+      responses:
+        '200':
+          description: 'Success: {"success": true, "total_rows": int, "rows_found": int, "rows": [...], "next_token": str|null,
+            "total": {...}}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true
+                  total_rows:
+                    type: integer
+                    description: Total number of rows in the dataset for the given window
+                  rows_found:
+                    type: integer
+                    description: Number of rows returned in this page
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                    description: Day or machine rows with gpu_earn, sto_earn, bwu_earn, bwd_earn, sla_earn, referral_earn,
+                      referral_count, and total_earn fields
+                  next_token:
+                    type: string
+                    description: Cursor for the next page, or null
+                  total:
+                    type: object
+                    description: Windowed aggregate totals across all rows
+        '400':
+          description: 'Bad request: invalid group_by, limit out of range, unsupported select_filters key, invalid order_by
+            col/dir, or invalid after_token'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

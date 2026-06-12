@@ -1,0 +1,175 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/volumes/search/:
+    post:
+      summary: Search Volume Offers
+      tags:
+      - Volumes
+      description: Search available disk volume offers using a JSON query body; returns offers with free disk space.
+      security: []
+      x-rateLimit: 2
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: object
+          properties:
+            limit:
+              type: integer
+              description: Maximum number of results to return
+              default: 64
+              example: 100
+        description: Query parameters for filtering volume search results
+        example:
+          limit: 100
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: 'The body is the search query object itself: each key is a volume offer field name paired with
+                a filter expression {operator: value} (operators: eq, neq, gt, gte, lt, lte, in, notin), plus the special
+                keys documented below. Volume-relevant fields include disk_space, storage_cost, duration, reliability, inet_up
+                and inet_down.'
+              properties:
+                limit:
+                  type: integer
+                  description: Maximum number of offers to return.
+                  example: 64
+                order:
+                  type: array
+                  description: 'Sort order: list of [column, direction] pairs, e.g. [["dph_total", "asc"]].'
+                  items:
+                    type: array
+                    items:
+                      type: string
+                  example:
+                  - - dph_total
+                    - asc
+                type:
+                  type: string
+                  description: Offer type to search.
+                  enum:
+                  - on-demand
+                  - bid
+                  - reserved
+                  example: on-demand
+                disable_bundling:
+                  type: boolean
+                  description: If true, machines are not bundled into multi-GPU offers.
+              additionalProperties:
+                type: object
+                description: 'Filter expression for an offer field: {operator: value}, e.g. {"gte": 2} or {"in": ["RTX 4090",
+                  "RTX 5090"]}.'
+                properties:
+                  eq:
+                    description: '"eq" comparison against the field value'
+                  neq:
+                    description: '"neq" comparison against the field value'
+                  gt:
+                    description: '"gt" comparison against the field value'
+                  gte:
+                    description: '"gte" comparison against the field value'
+                  lt:
+                    description: '"lt" comparison against the field value'
+                  lte:
+                    description: '"lte" comparison against the field value'
+                  in:
+                    description: '"in" comparison against the field value'
+                  notin:
+                    description: '"notin" comparison against the field value'
+                additionalProperties: false
+            example:
+              disk_space:
+                gte: 50
+              reliability:
+                gte: 0.98
+              order:
+              - - storage_total_cost
+                - asc
+              limit: 64
+        description: The raw search query object (not wrapped in a "q" key).
+      responses:
+        '200':
+          description: 'Matching volume offers: {"offers": [...]} with keys including id, storage_cost, disk_space, reliability,
+            etc.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  offers:
+                    type: array
+                    description: Array of volume offer objects
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          description: Offer/contract ID
+                        ask_contract_id:
+                          type: integer
+                          description: Ask contract ID
+                        bundle_id:
+                          type: integer
+                          description: Bundle identifier
+                        disk_space:
+                          type: number
+                          description: Free disk space available (GB)
+                        storage_cost:
+                          type: number
+                          description: Storage cost per GB per month (USD)
+                        storage_total_cost:
+                          type: number
+                          description: Total storage cost per hour (USD)
+                        reliability:
+                          type: number
+                          description: Host reliability score
+                        geolocation:
+                          type: string
+                          description: Host country code
+                        host_id:
+                          type: integer
+                          description: Host user ID
+                        verification:
+                          type: string
+                          description: Host verification status
+                        inet_down:
+                          type: number
+                          description: Download bandwidth (Mbps)
+                        inet_up:
+                          type: number
+                          description: Upload bandwidth (Mbps)
+                        cpu_arch:
+                          type: string
+                          description: CPU architecture
+                        disk_bw:
+                          type: number
+                          description: Disk bandwidth (MB/s)
+                        machine_id:
+                          type: integer
+                          description: Machine ID
+        '400':
+          description: 'Invalid query or JSON body: "Invalid query: must be dict of conditions" or "Invalid json body"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

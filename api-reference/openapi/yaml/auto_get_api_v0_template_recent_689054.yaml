@@ -1,0 +1,66 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/template/recent/:
+    get:
+      summary: List Recent Templates
+      tags:
+      - Templates
+      description: Returns the authenticated user's recently used templates ordered by last-used time, with keyset pagination
+        support.
+      security:
+      - BearerAuth: []
+      x-scope: user_read
+      x-rateLimit: 1.9
+      responses:
+        '200':
+          description: 'Returns {success: true, templates_found, templates, page_size, last_page_template_id, last_page_last_used_at}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success
+                  templates_found:
+                    type: integer
+                    description: Number of templates returned
+                  templates:
+                    type: array
+                    items:
+                      type: object
+                    description: Array of template objects including last_used_at field
+                  page_size:
+                    type: integer
+                    description: Page size used for this response
+                  last_page_template_id:
+                    type: integer
+                    description: ID of the last template in the page, for use as keyset pagination cursor; null if no results
+                  last_page_last_used_at:
+                    type: number
+                    description: last_used_at of the last template in the page, for use as keyset pagination cursor; null
+                      if no results
+        '400':
+          description: 'Non-integer page_size or last_page parameters: {success: false, error, msg: "Unable to convert given
+            page and/or page_size into integers"} or other error message'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

@@ -1,0 +1,67 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/users/{user_id}/payment-checkout/:
+    post:
+      summary: Create Stripe Checkout Session
+      tags:
+      - Accounts
+      description: Creates a Stripe Checkout setup session for the user to add a new payment method via hosted Stripe UI.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 5
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: The user for whom the checkout session is created; use "current" or a numeric user ID
+      responses:
+        '200':
+          description: 'Returns {"customer": <stripe_customer_object>, "checkoutSession": <stripe_session_object>}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  customer:
+                    type: object
+                    description: Stripe Customer object for the user
+                  checkoutSession:
+                    type: object
+                    description: Stripe Checkout Session object; use the url field to redirect the user
+                required:
+                - customer
+                - checkoutSession
+        '400':
+          description: 'User has no email: {"error": "missing_email", "msg": "Your user doesn''t have an email. Contact vast.ai
+            support to have this resolved."}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: 'Stripe session creation failed: {"error": "stripe_error", "msg": "Failed to create Stripe checkout
+            session. Please try again later."}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

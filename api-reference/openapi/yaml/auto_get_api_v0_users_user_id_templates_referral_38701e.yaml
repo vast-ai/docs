@@ -1,0 +1,87 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/users/{user_id}/templates/referral/:
+    get:
+      summary: Get Referral Templates
+      tags:
+      - Accounts
+      description: Returns templates associated with a referral hash_id or creator, combined with the user's own templates,
+        recommended templates, and autoscaler templates.
+      security:
+      - BearerAuth: []
+      x-scope: instance_read
+      x-rateLimit: 1.9
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ID of the user requesting referral templates; must match the authenticated user's ID (URL path parameter)
+      responses:
+        '200':
+          description: 'Returns {success: true, templates, referral_templates, popular, recommended, autoscaler}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true
+                  templates:
+                    type: array
+                    items:
+                      type: object
+                    description: Merged list of referral and user templates
+                  referral_templates:
+                    type: array
+                    items:
+                      type: object
+                    description: Templates matching the referral hash_id or creator/name
+                  popular:
+                    type: array
+                    items:
+                      type: object
+                    description: Popular templates (currently always empty list)
+                  recommended:
+                    type: array
+                    items:
+                      type: object
+                    description: Recommended templates
+                  autoscaler:
+                    type: array
+                    items:
+                      type: object
+                    description: Autoscaler-enabled templates
+        '400':
+          description: 'Invalid creator_id type: {success: false, error: "Invalid creator_id type", msg}; or parameter contains
+            null bytes/control characters: {success: false, error: "Invalid input", msg}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: 'URL user_id does not match token user_id: {success: false, error: "authorization_error", msg: "URL
+            user_id (...) does not match token user_id (...)"}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

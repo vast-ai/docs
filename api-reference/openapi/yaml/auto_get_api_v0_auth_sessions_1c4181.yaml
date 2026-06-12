@@ -1,0 +1,64 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/auth/sessions/:
+    get:
+      summary: List Active Sessions
+      tags:
+      - Accounts
+      description: Returns all active sessions for the authenticated user, enriched with geolocation data by IP address.
+      security:
+      - BearerAuth: []
+      x-scope: user_read
+      x-rateLimit: 1
+      responses:
+        '200':
+          description: 'Returns {success: true, sessions: [...]} with location data merged per session (key values omitted).'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success
+                  sessions:
+                    type: array
+                    description: List of active session objects with IP and location metadata
+                    items:
+                      type: object
+              example:
+                success: true
+                sessions:
+                - id: 5
+                  key_type: session
+                  last_ipaddr: 1.2.3.4
+                  deleted_at: 1700000000
+        '401':
+          description: User is not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No active sessions found ("No active sessions found.").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

@@ -1,0 +1,58 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/users/{user_id}/promo/{code}/:
+    post:
+      summary: Redeem Promo Code
+      tags:
+      - Billing
+      description: Applies a promotional code to the specified user's account.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 1.1
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ID of the user redeeming the promo code; must match the authenticated caller.
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+        description: The promotional code string to redeem.
+      responses:
+        '200':
+          description: 'Success: the redeemed promo value'
+        '404':
+          description: 'Not found: {"error": "user_doesnt_exist", "msg": "User doesn''t exist"} or {"error": "promo_doesnt_exist",
+            "msg": "Promo code doesn''t exist"}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 'Conflict: {"error": "promo_already_redeemed", "msg": "Promo code already redeemed!"}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

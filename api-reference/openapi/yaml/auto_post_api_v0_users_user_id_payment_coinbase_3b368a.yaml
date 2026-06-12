@@ -1,0 +1,75 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/users/{user_id}/payment-coinbase/:
+    post:
+      summary: Add Credits via Coinbase
+      tags:
+      - Accounts
+      description: Creates a Coinbase Commerce charge for the specified USD amount and records a pending invoice until payment
+        is confirmed.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 3
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: The user to credit; use "current" or a numeric user ID
+      responses:
+        '200':
+          description: Returns the Coinbase charge data object from the Commerce API
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    description: Coinbase charge ID (transfer group reference)
+                  hosted_url:
+                    type: string
+                    description: URL to redirect the user to complete crypto payment
+                  code:
+                    type: string
+                    description: Charge code
+                  name:
+                    type: string
+                    description: Charge name
+                  description:
+                    type: string
+                    description: Charge description
+                  pricing_type:
+                    type: string
+                    description: Pricing type (e.g. fixed_price)
+        '400':
+          description: 'Invalid amount: {"error": "invalid_params", "msg": "amount can not be <= 0."}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: 'Coinbase request/network error: {"error": "coinbase_request_failed", "details": {...}}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

@@ -1,0 +1,80 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/users/{user_id}/credit/:
+    post:
+      summary: Add Credit via Saved Payment
+      tags:
+      - Billing
+      description: Charges the user's saved Stripe payment method to add account credits.
+      security:
+      - BearerAuth: []
+      x-scope: billing_write
+      x-rateLimit: 1.5
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: The user to credit; use "current" or a numeric user ID
+      responses:
+        '200':
+          description: Returns the result of the saved Stripe payment charge
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Stripe PaymentIntent status (e.g. requires_action, succeeded)
+                  client_secret:
+                    type: string
+                    description: Client secret for confirming the payment intent on the frontend
+                  type:
+                    type: string
+                    description: Payment method type (e.g. card, ideal)
+                required:
+                - status
+                - client_secret
+                - type
+              example:
+                status: succeeded
+                client_secret: pi_abc123_secret_xyz
+                type: card
+        '401':
+          description: 'Email not verified: {"success": false, "msg": "Authorization Error. Please verify your account to
+            be able to add credits."}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: 'Access denied when requesting a different user''s account: {"error": "Access denied"}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 'Unsupported payment_type: {"error": "invalid payment_type"}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

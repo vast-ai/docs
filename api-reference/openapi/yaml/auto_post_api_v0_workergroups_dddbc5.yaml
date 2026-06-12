@@ -1,0 +1,122 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/workergroups/:
+    post:
+      summary: Create Workergroup
+      tags:
+      - Serverless
+      description: Creates a new serverless workergroup for the authenticated user; alias for POST /api/v0/autojobs/.
+      security: []
+      x-rateLimit: 2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                endpoint_name:
+                  type: string
+                  description: Name of the endpoint group
+                  example: vLLM-Qwen3-8B
+                endpoint_id:
+                  type: integer
+                  description: ID of existing endpoint group (alternative to endpoint_name)
+                  example: 123
+                template_hash:
+                  type: string
+                  description: Hash ID of template to use for worker instances
+                  example: abc123def456
+                template_id:
+                  type: integer
+                  description: ID of template (alternative to template_hash)
+                  example: 456
+                search_params:
+                  type: string
+                  description: Search query for finding worker instances (alternative to template)
+                  default: verified=true rentable=true rented=false
+                  example: gpu_name=RTX_3090 rentable=true
+                launch_args:
+                  type: string
+                  description: Additional launch arguments for worker instances
+                  example: --env VAR=value
+                min_load:
+                  type: number
+                  description: Minimum load threshold for scaling
+                  default: 1.0
+                  example: 1.0
+                target_util:
+                  type: number
+                  description: Target GPU utilization
+                  default: 0.9
+                  example: 0.9
+                cold_mult:
+                  type: number
+                  description: Cold start multiplier
+                  default: 3.0
+                  example: 3.0
+                cold_workers:
+                  type: integer
+                  description: Number of cold workers to maintain
+                  default: 3
+                  example: 3
+                max_workers:
+                  type: integer
+                  description: Maximum number of worker instances
+                  default: 20
+                  example: 20
+                test_workers:
+                  type: integer
+                  description: Number of test workers
+                  default: 3
+                  example: 3
+                gpu_ram:
+                  type: integer
+                  description: Minimum GPU RAM in GB
+                  default: 24
+                  example: 24
+      responses:
+        '200':
+          description: 'Workergroup created; returns {success: true, id: <workergroup_id>}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success.
+                  id:
+                    type: integer
+                    description: ID of the newly created workergroup.
+              example:
+                success: true
+                id: 42
+        '400':
+          description: 'Invalid arguments: missing/invalid search_params, image, endpoint, arg lengths, docker login, or storage'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Host-only accounts cannot create workergroups or use serverless
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

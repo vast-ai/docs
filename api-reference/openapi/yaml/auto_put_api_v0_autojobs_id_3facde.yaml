@@ -1,0 +1,106 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/autojobs/{id}/:
+    put:
+      summary: Update Autojob Workergroup
+      tags:
+      - Serverless
+      description: Updates scaling parameters, template, search params, or launch args on an existing workergroup for the
+        authenticated user.
+      security: []
+      x-rateLimit: 2
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Numeric ID of the workergroup to update.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                min_load:
+                  type: number
+                  description: Updated minimum load threshold for this workergroup.
+                  example: 0.2
+                target_util:
+                  type: number
+                  description: Updated target utilization ratio (0-1).
+                  example: 0.85
+                cold_mult:
+                  type: number
+                  description: Updated cold-standby multiplier.
+                  example: 2.5
+                test_workers:
+                  type: integer
+                  description: Updated number of test/canary workers.
+                  example: 2
+                template_hash:
+                  type: string
+                  description: Hash ID of a new template to switch to.
+                  example: def456
+                template_id:
+                  type: integer
+                  description: Numeric ID of a new template to switch to.
+                  example: 100
+                search_params:
+                  type: string
+                  description: Updated GPU offer filter expression.
+                  example: gpu_ram>=24
+                launch_args:
+                  type: string
+                  description: Updated launch arguments for worker instances.
+                gpu_ram:
+                  type: number
+                  description: Updated minimum GPU RAM in GB.
+                  example: 24
+                endpoint_id:
+                  type: integer
+                  description: ID of the endpoint this workergroup belongs to; required.
+                  example: 42
+      responses:
+        '200':
+          description: 'Returns {success: true}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success.
+              example:
+                success: true
+        '400':
+          description: 'Invalid arguments: missing endpoint_id, deployment-owned workergroup, endpoint not found, workergroup
+            not found, or invalid search_params'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Host-only accounts cannot update workergroups or use serverless
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

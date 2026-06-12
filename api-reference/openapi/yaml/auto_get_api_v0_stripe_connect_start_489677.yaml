@@ -1,0 +1,67 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/stripe-connect-start/:
+    get:
+      summary: Start Stripe Connect Onboarding
+      tags:
+      - Billing
+      description: Creates a Stripe Express connected account if needed and returns a single-use hosted onboarding Account
+        Link URL.
+      security: []
+      x-rateLimit: 0.3
+      responses:
+        '200':
+          description: 'Success; returns {"path": "<stripe_onboarding_url>"}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  path:
+                    type: string
+                    description: Single-use Stripe Connect onboarding URL.
+                required:
+                - path
+              example:
+                path: https://connect.stripe.com/setup/e/...
+        '400':
+          description: Stripe InvalidRequestError; message contains the Stripe error string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: 'Stripe rate limit hit; message: "Stripe rate limit, try again"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: 'Stripe error starting onboarding; message: "Stripe error starting onboarding"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 'Unexpected server error; message: "Unexpected error"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

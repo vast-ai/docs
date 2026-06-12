@@ -1,0 +1,111 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v1/instances/:
+    get:
+      summary: List Instances (v1)
+      tags:
+      - Instances
+      description: Returns paginated GPU instances for the authenticated user with keyset pagination and label count aggregations.
+      security:
+      - BearerAuth: []
+      x-scope: instance_read
+      x-rateLimit: 1
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        description: Instances per page. Default 25, max 25. Values ≤ 0 are treated as 5.
+        schema:
+          type: integer
+          default: 25
+          maximum: 25
+        example: 25
+      - name: after_token
+        in: query
+        required: false
+        description: Keyset pagination cursor from the previous response's `next_token`. An invalid token returns a 400 error.
+        schema:
+          type: string
+        example: eyJ2YWx1ZXMiOiB7ImlkIjogMTIzfX0=
+      - name: order_by
+        in: query
+        required: false
+        description: 'JSON array of sort directives, e.g. `[{"col":"id","dir":"asc"}]`. Valid `dir` values: `asc`, `desc`
+          (anything else treated as `asc`). `id` is always appended as a tiebreaker. Invalid column returns 400.'
+        schema:
+          type: string
+        example: '[{"col":"id","dir":"asc"}]'
+      - name: select_cols
+        in: query
+        required: false
+        description: JSON array of column names to return, e.g. `["id","label","actual_status"]`. Use `["*"]` for all columns
+          (default). Unknown column names are returned as `null`.
+        schema:
+          type: string
+          default: '["*"]'
+        example: '["id","label","actual_status","dph_total"]'
+      - name: select_filters
+        in: query
+        required: false
+        description: 'JSON object of column filters. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `in`, `notin`.
+
+          Filterable columns: `actual_status`, `gpu_name`, `verification`, `id`, `label`, and other columns stored directly
+          on the contract record. Computed fields (e.g. `dph_total`, `num_gpus`) are not filterable and return 400.
+
+          '
+        schema:
+          type: string
+          default: '{}'
+        example: '{"actual_status":{"eq":"running"}}'
+      responses:
+        '200':
+          description: 'Returns {success: true, total_instances, label_counts, instances_found, instances, next_token} with
+            paginated instance data.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: True on success
+                  total_instances:
+                    type: integer
+                    description: Total number of matching instances
+                  label_counts:
+                    type: object
+                    description: Map of label string to instance count
+                  instances_found:
+                    type: integer
+                    description: Number of instances in this page
+                  instances:
+                    type: array
+                    items:
+                      type: object
+                    description: Array of instance objects
+                  next_token:
+                    type: string
+                    description: Pagination token for the next page, or null
+        '401':
+          description: Unauthenticated or blacklisted user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
