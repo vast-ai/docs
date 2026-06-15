@@ -1,29 +1,119 @@
 ---
 title: "Fleet Operations"
 sidebarTitle: "Fleet Operations"
-description: "Multi-machine host operations and monitoring concepts."
+description: "Multi-machine host workflows using the CLI and SDK: bulk listing, maintenance, monitoring, and cleanup."
 "canonical": "/host/fleet-operations"
+personas:
+  - headless-operator
+  - business-owner
 ---
 
-Status: mockup placeholder.
+<div className="persona-chips"><span className="persona-chip">Headless / DC</span><span className="persona-chip">Business</span></div>
 
-Personas: Headless Operator, Business Owner.
+Operate many machines from one management box. Every workflow on this page composes host CLI commands that work over SSH — no console clicking per machine — and each has a [Python SDK](/host/sdk/show-machines) equivalent for automation.
 
-Stage: Operate.
+## Working at fleet scale
 
-## Purpose
+Three CLI features make fleet scripting practical:
 
-Reserve a home for larger datacenter and multi-machine workflows.
+- `vastai show machines -q` prints **only the numeric machine IDs**, so it composes into other commands.
+- `vastai list machines` (plural) accepts **multiple IDs** and applies the same listing arguments to all of them.
+- The global `--raw` flag returns machine-readable JSON, and `--retry N` retries flaky calls — use both in unattended scripts.
 
-## Addresses
+```bash
+# All machine IDs in the fleet
+vastai show machines -q
 
-- Thin but high-value headless/fleet operator needs.
-- Bulk maintenance and monitoring.
-- Consistent setup across many hosts.
+# Full fleet state as JSON for scripts and monitoring
+vastai show machines --raw
+```
 
-## Proposed Content
+## Bulk listing and pricing updates
 
-- Fleet assumptions.
-- Bulk operation links.
-- Monitoring checklist.
-- When to automate versus use console workflows.
+Update the listings of every machine at once by feeding the ID list into `list machines`. For example, extending all offer end dates:
+
+```bash
+vastai list machines $(vastai show machines -q) -e 12/31/2026 --retry 6
+```
+
+The same pattern works for any listing argument — on-demand price (`-g`), min bid floor (`-b`), discount rate (`-r`), min chunk (`-m`), or a rolling end date (`--duration "2 weeks"`). See [vastai list machines](/host/cli/list-machines) for all options and [Pricing Your Listing](/host/pricing-your-listing) for how to choose the values.
+
+<Warning>
+Price changes affect **new rental contracts only** — existing contracts keep their original terms. End dates are the exception: moving the offer end date **later at the same or lower price also extends existing rental contracts** ([details](/host/hosting-overview#extending-rental-contracts)). A fleet-wide end-date extension therefore extends your commitment on every active contract; if you have raised pricing, existing contracts cannot be extended.
+</Warning>
+
+## Fleet maintenance windows
+
+Schedule the same window across a rack or site, then audit what is scheduled:
+
+```bash
+# Schedule a 2-hour power maintenance for every machine
+for id in $(vastai show machines -q); do
+  vastai schedule maint "$id" --sdate 1782950400 --duration 2 --maintenance_category power
+done
+
+# Review all scheduled windows
+vastai show maints <ID>
+
+# Cancel if plans change
+vastai cancel maint <ID>
+```
+
+`--sdate` is unix epoch seconds (UTC) and `--duration` is in hours; categories are `power`, `internet`, `disk`, `gpu`, `software`, or `other`. Clients on affected machines are notified so they can save their work. The policy rules — when to wait for contracts to end versus schedule a window — are in [Maintenance Windows](/host/maintenance-windows).
+
+## Default (background) jobs
+
+A default job runs your own container on a machine whenever it is idle, at a price floor you set, so unrented GPUs still do useful work:
+
+```bash
+vastai set defjob <ID> --price_gpu 0.20 --image <your-image> --args <container-args>
+vastai remove defjob <ID>
+```
+
+This performs the same action as creating a background job at [cloud.vast.ai/host/create](https://cloud.vast.ai/host/create). See [vastai set defjob](/host/cli/set-defjob). Make sure your background workload complies with the [Workload Policy](/host/workload-policy).
+
+## Defragmenting GPU assignments
+
+On multi-GPU machines, scattered single-GPU rentals can block larger multi-GPU offers. Defragmenting rearranges GPU assignments to make more multi-GPU offers available:
+
+```bash
+vastai defrag machines $(vastai show machines -q)
+```
+
+See [vastai defrag machines](/host/cli/defrag-machines).
+
+## Monitoring the fleet
+
+A practical monitoring loop without a GUI:
+
+1. Pull fleet state with `vastai show machines --raw` and watch for red machine errors, reliability drops, and missing offers.
+2. Inspect a specific machine with `vastai show machine <ID>` ([reference](/host/cli/show-machine)).
+3. After fixing an issue or finishing maintenance, rerun the self-test on the affected machine — see [How to Self-Test](/host/how-to-self-test). The self-test rents a temporary instance, so run it when the machine is idle.
+4. Collect diagnostics for any failing machine with `vastai dump-logs <ID>` — see [what to collect](/host/common-errors-diagnostics#collect-logs).
+
+For market-wide pricing and demand signals to inform fleet pricing, use [GPU Market Metrics](/host/market-metrics) — the `vastai metrics` commands also support `--raw`.
+
+## Storage cleanup across the fleet
+
+Expired or deleted rental contracts occasionally fail to release storage. Clean up fleet-wide:
+
+```bash
+for id in $(vastai show machines -q); do
+  vastai cleanup machine "$id"
+done
+```
+
+See [vastai cleanup machine](/host/cli/cleanup-machine).
+
+## Decommissioning machines
+
+Unlist to stop new contracts, honor remaining rental end dates, then delete — the same rules as a single machine, per [Removing or Recreating Machines](/host/removing-recreating-machines).
+
+## Related pages
+
+| Topic | Read next |
+| --- | --- |
+| SSH-only install for new fleet machines | [Headless Install Path](/host/headless-install) |
+| Maintenance policy and client impact | [Maintenance Windows](/host/maintenance-windows) |
+| Pricing strategy | [Pricing Your Listing](/host/pricing-your-listing) |
+| Python automation | [SDK reference](/host/sdk/show-machines) |

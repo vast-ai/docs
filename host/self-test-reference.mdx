@@ -1,0 +1,60 @@
+---
+title: "Self-Test Reference"
+sidebarTitle: "Self-Test Reference"
+description: "Lookup reference for self-test failures, meanings, and next actions."
+"canonical": "/host/self-test-reference"
+personas:
+  - pro-operator
+  - headless-operator
+---
+
+<div className="persona-chips"><span className="persona-chip">Pro Operator</span><span className="persona-chip">Headless / DC</span></div>
+
+Use this reference to look up self-test failures, understand what they usually mean, and choose the next diagnostic step. Each failure has its own anchor so CLI errors and support replies can link directly to it.
+
+<a id="vericode-8" />
+## vericode=8 / Port Networking Issues
+
+[Glossary: vericode](/host/glossary#vericode)
+
+[vericode=8](/host/glossary#vericode) is a platform-detected direct-port or connectivity problem. Common causes include closed external ports, forwarding to the wrong LAN IP, CGNAT or no inbound public IP, firewall rules, asymmetric protocol handling, or a stale port range.
+
+Test the public IP:port if available, verify router and host firewall rules, then rerun the self-test after fixing the network path. See [Network & Ports](/host/network-ports) for the full connectivity checklist.
+
+<a id="no-response-120s" />
+## No response for 120s
+
+A `no response` or progress timeout means the CLI could not get usable progress from the temporary self-test instance after it was created. Newer CLI output may show a more specific code such as `progress_endpoint_unreachable`, `progress_empty_timeout`, or `progress_endpoint_lost`. Start with connectivity and startup checks:
+
+- Inspect the tested external IP:port if the CLI printed one.
+- Confirm router or firewall forwarding to the host LAN IP.
+- Retry from an outside network to rule out NAT hairpinning; see [testing from outside your LAN](/host/network-ports#test-ports-outside-lan).
+- Inspect the diagnostic bundle for instance status, container logs, and daemon logs.
+
+Other likely causes include container startup failure, Docker/NVIDIA runtime stalls, host daemon stalls, GPU or system hangs, or upload instability.
+
+<a id="machine-not-rentable" />
+## Machine ID not found or not rentable
+
+This can mean the machine is already rented, has zero active on-demand offers, is offline or unlisted, is not visible to the API account, is deverified or below a threshold, has offer-side error metadata, or the API key cannot inspect the host/offer state.
+
+Start with:
+
+```bash
+vastai search offers 'machine_id=MACHINE_ID rentable=any rented=any'
+```
+
+Then confirm the machine ID, API key/account, listed state, active offers, rental state, reliability, and any error metadata.
+
+<a id="warnings-ignore" />
+## Which warnings can be ignored?
+
+Avoid ignoring warnings by default. One clear self-test advisory is that mapping more than 64 direct ports per listed GPU is usually unnecessary and is not a self-test gate. Red machine errors, self-test failures, NVML/Xid errors, port networking issues, and not-visible/rentable states should be investigated.
+
+## Reliability below the preflight gate
+
+Reliability greater than 0.90 is a self-test preflight gate; if the machine is at or below it, the self-test can fail before renting the temporary instance. See [Reliability & Uptime](/host/reliability-uptime#reliability-threshold).
+
+## Errors not specific to the self-test
+
+For `bad bandwidthtest2`, CDI device injection failures, NVML mismatches, and other machine-health errors, see [Common Errors & Diagnostics](/host/common-errors-diagnostics).

@@ -3,28 +3,68 @@ title: "First 24 Hours After Install"
 sidebarTitle: "First 24 Hours"
 description: "Expectations after a host first installs and lists a machine."
 "canonical": "/host/first-24-hours"
+personas:
+  - hobbyist
+  - pro-operator
 ---
 
-Status: mockup placeholder.
+<div className="persona-chips"><span className="persona-chip">Hobbyist</span><span className="persona-chip">Pro Operator</span></div>
 
-Personas: Hobbyist, General Pro Operator.
+Use this page after installing and listing a machine to understand what to monitor first.
 
-Stage: Operate.
+<a id="healthy-daemon" />
+## What does a healthy host daemon look like?
 
-## Purpose
+A healthy host daemon should run without restart loops, connect to the Vast backend, report the expected GPUs and machine state, and support instance startup. From the host dashboard or CLI, the machine should appear under the host account, have active offers when listed, avoid red machine errors, and be able to run a temporary self-test instance that reports progress.
 
-Set expectations for the period after install, before a host understands normal platform behavior.
+<a id="monitor" />
+## What should I monitor in the first 24 hours?
 
-## Addresses
+Monitor machine visibility, active offers, self-test status, red machine errors, daemon logs, Docker/NVIDIA runtime health, direct port reachability from outside the LAN, thermals, power, storage capacity, network stability, and first-rental startup behavior. Test common client paths such as SSH and Jupyter when applicable.
 
-- "What now?" after listing.
-- First rental confusion.
-- Early reliability movement.
-- Watching logs without overreacting.
+<a id="test-like-a-client" />
+## Test your machine like a client
 
-## Proposed Content
+It is vital to test your own machine to ensure the ports and software are running smoothly.
 
-- What should happen immediately.
-- What can take time.
-- What is normal versus suspicious.
-- Where to watch machine status and logs.
+### Set up a separate client account (GUI)
+
+If you want to use the website GUI, set up a new account on a different email address, add a credit card, then find your machine and create instances on it like a client. This has the benefit of showing you the entire client experience. Testing the recommended PyTorch template is vital to ensure that SSH and Jupyter are working properly.
+
+### Use the CLI (preferred)
+
+The preferred method is the [CLI](https://cloud.vast.ai/cli/). For Windows users, we suggest setting up [WSL](https://learn.microsoft.com/en-us/windows/wsl/install), which requires installing Ubuntu on your Windows machine and enabling virtualization in BIOS.
+
+First list your connected machines:
+
+```text Text
+./vastai show machines
+```
+
+Then find the available offers for your machine ID:
+
+```text Text
+./vastai search offers 'machine_id=12345  verified=any'
+```
+
+Replace 12345 with your actual machine ID. This is also the fastest way to see all the offers listed for a given machine — the website GUI stacks similar offers, so it is not easy to see all listings there.
+
+Take the ID number from the first column and use it to create a free instance on your own machine. This example loads the latest PyTorch image along with both Jupyter and SSH direct launch modes:
+
+```text Text
+./vastai create instance <ID> --image pytorch/pytorch:latest --jupyter --direct --env '-e TZ=PDT -p 22:22 -p 8080:8080'
+```
+
+Check your [instance tab](https://cloud.vast.ai/instances/) to make sure PyTorch loaded correctly along with Jupyter and SSH. Click the \<\_ button to get the SSH command and test the direct SSH connection. Click the open button to test Jupyter. If the button is stuck "connecting", there is most likely a problem with the port configuration on the router in front of the machine; see [Network & Ports](/host/network-ports#test-ports-outside-lan). Once finished, destroy the instance.
+
+## What can take time
+
+Verification, search visibility, and first rentals do not happen instantly after listing. Passing self-test makes the machine eligible for verification, but verification timing depends on machine health, supply and demand, and platform policy. See [Understanding Verification](/host/understanding-verification#verification-time).
+
+## Related pages
+
+| Topic | Read next |
+| --- | --- |
+| Running the self-test | [How to Self-Test](/host/how-to-self-test) |
+| Machine not appearing in search | [Why Isn't My Machine in Search?](/host/not-in-search) |
+| Reliability expectations | [Reliability & Uptime](/host/reliability-uptime) |

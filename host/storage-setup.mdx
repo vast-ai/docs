@@ -3,28 +3,61 @@ title: "Storage Setup"
 sidebarTitle: "Storage Setup"
 description: "Disk, filesystem, Docker storage, XFS, RAID, and NVMe guidance for hosts."
 "canonical": "/host/storage-setup"
+personas:
+  - pro-operator
+  - headless-operator
 ---
 
-Status: mockup placeholder.
+<div className="persona-chips"><span className="persona-chip">Pro Operator</span><span className="persona-chip">Headless / DC</span></div>
 
-Personas: General Pro Operator, Headless Operator.
+Set up Docker storage, disks, filesystems, and mounts so rented workloads have stable fast storage.
 
-Stage: Set Up.
+<a id="docker-storage-layout" />
+## How should I set up Docker storage?
 
-## Purpose
+Use fast SSD/NVMe storage mounted predictably for Docker and Vast workloads. Current listing guidance expects at least 128 GB of fast SSD storage per GPU. Keep Docker storage on the intended data disk, not accidentally on the OS disk, and use stable mounts so Docker and the host daemon start after the storage is available.
 
-Make storage setup linkable instead of burying it in install troubleshooting.
+<a id="fstab-example" />
+## Example fstab line for one NVMe or SSD
 
-## Addresses
+For a normal single NVMe or SSD mounted for Docker storage, use the disk UUID rather than a device name like `/dev/nvme0n1p1`, because device names can change between boots. Example `/etc/fstab` entry:
 
-- XFS project quota confusion.
-- Docker data-root and mount issues.
-- RAID/NVMe layout questions.
-- Volume-offer space allocation questions.
+```text
+UUID=a1b2c3d4-e5f6-7890-abcd-ef1234567890  /var/lib/docker  xfs  rw,auto,pquota,nofail  0  0
+```
 
-## Proposed Content
+Replace the UUID with the value from `blkid` for your XFS-formatted partition. The important pieces are `/var/lib/docker`, `xfs`, and `pquota` project quota support. After editing `/etc/fstab`, run `sudo mount -a`; if it reports an error, fix the fstab entry before rebooting.
 
-- Recommended filesystem and mount layout.
-- XFS `prjquota` notes.
-- Docker storage location.
-- How rented volumes affect available host disk.
+<a id="xfs-prjquota" />
+## Is XFS with project quotas required?
+
+XFS with project quota support is the preferred layout when Docker storage quotas are used. Some machines may appear to work with other layouts, but quota-backed Docker storage errors are much easier to avoid when Docker's data root is on an XFS filesystem with project quotas enabled.
+
+<a id="nvme-raid" />
+## How should I choose single NVMe vs RAID/NVMe?
+
+For one NVMe, use a stable mount with enough capacity and performance for Docker and rented workloads. For multiple NVMes, RAID0 can increase capacity and throughput, but it also increases the failure domain because one failed drive can break the array. Choose the layout based on reliability goals, monitor drive health, and make sure the mount is available before Docker and the host daemon start.
+
+<a id="pquota-error" />
+## What causes the Docker pquota storage error?
+
+The error `--storage-opt is supported only for overlay over xfs with pquota` means Docker is being asked to use per-container storage quotas on a backing filesystem that is not mounted as XFS with project quota support.
+
+Move Docker's data root to a correctly mounted XFS filesystem with project quotas, then restart Docker and the host software after verifying the mount. Back up or confirm the target disk before formatting or moving Docker data.
+
+## Volume offers and host disk
+
+Space allocated to rented volume offers is subtracted from the storage available to GPU offers. For how volume offers interact with available disk, see [Hosting Overview](/host/hosting-overview#volume-offers).
+
+<a id="cached-images" />
+## Does Vast redownload images that were already used on my machine?
+
+Prior images are cached on the host when possible. If a renter uses an image that is already present on the machine, the system can reuse the cached image instead of downloading it again.
+
+## Related pages
+
+| Topic | Read next |
+| --- | --- |
+| Hardware minimums | [Supported Hardware](/host/supported-hardware#storage) |
+| Pre-install checklist | [Hardware Prep](/host/hardware-prep#install-prerequisites) |
+| Install failures | [Installing Host Software](/host/installing-host-software#install-failures) |

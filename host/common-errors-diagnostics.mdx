@@ -3,22 +3,100 @@ title: "Common Errors & Diagnostics"
 sidebarTitle: "Errors & Diagnostics"
 description: "Common host errors and diagnostic collection paths."
 "canonical": "/host/common-errors-diagnostics"
+personas:
+  - pro-operator
+  - headless-operator
 ---
 
-Status: mockup placeholder.
+<div className="persona-chips"><span className="persona-chip">Pro Operator</span><span className="persona-chip">Headless / DC</span></div>
 
-Personas: General Pro Operator, Headless Operator.
+Use this page for host errors that are not specific to install, networking, or self-test, and for collecting diagnostics before asking for help.
 
-Stage: Operate.
+<a id="logs" />
+## Where are installer, daemon, and self-test logs?
 
-## Purpose
+For self-test failures, the CLI can create a diagnostic bundle. Default self-test bundles include:
 
-Create a steady-state troubleshooting home for errors that are not install, network, or self-test specific.
+- `self-test-output.log`
+- `self-test-result.json`
+- `manifest.json`
+- `collection-errors.json`
 
-## Proposed Content
+Runtime failures can also include:
 
-- Diagnostic bundle handoff.
-- `kaalia` logs.
-- Docker and NVIDIA runtime checks.
-- Common machine error references.
-- Links to focused pages when a symptom has a better home.
+- `instance/show-instance.json`
+- `instance/container.log`
+- `instance/daemon.log`
+
+You can also create a manual bundle with:
+
+```bash
+vastai dump-logs <machine_id>
+```
+
+If you run the helper on the actual host, this can include host-local artifacts such as kaalia logs, `dmesg`, `journalctl`, Docker daemon config, and mount information:
+
+```bash
+vastai dump-logs <machine_id> --include-local-host-artifacts
+```
+
+<a id="red-error" />
+## What is this red error message on my machine?
+
+If the hosting software detects an error, that error message is listed on your machine in the machines page. Once the cause of the error has been resolved, most error messages are automatically cleared after 1-2 hours. The quickest way to learn more about resolving specific error messages is the hosting channels in [our Discord](https://discord.gg/hSuEbSQ4X8).
+
+<a id="docker-cache" />
+## My storage for clients is full of old stopped jobs — can I free up space?
+
+Try cleaning up the Docker build cache, as it sometimes frees up far more space than it claims. You can also clean up old unused images. For expired or deleted rental contracts that did not release their storage, run [vastai cleanup machine](/host/cli/cleanup-machine).
+
+<a id="nvidia-smi-fails" />
+## What should I do when nvidia-smi fails?
+
+Treat `nvidia-smi` failure as a host GPU or driver health problem. Check whether the NVIDIA driver is loaded, whether the GPU is visible on the PCIe bus, whether a reboot is needed after a driver or kernel update, whether there is an NVML driver/library mismatch, and whether system logs show NVRM, Xid, or PCIe errors. Do not keep a machine listed if it cannot reliably report GPU state.
+
+<a id="nvml-mismatch" />
+## What should I do for NVML driver/library mismatch?
+
+This usually means the NVIDIA userspace library and loaded kernel module are from different driver versions, often after an update. Plan downtime and reboot first. If the mismatch persists, clean up or reinstall the NVIDIA driver stack, then verify `nvidia-smi` before listing again.
+
+<a id="gpu-falls-off-bus" />
+## What should I do when a GPU falls off the PCIe bus?
+
+Treat this as a hardware, power, thermal, PCIe, or driver stability issue. Check logs for NVRM, Xid, and PCIe/AER errors. Power-cycle the machine, then inspect PSU capacity, power cables, risers, slots, PCIe lane settings, thermals, and any overclock or undervolt. Repeated bus drops should be fixed before the machine is listed again.
+
+<a id="bad-bandwidthtest2" />
+## What should I do for bad bandwidthtest2?
+
+`bad bandwidthtest2` is best treated as a machine health or verification error. It usually points at a GPU, PCIe, driver/runtime, or data-transfer problem. Check PCIe bandwidth and lane configuration, GPU seating, thermals, power, driver and NVML health, Xid errors, Docker GPU runtime behavior, and self-test diagnostic output. Rerun self-test after fixing the hardware or driver issue.
+
+<a id="failed-cdi" />
+## What should I do for failed to inject CDI devices?
+
+If logs or machine status mention failed CDI device injection, treat it as a container GPU device injection or runtime problem. Current self-test output may surface the same underlying issue as a startup or runtime failure instead of using the literal CDI text. Gather a diagnostic bundle, check Docker and NVIDIA container runtime/CDI configuration, confirm GPUs are visible on the host, inspect daemon and container logs, and check for related machine errors. If the configuration looks correct but containers still cannot receive GPU devices, escalate with the machine ID and logs.
+
+<a id="collect-logs" />
+## What logs should I collect before asking for help?
+
+Include the machine ID, account context, exact command, timestamps, screenshots or CLI output, tested external IP:port for network failures, and the self-test support bundle when available. If running on the host, include local host artifacts with:
+
+```bash
+vastai dump-logs <machine_id> --include-local-host-artifacts
+```
+
+Review bundles before sharing them.
+
+<a id="escalate-support" />
+## What should I escalate to Vast support?
+
+Escalate account conversion or hosting agreement issues, payment/tax/payout provider issues that the docs cannot resolve, backend machine records or ghost machines that normal UI/CLI actions cannot remove, API permission or account-visibility problems, suspected backend bugs, and cases where self-test or diagnostics show a platform state mismatch after following documented steps.
+
+Local Ubuntu, Docker, GPU driver, hardware, power, thermals, and consumer network setup are primarily host responsibilities. Bring logs and diagnostics when asking for help.
+
+## Related pages
+
+| Topic | Read next |
+| --- | --- |
+| Install-time failures | [Installing Host Software](/host/installing-host-software#install-failures) |
+| Self-test error strings | [Self-Test Reference](/host/self-test-reference) |
+| Connectivity problems | [Network & Ports](/host/network-ports) |

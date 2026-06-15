@@ -1,19 +1,21 @@
 ---
 title: "How to Self-Test"
+sidebarTitle: "How to Self-Test"
 createdAt: "Mon Nov 25 2025 00:00:00 GMT+0000 (Coordinated Universal Time)"
 updatedAt: "Mon Nov 25 2025 00:00:00 GMT+0000 (Coordinated Universal Time)"
 "canonical": "/host/how-to-self-test"
+personas:
+  - pro-operator
+  - headless-operator
 ---
 
-
-Personas: General Pro Operator, Headless Operator.
-
-Stage: Verify & List.
+<div className="persona-chips"><span className="persona-chip">Pro Operator</span><span className="persona-chip">Headless / DC</span></div>
 
 ## Minimal Requirements for Verification
 
 Before your machine can be verified on Vast.ai, it must meet all minimum quality and reliability benchmarks.
 Verification confirms that your machine is stable, performant, and properly configured to run client workloads.
+The canonical threshold list lives in [Verification Stages: requirements](/host/verification-stages#additional-requirements-for-verification).
 
 <Note>
 **Note:** Meeting these minimum requirements makes your machine eligible for verification, but does not automatically guarantee verification.
@@ -36,7 +38,9 @@ During the self-test, the following components and conditions are verified:
 * System RAM and CPU performance
 * Overall machine reliability under simulated workloads
 
-A short test workload will be executed to assess actual runtime performance.
+The self-test first checks whether the listed machine meets minimum requirements before renting a temporary diagnostic instance. If preflight passes, the CLI rents a temporary instance, starts the self-test image, polls runtime progress, runs system requirement checks, a CUDA ResNet workload, ECC memory allocation, NCCL, and combined CPU/GPU stress, then reports the result and destroys the temporary instance. The runtime system requirements stage checks that each GPU has at least 98% free VRAM, system RAM is at least 95% of total GPU VRAM capped around 2 TB, and visible physical CPU cores are at least the visible GPU count.
+
+Passing self-test makes the machine eligible for verification, but does not guarantee immediate verification.
 
 <Tip>
 **Tip:** Ensure no other jobs or instances are running during the self-test for the most accurate results.
@@ -51,7 +55,7 @@ Follow the official setup guide to install the Vast CLI:
 
 ### Step 1: Set Your API Key
 
-1.1 Get your API key: [API Keys Documentation](https://docs.vast.ai/guides/reference/keys#api-keys)
+1.1 Get your API key: [API Keys Documentation](/guides/reference/keys#api-keys)
 
 1.2 Authenticate your CLI with your Vast.ai account:
 
@@ -93,11 +97,17 @@ If the test passes, you’ll see:
 If the test fails:
 
 * The CLI will display detailed reasons for failure.
-* Apply the suggested fixes and rerun the test.
+* Look up the exact error string in the [Self-Test Reference](/host/self-test-reference), apply the suggested fixes, and rerun the test.
 
 If the test says the machine is "not found or not rentable":
 
-* Try un-listing your machine, then listing it again.
+* Check whether the machine is rented, offline/unlisted, below the reliability threshold, missing active offers, or hidden from your API key:
+
+```
+vastai search offers 'machine_id=<machine_id> rentable=any rented=any'
+```
+
+* See [Self-Test Failures: machine not found or not rentable](/host/self-test-reference#machine-not-rentable) for the possible root states and remediation path.
 * Ensure your machine has no missing data in your machines page, such as upload and download speed, RAM, or ports.
 
 ### Optional: Ignore Requirements Mode
