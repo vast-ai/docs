@@ -1,0 +1,156 @@
+---
+title: "Optimize Your Earnings"
+description: "A guide to the key settings, tradeoffs, and strategies that determine how much your machines earn. Your hardware is only half the equation; how you configure your listings is the other."
+"canonical": "/host/optimization-guide"
+---
+
+<Info>
+**Who this is for:** Hosts who have already completed the technical setup process and have machines ready to list. This guide covers the *economic* decisions; that is, the settings and strategies that affect your ranking, occupancy, and revenue.
+</Info>
+
+## Understanding Your Market Position
+
+Before tuning any individual setting, it helps to understand where your supply sits relative to demand. Your listing competes with others for customer attention, and your goal is to find the combination of price, availability, and configuration that maximizes your total revenue over time.
+
+Revenue isn't just about price. It's the product of your **price per hour** and your **occupancy rate** (the percentage of time your machines are rented). A high price with low occupancy can easily earn less than a moderate price with strong utilization. Every setting in this guide affects that balance.
+
+Customers filter and sort listings by a variety of criteria, most commonly by **verification status**, **duration**, and **disk space**. If your listing doesn't pass these filters, it won't appear in search results regardless of how competitive your price is.
+
+<Tip>
+Think of your listing as a product on a shelf. Price is only one factor; other factors like availability, duration terms, and configuration determine whether customers even see it.
+</Tip>
+
+## Duration
+
+Duration controls how long a rental contract can last. It's one of the most impactful settings because it affects both the type of customer you attract and the stability of your revenue.
+
+**The core tradeoff:** Longer durations tend to increase expected earnings because customers value the guaranteed availability. However, you are locked into your pricing terms for the full contract length. For example, if market rates rise, you can't adjust mid-contract.
+
+| Short duration | → | Long duration |
+| :-- | :-: | --: |
+| *Flexibility, lower commitment* | | *Higher expected value, price lock-in* |
+
+### Customer Segments by Duration
+
+Different customer types have very different duration preferences. Understanding this helps you target the right segment for your hardware:
+
+| Customer Type | Typical Duration Need | Notes |
+| :-- | :-- | :-- |
+| Serverless / automated inference | Short (hours to days) | These workloads are transient. Use short-term instances for this segment. |
+| Experimentation & fine-tuning | Medium (days to weeks) | Researchers and developers testing models before committing to long runs. |
+| Training runs | Long (weeks to months+) | Customers often prefer very long durations or no maximum. Stable, high-value contracts. |
+
+<Tip>
+Consider enabling the **auto-extend** feature. This allows rentals to automatically continue beyond their initial term. It reduces churn without requiring you to commit to a longer maximum duration.
+</Tip>
+
+<Warning>
+**Data center hosts:** Do not set a duration longer than you can reliably honor. Breaking a contract early carries a serious penalty. Only commit to what you can guarantee.
+</Warning>
+
+## Pricing
+
+Pricing is the most direct lever for your earnings, but the optimal price isn't simply "as high as possible." Rather, it's the rate that maximizes total revenue given your hardware, competition, and current market conditions.
+
+**The core tradeoff:** Higher prices increase revenue per rental hour, but reduce occupancy. Lower prices fill your machines faster, but each hour earns less. The optimum sits somewhere in the middle and shifts with supply and demand.
+
+| Lower price | → | Higher price |
+| :-- | :-: | --: |
+| *Higher occupancy* | | *Higher per-hour revenue* |
+
+### On-Demand Pricing
+
+Your primary listing price. Use market data and your competitors' pricing as a reference point. Consider your hardware's relative performance, your verification status, and your reliability track record, as these all affect how customers evaluate your listing against alternatives.
+
+### Interruptible Pricing (Min Bid Price)
+
+This is one of the most commonly misconfigured settings. The Min Bid Price is a **floor** for the bidding system, *not* an on-demand price. Customers bid above this floor, and competition among bidders will drive the actual price higher.
+
+Many hosts set their interruptible floor too high because they treat it like their on-demand rate. This is a mistake. When your machines are idle, you earn nothing. A well-set interruptible floor ensures your GPUs are working even during low-demand periods.
+
+**Recommended strategy:** Set your Min Bid Price close to your **cost of power when the GPU is under load**. At this floor, you're at least covering your electricity costs during idle periods. Bidders will typically pay above this floor, so your actual interruptible revenue will be higher. If no one bids, consider running your own background jobs on the otherwise-idle hardware.
+
+<Warning>
+Your floor price should **not** be close to your expected actual rental price. The bidding mechanism will bring the price up, so you set the minimum you'd accept, not the price you hope to get.
+</Warning>
+
+### Disk Pricing
+
+Disk pricing depends on how much storage you have relative to what clients need:
+
+| Situation | Approach |
+| :-- | :-- |
+| You have **excess disk** capacity | Set disk pricing closer to your amortized cost. Storage is not your bottleneck. |
+| You are **under-provisioned** on disk | Set disk pricing higher than you might expect. This prevents stopped instances from consuming all your storage and starving active rentals. |
+
+### Internet Bandwidth Pricing
+
+This depends entirely on your network setup. If you have fast, unmetered upstream internet, you can price bandwidth low or even at zero, as this is a strong competitive advantage. If your network has QoS controls or internal metering, set a reasonable bandwidth price to prevent any single client from saturating your connection and degrading service for others.
+
+## Min GPU Configuration
+
+The Min GPU setting controls the smallest GPU partition you offer. For an 8-GPU machine, this determines whether customers can rent 1, 2, 4, or 8 GPUs at a time. It's a critical lever for balancing demand capture against utilization efficiency.
+
+**The core tradeoff:** Smaller minimums (e.g., 1x) let you serve more customers and fill individual GPU slots, but create fragmentation. Partial rentals can leave awkward, hard-to-fill gaps, leading to underutilization. Larger minimums (e.g., 8x) eliminate fragmentation but limit your audience to customers who need a full node.
+
+| Min GPU = 1 | → | Min GPU = 8 |
+| :-- | :-: | --: |
+| *More renters, more fragmentation* | | *Fewer renters, cleaner utilization* |
+
+### How It Works
+
+When you set a Min GPU value, the platform creates listings at all powers of two from your minimum up to the total GPUs in the machine. For example, on an 8-GPU machine with Min GPU set to 2, listings are created for 2x, 4x, and 8x configurations.
+
+### Recommended Approach
+
+If you operate multiple machines, distribute your Min GPU settings across them rather than using the same value everywhere. A healthy mix might look like this:
+
+| Machine | Min GPU | Available Listings |
+| :-- | :-- | :-- |
+| Machine A | 1 | 1x, 2x, 4x, 8x |
+| Machine B | 2 | 2x, 4x, 8x |
+| Machine C | 4 | 4x, 8x |
+| Machine D | 8 | 8x only |
+
+This approach lets you capture demand across all configuration sizes while keeping fragmentation in check. Market data suggests there is meaningful demand for both 1x and 8x configurations, with approximately twice as much search volume for 8x rentals as for 1x.
+
+<Tip>
+Avoid setting *all* machines to 1x, as this leads to severe fragmentation and reduced overall utilization. Conversely, all-8x can work if competitors in your GPU class are highly fragmented and there's strong demand for full nodes, but it's generally not the default recommendation.
+</Tip>
+
+The optimal mix depends on current market conditions, so be sure to consider what your competitors are offering and where unmet demand exists. Review your utilization patterns and adjust periodically.
+
+## Keeping Your Machines Competitive
+
+Settings alone won't help if your machines aren't reliable and up to date. A few operational basics make a significant difference in your listing's performance.
+
+### Driver Updates
+
+Ensure you have the latest NVIDIA drivers installed at the time of listing. Outdated drivers can cause compatibility issues with customer workloads and result in failed rentals.
+
+### Testing
+
+Test your machines before listing and after any configuration changes. A machine that appears available but fails when rented wastes a customer's time and yours, so you lose the rental and risk a negative reliability signal.
+
+### Verification
+
+Verification is one of the most common filters customers apply when searching. Ensuring your machines are verified significantly increases your visibility in search results.
+
+### Data Center Hosts
+
+If you operate out of a data center, consider highlighting any certifications you hold (e.g., Tier 4 data center, HIPAA compliance) as differentiators. These can be meaningful selling points for enterprise and compliance-sensitive customers.
+
+---
+
+## Quick Reference: Settings at a Glance
+
+| Setting | Key Question | Watch Out For |
+| :-- | :-- | :-- |
+| **Duration** | How long can you reliably commit? | Over-committing (especially data centers); price lock-in on long contracts |
+| **On-Demand Price** | What rate balances occupancy and revenue? | Pricing in a vacuum without checking competitors |
+| **Min Bid Price** | What's your absolute floor (cost of power)? | Setting it like an on-demand price; leaving GPUs idle instead |
+| **Disk Price** | Are you over- or under-provisioned on storage? | Under-pricing when disk-constrained, causing starvation |
+| **Bandwidth Price** | Is your network metered or unmetered? | Zero pricing on a metered connection |
+| **Min GPU** | What's the right fragmentation vs. demand balance? | All machines at 1x (fragmentation) or all at 8x (missed demand) |
+| **NVIDIA Drivers** | Are drivers current at time of listing? | Outdated drivers causing failed rentals |
+| **Auto-Extend** | Is it enabled? | Forgetting to turn it on |
