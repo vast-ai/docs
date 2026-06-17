@@ -1,7 +1,7 @@
 ---
 title: "Installing the Vast Host Software"
 sidebarTitle: "Install Host Software"
-description: "Canonical install guide for the Vast host daemon and setup script."
+description: "Canonical install guide for the Vast host installer wizard and daemon."
 "canonical": "/host/installing-host-software"
 personas:
   - pro-operator
@@ -11,7 +11,7 @@ personas:
 
 <div className="persona-chips"><span className="persona-chip">Pro Operator</span><span className="persona-chip">Headless / DC</span><span className="persona-chip">Hobbyist</span></div>
 
-Install the Vast host software from the official setup flow, then verify that the daemon, Docker, storage, and GPU runtime are healthy.
+Install the Vast host software from the official setup flow, then verify that the daemon, Docker, storage, network, and GPU runtime are healthy.
 
 ## Before you install
 
@@ -20,18 +20,52 @@ Work through [Hardware Prep](/host/hardware-prep#install-prerequisites) and [Sto
 <a id="install-command" />
 ## Where should I copy the install command from?
 
-Copy the current install command from the official Vast host setup page after your account is host-enabled. The command may include account-specific token or API-key material, so do not reuse commands from old notes, screenshots, third-party guides, or another account.
+Copy the current installer command from the official [Vast host setup page](https://cloud.vast.ai/host/setup/) after your account is host-enabled. The setup page provides the current Host Installer Wizard for your account and machine.
+
+The command may include account-specific token or API-key material, so do not reuse commands from old notes, screenshots, third-party guides, or another account.
+
+<a id="host-installer-wizard" />
+## What is the Host Installer Wizard (TUI)?
+
+The Host Installer Wizard is Vast's guided terminal user interface (TUI) for new host machines. It runs in the terminal on the host and walks through the install flow step by step instead of leaving you to diagnose a long script failure after the fact.
+
+![Host Installer Wizard terminal review screen](/images/host-installer-wizard-tui.png)
+
+The exact screens can change as the installer improves. Always follow the current instructions shown on the official host setup page.
+
+Use it as the primary install path for new hosts:
+
+1. Sign in to the host-enabled Vast account.
+2. Open the official [host setup page](https://cloud.vast.ai/host/setup/).
+3. Copy the current installer command shown there.
+4. Run it on the host machine, either locally or over SSH.
+5. Work through each wizard screen and fix any failed check before continuing.
+
+The wizard is intended to check the major issues that usually block a host from becoming rentable:
+
+| Area | What to expect |
+| --- | --- |
+| Account access | Validates that the API key or account-specific setup material is usable before the daemon is installed. |
+| System readiness | Checks the operating system, NVIDIA driver, CUDA/GPU visibility, CPU/RAM, disk, and Docker-related prerequisites. |
+| Network readiness | Tests the configured port range and network speed before install completion. |
+| Installation | Installs the Vast host software and shows installer progress in the terminal. |
+| Logs and recovery | Shows useful failure context and points to the install log instead of leaving only a raw stack trace. |
+| Rentability | Runs or prompts for the host self-test so you can confirm the machine is actually ready to list. |
+
+<Tip>
+If you are running a headless server, use the same official setup flow over SSH. Keep the SSH session open until the wizard finishes or use a terminal multiplexer such as `tmux` when working over unstable remote links.
+</Tip>
 
 <a id="install-failures" />
 ## Why did the install script fail?
 
-Common causes include an expired or stale setup command, a truncated token or API key, an account that has not fully converted to host mode, an interrupted binary download, a deprecated endpoint, an executable or service failure such as `203/EXEC`, Docker/cgroup issues, or storage quota/filesystem mismatch.
+Common causes include an expired or stale setup command, a truncated token or API key, an account that has not fully converted to host mode, an interrupted installer download, a deprecated endpoint, an executable or service failure such as `203/EXEC`, Docker/cgroup issues, blocked ports, low upload speed, or storage quota/filesystem mismatch.
 
-Re-copy the install command from the official setup page, confirm the account is host-enabled, then check the installer and daemon logs before retrying.
+Re-copy the installer command from the official setup page, confirm the account is host-enabled, then rerun the Host Installer Wizard. If it fails again, use the wizard's displayed error, the installer log, and the daemon logs to decide what to fix before retrying.
 
 ## Logs and diagnostics
 
-Check `vast_host_install.log` for installer output and the `kaalia` systemd service for daemon health. For log locations and diagnostic bundles, see [Common Errors & Diagnostics](/host/common-errors-diagnostics#logs).
+Check `vast_host_install.log` for installer output and the `kaalia` systemd service for daemon health. The wizard may also show recent log output directly in the terminal when a step fails. For log locations and diagnostic bundles, see [Common Errors & Diagnostics](/host/common-errors-diagnostics#logs).
 
 ## After the install
 
