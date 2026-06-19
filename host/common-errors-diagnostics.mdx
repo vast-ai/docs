@@ -111,6 +111,24 @@ Treat repeated Xid, NVRM, PCIe, or AER errors as host hardware/driver health sig
 
 Inspect risers, slots, cables, contacts, power, BIOS lane settings, motherboard health, and GPU health before listing again.
 
+Search kernel and syslog history for AER/PCIe evidence:
+
+```bash
+sudo journalctl -k -b --no-pager | grep -Ei 'AER|PCIe Bus Error|pcieport|NVRM|Xid'
+sudo journalctl -k -b -1 --no-pager | grep -Ei 'AER|PCIe Bus Error|pcieport|NVRM|Xid'
+sudo dmesg -T | grep -Ei 'AER|PCIe Bus Error|pcieport|NVRM|Xid'
+sudo grep -Ei 'AER|PCIe Bus Error|pcieport|NVRM|Xid' /var/log/syslog /var/log/syslog.1 /var/log/kern.log /var/log/kern.log.1 2>/dev/null
+sudo zgrep -Ei 'AER|PCIe Bus Error|pcieport|NVRM|Xid' /var/log/syslog.*.gz /var/log/kern.log.*.gz 2>/dev/null
+```
+
+While reproducing under load, watch live kernel messages in another SSH session:
+
+```bash
+sudo journalctl -kf | grep --line-buffered -Ei 'AER|PCIe Bus Error|pcieport|NVRM|Xid'
+```
+
+Correlate timestamps with self-test runs, rentals, `gpu-burn`, or other load tests. Repeated messages during load are much more concerning than a small number of corrected messages during boot.
+
 <a id="red-error" />
 ## Red Machine Error
 
