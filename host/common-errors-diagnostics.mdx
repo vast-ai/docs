@@ -12,6 +12,16 @@ personas:
 
 Use this page for host errors that are not covered by install, networking, or self-test pages.
 
+## Common Dashboard Messages
+
+| Message | Start here |
+| --- | --- |
+| `Port issue` or `vericode=8` | [Port Issue / vericode=8](#port-issue) |
+| `GPU PCIE issue` or repeated AER messages | [GPU PCIE Issue / AER](#gpu-pcie-issue) |
+| `failed to inject CDI devices` or `unresolvable CDI devices` | [Failed To Inject CDI Devices](#failed-cdi) |
+| `bad bandwidthtest2` | [`bad bandwidthtest2`](#bad-bandwidthtest2) |
+| `nvidia-smi` fails or NVML mismatch | [`nvidia-smi` Fails](#nvidia-smi-fails) |
+
 <a id="logs" />
 ## Logs
 
@@ -94,10 +104,24 @@ sudo dmesg -T | grep -Ei 'NVRM|Xid|AER|PCIe|fallen|GPU has fallen'
 
 Treat repeated Xid, NVRM, PCIe, or AER errors as host hardware/driver health signals, not as isolated self-test messages.
 
+<a id="gpu-pcie-issue" />
+## GPU PCIE Issue / AER
+
+`GPU PCIE issue` means the PCIe link should be investigated. Corrected AER at boot can be harmless, but repeated AER messages, uncorrectable AER, errors under load, downgraded PCIe links under load, Xid 79, or `bad bandwidthtest2` point to a real hardware path problem.
+
+Inspect risers, slots, cables, contacts, power, BIOS lane settings, motherboard health, and GPU health before listing again.
+
 <a id="red-error" />
 ## Red Machine Error
 
 The Machines page shows red errors detected by the host software. Fix the cause, then allow the platform to refresh. Many resolved errors clear automatically after 1-2 hours.
+
+<a id="port-issue" />
+## Port Issue / vericode=8
+
+`Port issue`, `vericode=8`, and self-test progress timeouts usually mean a direct-port reachability problem. Confirm the configured host port range, forward the same range to the host LAN IP, and test from outside the LAN because same-LAN tests can be misleading.
+
+Forward both TCP and UDP. CGNAT, double NAT without a real public forwarding path, no inbound public IP, blocked inbound ports, or incompatible IPv6-only service are not supported hosting setups. See [Network & Ports](/host/network-ports) for the full checklist.
 
 <a id="docker-cache" />
 ## Full Client Storage
@@ -127,7 +151,20 @@ Treat this as a machine health or verification error. Check PCIe bandwidth, lane
 <a id="failed-cdi" />
 ## Failed To Inject CDI Devices
 
-This points to GPU device injection or container runtime setup. Gather diagnostics, confirm GPUs are visible on the host, check Docker/NVIDIA runtime/CDI configuration, and inspect daemon/container logs. Do not assume regenerating CDI configuration fixes an unhealthy GPU, driver, or PCIe link. Escalate with logs if containers still cannot receive GPUs.
+This points to GPU device injection or container runtime setup. First confirm the host can see every GPU and Docker can inject those GPUs into a normal container:
+
+```bash
+nvidia-smi -L
+sudo docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi -L
+```
+
+If the machine is idle and not rented, you can also run a short load test with a GPU burn image you trust:
+
+```bash
+sudo docker run --rm --gpus all oguzpastirmaci/gpu-burn 60
+```
+
+If the container test fails, gather diagnostics, check Docker/NVIDIA runtime/CDI configuration, and inspect daemon/container logs. Do not assume regenerating CDI configuration fixes an unhealthy GPU, driver, or PCIe link. Escalate with logs if containers still cannot receive GPUs.
 
 <a id="collect-logs" />
 ## Before Asking For Help
