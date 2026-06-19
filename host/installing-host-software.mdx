@@ -11,62 +11,113 @@ personas:
 
 <div className="persona-chips"><span className="persona-chip">Pro Operator</span><span className="persona-chip">Headless / DC</span><span className="persona-chip">Hobbyist</span></div>
 
-Install the Vast host software from the official setup flow, then verify that the daemon, Docker, storage, network, and GPU runtime are healthy.
+Install from the official Vast host setup flow, then confirm the daemon, Docker storage, network, and GPUs are healthy.
 
-## Before you install
+## Before You Install
 
-Work through [Hardware Prep](/host/hardware-prep#install-prerequisites) and [Storage Setup](/host/storage-setup) first. Your account must already be host-enabled with the agreement accepted; see [Account & Hosting Agreement](/host/account-hosting-agreement).
+Complete [Hardware Prep](/host/hardware-prep), [Storage Setup](/host/storage-setup), and [Network & Ports](/host/network-ports). Your account must be host-enabled and the hosting agreement accepted; see [Account & Hosting Agreement](/host/account-hosting-agreement).
 
 <a id="install-command" />
-## Where should I copy the install command from?
+## Install Command
 
-Copy the current installer command from the official [Vast host setup page](https://cloud.vast.ai/host/setup/) after your account is host-enabled. The setup page provides the current Host Installer Wizard for your account and machine.
+Copy the current command from the official [Vast host setup page](https://cloud.vast.ai/host/setup/).
 
-The command may include account-specific token or API-key material, so do not reuse commands from old notes, screenshots, third-party guides, or another account.
+The command can include an account-specific machine installation key. Do not reuse commands from old notes, shell history, screenshots, third-party guides, or another account. A regular API key is not a setup-page installation key.
 
 <a id="host-installer-wizard" />
-## What is the Host Installer Wizard (TUI)?
+## Host Installer Wizard
 
-The Host Installer Wizard is Vast's guided terminal user interface (TUI) for new host machines. It runs in the terminal on the host and walks through the install flow step by step instead of leaving you to diagnose a long script failure after the fact.
+The Host Installer Wizard is Vast's terminal UI for new host machines.
 
 ![Host Installer Wizard terminal review screen](/images/host-installer-wizard-tui.png)
 
-The exact screens can change as the installer improves. Always follow the current instructions shown on the official host setup page.
+Use it as the default install path:
 
-Use it as the primary install path for new hosts:
+1. Sign in to the host-enabled account.
+2. Open the [host setup page](https://cloud.vast.ai/host/setup/).
+3. Copy the current installer command.
+4. Run it on the host, locally or over SSH.
+5. Fix failed checks before continuing.
 
-1. Sign in to the host-enabled Vast account.
-2. Open the official [host setup page](https://cloud.vast.ai/host/setup/).
-3. Copy the current installer command shown there.
-4. Run it on the host machine, either locally or over SSH.
-5. Work through each wizard screen and fix any failed check before continuing.
-
-The wizard is intended to check the major issues that usually block a host from becoming rentable:
-
-| Area | What to expect |
-| --- | --- |
-| Account access | Validates that the API key or account-specific setup material is usable before the daemon is installed. |
-| System readiness | Checks the operating system, NVIDIA driver, CUDA/GPU visibility, CPU/RAM, disk, and Docker-related prerequisites. |
-| Network readiness | Tests the configured port range and network speed before install completion. |
-| Installation | Installs the Vast host software and shows installer progress in the terminal. |
-| Logs and recovery | Shows useful failure context and points to the install log instead of leaving only a raw stack trace. |
-| Rentability | Runs or prompts for the host self-test so you can confirm the machine is actually ready to list. |
+The wizard checks account access, OS/GPU readiness, storage, network ports, network speed, install progress, and self-test readiness.
 
 <Tip>
-If you are running a headless server, use the same official setup flow over SSH. Keep the SSH session open until the wizard finishes or use a terminal multiplexer such as `tmux` when working over unstable remote links.
+For SSH installs, keep the session open or use `tmux`.
 </Tip>
 
+If the wizard stops at NVIDIA/CUDA checks, repair the driver, reboot, confirm `nvidia-smi` shows every GPU, then rerun the wizard.
+
+<a id="headless-fallback" />
+## Headless Fallback
+
+Use the TUI when possible. If the SSH terminal cannot drive it reliably, use the raw installer only after the host is already prepared:
+
+- `nvidia-smi` shows every GPU.
+- `/var/lib/docker` is XFS with project quotas.
+- TCP and UDP are forwarded for the direct port range.
+- You copied a fresh setup-page machine installation key.
+
+Example:
+
+```bash
+mkdir -p ~/vast-install
+cd ~/vast-install
+wget https://console.vast.ai/install -O install
+read -rsp "Paste fresh Vast host setup key: " VAST_HOST_KEY
+echo
+sudo python3 ./install "$VAST_HOST_KEY" \
+  --no-driver \
+  --docker-partition /dev/mapper/vg1-lv--1 \
+  --ports 40000 40799
+unset VAST_HOST_KEY
+```
+
+Replace the device and port range with your host values. Use `--no-driver` only after verifying the NVIDIA driver yourself. Do not reset machine identity unless Vast support tells you to.
+
+<Warning>
+Keep setup keys out of screenshots, tickets, and shell history.
+</Warning>
+
 <a id="install-failures" />
-## Why did the install script fail?
+## Install Failures
 
-Common causes include an expired or stale setup command, a truncated token or API key, an account that has not fully converted to host mode, an interrupted installer download, a deprecated endpoint, an executable or service failure such as `203/EXEC`, Docker/cgroup issues, blocked ports, low upload speed, or storage quota/filesystem mismatch.
+Common causes:
 
-Re-copy the installer command from the official setup page, confirm the account is host-enabled, then rerun the Host Installer Wizard. If it fails again, use the wizard's displayed error, the installer log, and the daemon logs to decide what to fix before retrying.
+- Stale setup command.
+- Account not fully host-enabled.
+- Interrupted installer download.
+- Driver or Docker/cgroup problem.
+- Blocked ports or low upload speed.
+- Storage quota/filesystem mismatch.
 
-## Logs and diagnostics
+Refresh the setup page, copy a fresh command, confirm host account access, and rerun the wizard. Use the wizard error, installer log, and daemon logs to decide what to fix.
 
-Check `vast_host_install.log` for installer output and the `kaalia` systemd service for daemon health. The wizard may also show recent log output directly in the terminal when a step fails. For log locations and diagnostic bundles, see [Common Errors & Diagnostics](/host/common-errors-diagnostics#logs).
+## Logs
 
-## After the install
+Check `vast_host_install.log`, the `vastai.service` systemd unit, and the kaalia logs. For log locations and diagnostic bundles, see [Common Errors & Diagnostics](/host/common-errors-diagnostics#logs).
 
-Confirm the machine appears under your host account, then continue with [How to Self-Test](/host/how-to-self-test) and [First 24 Hours](/host/first-24-hours#healthy-daemon).
+## After Install
+
+Confirm the machine appears under your host account, then check:
+
+```bash
+systemctl is-active vastai.service vast_metrics.service docker nvidia-persistenced.service
+findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS
+sudo xfs_quota -x -c "state" /var/lib/docker
+sudo cat /var/lib/vastai_kaalia/host_port_range
+```
+
+Expected:
+
+- Services report `active`.
+- `/var/lib/docker` is XFS with `pquota` or `prjquota`.
+- XFS project quota accounting and enforcement are ON.
+- Port range matches your firewall/router forwarding.
+
+The installer may start self-test automatically. On a fresh host it can wait about 10 minutes for daemon initialization:
+
+```bash
+sudo tail -f /var/lib/vastai_kaalia/self_test.log
+```
+
+Then continue with [How to Self-Test](/host/how-to-self-test) and [First 24 Hours](/host/first-24-hours).

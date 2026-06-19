@@ -10,81 +10,153 @@ personas:
 
 <div className="persona-chips"><span className="persona-chip">Pro Operator</span><span className="persona-chip">Headless / DC</span></div>
 
-Use this page for host errors that are not specific to install, networking, or self-test, and for collecting diagnostics before asking for help.
+Use this page for host errors that are not covered by install, networking, or self-test pages.
 
 <a id="logs" />
-## Where are installer, daemon, and self-test logs?
+## Logs
 
-For self-test failures, the CLI can create a diagnostic bundle. Default self-test bundles include:
+Installer logs are written to `vast_host_install.log` in the directory where you launched the installer, not under `/var/lib/vastai_kaalia`.
+
+```bash
+cat vast_host_install.log
+```
+
+If the installer created a compressed log archive:
+
+```bash
+tar -xzvf vastai_install_logs.tar.gz
+cat vast_host_install.log
+```
+
+The host daemon log is:
+
+```bash
+sudo tail -n 100 /var/lib/vastai_kaalia/kaalia.log
+```
+
+For self-test failures, the CLI can create a diagnostic bundle. The normal command is:
+
+```bash
+vastai self-test machine <machine_id>
+```
+
+Failure bundles are saved by default under:
+
+```text
+/tmp/vast_selftest_<machine_id>_<timestamp>.tar.gz
+```
+
+You can override the output directory:
+
+```bash
+vastai self-test machine <machine_id> \
+  --support-bundle-dir /path/to/output
+```
+
+Bundles can include:
 
 - `self-test-output.log`
 - `self-test-result.json`
 - `manifest.json`
 - `collection-errors.json`
-
-Runtime failures can also include:
-
 - `instance/show-instance.json`
 - `instance/container.log`
 - `instance/daemon.log`
 
-You can also create a manual diagnostic bundle with the Vast CLI. Use the current CLI reference for the exact command and run it from the host-enabled account that owns the machine.
+For a quick SSH check:
 
-If you run diagnostics on the actual host, the bundle can include host-local artifacts such as kaalia logs, `dmesg`, `journalctl`, Docker daemon config, and mount information.
+```bash
+systemctl is-active vastai.service vast_metrics.service docker nvidia-persistenced.service
+sudo journalctl -u vastai.service -n 80 --no-pager
+sudo journalctl -u vast_metrics.service -n 80 --no-pager
+sudo tail -n 100 /var/lib/vastai_kaalia/kaalia.log
+sudo cat /var/lib/vastai_kaalia/host_port_range
+```
+
+Services should be `active`, logs should not show restart loops or repeated fatal errors, and the configured port range should match the forwarded ports.
+
+<a id="gpu-kernel-logs" />
+## GPU, PCIe, And AER Kernel Logs
+
+Use kernel logs to distinguish a normal container/runtime error from a machine-health problem:
+
+- **NVRM**: NVIDIA kernel driver messages.
+- **Xid**: NVIDIA GPU fault, reset, or error codes.
+- **PCIe**: the bus/link between the GPU, motherboard, and CPU.
+- **AER**: PCIe Advanced Error Reporting messages. Repeated AER messages can point to risers, slots, power, BIOS lane settings, cabling, motherboard, or GPU hardware issues.
+
+Check the current boot:
+
+```bash
+sudo journalctl -k -b --no-pager | grep -Ei 'NVRM|Xid|AER|PCIe|fallen|GPU has fallen'
+sudo dmesg -T | grep -Ei 'NVRM|Xid|AER|PCIe|fallen|GPU has fallen'
+```
+
+Treat repeated Xid, NVRM, PCIe, or AER errors as host hardware/driver health signals, not as isolated self-test messages.
 
 <a id="red-error" />
-## What is this red error message on my machine?
+## Red Machine Error
 
-If the hosting software detects an error, that error message is listed on your machine in the machines page. Once the cause of the error has been resolved, most error messages are automatically cleared after 1-2 hours. The quickest way to learn more about resolving specific error messages is the hosting channels in [our Discord](https://discord.gg/hSuEbSQ4X8).
+The Machines page shows red errors detected by the host software. Fix the cause, then allow the platform to refresh. Many resolved errors clear automatically after 1-2 hours.
 
 <a id="docker-cache" />
-## My storage for clients is full of old stopped jobs — can I free up space?
+## Full Client Storage
 
-Try cleaning up the Docker build cache, as it sometimes frees up far more space than it claims. You can also clean up old unused images. For expired or deleted rental contracts that did not release their storage, run [vastai cleanup machine](/host/cli/cleanup-machine).
+Try cleaning Docker build cache and old unused images. For expired or deleted rentals that did not release storage, run [vastai cleanup machine](/host/cli/cleanup-machine).
 
 <a id="nvidia-smi-fails" />
-## What should I do when nvidia-smi fails?
+## `nvidia-smi` Fails
 
-Treat `nvidia-smi` failure as a host GPU or driver health problem. Check whether the NVIDIA driver is loaded, whether the GPU is visible on the PCIe bus, whether a reboot is needed after a driver or kernel update, whether there is an NVML driver/library mismatch, and whether system logs show NVRM, Xid, or PCIe errors. Do not keep a machine listed if it cannot reliably report GPU state.
+Treat this as a GPU or driver health problem. Check driver load, PCIe visibility, reboot state after updates, NVML mismatch, and NVRM/Xid/PCIe logs. Do not list a machine that cannot reliably report GPU state.
 
 <a id="nvml-mismatch" />
-## What should I do for NVML driver/library mismatch?
+## NVML Driver/Library Mismatch
 
-This usually means the NVIDIA userspace library and loaded kernel module are from different driver versions, often after an update. Plan downtime and reboot first. If the mismatch persists, clean up or reinstall the NVIDIA driver stack, then verify `nvidia-smi` before listing again.
+This usually means the NVIDIA userspace library and loaded kernel module are different versions. Plan downtime, reboot first, then reinstall or repair the NVIDIA driver stack if needed.
 
 <a id="gpu-falls-off-bus" />
-## What should I do when a GPU falls off the PCIe bus?
+## GPU Falls Off The PCIe Bus
 
-Treat this as a hardware, power, thermal, PCIe, or driver stability issue. Check logs for NVRM, Xid, and PCIe/AER errors. Power-cycle the machine, then inspect PSU capacity, power cables, risers, slots, PCIe lane settings, thermals, and any overclock or undervolt. Repeated bus drops should be fixed before the machine is listed again.
+Check NVRM, Xid, and PCIe/AER logs. Power-cycle, then inspect PSU capacity, cables, risers, slots, PCIe lane settings, thermals, and any overclock/undervolt. Fix repeated bus drops before listing again.
 
 <a id="bad-bandwidthtest2" />
-## What should I do for bad bandwidthtest2?
+## `bad bandwidthtest2`
 
-`bad bandwidthtest2` is best treated as a machine health or verification error. It usually points at a GPU, PCIe, driver/runtime, or data-transfer problem. Check PCIe bandwidth and lane configuration, GPU seating, thermals, power, driver and NVML health, Xid errors, Docker GPU runtime behavior, and self-test diagnostic output. Rerun self-test after fixing the hardware or driver issue.
+Treat this as a machine health or verification error. Check PCIe bandwidth, lane configuration, GPU seating, thermals, power, driver/NVML health, Xid errors, Docker GPU runtime behavior, and self-test output. Rerun self-test after fixes.
 
 <a id="failed-cdi" />
-## What should I do for failed to inject CDI devices?
+## Failed To Inject CDI Devices
 
-If logs or machine status mention failed CDI device injection, treat it as a container GPU device injection or runtime problem. Current self-test output may surface the same underlying issue as a startup or runtime failure instead of using the literal CDI text. Gather a diagnostic bundle, check Docker and NVIDIA container runtime/CDI configuration, confirm GPUs are visible on the host, inspect daemon and container logs, and check for related machine errors. If the configuration looks correct but containers still cannot receive GPU devices, escalate with logs and the machine details requested by support.
+This points to GPU device injection or container runtime setup. Gather diagnostics, confirm GPUs are visible on the host, check Docker/NVIDIA runtime/CDI configuration, and inspect daemon/container logs. Do not assume regenerating CDI configuration fixes an unhealthy GPU, driver, or PCIe link. Escalate with logs if containers still cannot receive GPUs.
 
 <a id="collect-logs" />
-## What logs should I collect before asking for help?
+## Before Asking For Help
 
-Include the account context, exact command, timestamps, screenshots or CLI output, tested external IP:port for network failures, and the self-test support bundle when available. If support asks for machine-specific details, share them in the support channel rather than a public community thread.
+Include:
 
-Review bundles before sharing them.
+- Account context and exact command.
+- Machine ID, offer ID if relevant, and whether the account is the host account.
+- Exact timestamps with timezone.
+- Exact error strings, screenshots, or CLI output.
+- What changed recently: reboot, driver, kernel, Docker, BIOS, storage, router, or ISP.
+- Host OS, GPU model/count, NVIDIA driver version, and Docker storage mount output.
+- Tested external IP and port for networking issues.
+- Self-test support bundle when available.
+- Installer log, daemon log, and relevant kernel log excerpts.
+
+Review bundles before sharing them. Share sensitive machine/account details only in the appropriate support channel.
 
 <a id="escalate-support" />
-## What should I escalate to Vast support?
+## Escalate To Vast Support
 
-Escalate account conversion or hosting agreement issues, payment/tax/payout provider issues that the docs cannot resolve, backend machine records or ghost machines that normal UI/CLI actions cannot remove, API permission or account-visibility problems, suspected backend bugs, and cases where self-test or diagnostics show a platform state mismatch after following documented steps.
+Escalate account conversion, hosting agreement, payout, API permission, backend machine record, ghost machine, suspected backend bug, or platform-state mismatch issues.
 
-Local Ubuntu, Docker, GPU driver, hardware, power, thermals, and consumer network setup are primarily host responsibilities. Bring logs and diagnostics when asking for help.
+Local Ubuntu, Docker, GPU driver, hardware, power, thermals, and consumer networking are primarily host responsibilities. Vast hosting requires direct public inbound TCP/UDP reachability; CGNAT or double NAT without a real public forwarding path is not a supported hosting network setup.
 
-## Related pages
+## Related Pages
 
 | Topic | Read next |
 | --- | --- |
-| Install-time failures | [Installing Host Software](/host/installing-host-software#install-failures) |
-| Self-test error strings | [Self-Test Reference](/host/self-test-reference) |
-| Connectivity problems | [Network & Ports](/host/network-ports) |
+| Install failures | [Installing Host Software](/host/installing-host-software#install-failures) |
+| Self-test errors | [Self-Test Reference](/host/self-test-reference) |
+| Connectivity | [Network & Ports](/host/network-ports) |

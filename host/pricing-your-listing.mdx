@@ -10,60 +10,55 @@ personas:
 
 <div className="persona-chips"><span className="persona-chip">Business</span><span className="persona-chip">Pro Operator</span></div>
 
-Use this page when you are ready to list a verified machine or adjust an existing offer. Pricing is a balance between hourly rate, utilization, renter fit, and how long you are willing to keep the machine available.
+Use this page when you are ready to list a machine or adjust an offer. Price for total revenue, not just the highest hourly rate.
 
 ## Before You Price
 
-Check these first:
+Confirm:
 
-1. The machine is stable enough to rent and has no unresolved hardware, driver, Docker, storage, or network errors.
-2. The offer end date matches the commitment you are willing to honor.
-3. You have compared similar machines in [GPU Market Metrics](/host/market-metrics).
-4. You have estimated gross revenue using the [Earnings & Pricing Model](/host/earning).
-5. You understand that price changes affect new rental contracts only.
+- No unresolved hardware, driver, Docker, storage, or network errors.
+- Offer end date matches the commitment you can honor.
+- Similar machines have been checked in [GPU Market Metrics](/host/market-metrics).
+- Gross revenue has been estimated with the [Earnings Model](/host/earning).
+- You understand that price changes affect future rental contracts only.
 
 <a id="listing-controls" />
 ## Listing Controls
 
-These controls define the terms renters see when they choose your machine.
-
-| Control | CLI option | What it changes |
+| Control | CLI option | Meaning |
 | --- | --- | --- |
-| On-demand GPU price | `--price_gpu` | Per-GPU rental price in dollars per hour for active on-demand rentals. |
-| Interruptible minimum bid | `--price_min_bid` | Lowest per-GPU bid price you will accept for interruptible rentals. |
-| Reserved discount rate | `--discount_rate` | Maximum long-term prepay discount rate for reserved rentals. |
-| Minimum GPU chunk | `--min_chunk` | Smallest GPU group a renter can select from a multi-GPU machine. |
-| Offer end date | `--end_date` or `--duration` | How long the offer accepts new rental contracts. |
-| Disk price | `--price_disk` | Storage price in dollars per GB per month for inactive instances. |
-| Upload and download price | `--price_inetu`, `--price_inetd` | Bandwidth prices in dollars per GB. |
-| Volume offer size and price | `--vol_size`, `--vol_price` | Optional separately listed storage volume offer. |
+| On-demand GPU price | `--price_gpu` | Dollars per GPU-hour. |
+| Interruptible min bid | `--price_min_bid` | Lowest bid you will accept for interruptible rentals. |
+| Reserved discount | `--discount_rate` | Maximum long-term prepay discount. |
+| Minimum GPU chunk | `--min_chunk` | Smallest GPU group renters can select. |
+| Offer end date | `--end_date` or `--duration` | How long new renters can accept the offer. |
+| Disk price | `--price_disk` | Dollars per GB per month for inactive storage. |
+| Bandwidth price | `--price_inetu`, `--price_inetd` | Dollars per GB uploaded/downloaded. |
+| Volume offer | `--vol_size`, `--vol_price` | Optional separately listed storage. |
 
-DPH means dollars per hour. In host listing discussions, it usually refers to the hourly price of GPU compute, but the renter's total cost can also include storage and bandwidth.
+DPH means dollars per hour, usually GPU compute price.
 
 ## Starting Workflow
 
-1. Find comparable offers with the same GPU model, similar GPU count, similar verification state, similar region, and similar machine quality.
-2. Compare P10, median, and P90 prices for the last 30 days.
-3. Choose an on-demand price that fits your goal: high occupancy, high hourly rate, or a balanced middle.
-4. Set `min_gpu`/`--min_chunk` to `1` unless you have a clear reason to require multi-GPU rentals.
-5. Set an interruptible minimum bid if you want lower-priority bid rentals.
-6. Set a reserved discount only if you are comfortable with longer rentals at a lower effective rate.
+1. Compare same GPU model, GPU count, verification state, region, and machine quality.
+2. Check P10, median, and P90 pricing for the last 30 days.
+3. Pick an on-demand price for your goal: occupancy, hourly rate, or balance.
+4. Set `min_gpu`/`--min_chunk` to `1` unless you have a reason to require larger rentals.
+5. Set an interruptible min bid only as a floor, not as your target price.
+6. Use reserved discounts only if you can support longer rentals.
 7. Set an offer end date you can honor.
-8. Review utilization after the machine has had enough time on the market.
 
-## Worked Example
+## Example
 
-A 4-GPU machine has comparable 30-day market prices of P10 `$0.35`, median `$0.45`, and P90 `$0.65` per GPU-hour. The host wants a balanced start and chooses:
+For a 4-GPU machine with comparable prices of P10 `$0.35`, median `$0.45`, and P90 `$0.65` per GPU-hour:
 
-| Setting | Example value | Reason |
-| --- | --- | --- |
-| On-demand price | `$0.45/GPU/hr` | Starts near the comparable median. |
-| Interruptible min bid | `$0.25/GPU/hr` | Allows lower-priority rentals without accepting very low bids. |
-| Reserved discount | `0.30` | Offers a discount for longer rentals while preserving margin. |
-| Minimum GPU chunk | `1` | Lets renters take 1, 2, or 4 GPUs instead of requiring the whole machine. |
-| Offer end date | A known maintenance-safe date | Avoids open-ended commitments the host may not be able to honor. |
-
-The matching CLI options are:
+| Setting | Example |
+| --- | --- |
+| On-demand price | `$0.45/GPU/hr` |
+| Interruptible min bid | `$0.25/GPU/hr` |
+| Reserved discount | `0.30` |
+| Minimum GPU chunk | `1` |
+| Offer end date | Maintenance-safe date |
 
 ```bash
 --price_gpu 0.45 \
@@ -73,40 +68,35 @@ The matching CLI options are:
   --end_date 12/31/2026
 ```
 
-Use those values through the console or the current [vastai list machine](/host/cli/list-machine) CLI syntax. Adjust the numbers for your market, operating costs, and risk tolerance.
+Adjust for your market, operating cost, and risk tolerance. Use the current [vastai list machine](/host/cli/list-machine) syntax.
 
 ## Changing Price Later
 
-When a renter accepts an offer, the offer terms become that rental contract. The price, hardware terms, and rental end date are locked for that contract.
-
-Changing the listing price later affects only future rental contracts:
+When a renter accepts an offer, its terms become that rental contract. Later changes affect only future rentals.
 
 | Change | Effect |
 | --- | --- |
-| Raise the listed price | New renters see the higher price. Existing renters keep their original price. |
-| Lower the listed price | New renters see the lower price. Existing renters keep their original price. |
-| Shorten the offer end date | New contracts are limited by the new end date. Existing rental end dates do not shorten. |
-| Unlist the machine | Prevents new rentals, but active rental contracts continue until their rental end dates. |
+| Raise or lower price | New renters see the new price; active renters keep the accepted price. |
+| Shorten offer end date | New contracts use the new date; active rental end dates do not shorten. |
+| Unlist machine | Stops new rentals; active contracts continue. |
 
-If a machine has active rental contracts, keep it online and functional until the latest rental end date shown for that machine.
+Keep the machine online until the latest active rental end date.
 
 ## When To Adjust
 
-Use utilization and market movement as your main signals.
-
 | Signal | Possible action |
 | --- | --- |
-| Low utilization and many similar cheaper offers | Lower price, improve listing quality, or revisit hardware fit. |
-| High utilization and many similar offers priced higher | Consider raising price for future contracts. |
-| Good price but poor rentals | Check verification, reliability, search visibility, network, storage, and machine errors. |
-| Frequent interruptible rentals but low on-demand demand | Recheck on-demand price and whether your machine is mainly attractive to price-sensitive renters. |
-| Strong long-running demand | Consider a reserved discount and a longer offer end date if operations can support it. |
+| Healthy but idle | Lower price or improve listing fit. |
+| Always rented | Test a modest increase for future contracts. |
+| Similar machines are cheaper | Reprice or improve machine quality. |
+| Poor rentals despite fair price | Check verification, reliability, search visibility, network, storage, and errors. |
+| Strong long-running demand | Consider reserved discount and longer end date. |
 
-## Common Questions
+## Related
 
 | Question | Read next |
 | --- | --- |
-| What simple pricing model should I understand? | [Earnings & Pricing Model](/host/earning) |
-| Where do I find market price data? | [GPU Market Metrics](/host/market-metrics) |
-| How do I list from the CLI? | [vastai list machine](/host/cli/list-machine) |
-| How do I change the interruptible bid floor? | [vastai set min-bid](/host/cli/set-min-bid) |
+| Revenue model | [Earnings & Pricing Model](/host/earning) |
+| Market data | [GPU Market Metrics](/host/market-metrics) |
+| CLI listing | [vastai list machine](/host/cli/list-machine) |
+| Interruptible bid floor | [vastai set min-bid](/host/cli/set-min-bid) |

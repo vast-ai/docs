@@ -10,55 +10,79 @@ personas:
 
 <div className="persona-chips"><span className="persona-chip">Hobbyist</span><span className="persona-chip">Pro Operator</span></div>
 
-Use this page after installing and listing a machine to understand what to monitor first.
+Use the first day to confirm the host is stable, listed correctly, and reachable from outside your network.
 
 <a id="healthy-daemon" />
-## What does a healthy host daemon look like?
+## Healthy Daemon
 
-A healthy host daemon should run without restart loops, connect to the Vast backend, report the expected GPUs and machine state, and support instance startup. From the host dashboard or CLI, the machine should appear under the host account, have active offers when listed, avoid red machine errors, and be able to run a temporary self-test instance that reports progress.
+A healthy host:
+
+- Shows under the host account.
+- Has active offers when listed.
+- Has no red machine errors.
+- Runs the Vast daemon, metrics service, Docker, and NVIDIA persistence service.
+- Can run a temporary self-test instance that reports progress.
+
+SSH checks:
+
+```bash
+systemctl is-active vastai.service vast_metrics.service docker nvidia-persistenced.service
+systemctl --no-pager --full status vastai.service vast_metrics.service docker nvidia-persistenced.service
+sudo journalctl -u vastai.service -n 80 --no-pager
+sudo journalctl -u vast_metrics.service -n 80 --no-pager
+sudo tail -n 100 /var/lib/vastai_kaalia/kaalia.log
+sudo cat /var/lib/vastai_kaalia/host_port_range
+```
+
+The services should be `active`, without restart loops or repeated fatal errors. The configured port range should match the forwarded range.
 
 <a id="monitor" />
-## What should I monitor in the first 24 hours?
+## Monitor
 
-Monitor machine visibility, active offers, self-test status, red machine errors, daemon logs, Docker/NVIDIA runtime health, direct port reachability from outside the LAN, thermals, power, storage capacity, network stability, and first-rental startup behavior. Test common client paths such as SSH and Jupyter when applicable.
+Watch:
+
+- Machine visibility and active offers.
+- Self-test result.
+- Red machine errors.
+- Daemon, Docker, and NVIDIA runtime health.
+- External port reachability.
+- Thermals, power, storage, and network stability.
+- First-rental startup behavior.
 
 <a id="test-like-a-client" />
-## Test your machine like a client
+## Test Like A Client
 
-It is vital to test your own machine to ensure the ports and software are running smoothly.
+Use a separate client account or the CLI to rent a small test instance on your own machine.
 
-### Set up a separate client account (GUI)
+List visible machines/offers:
 
-If you want to use the website GUI, set up a new account on a different email address, add a credit card, then find your machine and create instances on it like a client. This has the benefit of showing you the entire client experience. Testing the recommended PyTorch template is vital to ensure that SSH and Jupyter are working properly.
-
-### Use the CLI (preferred)
-
-The preferred method is the [CLI](https://cloud.vast.ai/cli/). For Windows users, we suggest setting up [WSL](https://learn.microsoft.com/en-us/windows/wsl/install), which requires installing Ubuntu on your Windows machine and enabling virtualization in BIOS.
-
-First review the machines and offers visible to your host account:
-
-```text Text
-./vastai show machines
+```text
+vastai show machines
 ```
 
-Then use the CLI reference or console state to find one of your machine's available offer IDs. The website GUI can group similar offers, so the CLI can be useful for seeing the offer-level state. Do not post API keys, account-specific commands, or sensitive account details in public channels.
+Create a test instance from one available offer:
 
-Take the ID number from the first column and use it to create a free instance on your own machine. This example loads the latest PyTorch image along with both Jupyter and SSH direct launch modes:
-
-```text Text
-./vastai create instance <ID> --image pytorch/pytorch:latest --jupyter --direct --env '-e TZ=PDT -p 22:22 -p 8080:8080'
+```text
+vastai create instance <ID> --image pytorch/pytorch:latest --jupyter --direct --env '-e TZ=PDT -p 22:22 -p 8080:8080'
 ```
 
-Check your [instance tab](https://cloud.vast.ai/instances/) to make sure PyTorch loaded correctly along with Jupyter and SSH. Click the \<\_ button to get the SSH command and test the direct SSH connection. Click the open button to test Jupyter. If the button is stuck "connecting", there is most likely a problem with the port configuration on the router in front of the machine; see [Network & Ports](/host/network-ports#test-ports-outside-lan). Once finished, destroy the instance.
+Then test:
 
-## What can take time
+- Instance appears in the client account.
+- SSH command works.
+- Jupyter opens.
+- Ports do not hang at "connecting."
 
-Verification, search visibility, and first rentals do not happen instantly after listing. Passing self-test makes the machine eligible for verification, but verification timing depends on machine health, supply and demand, and platform policy. See [Understanding Verification](/host/understanding-verification#verification-time).
+Destroy the test instance when done. If SSH or Jupyter is stuck connecting, check [Network & Ports](/host/network-ports#test-ports-outside-lan).
 
-## Related pages
+## What Can Take Time
+
+Verification, search visibility, and first rentals are not instant. Passing self-test makes the machine eligible; timing still depends on machine health, supply, demand, and platform policy.
+
+## Related Pages
 
 | Topic | Read next |
 | --- | --- |
-| Running the self-test | [How to Self-Test](/host/how-to-self-test) |
-| Machine not appearing in search | [Why Isn't My Machine in Search?](/host/not-in-search) |
-| Reliability expectations | [Reliability & Uptime](/host/reliability-uptime) |
+| Self-test | [How to Self-Test](/host/how-to-self-test) |
+| Not in search | [Why Isn't My Machine in Search?](/host/not-in-search) |
+| Reliability | [Reliability & Uptime](/host/reliability-uptime) |

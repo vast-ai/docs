@@ -15,16 +15,37 @@ Prepare the host machine before installing the Vast host software, including OS,
 <a id="install-prerequisites" />
 ## What should be ready before I run the host installer?
 
-Before installing, make sure the host has supported same-type GPUs, native Ubuntu/Linux, an AVX-capable CPU, at least one physical CPU core per listed GPU, adequate RAM, fast SSD/NVMe storage, compatible GPU drivers, stable public networking, and enough direct ports forwarded for both TCP and UDP.
+Before installing, make sure the host has supported same-type GPUs, native Ubuntu/Linux, an AVX-capable CPU, at least one physical CPU core per listed GPU, adequate RAM, fast SSD/NVMe storage, working compatible GPU drivers, stable public networking, and enough direct ports forwarded for both TCP and UDP.
+
+For Docker storage, the preferred setup is `/var/lib/docker` mounted on XFS with project quotas enabled in `/etc/fstab`; see [Storage Setup](/host/storage-setup#fstab-example).
 
 For verification, the self-test preflight enforces the current minimum thresholds (CUDA support, reliability gate, direct ports, PCIe bandwidth, internet bandwidth, VRAM, system RAM). The canonical list lives in [Verification Stages: requirements](/host/verification-stages#additional-requirements-for-verification).
 
 For CPU capacity, use the physical-core rule: the host should have at least one visible physical CPU core per visible GPU. Hyperthreads and logical CPUs do not count as physical cores.
 
+## How do I inventory a clean host?
+
+Before changing drivers, disks, or networking, record the machine's starting state. This makes it easier to spot whether an install problem came from the provider image, the storage layout, the driver, or the Vast installer.
+
+```bash
+lsb_release -a
+uname -a
+lscpu | sed -n '1,25p'
+lspci | grep -i nvidia
+lsblk -f
+findmnt / /data0 /var/lib/docker
+df -h /
+ip -brief address
+```
+
+Save the output somewhere private and redact public IPs or account details before sharing it. If `/var/lib/docker` is already mounted, Docker already has data, or old Vast services are still installed on a supposedly clean machine, resolve that before treating the host as freshly provisioned.
+
 <a id="ubuntu-versions" />
 ## What Ubuntu versions should hosts use?
 
 Use **Ubuntu 24.04 LTS** for new installs when possible. **Ubuntu 22.04 LTS** also works and may be useful when a driver or operational constraint requires it. Confirm the OS works with your GPU driver, Docker, storage setup, and the Vast host installer before listing a production host.
+
+Do not blindly copy old Ubuntu 22.04 cgroup-v1 workaround commands onto Ubuntu 24.04. Docker, kernel, and cgroup defaults differ by OS version; follow the current Vast host installer path for the OS you are actually using, and treat cgroup errors as install diagnostics to fix before listing.
 
 <a id="nvidia-driver-version" />
 ## What NVIDIA driver version should I use?

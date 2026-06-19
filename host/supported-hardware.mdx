@@ -10,121 +10,74 @@ personas:
 
 <div className="persona-chips"><span className="persona-chip">Hobbyist</span><span className="persona-chip">Business</span></div>
 
-Use this page before buying hardware, installing the host software, or listing a machine. A machine can be technically listable and still be a poor fit if it cannot pass self-test, cannot receive inbound connections, or is not attractive to renters.
+Use this page before buying hardware, installing the host software, or listing a machine.
 
 <Note>
-Passing the minimum requirements makes a machine eligible for verification. It does not guarantee verification, search placement, rentals, or earnings.
+Meeting minimum requirements makes a machine eligible. It does not guarantee verification, search placement, rentals, or earnings.
 </Note>
 
 ## Quick Check
 
-For a normal Vast host, plan on:
+A typical Vast host needs:
 
-- A dedicated native Ubuntu/Linux machine.
-- Same-type GPUs in the machine.
-- A supported NVIDIA GPU, or one of the AMD GPU families listed below.
-- More than 7 GiB VRAM per GPU for self-test.
-- An AVX-capable CPU.
-- At least one physical CPU core per visible/listed GPU.
-- Enough system RAM for the listed GPUs.
+- Native Ubuntu/Linux on x86_64/AMD64 hardware.
+- Same-type GPUs.
+- Supported NVIDIA GPUs, or the AMD families listed below.
+- More than 7 GiB VRAM per GPU.
+- AVX-capable CPU.
+- At least one physical CPU core per visible/listed GPU. Hyperthreads do not count.
+- Enough system RAM for the GPU tier.
 - Fast SSD/NVMe storage, with at least 128 GB per GPU as a listing baseline.
-- Stable public networking with direct inbound port forwarding.
-
-If any of those are uncertain, check them before spending money on hardware.
+- Public inbound networking with direct TCP and UDP port forwarding.
 
 ## GPU Support
 
-Current listing guidance includes:
-
-| Vendor | Current guidance |
+| Vendor | Guidance |
 | --- | --- |
-| NVIDIA | 10-series NVIDIA GPUs or newer. Older GPUs may depend on self-test image compatibility and are usually less attractive to renters. Higher-demand datacenter, workstation, and recent consumer GPUs are more likely to be useful. |
-| AMD | MI25 or newer Radeon Instinct, Radeon VII, Radeon Pro VII, Radeon RX 7900 GRE/XT/XTX, and Radeon Pro W7900/W7800. Other 6000-series or newer Radeon RX/Pro W GPUs may work, but may not be searchable with standard AMD ROCm filters. |
+| NVIDIA | 10-series or newer. Newer datacenter, workstation, and recent consumer GPUs are more attractive to renters. |
+| AMD | MI25 or newer Radeon Instinct, Radeon VII, Radeon Pro VII, Radeon RX 7900 GRE/XT/XTX, and Radeon Pro W7900/W7800. Other 6000-series or newer Radeon RX/Pro W GPUs may work, but may not appear in standard ROCm filters. |
 
-All GPUs in the machine should be the same type. Avoid mixed GPU models in one listed machine unless Vast explicitly documents support for that setup.
+Avoid mixed GPU models unless Vast explicitly documents support for that setup.
 
-Newer GPU models are added as they come online. If a new model is not yet listed or searchable, ask Vast to add it through support or the [host community channels](/host/community).
+If a new GPU model is not listed or searchable yet, ask Vast to add it through support or the [host community channels](/host/community).
 
 ## Minimum Listing Baseline
 
-These are baseline expectations for listing a machine:
-
 | Area | Baseline |
 | --- | --- |
-| Operating system | Ubuntu 24.04 LTS is preferred for new installs. Ubuntu 22.04 also works. See [Ubuntu versions](/host/hardware-prep#ubuntu-versions). |
-| Machine use | Dedicated host machine. Do not use the same machine for unrelated workloads while it is rented. |
-| GPU type | Supported same-type GPUs. |
-| CPU | AVX-capable CPU. At least one physical CPU core per listed GPU. Hyperthreads and logical CPUs do not count as physical cores. CPUs without hyperthreading are fine. |
-| System RAM | At least 4 GB system RAM per GPU as a listing baseline. Self-test can require much more, especially on high-VRAM machines. |
-| Storage | Fast SSD/NVMe storage with at least 128 GB per GPU. |
-| PCIe | At least 1x PCIe for every 2.5 TFLOPS of GPU performance. Avoid riser, lane, power, or BIOS layouts that throttle GPUs. |
-| Network | Fast, reliable internet and an open direct port range mapped to the machine for both TCP and UDP. |
+| OS | Ubuntu 24.04 LTS preferred; Ubuntu 22.04 also works. |
+| Machine use | Dedicated host machine while rented. |
+| CPU | AVX-capable, with at least one physical core per listed GPU. |
+| System RAM | At least 4 GB per GPU as a listing baseline; high-VRAM GPUs may need more. |
+| Storage | Fast SSD/NVMe, at least 128 GB per GPU. |
+| PCIe | Enough lanes/bandwidth for the GPUs; avoid unstable risers, power, and BIOS layouts. |
+| Network | Reliable public inbound connectivity for the configured port range. |
 
-## Verification And Self-Test Requirements
+For current verification thresholds, see [Verification Stages](/host/verification-stages#additional-requirements-for-verification).
 
-Verification adds stricter checks on top of the listing baseline: CUDA driver/runtime support, a reliability eligibility gate, direct ports per GPU, PCIe bandwidth, internet bandwidth that scales with total VRAM, per-GPU VRAM, system RAM, and runtime CPU-core checks.
+## Balance Matters
 
-The canonical, current thresholds live in [Verification Stages: requirements](/host/verification-stages#additional-requirements-for-verification). For the operational steps, see [How to Self-Test](/host/how-to-self-test) and [Understanding Verification](/host/understanding-verification).
+A strong GPU can still be a poor host if the rest of the machine is weak. Match CPU, RAM, PCIe, storage, cooling, power, and network capacity to the GPU tier.
 
-## CPU, RAM, And Balance
+Avoid reducing GPU count, RAM, disk, or other capacity after the machine is created; reductions can trigger deverification.
 
-Do not size the rest of the machine as an afterthought. A high-end GPU host with weak CPU, low RAM, poor PCIe layout, slow storage, or unstable networking is less likely to pass verification or deliver good renter experience.
+## Storage And Network
 
-Use these rules of thumb:
+Docker storage should be fast, predictable, and mounted before Docker starts. Vast uses XFS project quotas for per-container storage limits. See [Storage Setup](/host/storage-setup).
 
-- Count physical CPU cores, not vCPUs or hyperthreads.
-- Match CPU, RAM, PCIe, storage, and network capacity to the GPU tier.
-- Keep enough system RAM for CPU-side staging and self-test.
-- Avoid reducing GPU count, RAM, disk, or other capacity after a machine has been created; reductions can trigger deverification.
-
-## Storage
-
-Use fast SSD/NVMe storage mounted predictably before Docker and the host daemon start.
-
-For Docker storage quotas, Vast uses XFS with project quota support. Storage problems often appear later as install failures, Docker quota errors, self-test failures, or poor renter performance. See [Storage Setup](/host/storage-setup).
-
-## Network
-
-Vast hosts need inbound public connectivity to mapped ports. Residential networking can work, but only if the router, firewall, ISP, and public IP path allow direct inbound connections.
-
-Avoid hosting from networks with:
-
-- CGNAT or no public inbound IPv4 path.
-- IPv6-only service without compatible inbound reachability.
-- Port forwarding that only works from inside the LAN.
-- Frequent packet loss, disconnects, or unstable upload.
-
-See [Network & Ports](/host/network-ports) before listing.
+Hosts also need public inbound connectivity. CGNAT, double NAT without a real public forwarding path, blocked ports, IPv6-only service, LAN-only port forwarding, packet loss, or unstable upload can prevent listing, self-test, or rentals. See [Network & Ports](/host/network-ports).
 
 ## Unsupported Or Discouraged Setups
 
-Avoid these setups unless Vast explicitly documents support for your exact configuration:
-
-| Setup | Why to avoid it |
+| Setup | Why |
 | --- | --- |
-| Windows as the host OS | Vast hosting is built around native Linux hosting. WSL can be useful for running the CLI from a client machine, but it is not the supported host operating system. |
-| ARM or GB10-class systems | Current host requirements include AVX-capable CPUs and the normal host path should be treated as native Ubuntu/Linux on x86_64/AMD64 hardware unless Vast documents a specific ARM host path. |
-| Mixed GPU models | All GPUs on the machine should be the same type. Mixed cards complicate offers, verification, and renter expectations. |
-| Low-VRAM or very old GPUs | The self-test requires more than 7 GiB VRAM per GPU, and low-demand hardware may not earn enough to justify hosting. |
-| Gaming or workstation use during rentals | Rented machines should be dedicated. Local gaming, mining, display workloads, or background GPU jobs can disrupt renters and self-test. |
-| No public inbound networking | Machines behind CGNAT, blocked ports, or unstable residential links often fail connectivity checks. |
-
-## VM Support
-
-VM support is optional, but it can affect search visibility and demand for some renters. VM support depends on CPU, chipset, BIOS, IOMMU, kernel, and GPU behavior. It is automatically tested by the host software when applicable.
-
-See [VMs & IOMMU](/host/vms) before buying hardware specifically for VM workloads.
+| Windows or WSL as the host OS | Vast hosting is built for native Linux hosts. |
+| ARM or GB10-class systems | Current host requirements assume AVX-capable x86_64/AMD64 hardware unless Vast documents an ARM path. |
+| Mixed GPU models | Complicates offers, verification, and renter expectations. |
+| Low-VRAM or very old GPUs | Self-test requires more than 7 GiB VRAM; demand may also be weak. |
+| Gaming/workstation use during rentals | Rented machines should be dedicated. |
+| No public inbound networking | Connectivity checks and renter access can fail. |
 
 ## Before You Buy
 
-Before buying or repurposing hardware:
-
-1. Check the GPU model and VRAM against this page.
-2. Confirm the CPU supports AVX and has enough physical cores.
-3. Confirm the motherboard, risers, slots, and BIOS can provide enough PCIe bandwidth.
-4. Confirm you can run native Ubuntu/Linux and stable GPU drivers.
-5. Confirm you have fast SSD/NVMe storage.
-6. Confirm your network has a public inbound path and enough direct ports.
-7. Check [GPU Market Metrics](/host/market-metrics) and similar listings before assuming earnings.
-
-After the machine is ready, continue with [Hosting Quickstart](/host/quickstart).
+Confirm GPU demand with [GPU Market Metrics](/host/market-metrics), then verify CPU, RAM, PCIe, storage, and networking before spending money. After hardware is ready, continue with [Hosting Quickstart](/host/quickstart).

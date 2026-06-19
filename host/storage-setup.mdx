@@ -10,56 +10,123 @@ personas:
 
 <div className="persona-chips"><span className="persona-chip">Pro Operator</span><span className="persona-chip">Headless / DC</span></div>
 
-Set up Docker storage, disks, filesystems, and mounts so rented workloads have stable fast storage.
+Vast uses Docker storage for renter data. Put `/var/lib/docker` on fast SSD/NVMe storage with XFS project quotas.
+
+<Warning>
+Formatting a disk or LVM volume destroys data. Identify the OS disk and any provider data mount before running `mkfs`.
+</Warning>
 
 <a id="docker-storage-layout" />
-## How should I set up Docker storage?
+## Docker Storage Layout
 
-Use fast SSD/NVMe storage mounted predictably for Docker and Vast workloads. Current listing guidance expects at least 128 GB of fast SSD storage per GPU. Keep Docker storage on the intended data disk, not accidentally on the OS disk, and use stable mounts so Docker and the host daemon start after the storage is available.
+Current listing guidance expects at least 128 GB of fast SSD storage per GPU. Docker storage should:
+
+- Be on the intended data disk, not accidentally on the OS disk.
+- Mount predictably at boot before Docker and the host daemon start.
+- Use XFS with `pquota` or `prjquota`.
+- Have enough capacity for active rentals, stopped instances, cached images, and any volume offers.
+
+Inspect first:
+
+```bash
+lsblk -f
+findmnt /
+findmnt /data0 || true
+findmnt /var/lib/docker || true
+df -h /
+```
+
+Back up `/etc/fstab` before editing mounts:
+
+```bash
+sudo cp /etc/fstab /etc/fstab.pre-vast-docker.$(date -u +%Y%m%d%H%M%S)
+```
+
+<a id="disposable-device-example" />
+## Disposable Device Example
+
+Use this only after you have confirmed the target partition, RAID device, or LVM volume is safe to dedicate to Docker.
+
+```bash
+export VAST_DOCKER_DEVICE=/dev/mapper/vg1-lv--1
+lsblk -f "$VAST_DOCKER_DEVICE"
+findmnt -S "$VAST_DOCKER_DEVICE" || true
+if findmnt -S "$VAST_DOCKER_DEVICE" >/dev/null; then
+  sudo umount "$VAST_DOCKER_DEVICE"
+fi
+sudo mkfs.xfs -f "$VAST_DOCKER_DEVICE"
+sudo mkdir -p /var/lib/docker
+sudo blkid "$VAST_DOCKER_DEVICE"
+```
+
+Comment out any old `/data0` line for the same device, add the `/var/lib/docker` fstab line, then mount:
+
+```bash
+sudo mount -a
+findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS
+sudo xfs_quota -x -c "state" /var/lib/docker
+```
+
+If you are starting from a raw disk, create a partition first. The [Headless Install Path](/host/headless-install) includes a `cfdisk` example.
 
 <a id="fstab-example" />
-## Example fstab line for one NVMe or SSD
+## Example fstab Line
 
-For a normal single NVMe or SSD mounted for Docker storage, use the disk UUID rather than a device name like `/dev/nvme0n1p1`, because device names can change between boots. Example `/etc/fstab` entry:
+Use the disk UUID, not a device name like `/dev/nvme0n1p1`:
 
 ```text
 UUID=a1b2c3d4-e5f6-7890-abcd-ef1234567890  /var/lib/docker  xfs  rw,auto,pquota,nofail  0  0
 ```
 
-Replace the UUID with the value from `blkid` for your XFS-formatted partition. The important pieces are `/var/lib/docker`, `xfs`, and `pquota` project quota support. After editing `/etc/fstab`, run `sudo mount -a`; if it reports an error, fix the fstab entry before rebooting.
+After editing:
+
+```bash
+sudo mount -a
+findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS
+sudo xfs_quota -x -c "state" /var/lib/docker
+```
+
+The mount should be XFS, include `pquota` or `prjquota`, and show project quota accounting/enforcement as ON.
 
 <a id="xfs-prjquota" />
-## Is XFS with project quotas required?
+## XFS Project Quotas
 
-Yes. Vast uses XFS project quotas to enforce per-container storage quotas. Put Docker's data root on an XFS filesystem mounted with project quota support.
+Yes, XFS project quotas are required. Vast uses them for per-container storage quotas.
 
-Do not fix quota errors by removing Docker storage quota configuration. If Docker reports a quota or pquota error, fix the filesystem and mount layout instead.
+Do not work around quota errors by removing Docker quota settings. Fix the filesystem and mount instead.
 
 <a id="nvme-raid" />
-## How should I choose single NVMe vs RAID/NVMe?
+## Single NVMe vs RAID
 
-For one NVMe, use a stable mount with enough capacity and performance for Docker and rented workloads. For multiple NVMes, RAID0 can increase capacity and throughput, but it also increases the failure domain because one failed drive can break the array. Choose the layout based on reliability goals, monitor drive health, and make sure the mount is available before Docker and the host daemon start.
+One NVMe is simplest. Multiple NVMes in RAID0 can improve capacity and throughput, but one failed drive can break the array. Pick the layout that matches your reliability goals and monitor drive health.
 
 <a id="pquota-error" />
-## What causes the Docker pquota storage error?
+## Docker pquota Error
 
-The error `--storage-opt is supported only for overlay over xfs with pquota` means Docker is being asked to use per-container storage quotas on a backing filesystem that is not mounted as XFS with project quota support.
+`--storage-opt is supported only for overlay over xfs with pquota` means Docker storage is not on XFS with project quotas.
 
-Move Docker's data root to a correctly mounted XFS filesystem with project quotas, then restart Docker and the host software after verifying the mount. Back up or confirm the target disk before formatting or moving Docker data. Do not disable storage quota enforcement as a workaround.
+Move Docker's data root to a correctly mounted XFS filesystem, verify quotas, then restart Docker and the host software.
 
-## Volume offers and host disk
+## Installer Connection
 
-Space allocated to rented volume offers is subtracted from the storage available to GPU offers. For how volume offers interact with available disk, see [Hosting Overview](/host/hosting-overview#volume-offers).
+The Host Installer Wizard should detect prepared Docker storage. If you use the [headless fallback installer](/host/installing-host-software#headless-fallback), pass the block device behind the Docker mount:
+
+```bash
+sudo python3 ./install "$VAST_HOST_KEY" \
+  --no-driver \
+  --docker-partition /dev/mapper/vg1-lv--1 \
+  --ports 40000 40799
+```
+
+Fix ext4, missing quotas, or wrong-device mounts before installing.
+
+## Volume Offers And Cached Images
+
+Rented volume space reduces storage available to GPU offers. Cached images can be reused when possible instead of redownloaded.
+
+For volume behavior, see [Hosting Overview](/host/hosting-overview#volume-offers).
 
 <a id="cached-images" />
-## Does Vast redownload images that were already used on my machine?
+## Does Vast redownload images that were already used?
 
-Prior images are cached on the host when possible. If a renter uses an image that is already present on the machine, the system can reuse the cached image instead of downloading it again.
-
-## Related pages
-
-| Topic | Read next |
-| --- | --- |
-| Hardware minimums | [Supported Hardware](/host/supported-hardware#storage) |
-| Pre-install checklist | [Hardware Prep](/host/hardware-prep#install-prerequisites) |
-| Install failures | [Installing Host Software](/host/installing-host-software#install-failures) |
+Prior images are cached when possible. If a renter uses an image already present on the machine, the system can reuse it.

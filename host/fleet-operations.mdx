@@ -10,66 +10,56 @@ personas:
 
 <div className="persona-chips"><span className="persona-chip">Headless / DC</span><span className="persona-chip">Business</span></div>
 
-Operate many machines from one management box. Every workflow on this page composes host CLI commands that work over SSH — no console clicking per machine — and each has a [Python SDK](/host/sdk/show-machines) equivalent for automation.
+Use the CLI or SDK to manage many machines from one workstation.
 
-## Working at fleet scale
+## Fleet State
 
-Three CLI features make fleet scripting practical:
-
-- Machine listing commands can return compact output for scripting.
-- `vastai list machines` (plural) can apply the same listing arguments to multiple selected machines.
-- The global `--raw` flag returns machine-readable JSON, and `--retry N` retries flaky calls — use both in unattended scripts.
+Use `--raw` for scripts and `--retry N` for unattended calls:
 
 ```bash
-# Full fleet state as JSON for scripts and monitoring
 vastai show machines --raw
 ```
 
-## Bulk listing and pricing updates
+SDK equivalents live under the [host SDK reference](/host/sdk/show-machines).
 
-Update the listings of selected machines with `list machines`. For example, extending offer end dates across a prepared selection:
+## Bulk Listing And Pricing
+
+Apply listing changes to selected machines:
 
 ```bash
 vastai list machines <selected-machines> -e 12/31/2026 --retry 6
 ```
 
-The same pattern works for any listing argument — on-demand price (`-g`), min bid floor (`-b`), discount rate (`-r`), min chunk (`-m`), or a rolling end date (`--duration "2 weeks"`). See [vastai list machines](/host/cli/list-machines) for all options and [Pricing Your Listing](/host/pricing-your-listing) for how to choose the values.
+The same pattern works for on-demand price (`-g`), min bid (`-b`), discount rate (`-r`), min chunk (`-m`), or rolling duration (`--duration "2 weeks"`). See [vastai list machines](/host/cli/list-machines).
 
 <Warning>
-Price changes affect **new rental contracts only** — existing contracts keep their original terms. End dates are the exception: moving the offer end date **later at the same or lower price also extends existing rental contracts** ([details](/host/hosting-overview#extending-rental-contracts)). A fleet-wide end-date extension therefore extends your commitment on every active contract; if you have raised pricing, existing contracts cannot be extended.
+Price changes affect new rental contracts only. Extending the offer end date at the same or lower price can extend existing contracts, increasing your commitment.
 </Warning>
 
-## Fleet maintenance windows
-
-Schedule the same window across a rack or site, then audit what is scheduled:
+## Maintenance Windows
 
 ```bash
-# Schedule a 2-hour power maintenance window for a selected machine
 vastai schedule maint <selected-machine> --sdate 1782950400 --duration 2 --maintenance_category power
-
-# Review all scheduled windows
 vastai show maints
-
-# Cancel if plans change
 vastai cancel maint <maintenance-id>
 ```
 
-`--sdate` is unix epoch seconds (UTC) and `--duration` is in hours; categories are `power`, `internet`, `disk`, `gpu`, `software`, or `other`. Clients on affected machines are notified so they can save their work. The policy rules — when to wait for contracts to end versus schedule a window — are in [Maintenance Windows](/host/maintenance-windows).
+`--sdate` is Unix epoch seconds UTC. Categories are `power`, `internet`, `disk`, `gpu`, `software`, or `other`. See [Maintenance Windows](/host/maintenance-windows).
 
-## Default (background) jobs
+## Default Jobs
 
-A default job runs your own container on a machine whenever it is idle, at a price floor you set, so unrented GPUs still do useful work:
+Run your own container when a machine is idle:
 
 ```bash
 vastai set defjob <ID> --price_gpu 0.20 --image <your-image> --args <container-args>
 vastai remove defjob <ID>
 ```
 
-This performs the same action as creating a background job at [cloud.vast.ai/host/create](https://cloud.vast.ai/host/create). See [vastai set defjob](/host/cli/set-defjob). Make sure your background workload complies with the [Workload Policy](/host/workload-policy).
+Make sure background work complies with the [Workload Policy](/host/workload-policy).
 
-## Defragmenting GPU assignments
+## Defragment GPUs
 
-On multi-GPU machines, scattered single-GPU rentals can block larger multi-GPU offers. Defragmenting rearranges GPU assignments to make more multi-GPU offers available:
+On multi-GPU machines, defragmentation can free larger GPU groups:
 
 ```bash
 vastai defrag machines $(vastai show machines -q)
@@ -77,36 +67,33 @@ vastai defrag machines $(vastai show machines -q)
 
 See [vastai defrag machines](/host/cli/defrag-machines).
 
-## Monitoring the fleet
+## Monitor
 
-A practical monitoring loop without a GUI:
+A simple loop:
 
-1. Pull fleet state with `vastai show machines --raw` and watch for red machine errors, reliability drops, and missing offers.
-2. Inspect a selected machine with the console or [vastai show machine](/host/cli/show-machine).
-3. After fixing an issue or finishing maintenance, rerun the self-test on the affected machine — see [How to Self-Test](/host/how-to-self-test). The self-test rents a temporary instance, so run it when the machine is idle.
-4. Collect diagnostics for any failing machine — see [what to collect](/host/common-errors-diagnostics#collect-logs).
+1. Pull `vastai show machines --raw`.
+2. Watch for red errors, reliability drops, missing offers, and storage pressure.
+3. Inspect individual machines with [vastai show machine](/host/cli/show-machine).
+4. Rerun self-test on idle machines after fixes.
+5. Collect diagnostics for failures.
 
-For market-wide pricing and demand signals to inform fleet pricing, use [GPU Market Metrics](/host/market-metrics) — the `vastai metrics` commands also support `--raw`.
+For pricing and demand, use [GPU Market Metrics](/host/market-metrics). The `vastai metrics` commands also support `--raw`.
 
-## Storage cleanup across the fleet
+## Cleanup And Decommissioning
 
-Expired or deleted rental contracts occasionally fail to release storage. Clean up fleet-wide:
+Clean stale storage:
 
 ```bash
 vastai cleanup machine <selected-machine>
 ```
 
-See [vastai cleanup machine](/host/cli/cleanup-machine).
+To decommission, unlist first, honor remaining rental end dates, then delete. See [Remove or Recreate](/host/removing-recreating-machines).
 
-## Decommissioning machines
-
-Unlist to stop new contracts, honor remaining rental end dates, then delete — the same rules as a single machine, per [Removing or Recreating Machines](/host/removing-recreating-machines).
-
-## Related pages
+## Related Pages
 
 | Topic | Read next |
 | --- | --- |
-| SSH-only install for new fleet machines | [Headless Install Path](/host/headless-install) |
-| Maintenance policy and client impact | [Maintenance Windows](/host/maintenance-windows) |
-| Pricing strategy | [Pricing Your Listing](/host/pricing-your-listing) |
-| Python automation | [SDK reference](/host/sdk/show-machines) |
+| Headless install | [Headless Install](/host/headless-install) |
+| Maintenance | [Maintenance Windows](/host/maintenance-windows) |
+| Pricing | [Pricing Your Listing](/host/pricing-your-listing) |
+| SDK automation | [SDK reference](/host/sdk/show-machines) |

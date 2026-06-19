@@ -11,140 +11,115 @@ personas:
 
 <div className="persona-chips"><span className="persona-chip">Business</span></div>
 
-Use this page to estimate host revenue before buying hardware, setting prices, or changing an existing listing. The useful model is simple: market price range, rentable GPU count, and actual utilization over time.
+Use this page to estimate gross host revenue before buying hardware, setting prices, or changing an offer.
 
 <Note>
-Hosting earnings are not guaranteed. Verification, a competitive price, or a strong machine can improve eligibility and attractiveness, but rentals still depend on demand, supply, reliability, search behavior, and renter requirements.
+Earnings are not guaranteed. Demand, supply, reliability, search filters, location, and renter requirements all affect utilization.
 </Note>
 
 <a id="hosting-earnings" />
-## Simple Monthly Model
+## Revenue Components
 
-For a first estimate, use:
+Host earnings are based on the host-side rates you set. Client-facing totals can include separate Vast/client-side fees, so the amount a client pays can differ from the host-side earning rate shown to you.
+
+Gross host revenue can include several components:
 
 ```text
-monthly gross = rentable GPUs x per-GPU hourly price x 720 x utilization
+gross host revenue =
+  GPU compute revenue
++ storage revenue
++ bandwidth revenue
++ volume revenue
 ```
 
-Where:
+| Component | What drives it |
+| --- | --- |
+| GPU compute | Listed GPUs rented, accepted GPU-hour rate, and running time. |
+| Storage | Storage allocated over time. Storage can keep accruing while an instance is stopped or retained, depending on the instance state. |
+| Bandwidth | Upload and download usage charged at the host-side bandwidth rates. |
+| Volumes | Separate volume offers, if you enable and price them. |
+
+Changing prices affects new rental contracts. Existing contracts use the rates accepted when the renter started the instance or reservation.
+
+## Compute-Only Monthly Model
+
+```text
+monthly compute gross = rentable GPUs x hourly GPU price x 720 x utilization
+```
 
 | Input | Meaning |
 | --- | --- |
-| `rentable GPUs` | The number of GPUs that can be rented during the month. If only part of a multi-GPU machine is usually rented, use that smaller count. |
-| `per-GPU hourly price` | The expected GPU price in dollars per GPU-hour. Compare against similar offers, not just the highest visible listing. |
-| `720` | A 30-day month at 24 hours per day. |
-| `utilization` | The share of the month the GPU capacity is rented. Use `0.55` for 55% utilization. |
+| `rentable GPUs` | GPUs expected to be rented during the month. |
+| `hourly GPU price` | Expected host-side dollars per GPU-hour. Use comparable listings. |
+| `720` | 30 days x 24 hours. |
+| `utilization` | Share of time rented, such as `0.55` for 55%. |
 
-This is a gross revenue estimate before power, cooling, colocation, internet, hardware depreciation, repairs, taxes, and any other operating costs.
+This compute-only shortcut does not include storage, bandwidth, or volume revenue. It is also gross revenue before power, cooling, colocation, internet, hardware depreciation, repairs, taxes, and payment/accounting costs.
 
-## 30-Day Range Estimate
+## 30-Day Range
 
-The most useful planning range is based on the last 30 days of comparable market data:
-
-1. Pick the closest comparable GPU class, hosting type, verification state, and machine quality.
-2. Look at 30-day P10, median, and P90 price signals for that GPU.
-3. Estimate utilization from your own machine history, or from comparable market demand if this is new hardware.
-4. Calculate a lower, middle, and upper gross monthly range.
+For planning compute revenue, compare similar machines over the last 30 days:
 
 | Scenario | Formula |
 | --- | --- |
-| Conservative | `GPUs x P10 hourly price x 720 x 30-day utilization` |
-| Expected | `GPUs x median hourly price x 720 x 30-day utilization` |
-| Optimistic | `GPUs x P90 hourly price x 720 x 30-day utilization` |
+| Conservative | `GPUs x P10 price x 720 x utilization` |
+| Expected | `GPUs x median price x 720 x utilization` |
+| Optimistic | `GPUs x P90 price x 720 x utilization` |
 
-P10 means the lower end of the observed market range. Median is the midpoint. P90 is an upper market signal and is usually realistic only when your machine has a clear advantage such as stronger reliability, better network, better storage, better location, datacenter verification, or scarce GPU supply.
+Use P90 only when your machine has a real advantage: strong reliability, better network, fast storage, better location, datacenter status, or scarce GPU supply. Then add realistic storage, bandwidth, and volume assumptions separately.
 
-## Worked Example
+## Compute-Only Example
 
-Suppose a host has 4 rentable GPUs, observed or expected utilization of 55%, and comparable 30-day prices of:
+A 4-GPU host at 55% utilization:
 
-| Price signal | Per-GPU hourly price |
-| --- | --- |
-| P10 | \$0.35 |
-| Median | \$0.45 |
-| P90 | \$0.65 |
-
-The estimates are:
-
-| Scenario | Calculation | Gross monthly estimate |
+| Price signal | Calculation | Gross/month |
 | --- | --- | --- |
-| Conservative | `4 x 0.35 x 720 x 0.55` | \$554.40 |
-| Expected | `4 x 0.45 x 720 x 0.55` | \$712.80 |
-| Optimistic | `4 x 0.65 x 720 x 0.55` | \$1,029.60 |
+| P10: $0.35/hr | `4 x 0.35 x 720 x 0.55` | $554.40 |
+| Median: $0.45/hr | `4 x 0.45 x 720 x 0.55` | $712.80 |
+| P90: $0.65/hr | `4 x 0.65 x 720 x 0.55` | $1,029.60 |
 
-Use this as a planning range, not a promise. A machine with poor reliability, weak networking, low system RAM, slow storage, bad pricing, or low demand can underperform the range.
+If actual earnings are lower than the estimate, check utilization first, then compare storage, bandwidth, and volume settings. A higher price does not help if renters choose cheaper or healthier machines.
 
 ## What To Compare
 
-Compare against machines that are close to yours:
+Compare machines with similar:
 
-| Factor | Why it matters |
-| --- | --- |
-| GPU model and GPU count | Demand and price vary heavily by GPU type and by whether renters need 1 GPU or many GPUs. |
-| Verification and hosting type | Verified and datacenter-quality machines may appear more attractive to renters. |
-| Region and network | Latency, bandwidth, and public reachability affect renter fit. |
-| System RAM and CPU | Some workloads need more host RAM or CPU per GPU than the minimum requirements. |
-| Storage type and capacity | NVMe and enough usable disk can make a listing more attractive. |
-| Reliability and uptime | A stronger reliability history can support better visibility and pricing power. |
-| `min_gpu`, bids, discounts, and offer end date | Listing terms affect who can rent the machine and for how long. |
+- GPU model and count.
+- Verification state and host type.
+- Region, latency, and bandwidth.
+- System RAM, CPU, storage, and disk size.
+- Storage and bandwidth prices.
+- Reliability and uptime.
+- `min_gpu`, bids, discounts, and offer end date.
 
-## Market Data Sources
+## Market Data
 
-Start with Vast's own market data:
+Start with Vast sources:
 
-- [GPU Market Metrics](/host/market-metrics) explains the dashboard, CLI, and API sources.
-- [Host market dashboard](https://cloud.vast.ai/host/market/) shows current and historical GPU supply, demand, and P10/median/P90 pricing.
-- [Vast hosting earnings calculator](https://vast.ai/hosting/calculator) gives a data-backed estimate using marketplace utilization and price references.
+- [GPU Market Metrics](/host/market-metrics)
+- [Host market dashboard](https://cloud.vast.ai/host/market/)
+- [Vast hosting earnings calculator](https://vast.ai/hosting/calculator)
 
-Third-party dashboards can be useful as additional context:
-
-- [500.farm Vast charts](https://500.farm/vastai/charts/)
-
-<Warning>
-Third-party tools are not official Vast documentation. Treat them as comparison aids, and verify important pricing or utilization decisions against Vast market data and your own host dashboard.
-</Warning>
-
-## Actual Earnings
-
-For an existing host, compare forecasts with actual results:
-
-| Where to look | What to check |
-| --- | --- |
-| Host dashboard earnings | Current balance, total rental earnings, payout history, and payout account status. |
-| Payout timing | Plan around 2 to 4 weeks from when earnings are posted, depending on location and payout method. Earnings are posted on Fridays around 12:00 PM Pacific time. |
-| Billing history | Generate billing history with charges included when you need invoice detail. |
-| Machine history | Rented hours, idle time, reliability changes, maintenance windows, and machine errors. |
-| Market metrics | Whether your GPU's supply, demand, and median price moved during the same period. |
-
-If current earnings are below the 30-day estimate, first check utilization. A higher hourly price does not help if renters choose cheaper or healthier comparable machines.
+Third-party dashboards such as [500.farm Vast charts](https://500.farm/vastai/charts/) can help with comparison, but they are not the source of truth.
 
 ## Pricing Strategy
 
-Most hosts should start from comparable market prices, then adjust based on actual utilization:
+Start near comparable market prices, then adjust from actual utilization.
 
-- New machines often need competitive pricing while they build reliability and rental history.
-- A machine can justify a higher price only when it has clear advantages that renters value.
-- Lowering price can improve utilization, but it can also reduce gross revenue if the machine was already consistently rented.
-- Raising price affects new rental contracts only. Existing rental contracts keep the terms they accepted when they rented.
-- Do not chase every short-term market move. Review trends over a week or month unless demand changes sharply.
+- New machines often need competitive pricing while they build reliability history.
+- Higher prices only work when renters value the machine's advantages.
+- Lower prices can improve utilization, but may reduce revenue if the machine was already rented.
+- Price changes affect new rental contracts only.
+- Review trends over a week or month, not every short-term move.
 
 ## Net Margin
 
-Gross revenue is only the top line. For a realistic business view, subtract:
+Subtract operating costs before judging profit:
 
 - Power and cooling.
-- Internet, colocation, rack, or facility costs.
-- Hardware depreciation and financing.
-- Replacement parts and maintenance time.
-- Payment provider, accounting, and tax-related costs.
+- Internet, rack, or colocation.
+- Hardware depreciation or financing.
+- Repairs and maintenance time.
+- Accounting, tax, and payment-provider costs.
 
 For payout timing, see [Host Payouts](/host/payment). For tax handling, see [Tax Guide for Hosts](/host/guide-to-taxes).
-
-## Related Questions
-
-| Question | Read next |
-| --- | --- |
-| How should I price my listings? | [Pricing Your Listing](/host/pricing-your-listing) |
-| What should I know about min GPU, bids, and discounts? | [Pricing Your Listing: listing controls](/host/pricing-your-listing#listing-controls) |
-| How do hosts get paid? | [Host Payouts](/host/payment) |
-| Where does the market data come from? | [GPU Market Metrics](/host/market-metrics) |

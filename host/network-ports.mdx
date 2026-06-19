@@ -10,42 +10,114 @@ personas:
 
 <div className="persona-chips"><span className="persona-chip">Pro Operator</span><span className="persona-chip">Headless / DC</span></div>
 
-Configure public networking, direct ports, firewalls, and router forwarding before verification.
+Configure public inbound networking before verification. Vast hosts need direct ports reachable from outside the host LAN.
 
 <a id="ports-per-gpu" />
-## How many direct ports are required per GPU?
+## Ports Per GPU
 
-The self-test requires at least 3 direct ports per listed GPU.
+Self-test requires at least 3 direct ports per listed GPU. For production hosting, plan for about 100 direct ports per listed GPU. One instance can map up to 64 ports, and a larger range gives headroom while old mappings are being released and new instances are starting.
 
-Vast maps a maximum of **64 ports per instance**, so the useful ceiling scales with how many instances the machine can host. For example, a 4-GPU machine sliced into single-GPU instances can make use of up to 256 mapped ports (64 per instance). Mapping more than 64 direct ports per listed GPU is unnecessary and is not a self-test requirement.
+| Listed GPUs | Minimum | Practical example |
+| --- | ---: | --- |
+| 1 | 3 | `40000-40099` |
+| 4 | 12 | `40000-40399` |
+| 8 | 24 | `40000-40799` |
+
+The forwarded router/firewall range must match the range configured in the host software. The 100-port guidance is practical headroom, not a self-test minimum.
 
 <a id="tcp-udp" />
-## Do I need TCP and UDP forwarding?
+## TCP And UDP
 
-Yes. Forward both TCP and UDP for the configured direct port range. Treat this as a host networking requirement, not an optional optimization.
+Forward both TCP and UDP for the configured direct port range. TCP-only forwarding can pass some checks while still failing renter workloads that need UDP.
 
-Some checks and workflows use TCP, but renter workloads can require UDP. Keeping both protocols forwarded across the same direct port range avoids partial connectivity that only appears after a renter starts using the machine.
+## Set The Host Port Range
+
+In the Host Installer Wizard, enter the same range you forwarded.
+
+For the raw installer:
+
+```bash
+sudo python3 ./install "$VAST_HOST_KEY" --ports 40000 40799
+```
+
+For an installed host:
+
+```bash
+echo -n "40000-40799" | sudo tee /var/lib/vastai_kaalia/host_port_range
+sudo systemctl restart vastai.service
+sudo tail -n 50 /var/lib/vastai_kaalia/kaalia.log | grep host_port_range
+```
+
+The log should show `host_port_range: 40000 40799`.
 
 <a id="cgnat-starlink-ipv6" />
-## What if I am behind CGNAT, Starlink, IPv6-only, or no public IP?
+## CGNAT, Starlink, IPv6-Only, Or No Public IP
 
-Vast host instances need direct public connectivity to mapped ports. CGNAT, many residential Starlink setups, IPv6-only service without compatible inbound reachability, and networks without a public inbound path can prevent clients and the self-test from reaching the host.
+Vast instances need public inbound TCP and UDP reachability. CGNAT, double NAT without a real public forwarding path, many residential Starlink setups, incompatible IPv6-only service, blocked inbound ports, or no public inbound IP are not supported for hosting because renters and self-test must be able to reach the machine directly.
 
-Compare your router WAN IP with your public IP, test from outside your LAN, and ask your ISP for public inbound connectivity if needed.
+Compare your router WAN IP with your public IP and test from outside the LAN. If the router does not have a public inbound address or cannot forward the configured ports to the host, use a network connection that provides public inbound connectivity before listing the machine.
 
 <a id="test-ports-outside-lan" />
-## How should I test ports from outside my LAN?
+## Test Ports From Outside The LAN
 
-Test the external public IP and mapped port from a different network, not only from the host's LAN. Same-LAN tests can fail because of NAT hairpinning even when the port is reachable externally. If the CLI reports a tested external IP:port, troubleshoot that exact mapping first and confirm the router or firewall forwards it to the host machine's LAN address.
+Same-LAN tests can be misleading because of NAT hairpinning. Test from a different network, such as mobile data, a cloud VM, or another external machine.
 
-## Connectivity failures during self-test
+On the host, start a temporary TCP listener and confirm it is listening:
 
-Self-test timeouts and [`vericode=8`](/host/glossary#vericode) port errors are usually network-path problems, not hardware problems. See [Self-Test Failures: vericode=8](/host/self-test-reference#vericode-8) and [Self-Test Failures: no response for 120s](/host/self-test-reference#no-response-120s).
+```bash
+sudo python3 -m http.server 40000 --bind 0.0.0.0
+sudo ss -ltnp | grep ':40000'
+```
 
-## Related pages
+From macOS or Linux outside the LAN:
+
+```bash
+curl -v http://PUBLIC_IP:40000/
+nc -vz PUBLIC_IP 40000
+```
+
+From Windows PowerShell outside the LAN:
+
+```powershell
+Test-NetConnection PUBLIC_IP -Port 40000
+curl.exe http://PUBLIC_IP:40000/
+```
+
+You can also use a public TCP checker such as [portchecker.co](https://portchecker.co/) for a quick outside-LAN TCP check.
+
+For UDP, watch for packets on the host:
+
+```bash
+sudo tcpdump -ni any udp port 40000
+```
+
+Then send a UDP packet from macOS or Linux outside the LAN:
+
+```bash
+printf 'vast-port-test\n' | nc -u -w2 PUBLIC_IP 40000
+```
+
+From Windows PowerShell outside the LAN:
+
+```powershell
+$udp = New-Object System.Net.Sockets.UdpClient
+$bytes = [Text.Encoding]::ASCII.GetBytes("vast-port-test")
+$udp.Send($bytes, $bytes.Length, "PUBLIC_IP", 40000)
+$udp.Close()
+```
+
+Stop temporary listeners before running the installer.
+
+During self-test, troubleshoot the exact public IP and port reported by the CLI, such as `https://PUBLIC_IP:PORT/progress`.
+
+## Connectivity Failures
+
+Self-test timeouts and [`vericode=8`](/host/glossary#vericode) usually mean a network-path problem. See [Self-Test Reference: vericode=8](/host/self-test-reference#vericode-8) and [no response for 120s](/host/self-test-reference#no-response-120s).
+
+## Related Pages
 
 | Topic | Read next |
 | --- | --- |
-| Network suitability before buying | [Supported Hardware](/host/supported-hardware#network) |
-| Running the self-test | [How to Self-Test](/host/how-to-self-test) |
-| Decoding failures | [Self-Test Reference](/host/self-test-reference) |
+| Hardware/network fit | [Supported Hardware](/host/supported-hardware) |
+| Self-test | [How to Self-Test](/host/how-to-self-test) |
+| Failure reference | [Self-Test Reference](/host/self-test-reference) |

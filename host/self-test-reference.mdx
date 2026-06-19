@@ -17,7 +17,7 @@ Use this reference to look up self-test failures, understand what they usually m
 
 [Glossary: vericode](/host/glossary#vericode)
 
-[vericode=8](/host/glossary#vericode) is a platform-detected direct-port or connectivity problem. Common causes include closed external ports, forwarding to the wrong LAN IP, CGNAT or no inbound public IP, firewall rules, asymmetric protocol handling, or a stale port range.
+[vericode=8](/host/glossary#vericode) is a platform-detected direct-port or connectivity problem. Common causes include closed external ports, forwarding to the wrong LAN IP, CGNAT or double NAT without a real public forwarding path, no inbound public IP, firewall rules, TCP/UDP mismatch, asymmetric protocol handling, or a stale port range.
 
 Test the public IP:port if available, verify router and host firewall rules, then rerun the self-test after fixing the network path. See [Network & Ports](/host/network-ports) for the full connectivity checklist.
 
@@ -36,7 +36,7 @@ Other likely causes include container startup failure, Docker/NVIDIA runtime sta
 <a id="machine-not-rentable" />
 ## Machine not found or not rentable
 
-This can mean the machine is already rented, has zero active on-demand offers, is offline or unlisted, is not visible to the account running the test, is deverified or below a threshold, or has offer-side error metadata.
+This can mean the machine is already rented in a way that hides the expected offer, has zero active on-demand offers, is offline or unlisted, is not visible to the account running the test, is deverified or below a threshold, or has offer-side error metadata.
 
 Start with:
 
@@ -44,12 +44,13 @@ Start with:
 2. Confirm the machine is listed, online, not currently rented, and has active offers.
 3. Check reliability, verification state, red machine errors, and missing details such as ports, RAM, upload speed, and download speed.
 4. Confirm the CLI is authenticated to the same host-enabled account.
-5. If the console state looks wrong after refresh and rerun, collect logs and escalate to support.
+5. Search directly for the machine ID; see [Why Isn't My Machine in Search?](/host/not-in-search#check-machine-listed).
+6. If the console state looks wrong after refresh and rerun, collect logs and escalate to support.
 
 <a id="warnings-ignore" />
 ## Which warnings can be ignored?
 
-Avoid ignoring warnings by default. One clear self-test advisory is that mapping more than 64 direct ports per listed GPU is usually unnecessary and is not a self-test gate. Red machine errors, self-test failures, NVML/Xid errors, port networking issues, and not-visible/rentable states should be investigated.
+Avoid ignoring warnings by default. One clear self-test advisory is that mapping more than the minimum number of direct ports per GPU is not itself a self-test gate. For production hosting, about 100 forwarded TCP/UDP ports per listed GPU is still practical headroom because individual instances can use many ports and old mappings may overlap with new starts. Red machine errors, self-test failures, NVML/Xid errors, port networking issues, and not-visible/rentable states should be investigated.
 
 ## Reliability below the preflight gate
 
