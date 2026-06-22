@@ -42,6 +42,29 @@ Back up `/etc/fstab` before editing mounts:
 sudo cp /etc/fstab /etc/fstab.pre-vast-docker.$(date -u +%Y%m%d%H%M%S)
 ```
 
+<a id="xfs-prjquota" />
+## XFS Project Quotas
+
+XFS project quotas are required. Vast uses them for per-container storage quotas.
+
+Add `pquota` or `prjquota` to the mount-options column for the `/var/lib/docker` XFS mount in `/etc/fstab`. In the example below, the mount-options column is `rw,auto,pquota,nofail`:
+
+```text
+UUID=a1b2c3d4-e5f6-7890-abcd-ef1234567890  /var/lib/docker  xfs  rw,auto,pquota,nofail  0  0
+```
+
+After editing `/etc/fstab`, mount and verify:
+
+```bash
+sudo mount -a
+findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS
+sudo xfs_quota -x -c "state" /var/lib/docker
+```
+
+The mount should be XFS, include `pquota` or `prjquota`, and show project quota accounting/enforcement as ON.
+
+Do not work around quota errors by removing Docker quota settings. Fix the filesystem and mount instead.
+
 <a id="disposable-device-example" />
 ## Disposable Device Example
 
@@ -87,13 +110,6 @@ sudo xfs_quota -x -c "state" /var/lib/docker
 ```
 
 The mount should be XFS, include `pquota` or `prjquota`, and show project quota accounting/enforcement as ON.
-
-<a id="xfs-prjquota" />
-## XFS Project Quotas
-
-Yes, XFS project quotas are required. Vast uses them for per-container storage quotas.
-
-Do not work around quota errors by removing Docker quota settings. Fix the filesystem and mount instead.
 
 <a id="nvme-raid" />
 ## Single NVMe vs RAID
