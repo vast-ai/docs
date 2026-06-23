@@ -1,0 +1,138 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/autojobs/:
+    post:
+      summary: Create Autojob Workergroup
+      tags:
+      - Serverless
+      description: Creates a new serverless workergroup (autojob) for the authenticated user, optionally creating an endpoint
+        if one doesn't exist.
+      security: []
+      x-rateLimit: 4
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                min_load:
+                  type: number
+                  description: Minimum load threshold below which the autoscaler keeps warm workers running.
+                  example: 0.1
+                min_cold_load:
+                  type: number
+                  description: Minimum baseline of cold (standby) load capacity the endpoint should maintain; applied when
+                    the endpoint is auto-created via endpoint_name.
+                  example: 0.0
+                target_util:
+                  type: number
+                  description: Target utilization ratio (0-1) that the autoscaler aims to maintain across workers.
+                  example: 0.8
+                cold_mult:
+                  type: number
+                  description: Multiplier controlling how many cold-standby workers are maintained relative to active workers.
+                  example: 2
+                cold_workers:
+                  type: integer
+                  description: Fixed number of cold (standby) workers to keep available; must be <= max_workers.
+                  example: 3
+                max_workers:
+                  type: integer
+                  description: Upper bound on the total number of workers this workergroup may scale up to.
+                  example: 10
+                test_workers:
+                  type: integer
+                  description: Number of workers reserved for testing/canary use.
+                  example: 1
+                gpu_ram:
+                  type: number
+                  description: Minimum GPU RAM in GB to target when selecting machines for this workergroup.
+                  example: 16
+                autoscaler_instance:
+                  type: string
+                  description: Autoscaler deployment environment to use (e.g. 'prod', 'dev').
+                  example: prod
+                docker_login_user:
+                  type: string
+                  description: Docker registry username for pulling private images.
+                  example: myuser
+                docker_login_pass:
+                  type: string
+                  description: Docker registry password for pulling private images.
+                docker_login_repo:
+                  type: string
+                  description: Docker registry hostname/repo to authenticate against.
+                  example: docker.io
+                template_hash:
+                  type: string
+                  description: Hash ID of a saved template to use for worker launch configuration.
+                  example: abc123def456
+                template_id:
+                  type: integer
+                  description: Numeric ID of a saved template to use for worker launch configuration.
+                  example: 999
+                launch_args:
+                  type: string
+                  description: Additional CLI-style arguments to pass when launching worker instances.
+                  example: --image pytorch/pytorch:latest --disk 20
+                endpoint_name:
+                  type: string
+                  description: Human-readable name identifying the target endpoint; if no endpoint with this name exists,
+                    one is automatically created.
+                  example: my-inference-endpoint
+                endpoint_id:
+                  type: integer
+                  description: Numeric ID of an existing endpoint to attach this workergroup to; required when endpoint_name
+                    is not provided.
+                  example: 42
+                search_params:
+                  type: string
+                  description: GPU offer filter expression (e.g. 'gpu_ram>=16 num_gpus=1') that the autoscaler uses to find
+                    machines for workers.
+                  example: gpu_ram>=16 num_gpus=1
+      responses:
+        '200':
+          description: 'Workergroup created; returns {success: true, id: <workergroup_id>}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success.
+                  id:
+                    type: integer
+                    description: ID of the newly created workergroup.
+              example:
+                success: true
+                id: 42
+        '400':
+          description: 'Invalid arguments: missing/invalid search_params, image, endpoint, arg lengths, docker login, or storage'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Host-only accounts cannot create workergroups or use serverless
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

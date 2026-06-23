@@ -1,0 +1,89 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/template/:
+    put:
+      summary: Update Template
+      tags:
+      - Templates
+      description: Updates an existing template identified by hash_id; if other users share the template, a new version is
+        created to preserve the original.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 1.9
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                hash_id:
+                  type: string
+                  description: Hash ID of the template to edit. Required for identifying which template to update.
+                name:
+                  type: string
+                  description: Name of the template
+                image:
+                  type: string
+                  description: Docker image path
+                desc:
+                  type: string
+                  description: Short description of the template
+                recommended_disk_space:
+                  type: number
+                  description: Recommended disk space in GB
+                template:
+                  type: object
+                  description: Template object whose hash_id is used as a fallback to identify the template to update when
+                    no top-level hash_id is provided.
+              required:
+              - hash_id
+            example:
+              hash_id: 5915f1dc1ce881defb572015eb9d8178
+              desc: Updated description
+              recommended_disk_space: 16
+      responses:
+        '200':
+          description: 'Returns {success: true, hash_id, msg: "Template {id} Updated Successfully", template}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success
+                  hash_id:
+                    type: string
+                    description: New MD5 hash of the updated template
+                  msg:
+                    type: string
+                    description: E.g. "Template 123 Updated Successfully"
+                  template:
+                    type: object
+                    description: The updated template object
+        '400':
+          description: 'Invalid hash_id: "Unable to Update Template. None found for given Hash ID: ..."; wrong creator: "Only
+            the Template Creator may Update Existing Template."; unexpected column key: "Unexpected Key ''...'' found in Template.";
+            or other validation errors'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

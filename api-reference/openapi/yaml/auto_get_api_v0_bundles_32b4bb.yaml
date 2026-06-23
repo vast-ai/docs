@@ -1,0 +1,123 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/bundles/:
+    get:
+      summary: Search Offers (GET)
+      tags:
+      - Search
+      description: Search for available GPU machine offers using a JSON-encoded `q` query parameter — the same query object
+        the POST body accepts; see POST /api/v0/bundles/ for the full list of filterable fields and operators.
+      security: []
+      x-rateLimit:
+        profile: low_volume_burst
+        threshold: 2
+      parameters:
+      - name: q
+        in: query
+        required: false
+        description: 'JSON-encoded search query object — the same format as the POST body: offer fields with filter expressions
+          {operator: value} (operators: eq, neq, gt, gte, lt, lte, in, notin) plus special keys limit, order, type.'
+        schema:
+          type: string
+        example: '{"gpu_name": {"eq": "RTX 4090"}, "num_gpus": {"gte": 2}, "limit": 64}'
+      - name: select_cols
+        in: query
+        required: false
+        description: Optional JSON-encoded array of offer columns to include in the results.
+        schema:
+          type: string
+        example: '["id", "gpu_name", "dph_total"]'
+      responses:
+        '200':
+          description: 'Successful response with matching offers: {"offers": [...]}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  offers:
+                    type: array
+                    description: Array of offer objects with pricing, GPU specs, and scoring fields
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          description: Offer/contract ID
+                        gpu_name:
+                          type: string
+                          description: GPU model name
+                        num_gpus:
+                          type: integer
+                          description: Number of GPUs in the offer
+                        dph_total:
+                          type: number
+                          description: Total price per hour (USD)
+                        dph_base:
+                          type: number
+                          description: Base GPU price per hour (USD)
+                        min_bid:
+                          type: number
+                          description: Minimum interruptible bid price
+                        score:
+                          type: number
+                          description: Computed quality/value score
+                        reliability:
+                          type: number
+                          description: Host reliability score (0–1)
+                        dlperf:
+                          type: number
+                          description: Deep-learning performance score
+                        dlperf_per_dphtotal:
+                          type: number
+                          description: Performance per dollar
+                        gpu_ram:
+                          type: number
+                          description: GPU RAM per card (MB)
+                        disk_space:
+                          type: number
+                          description: Available disk space (GB)
+                        verification:
+                          type: string
+                          description: Host verification status string
+                        rented:
+                          type: boolean
+                          description: Whether the caller is renting this offer
+                        duration:
+                          type: number
+                          description: Available rental duration remaining (seconds)
+              example:
+                offers:
+                - id: 12345
+                  gpu_name: RTX 4090
+                  num_gpus: 1
+                  dph_total: 0.45
+                  dph_base: 0.4
+                  score: 1.23
+                  reliability: 0.99
+                  dlperf: 22.5
+                  verification: verified
+                  rented: false
+        '400':
+          description: 'Invalid query: "Invalid query: must be dict of conditions" or "Invalid json body"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

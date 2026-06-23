@@ -1,0 +1,124 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/webhooks/:
+    post:
+      summary: Create User Webhook
+      tags:
+      - Accounts
+      description: Register a new webhook URL for the authenticated user, subscribing it to the specified event types.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 2.0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                webhook_url:
+                  type: string
+                  description: HTTPS URL to receive webhook event deliveries; must start with 'https://', have a valid hostname,
+                    and be at most 2048 characters.
+                  example: https://example.com/vastai-hook
+                event_types:
+                  type: array
+                  description: List of notification slug strings (e.g. 'low_disk_space' or 'host:low_disk_space') this webhook
+                    should receive; must be non-empty and contain only known slugs.
+                  example:
+                  - low_disk_space
+                  - near_end_date
+                name:
+                  type: string
+                  description: Optional human-readable display label for this webhook (max 120 characters, no control characters).
+                  example: My integration
+      responses:
+        '200':
+          description: 'Success; returns {success: true, webhook: object, enabled_notification_preferences: list}; webhook
+            includes webhook_secret (shown once)'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success.
+                  webhook:
+                    type: object
+                    description: The created webhook object including id, user_id, name, webhook_url, event_types, created_at,
+                      updated_at, and the one-time webhook_secret.
+                    properties:
+                      id:
+                        type: integer
+                        description: Webhook ID.
+                      user_id:
+                        type: integer
+                        description: Owning user ID.
+                      name:
+                        type: string
+                        description: Optional display name.
+                      webhook_url:
+                        type: string
+                        description: The registered HTTPS endpoint URL.
+                      event_types:
+                        type: array
+                        items:
+                          type: string
+                        description: Subscribed event type slugs.
+                      created_at:
+                        type: number
+                        description: Unix timestamp of creation.
+                      updated_at:
+                        type: number
+                        description: Unix timestamp of last update.
+                      webhook_secret:
+                        type: string
+                        description: Signing secret for verifying webhook payloads; returned only at creation time.
+                  enabled_notification_preferences:
+                    type: array
+                    items:
+                      type: string
+                    description: List of preference keys (e.g. 'host:low_disk_space') that were automatically enabled for
+                      webhook delivery.
+              example:
+                success: true
+                webhook:
+                  id: 42
+                  user_id: 1001
+                  name: My Webhook
+                  webhook_url: https://example.com/vastai-events
+                  event_types:
+                  - low_disk_space
+                  created_at: 1700000000
+                  updated_at: 1700000000
+                  webhook_secret: abc123secretkey
+                enabled_notification_preferences:
+                - host:low_disk_space
+        '400':
+          description: 'Bad request; possible messages: ''webhook_url is required and must be a string'', ''webhook_url must
+            use HTTPS'', ''webhook_url exceeds maximum length of 2048 characters'', ''webhook_url must include a hostname'',
+            ''webhook_url has an invalid port'', ''event_types must be a list'', ''event_types must contain at least one event
+            type'', ''Unknown event type: <slug>'', ''Duplicate event type: <slug>'', "Maximum of 4 webhooks per user", ''This
+            webhook URL is already registered'''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

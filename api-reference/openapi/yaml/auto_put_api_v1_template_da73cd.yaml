@@ -1,0 +1,81 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v1/template/:
+    put:
+      summary: Update Template (v1)
+      tags:
+      - Templates
+      description: Updates a template by ID and hash_id; creates a new version if the user is not the creator or if other
+        users or active instances reference the original.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 1.9
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                hash_id:
+                  type: string
+                  description: Current MD5 hash of the template to update, used to verify the correct version is being modified
+                    (required)
+                  example: 49c538d097ad6437413b83711c9f61e8
+                template:
+                  type: object
+                  description: Template object whose hash_id is used as a fallback to identify the template to update when
+                    no top-level hash_id is provided.
+      responses:
+        '200':
+          description: 'Returns {success: true, hash_id, msg, template}; msg varies: "No Edits made...", "Created an Edited
+            Copy...", or "Created an Edited Copy of Template..."'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success
+                  hash_id:
+                    type: string
+                    description: Hash ID (present when no edits were made)
+                  msg:
+                    type: string
+                    description: 'Outcome description, e.g. ''Created an Edited Copy of Template 123. New Template ID: 456''
+                      or ''No Edits made for template 123'''
+                  template:
+                    type: object
+                    description: The updated or newly created template object
+        '400':
+          description: 'Missing hash_id or template id, invalid params, unexpected column key, or other validation error;
+            returns {success: false, error, msg}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 'Template not found or deleted, or hash_id mismatch: {success: false, error: "invalid_template", msg:
+            "error 404: Template not found"}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

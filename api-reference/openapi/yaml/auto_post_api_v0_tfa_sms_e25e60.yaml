@@ -1,0 +1,91 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/tfa/sms/:
+    post:
+      summary: Send 2FA SMS Code
+      tags:
+      - Accounts
+      description: Sends a 2FA verification code to a phone number via SMS, for SMS 2FA setup or login.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 2.0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone_number:
+                  type: string
+                  description: Phone number to send the code to in E.164 format; falls back to the account's registered number
+                    if omitted
+                  example: '+14155550123'
+                tfa_method_id:
+                  type: integer
+                  description: ID of an existing SMS 2FA method whose phone number should be used
+                  example: 3
+                secret:
+                  type: string
+                  description: Existing tfa_secret to reuse when refreshing a code during an active login challenge
+                  example: abc123secret
+      responses:
+        '200':
+          description: 'Returns {msg: "2FA Sent", secret} where secret is used to verify the code.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  msg:
+                    type: string
+                    description: '"2FA Sent"'
+                  secret:
+                    type: string
+                    description: TFA secret token to include in the subsequent verification request
+              example:
+                msg: 2FA Sent
+                secret: abc123randomtoken
+        '400':
+          description: Email not verified ("email_not_verified"), no phone number provided ("invalid_params"), a recent code
+            already sent ("tfa_challenge_exists"), Twilio error on send ("twilio_error"), or number blocked by Twilio Lookup
+            ("sms_blocked_number").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing 2FA secret or bearer token ("missing_auth_value").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: SMS sending disabled due to fraud ("sms_fraud_detected").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many SMS attempts ("sms_rate_limited" or "preauth_phone_cap").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

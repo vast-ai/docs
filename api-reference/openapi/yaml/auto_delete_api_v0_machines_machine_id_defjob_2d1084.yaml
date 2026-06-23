@@ -1,0 +1,69 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/machines/{machine_id}/defjob:
+    delete:
+      summary: Delete Machine Default Jobs
+      tags:
+      - Machines
+      description: Deletes all host-owned background (bid/default) job contracts and containers running on the specified machine.
+      security:
+      - BearerAuth: []
+      x-scope: machine_write
+      x-rateLimit: 1.2
+      parameters:
+      - name: machine_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ID of the machine whose default host jobs should be deleted.
+      responses:
+        '200':
+          description: 'Returns {success: true, machine_id, user_id}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Whether the deletion succeeded
+                  machine_id:
+                    type: integer
+                    description: ID of the affected machine
+                  user_id:
+                    type: integer
+                    description: ID of the authenticated user
+              example:
+                success: true
+                machine_id: 12345
+                user_id: 9876
+        '404':
+          description: '"No such machine id" when the machine does not exist'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: '"error: only the owner can access this machine." when caller does not own the machine'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

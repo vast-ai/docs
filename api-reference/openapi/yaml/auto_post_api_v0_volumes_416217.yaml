@@ -1,0 +1,116 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/volumes/:
+    post:
+      summary: Create Volume Listings
+      tags:
+      - Volumes
+      description: Creates or updates disk volume ask listings for one or more of the host's machines.
+      security:
+      - BearerAuth: []
+      x-scope: instance_write
+      x-rateLimit: 5
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                hidden_listing:
+                  type: boolean
+                  description: When true, the volume listing is not shown in public marketplace search results.
+                  example: false
+                machine:
+                  type: integer
+                  description: Single machine ID to list a volume for. Use machines (array) for multiple. One of machine or
+                    machines is required.
+                  example: 7890
+                machines:
+                  type: array
+                  description: List of machine IDs to list volumes for simultaneously. Overrides machine if both are supplied.
+                  example:
+                  - 7890
+                  - 7891
+      responses:
+        '200':
+          description: 'Returns {"success": <bool>, "you_sent": <request_body>, "results": [{"machine_id", "user_id", "extended",
+            "new_contracts", "upd_contracts"}, ...]}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: True if all machine listings succeeded.
+                  you_sent:
+                    type: object
+                    description: The request body that was submitted.
+                  results:
+                    type: array
+                    description: Per-machine result objects.
+                    items:
+                      type: object
+                      properties:
+                        machine_id:
+                          type: integer
+                          description: Machine identifier.
+                        user_id:
+                          type: integer
+                          description: Owner user identifier.
+                        extended:
+                          type: integer
+                          description: Number of active contracts extended.
+                        new_contracts:
+                          type: array
+                          description: Newly created ask contracts.
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: integer
+                                description: New contract identifier.
+                              size:
+                                type: number
+                                description: Disk size allocated.
+                        upd_contracts:
+                          type: array
+                          description: IDs of updated ask contracts.
+                          items:
+                            type: integer
+        '400':
+          description: 'Invalid machine id or no matching machine for account; message: "Invalid machine id" or "No such machine(s)
+            for your account"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '402':
+          description: 'Machine is offline; returns {"success": false, "msg": "error: can only create asks for an online machine."}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Disk ask creation or update failed with invalid arguments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

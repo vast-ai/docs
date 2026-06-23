@@ -1,0 +1,76 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/webhooks/{id}/test/:
+    post:
+      summary: Send Webhook Test Event
+      tags:
+      - Accounts
+      description: Fire a canned test event at one of the caller's webhooks to verify end-to-end delivery without persisting
+        a notification record.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 2.0
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Unique identifier of the webhook to send a test event to.
+      responses:
+        '200':
+          description: 'Success; returns {success: true, webhook_id: int, event_id: string}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success.
+                  webhook_id:
+                    type: integer
+                    description: ID of the webhook that received the test event.
+                  event_id:
+                    type: string
+                    description: Unique hex event identifier used in the delivered payload.
+              example:
+                success: true
+                webhook_id: 42
+                event_id: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
+        '400':
+          description: 'Permanent delivery failure; returns {success: false, msg: ''Webhook URL is not deliverable''}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 'Webhook not found; returns {success: false, msg: ''Webhook not found''}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: 'Transient delivery failure; returns {success: false, msg: ''Webhook delivery failed''}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

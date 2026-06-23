@@ -1,0 +1,121 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/endptjobs/{id}/:
+    put:
+      summary: Update Endpoint
+      tags:
+      - Serverless
+      description: Updates autoscaling configuration on an existing endpoint; endpoint must not be managed by a deployment.
+      security: []
+      x-rateLimit: 2
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ID of the endpoint group to update
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                min_load:
+                  type: number
+                  description: Minimum floor load in perf units/s (token/s for LLMs)
+                  example: 0.0
+                min_cold_load:
+                  type: number
+                  description: Updated minimum cold load threshold.
+                  example: 0.05
+                target_util:
+                  type: number
+                  description: Target capacity utilization (fraction, max 1.0)
+                  example: 0.9
+                cold_mult:
+                  type: number
+                  description: Cold/stopped instance capacity target as multiple of hot capacity target
+                  example: 2.5
+                cold_workers:
+                  type: integer
+                  description: Min number of workers to keep 'cold' when you have no load
+                  example: 5
+                max_workers:
+                  type: integer
+                  description: Max number of workers your endpoint group can have
+                  example: 20
+                max_queue_time:
+                  type: number
+                  description: Updated maximum acceptable queue time in seconds.
+                  example: 90
+                target_queue_time:
+                  type: number
+                  description: Updated desired queue time in seconds; must be <= max_queue_time.
+                  example: 15
+                endpoint_name:
+                  type: string
+                  description: Deployment endpoint name
+                  example: my_endpoint
+                autoscaler_instance:
+                  type: string
+                  description: Autoscaler deployment environment.
+                  example: prod
+                endpoint_state:
+                  type: string
+                  description: New activation state for the endpoint.
+                  example: active
+                  enum:
+                  - active
+                  - suspended
+                  - stopped
+                inactivity_timeout:
+                  type: number
+                  description: Updated seconds of inactivity before suspension.
+                  example: 600
+                overrecruit_ratio:
+                  type: number
+                  description: Updated over-recruit ratio for traffic spike absorption.
+                  example: 1.3
+      responses:
+        '200':
+          description: 'Returns {success: true}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success.
+              example:
+                success: true
+        '400':
+          description: Endpoint is deployment-managed, or "Endpoint {endptjob_id} for user {user_id} not found."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Host-only accounts cannot update endpoints or use serverless
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

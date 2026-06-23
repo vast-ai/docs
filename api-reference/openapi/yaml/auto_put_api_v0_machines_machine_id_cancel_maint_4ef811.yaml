@@ -1,0 +1,70 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/machines/{machine_id}/cancel_maint:
+    put:
+      summary: Cancel Machine Maintenance
+      tags:
+      - Machines
+      description: Cancels all scheduled (non-expired) maintenance windows for the specified machine owned by the caller.
+      security:
+      - BearerAuth: []
+      x-scope: machine_write
+      x-rateLimit: 2.5
+      parameters:
+      - name: machine_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ID of the machine (from the URL path) whose scheduled maintenance windows should all be cancelled; must
+          be owned by the authenticated user.
+      responses:
+        '200':
+          description: '{success: true, ctime, machine_id, msg: "deleted N scheduled maintenance window(s) on machine {machine_id}"}
+            on success.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: true on successful cancellation
+                  ctime:
+                    type: number
+                    description: Unix timestamp when the cancellation was performed
+                  machine_id:
+                    type: integer
+                    description: ID of the machine whose maintenances were cancelled
+                  msg:
+                    type: string
+                    description: Human-readable summary of how many windows were cancelled
+              example:
+                success: true
+                ctime: 1750000000
+                machine_id: 1001
+                msg: deleted 2 scheduled maintenance window(s) on machine 1001
+        '404':
+          description: '{success: false, msg: "No such machine id"} when the machine does not exist or is not owned by the
+            caller.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

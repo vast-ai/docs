@@ -1,0 +1,122 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/machines/maintenances/batch:
+    post:
+      summary: Batch Schedule Maintenances
+      tags:
+      - Machines
+      description: Schedules maintenance windows for multiple machines at once, notifying affected instance clients and sending
+        the host a single confirmation email.
+      security:
+      - BearerAuth: []
+      x-scope: machine_write
+      x-rateLimit: 2.0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                machine_ids:
+                  type: array
+                  description: List of machine IDs (1–100 entries) to schedule maintenance for; non-owned IDs are reported
+                    as failures.
+                  example:
+                  - 12345
+                  - 67890
+                sdate:
+                  type: number
+                  description: Unix timestamp for the maintenance start time; must be in the future and within 1 year.
+                  example: 1718100000
+                duration:
+                  type: number
+                  description: Duration of the maintenance window in hours; minimum effective value is 1. Defaults to 1 if
+                    omitted.
+                  example: 4
+                maintenance_category:
+                  type: string
+                  description: Category describing the reason for maintenance. Defaults to "other" if omitted.
+                  example: power
+                  enum:
+                  - power
+                  - internet
+                  - disk
+                  - gpu
+                  - software
+                  - other
+      responses:
+        '200':
+          description: '{success: true, results: [{success, machine_id, notifications_sent}, ...]} when at least one machine
+            was successfully scheduled.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: true if at least one machine was successfully scheduled
+                  results:
+                    type: array
+                    description: Per-machine outcome list, including successes, not-found, and invalid entries
+                    items:
+                      type: object
+                      properties:
+                        success:
+                          type: boolean
+                          description: Whether this machine was scheduled
+                        machine_id:
+                          type: integer
+                          description: Machine ID
+                        notifications_sent:
+                          type: integer
+                          description: Number of client notification emails sent (present on success)
+                        error:
+                          type: string
+                          description: Error code if failed (e.g. not_found)
+                        msg:
+                          type: string
+                          description: Human-readable message if failed
+              example:
+                success: true
+                results:
+                - success: true
+                  machine_id: 1001
+                  notifications_sent: 2
+                - success: false
+                  machine_id: 9999
+                  error: not_found
+                  msg: No such machine id or not owned
+        '400':
+          description: '"machine_ids must be a non-empty list", "machine_ids must contain at most 100 entries", "No valid
+            machine_ids provided", "duration must be a positive number", or "maintenance_category must be one of: disk, gpu,
+            internet, other, power, software" when input validation fails; also returned (with success:false) if no machines
+            were owned.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: '"Missing sdate", "sdate must be a numeric timestamp", "sdate must be in the future", or "sdate must
+            be within 1 year" when the start time is invalid.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
