@@ -1,0 +1,86 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/tfa/authorize-new-method/:
+    put:
+      summary: Verify New 2FA Method Authorization
+      tags:
+      - Accounts
+      description: Completes the two-step authorization flow for adding a new 2FA method by verifying the code sent in the
+        POST step.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 2.0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  description: Verification code received via the method chosen in the POST step
+                  example: '123456'
+                secret:
+                  type: string
+                  description: The tfa_secret returned from the POST authorize-new-method step
+                  example: abc123secret
+      responses:
+        '200':
+          description: 'Returns {success: true, msg: "Authorization successful."} after code verification.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true
+                  msg:
+                    type: string
+                    description: '"Authorization successful."'
+              example:
+                success: true
+                msg: Authorization successful.
+        '400':
+          description: Missing code or secret ("missing_params"), no pending authorization found ("no_pending_authorization"),
+            or invalid 2FA code ("2fa_verification_failed").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: User is not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Team user in team context ("team_user_forbidden").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Authorization service temporarily unavailable ("service_unavailable").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

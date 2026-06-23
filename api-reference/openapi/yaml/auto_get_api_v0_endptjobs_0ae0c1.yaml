@@ -1,0 +1,104 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/endptjobs/:
+    get:
+      summary: List Endpoints
+      tags:
+      - Serverless
+      description: Returns all active serverless endpoints for the authenticated user, including autoscaling config and auto-delete
+        countdown.
+      security: []
+      x-rateLimit: 3
+      responses:
+        '200':
+          description: 'Returns {success: true, results: [{id, min_load, min_cold_load, target_util, cold_mult, cold_workers,
+            max_workers, max_queue_time, target_queue_time, endpoint_name, api_key, user_id, created_at, endpoint_state, inactivity_timeout,
+            auto_delete_in_seconds, auto_delete_due_24h}, ...]}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success.
+                  results:
+                    type: array
+                    description: List of endpoint objects.
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          description: Endpoint ID.
+                        min_load:
+                          type: number
+                          description: Minimum load threshold.
+                        min_cold_load:
+                          type: number
+                          description: Minimum cold load threshold.
+                        target_util:
+                          type: number
+                          description: Target utilization ratio.
+                        cold_mult:
+                          type: number
+                          description: Cold worker multiplier.
+                        cold_workers:
+                          type: integer
+                          description: Number of cold (standby) workers.
+                        max_workers:
+                          type: integer
+                          description: Maximum allowed workers.
+                        max_queue_time:
+                          type: number
+                          description: Maximum queue wait time in seconds.
+                        target_queue_time:
+                          type: number
+                          description: Target queue wait time in seconds.
+                        endpoint_name:
+                          type: string
+                          description: Human-readable endpoint name.
+                        api_key:
+                          type: string
+                          description: Auth token for the user.
+                        user_id:
+                          type: integer
+                          description: ID of the owning user.
+                        created_at:
+                          type: number
+                          description: Unix timestamp of creation.
+                        endpoint_state:
+                          type: string
+                          description: Current state of the endpoint (e.g. active, stopped).
+                        inactivity_timeout:
+                          type: number
+                          description: Seconds of inactivity before auto-stop.
+                        auto_delete_in_seconds:
+                          type: number
+                          description: Seconds until auto-deletion if endpoint has no workergroups; null if has active workergroups.
+                        auto_delete_due_24h:
+                          type: boolean
+                          description: True if auto-deletion is due within 24 hours.
+        '400':
+          description: '"No endpoints for user {user_id} found."'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

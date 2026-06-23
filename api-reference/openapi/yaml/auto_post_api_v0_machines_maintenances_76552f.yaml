@@ -1,0 +1,84 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/machines/maintenances:
+    post:
+      summary: Query Maintenance Windows by Machine IDs
+      tags:
+      - Machines
+      description: Returns active maintenance windows for the specified list of machine IDs.
+      security:
+      - BearerAuth: []
+      x-scope: instance_read
+      x-rateLimit: 1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                machine_ids:
+                  type: array
+                  description: List of machine IDs (integers, comma-separated string, or a single integer) to retrieve active
+                    maintenance windows for.
+                  example:
+                  - 12345
+                  - 67890
+                ctime:
+                  type: number
+                  description: Unix timestamp used as the reference 'current time' for filtering out already-ended windows;
+                    defaults to server's current time.
+                  example: 1718000000
+      responses:
+        '200':
+          description: 'Array of maintenance window objects with fields: id, machine_id, duration_hours, start_time, maintenance_category.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      description: Maintenance record ID
+                    machine_id:
+                      type: integer
+                      description: ID of the machine
+                    duration_hours:
+                      type: integer
+                      description: Duration of the maintenance window in hours
+                    start_time:
+                      type: number
+                      description: Unix timestamp when maintenance begins
+                    maintenance_category:
+                      type: string
+                      description: Category of maintenance (power, internet, disk, gpu, software, other)
+              example:
+              - id: 42
+                machine_id: 1001
+                duration_hours: 2
+                start_time: 1750000000
+                maintenance_category: disk
+        '400':
+          description: '"input argument machine_ids can not be None" when machine_ids is missing or empty.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

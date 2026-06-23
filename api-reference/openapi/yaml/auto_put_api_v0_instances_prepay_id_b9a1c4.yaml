@@ -1,0 +1,75 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/instances/prepay/{id}/:
+    put:
+      summary: Prepay Instance
+      tags:
+      - Instances
+      description: Deposits credit against an instance to receive a time-based discount on future billing.
+      security:
+      - BearerAuth: []
+      x-scope: instance_write
+      x-rateLimit: 2
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ID of the instance to prepay for
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount:
+                  type: number
+                  description: Amount of credits to prepay
+                  example: 500.0
+      responses:
+        '200':
+          description: 'Returns {success: true, timescale: <months>, discount_rate: <rate>} on successful prepay.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: True when prepayment was applied
+                  timescale:
+                    type: number
+                    description: Effective rental period in months covered by the deposit
+                  discount_rate:
+                    type: number
+                    description: Discount rate applied to the prepaid amount (0–1)
+              example:
+                success: true
+                timescale: 3
+                discount_rate: 0.2
+        '400':
+          description: 'Returns {error: "invalid_args", msg: "amount must be > 0"}, {error: "invalid_args", msg: "No such
+            instance"}, {error: "insufficient_credit", msg: "Insufficient credit"}, or {error: "rental_too_long", msg: "Cannot
+            rent instance for that length of time"}.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

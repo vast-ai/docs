@@ -1,0 +1,123 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/machines/create_asks/:
+    put:
+      summary: List Machine GPU Offers
+      tags:
+      - Machines
+      description: Creates or updates ask (offer) contracts for one or more of the host's machines, making GPUs available
+        for rent.
+      security:
+      - BearerAuth: []
+      x-scope: machine_write
+      x-rateLimit: 5
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                machine:
+                  type: integer
+                  description: ID of the machine to list
+                price_gpu:
+                  type: number
+                  format: float
+                  description: Price per GPU per hour
+                price_disk:
+                  type: number
+                  format: float
+                  description: Price per GB of disk storage
+                price_inetu:
+                  type: number
+                  format: float
+                  description: Price per GB of upload bandwidth
+                price_inetd:
+                  type: number
+                  format: float
+                  description: Price per GB of download bandwidth
+                price_min_bid:
+                  type: number
+                  format: float
+                  description: Minimum bid price allowed
+                min_chunk:
+                  type: integer
+                  description: Minimum number of GPUs that must be rented together
+                  default: 1
+                end_date:
+                  type: number
+                  format: float
+                  description: Unix timestamp for when the listing expires
+                credit_discount_max:
+                  type: number
+                  format: float
+                  description: Maximum discount rate allowed for prepaid credits
+                hidden_listing:
+                  type: boolean
+                  description: When true the offers are created but not shown publicly in search results.
+                  example: false
+                machines:
+                  type: array
+                  description: List of machine IDs to list simultaneously; overrides the singular `machine` field when provided.
+                  example:
+                  - 12345
+                  - 67890
+              required:
+              - machine
+      responses:
+        '200':
+          description: Returns {success, you_sent, results} with per-machine results from create_asks_
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Whether all per-machine ask operations succeeded
+                  you_sent:
+                    type: object
+                    description: Echo of the request body
+                  results:
+                    type: array
+                    items:
+                      type: object
+                    description: Per-machine result objects from the ask-creation process
+              example:
+                success: true
+                you_sent:
+                  machine: 12345
+                  price: 0.25
+                results:
+                - success: true
+        '400':
+          description: 'Invalid machine id or min_chunk: "Invalid machine id or min_chunk"; or machine not found: "No such
+            machine(s) for your account"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: 'Caller is not the machine owner: "Only the owner can create ask contracts for a machine."; or machine
+            is decommissioned/locked: "Machines {ids} are decommissioned or locked for migration"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

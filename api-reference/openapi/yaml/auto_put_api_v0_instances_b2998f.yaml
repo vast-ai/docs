@@ -1,0 +1,74 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/instances/:
+    put:
+      summary: Update Instances Bulk
+      tags:
+      - Instances
+      description: Changes the state (running/stopped) or label of multiple instances by ID in a single request.
+      security:
+      - BearerAuth: []
+      x-scope: instance_write
+      x-rateLimit: 4
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  description: List of instance contract IDs to update; maximum 64 IDs per request.
+                  example:
+                  - 12345
+                  - 12346
+                state:
+                  type: string
+                  description: Target state to set for all specified instances.
+                  enum:
+                  - running
+                  - stopped
+      responses:
+        '200':
+          description: 'Returns {success: true} when at least one instance was updated.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: True when update succeeded
+              example:
+                success: true
+        '400':
+          description: 'Returns {error: "invalid_args", msg: "ids list required"} when no ids provided, {error: "invalid_args",
+            msg: "chunk length of N > 64"} when too many IDs, or {error: "insufficient_credit", msg: "You lack credit."} for
+            billing issues.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 'Returns {error: "invalid_args", msg: "Invalid instance ID list ids."} when no matching instances found.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

@@ -1,0 +1,82 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/commands/transfer_credit/:
+    put:
+      summary: Transfer Credit to User
+      tags:
+      - Accounts
+      description: Transfers a specified credit amount from the authenticated user's account to another user identified by
+        email or user ID.
+      security:
+      - BearerAuth: []
+      x-scope: billing_write
+      x-rateLimit: 2.5
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                recipient:
+                  type: string
+                  description: Email address or user ID of the recipient
+                  example: user@example.com
+                amount:
+                  type: number
+                  format: float
+                  description: Amount of credits to transfer (must be positive)
+                  minimum: 0.01
+                  example: 100.0
+                client_id:
+                  type: string
+                  description: Client identifier (usually "me")
+                  example: me
+              required:
+              - recipient
+              - amount
+      responses:
+        '200':
+          description: 'Success: returns {"success": true}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success
+              example:
+                success: true
+        '400':
+          description: 'Bad request: "The amount to transfer cannot be zero or negative", "Amount cannot have more than 2
+            decimal places", "Invalid recipient email format", "Invalid recipient", "You cannot transfer credit to yourself",
+            "Team accounts can only transfer credit back to the team owner", "You lack the credit balance to perform that
+            operation", "User not found", or invalid args'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 'Unauthorized: "Authorization Error. Please check your email for a confirmation link and try again"
+            (email confirmation required)'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

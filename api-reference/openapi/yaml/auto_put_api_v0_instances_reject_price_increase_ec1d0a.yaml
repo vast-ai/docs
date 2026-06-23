@@ -1,0 +1,72 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/instances/reject-price-increase/:
+    put:
+      summary: Reject Instance Price Increase
+      tags:
+      - Instances
+      description: Rejects a pending price-increase offer for an instance, leaving the contract at its current price.
+      security:
+      - BearerAuth: []
+      x-scope: instance_write
+      x-rateLimit: 2.0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pending_price_increase_id:
+                  type: integer
+                  description: ID of the pending price increase record to reject.
+                  example: 789
+      responses:
+        '200':
+          description: 'Returns result object including {success: true, contract_id} on rejection.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: True when rejected
+                  pending_price_increase_id:
+                    type: integer
+                    description: ID of the pending price increase record
+                  contract_id:
+                    type: integer
+                    description: ID of the affected instance contract
+              example:
+                success: true
+                pending_price_increase_id: 42
+                contract_id: 1234
+        '400':
+          description: Returns error if the pending_price_increase_id is invalid or the rejection cannot be processed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthenticated request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

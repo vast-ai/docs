@@ -1,0 +1,88 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /route/:
+    post:
+      summary: Route Serverless Request
+      description: Ask the serverless router for a ready worker to handle one request against a serverless endpoint group.
+        Returns the worker URL (plus a signature the worker validates) or a backlog/scaling status when no worker is immediately
+        available.
+      tags:
+      - Serverless
+      servers:
+      - url: https://run.vast.ai
+        description: Serverless request router
+      security:
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                endpoint_id:
+                  type: integer
+                  description: Endpoint group id (supply this or `endpoint`).
+                endpoint:
+                  type: string
+                  description: Endpoint group name (supply this or `endpoint_id`).
+                api_key:
+                  type: string
+                  description: Endpoint API key. May instead be supplied as a Bearer token in the Authorization header.
+                cost:
+                  type: number
+                  description: Estimated request cost in cost units (must be ≥ 0).
+                latency:
+                  type: number
+                  description: Average time a single worker takes to complete this request, in seconds.
+                request_idx:
+                  type: integer
+                  description: Request index; 0 (or omitted) starts a new request, a prior value re-polls it.
+                guid:
+                  type: integer
+                  description: Client-supplied request identifier.
+                replay_timeout:
+                  type: number
+                  description: Seconds after which an unanswered request may be replayed on another worker.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  endpoint:
+                    type: string
+                  request_idx:
+                    type: integer
+                  url:
+                    type: string
+                    description: Worker URL to send the request to (present when a worker is ready).
+                  cost:
+                    type: number
+                  reqnum:
+                    type: integer
+                  signature:
+                    type: string
+                    description: Router signature the worker validates before serving the request.
+                  status:
+                    type: string
+                    description: Set when no worker URL is returned (e.g. "endpoint stopped").
+        '400':
+          description: Bad request — missing/invalid parameters (response body contains an `error_msg` string).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error_msg:
+                    type: string

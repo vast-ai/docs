@@ -1,0 +1,90 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/machines/maintenances:
+    get:
+      summary: List Machine Maintenance Windows
+      tags:
+      - Machines
+      description: Returns active (non-cancelled, non-expired) maintenance windows for host-owned machines identified by the
+        provided machine_ids.
+      security:
+      - BearerAuth: []
+      x-scope: instance_read
+      x-rateLimit: 2
+      responses:
+        '200':
+          description: Array of active maintenance window objects, each including end_time computed from start_time and duration_hours.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      description: Maintenance record ID
+                    machine_id:
+                      type: integer
+                      description: ID of the machine this maintenance applies to
+                    start_time:
+                      type: number
+                      description: Unix timestamp when maintenance begins
+                    duration_hours:
+                      type: integer
+                      description: Duration of the maintenance window in hours
+                    maintenance_category:
+                      type: string
+                      description: Category of maintenance (power, internet, disk, gpu, software, other)
+                    maintenance_reason:
+                      type: string
+                      description: Optional reason for maintenance
+                    created_at:
+                      type: number
+                      description: Unix timestamp when the record was created
+                    cancelled_at:
+                      type: number
+                      description: Unix timestamp when cancelled, or null if active
+                    end_time:
+                      type: number
+                      description: Computed unix timestamp when maintenance ends (start_time + duration_hours * 3600)
+              example:
+              - id: 42
+                machine_id: 1001
+                start_time: 1750000000
+                duration_hours: 4
+                maintenance_category: power
+                maintenance_reason: null
+                created_at: 1749990000
+                cancelled_at: null
+                end_time: 1750014400
+        '400':
+          description: '"machine_ids cannot be empty" when machine_ids param is missing or empty.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: '"machine_ids (...) do not exist" when no machines are found, or "only include machine_ids that exist
+            and are owned by you" when none of the given IDs are owned by the caller.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

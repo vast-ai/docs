@@ -1,0 +1,73 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/machines/{machine_id}/asks:
+    delete:
+      summary: Delete Machine Asks
+      tags:
+      - Machines
+      description: Deletes all ask (offer) contracts for the specified machine and cleans up any orphaned machine contracts.
+      security:
+      - BearerAuth: []
+      x-scope: machine_write
+      x-rateLimit: 1.8
+      parameters:
+      - name: machine_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ID of the machine whose ask contracts should be deleted.
+      responses:
+        '200':
+          description: 'Returns {success: true, machine_id, user_id, orphaned_cleaned}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Whether the deletion succeeded
+                  machine_id:
+                    type: integer
+                    description: ID of the affected machine
+                  user_id:
+                    type: integer
+                    description: ID of the authenticated user
+                  orphaned_cleaned:
+                    type: integer
+                    description: Number of orphaned machine-contract records also removed
+              example:
+                success: true
+                machine_id: 12345
+                user_id: 9876
+                orphaned_cleaned: 2
+        '404':
+          description: '"No such machine id" when the machine does not exist'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: '"error: only the owner can access this machine." when caller does not own the machine'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

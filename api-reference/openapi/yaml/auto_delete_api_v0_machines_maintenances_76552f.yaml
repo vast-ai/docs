@@ -1,0 +1,63 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/machines/maintenances:
+    delete:
+      summary: Delete Machine Maintenance Window
+      tags:
+      - Machines
+      description: Cancels a single scheduled maintenance window by its ID, provided the caller owns the associated machine.
+      security:
+      - BearerAuth: []
+      x-scope: machine_write
+      x-rateLimit: 1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                maintenance_id:
+                  type: integer
+                  description: ID of the maintenance record to cancel.
+                  example: 42
+      responses:
+        '200':
+          description: '{success: true, msg: "Maintenance cancelled"} when the record was successfully cancelled.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: true when the record was cancelled
+                  msg:
+                    type: string
+                    description: Human-readable result message
+              example:
+                success: true
+                msg: Maintenance cancelled
+        '400':
+          description: '"Missing maintenance_id" when no maintenance_id is provided, or failure with the specific reason (e.g.,
+            "Maintenance record not found", "User is not the owner of the machine", "Maintenance not found or already cancelled").'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

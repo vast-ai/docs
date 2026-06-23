@@ -1,0 +1,73 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/ssh/{id}/:
+    put:
+      summary: Update SSH Key
+      tags:
+      - Accounts
+      description: Replaces the public key value of an existing SSH key entry for the authenticated user.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 1
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ID of the SSH key to update
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ssh_key:
+                  type: string
+                  description: The new value for the SSH key
+                  example: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC3...
+      responses:
+        '200':
+          description: 'Success: {"success": true, "key": {ssh key object}}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true
+                  key:
+                    type: object
+                    description: The updated SSH key record
+        '400':
+          description: 'Bad request: "No ssh key provided" (missing id), "The SSH key already exists on this account" (duplicate),
+            or retrieval failure'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 'Not found: {"success": false, "error": "not_found", "msg": "The SSH key does not exist on this account"}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string

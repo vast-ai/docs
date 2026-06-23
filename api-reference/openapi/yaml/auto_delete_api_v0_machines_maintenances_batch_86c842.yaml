@@ -1,0 +1,86 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/machines/maintenances/batch:
+    delete:
+      summary: Batch Delete Maintenances
+      tags:
+      - Machines
+      description: Cancels multiple scheduled maintenance windows by their IDs, skipping any the caller does not own.
+      security:
+      - BearerAuth: []
+      x-scope: machine_write
+      x-rateLimit: 2.0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                maintenance_ids:
+                  type: array
+                  description: List of maintenance record IDs (1–100 entries) to cancel.
+                  example:
+                  - 1
+                  - 2
+                  - 3
+      responses:
+        '200':
+          description: '{success: true, results: [{success, maintenance_id, msg}, ...]} when at least one maintenance record
+            was cancelled.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: true if at least one record was cancelled
+                  results:
+                    type: array
+                    description: Per-maintenance-ID outcome list
+                    items:
+                      type: object
+                      properties:
+                        success:
+                          type: boolean
+                          description: Whether this record was cancelled
+                        maintenance_id:
+                          type: integer
+                          description: Maintenance record ID
+                        msg:
+                          type: string
+                          description: Human-readable outcome message
+              example:
+                success: true
+                results:
+                - success: true
+                  maintenance_id: 42
+                  msg: Maintenance record deleted
+                - success: false
+                  maintenance_id: 99
+                  msg: Maintenance record not found
+        '400':
+          description: '"maintenance_ids must be a non-empty list", "maintenance_ids must contain at most 100 entries", or
+            "No valid maintenance_ids provided" when input is invalid; also returned (with success:false and per-item results)
+            when no deletions succeeded.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
