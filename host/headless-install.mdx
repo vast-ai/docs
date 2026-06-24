@@ -1,0 +1,227 @@
+---
+title: "Headless Install Path"
+sidebarTitle: "Headless Install"
+description: "SSH-only, Ubuntu Server install path for datacenter and remote-managed hosts."
+"canonical": "/host/headless-install"
+personas:
+  - headless-operator
+---
+
+<div className="persona-chips"><span className="persona-chip">Headless / DC</span></div>
+
+Use this path for hosts managed over SSH, BMC, or IPMI with no local display or desktop environment.
+
+<Note>
+Start from a clean Ubuntu 24.04.x Server install with OpenSSH enabled. Check [Supported Hardware](/host/supported-hardware) before installing.
+</Note>
+
+## 1. Connect Over SSH
+
+After a reinstall, SSH may show a new host-key fingerprint. Confirm the fingerprint through your provider console or BMC/IPMI before accepting it.
+
+If the reinstall was expected:
+
+```bash
+ssh-keygen -R HOST_PUBLIC_IP
+ssh ubuntu@HOST_PUBLIC_IP
+```
+
+Do not accept an unexplained fingerprint change.
+
+## 2. Update Ubuntu
+
+Use noninteractive `apt-get` so SSH sessions do not hang on config prompts:
+
+```bash
+sudo apt-get update
+APT_OPTS="-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
+sudo DEBIAN_FRONTEND=noninteractive apt-get $APT_OPTS upgrade -y
+sudo DEBIAN_FRONTEND=noninteractive apt-get $APT_OPTS dist-upgrade -y
+sudo DEBIAN_FRONTEND=noninteractive apt-get $APT_OPTS install -y update-manager-core
+```
+
+If the HWE kernel is not installed:
+
+```bash
+sudo DEBIAN_FRONTEND=noninteractive apt-get $APT_OPTS install --install-recommends linux-generic-hwe-24.04 -y
+sudo reboot
+```
+
+## 3. Install NVIDIA Drivers
+
+```bash
+APT_OPTS="-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
+sudo DEBIAN_FRONTEND=noninteractive apt-get $APT_OPTS install -y build-essential ubuntu-drivers-common
+sudo apt-get update
+ubuntu-drivers devices
+```
+
+Install the recommended stable driver. Example from one Ubuntu 24.04 test host:
+
+```bash
+sudo DEBIAN_FRONTEND=noninteractive apt-get $APT_OPTS install -y nvidia-driver-595-open
+sudo reboot
+```
+
+After reconnecting:
+
+```bash
+nvidia-smi
+```
+
+If `nvidia-smi` fails, fix the driver stack before running the Vast installer.
+
+## 4. Disable Automatic Updates
+
+Automatic package updates can disrupt drivers during rentals. Disable them and update only during planned maintenance:
+
+```bash
+sudo DEBIAN_FRONTEND=noninteractive apt-get purge --auto-remove unattended-upgrades -y
+sudo systemctl disable apt-daily-upgrade.timer apt-daily.timer
+sudo systemctl mask apt-daily-upgrade.service apt-daily.service
+```
+
+See [Maintenance Windows](/host/maintenance-windows).
+
+## 5. Configure X
+
+Ubuntu Server does not need a desktop, but Vast containers need NVIDIA X configuration:
+
+```bash
+sudo nvidia-xconfig -a --cool-bits=28 --allow-empty-initial-configuration --enable-all-gpus
+```
+
+If the machine started as Ubuntu Desktop, remove GNOME first:
+
+```bash
+sudo apt-get update
+sudo apt-get -y upgrade
+sudo apt-get install -y libgtk-3-0 xinit xserver-xorg-core
+sudo apt-get remove -y gnome-shell
+sudo update-grub
+sudo nvidia-xconfig -a --cool-bits=28 --allow-empty-initial-configuration --enable-all-gpus
+```
+
+## 6. Mount Docker Storage
+
+Vast stores client data under `/var/lib/docker`. Put it on a dedicated XFS filesystem with project quotas. See [Storage Setup](/host/storage-setup).
+
+<Warning>
+The example below wipes the target device. Do not use your OS disk.
+</Warning>
+
+Identify the target:
+
+```bash
+lsblk -f
+findmnt /
+findmnt /var/lib/docker || true
+findmnt /data0 || true
+```
+
+Create a partition if needed:
+
+```bash
+sudo cfdisk /dev/nvme0n1
+```
+
+Format, mount, and verify:
+
+```bash
+sudo mkfs.xfs /dev/nvme0n1p1
+sudo mkdir -p /var/lib/docker
+sudo blkid /dev/nvme0n1p1
+```
+
+Add an `/etc/fstab` line using your UUID:
+
+```text
+UUID=a1b2c3d4-e5f6-7890-abcd-ef1234567890  /var/lib/docker  xfs  rw,auto,pquota,nofail  0  0
+```
+
+Then mount:
+
+```bash
+sudo mount -a
+df -h /var/lib/docker
+findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS
+sudo xfs_quota -x -c "state" /var/lib/docker
+```
+
+Project quota accounting and enforcement must be ON.
+
+## 7. Enable GPU Persistence
+
+```bash
+sudo bash -c '(crontab -l 2>/dev/null; echo "@reboot nvidia-smi -pm 1" ) | crontab -'
+```
+
+## 8. Run The Vast Installer
+
+Use the official Host Installer Wizard from the [Vast host setup page](https://cloud.vast.ai/host/setup/). Copy a fresh command from the host-enabled account and run it over SSH.
+
+Use `tmux` if the SSH session may drop:
+
+```bash
+tmux new -s vast-install
+```
+
+Do not reuse old installer commands, screenshots, third-party commands, or a command copied from another account.
+
+If the TUI cannot run reliably in your SSH terminal, use the [headless fallback](/host/installing-host-software#headless-fallback):
+
+```bash
+read -rsp "Paste fresh Vast host setup key: " VAST_HOST_KEY
+echo
+sudo python3 ./install "$VAST_HOST_KEY" \
+  --no-driver \
+  --docker-partition /dev/mapper/vg1-lv--1 \
+  --ports 40000 40799
+unset VAST_HOST_KEY
+```
+
+Use `--no-driver` only after `nvidia-smi` shows all GPUs.
+
+## 9. Configure Networking
+
+Forward the direct port range from outside your network to the host for both TCP and UDP. If the installer did not set the range, configure it:
+
+```bash
+echo -n "40000-40799" | sudo tee /var/lib/vastai_kaalia/host_port_range
+sudo systemctl restart vastai.service
+sudo tail -n 50 /var/lib/vastai_kaalia/kaalia.log | grep host_port_range
+```
+
+Size the range with [Network & Ports](/host/network-ports#ports-per-gpu). Test from outside the LAN; same-LAN tests can be misleading because of NAT hairpinning.
+
+## 10. Reboot And Verify
+
+```bash
+sudo reboot
+```
+
+After reconnecting:
+
+```bash
+df -h /var/lib/docker
+findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS
+sudo xfs_quota -x -c "state" /var/lib/docker
+systemctl is-active vastai.service vast_metrics.service docker nvidia-persistenced.service
+sudo cat /var/lib/vastai_kaalia/host_port_range
+nvidia-smi
+```
+
+Then list, self-test, and monitor the machine:
+
+- [Pricing Your Listing](/host/pricing-your-listing)
+- [How to Self-Test](/host/how-to-self-test)
+- [First 24 Hours After Install](/host/first-24-hours)
+
+## Related Pages
+
+| Topic | Read next |
+| --- | --- |
+| Standard install | [Installing Host Software](/host/installing-host-software) |
+| Storage layout | [Storage Setup](/host/storage-setup) |
+| Fleet operations | [Fleet Operations](/host/fleet-operations) |
+| Maintenance | [Maintenance Windows](/host/maintenance-windows) |

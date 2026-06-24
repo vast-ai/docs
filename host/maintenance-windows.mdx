@@ -1,0 +1,100 @@
+---
+title: "Maintenance Windows"
+sidebarTitle: "Maintenance Windows"
+description: "How hosts plan maintenance without disrupting active contracts."
+"canonical": "/host/maintenance-windows"
+personas:
+  - pro-operator
+  - headless-operator
+---
+
+<div className="persona-chips"><span className="persona-chip">Pro Operator</span><span className="persona-chip">Headless / DC</span></div>
+
+Use maintenance windows to plan host work without surprising active renters.
+
+<a id="before-maintenance" />
+## Before Maintenance
+
+Wait until active rental contracts have ended, or until the machine has no running instances, before planned maintenance. Unlisting prevents new rental contracts, but it does not end existing contracts.
+
+Check the machine before you change its listing state:
+
+```bash
+vastai show machines
+vastai show machine <machine-id>
+```
+
+<Note>
+  A single machine can have multiple active rental contracts from different clients. Do not take the machine offline until every active rental contract has ended.
+</Note>
+
+<a id="planned-maintenance" />
+## Planned Maintenance
+
+For planned work, set the offer end date to the maintenance date so new rentals do not run past your planned downtime. Existing contracts keep their accepted end date, so choose a date that still honors the latest active rental.
+
+```bash
+vastai list machine <machine-id> --end_date MM/DD/YYYY
+```
+
+For multiple machines, use the fleet command:
+
+```bash
+vastai list machines <machine-id-1> <machine-id-2> --end_date MM/DD/YYYY --retry 6
+```
+
+When the active contracts have ended, unlist the machine before taking it down:
+
+```bash
+vastai unlist machine <machine-id>
+```
+
+See [vastai list machine](/host/cli/list-machine), [vastai list machines](/host/cli/list-machines), and [vastai unlist machine](/host/cli/unlist-machine).
+
+<a id="schedule-window" />
+## Schedule An Unplanned Window
+
+If you must take the machine down unexpectedly, schedule a maintenance window so clients are notified and can save their work. The start date is Unix epoch seconds in UTC, and the duration is in hours.
+
+```bash
+vastai schedule maint <machine-id> --sdate <unix-start> --duration <hours> --maintenance_category software
+```
+
+Example:
+
+```bash
+vastai schedule maint 8207 --sdate 1782950400 --duration 2 --maintenance_category power
+```
+
+Maintenance categories are `power`, `internet`, `disk`, `gpu`, `software`, or `other`. See [vastai schedule maint](/host/cli/schedule-maint).
+
+<a id="check-cancel" />
+## Check Or Cancel Maintenance
+
+Check scheduled maintenance for one or more machines:
+
+```bash
+vastai show maints --ids <machine-id>
+vastai show maints --ids <machine-id-1>,<machine-id-2>
+```
+
+Cancel scheduled maintenance for a machine:
+
+```bash
+vastai cancel maint <machine-id>
+```
+
+See [vastai show maints](/host/cli/show-maints) and [vastai cancel maint](/host/cli/cancel-maint).
+
+<a id="automatic-updates" />
+## Should I disable automatic updates?
+
+Avoid unattended kernel or GPU driver changes during active rentals. Driver and kernel updates can break running jobs or leave the host in a driver/library mismatch state until rebooted. Plan updates during maintenance windows, then verify `nvidia-smi`, Docker GPU access, and self-test behavior before accepting new rentals.
+
+## Related pages
+
+| Topic | Read next |
+| --- | --- |
+| Contract and offer end dates | [Hosting Overview](/host/hosting-overview#offer-end-date) |
+| Reliability impact of downtime | [Reliability & Uptime](/host/reliability-uptime) |
+| Removing a machine entirely | [Removing or Recreating Machines](/host/removing-recreating-machines) |
