@@ -47,6 +47,30 @@ Start with:
 5. Search directly for the machine ID; see [Why Isn't My Machine in Search?](/host/not-in-search#check-machine-listed).
 6. If the console state looks wrong after refresh and rerun, collect logs and escalate to support.
 
+<a id="nccl-failed" />
+## `nccl_failed`
+
+`nccl_failed` means the temporary self-test instance could not initialize and synchronize NCCL workers across the visible GPUs. Treat this as a multi-GPU communication failure, not as proof of one specific root cause.
+
+Start with:
+
+1. Inspect the self-test support bundle for the NCCL error output.
+2. Confirm every GPU is visible with `nvidia-smi` and Docker GPU access.
+3. Check driver/CUDA/PyTorch/NCCL compatibility.
+4. Check GPU peer-to-peer communication, PCIe/NVLink topology, Xid errors, and any GPU reset or bus errors.
+5. On HGX, DGX, or other NVSwitch systems, check Fabric Manager/NVLSM on the host. The self-test container can show NCCL symptoms, but it cannot confirm whether host services such as `nvidia-fabricmanager` are running or healthy.
+
+Useful host-side checks for NVSwitch systems include:
+
+```bash
+systemctl status nvidia-fabricmanager
+journalctl -u nvidia-fabricmanager --since "-24h"
+nvidia-smi -q | grep -i -A 2 Fabric
+nvidia-smi topo -m
+```
+
+Fabric state should normally show completed/successful registration on systems where NVIDIA exposes fabric state through NVML. If Fabric Manager is not applicable to the hardware, focus on driver/runtime compatibility, PCIe/NVLink topology, and the raw NCCL error.
+
 <a id="warnings-ignore" />
 ## Which warnings can be ignored?
 
@@ -58,4 +82,4 @@ Reliability greater than 0.9 is a self-test and verification gate; if the machin
 
 ## Errors not specific to the self-test
 
-For `bad bandwidthtest2`, CDI device injection failures, NVML mismatches, and other machine-health errors, see [Common Errors & Diagnostics](/host/common-errors-diagnostics).
+For `bad bandwidthtest2`, CDI device injection failures, NVML mismatches, and other machine-health errors, see [Machine Error Reference](/host/machine-errors) and [Common Errors & Diagnostics](/host/common-errors-diagnostics).
