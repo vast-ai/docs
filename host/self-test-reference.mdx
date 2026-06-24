@@ -12,6 +12,27 @@ personas:
 
 Use this reference to look up self-test failures, understand what they usually mean, and choose the next diagnostic step. Each failure has its own anchor so CLI errors and support replies can link directly to it.
 
+## Quick Error Lookup
+
+Use the exact message printed by the CLI. Fix the host-side cause, then rerun self-test.
+
+| Message or stage | Usually means | Host action |
+| --- | --- | --- |
+| `Machine not found or not rentable` | The machine is not testable from the current account or has no rentable offer. | Check listing state, active offers, account/API key, reliability, red errors, and missing machine details. |
+| `Reliability <= 0.90` | The machine has not met the reliability gate. | Keep the host online and stable; use diagnostic mode only for troubleshooting, not verification proof. |
+| `Authorization Error`, `HTTP 401`, or missing permission | The API key cannot inspect the machine or offer. | Use a host-enabled account/API key with the needed machine and offer permissions. |
+| `CUDA compatibility` failure | Driver/runtime support is too old for the self-test image. | Update or repair the NVIDIA driver stack, then confirm Docker GPU access. |
+| Direct ports below requirement | The machine does not expose enough direct ports for the listed GPUs. | Configure and forward at least 3 TCP/UDP ports per listed GPU for self-test; use more headroom for production hosting. |
+| PCIe bandwidth failure or `bad bandwidthtest2` | GPU transfer or PCIe health is below the gate. | Check PCIe lanes, risers, slots, power, thermals, Xid/AER logs, and GPU seating. |
+| Upload/download bandwidth failure | Network throughput is below the machine requirement. | Check ISP/datacenter bandwidth, routing, host load, and repeated speed results. |
+| VRAM, RAM, or physical CPU core failure | Hardware resources do not meet the listed GPU requirement. | Confirm visible GPUs, host RAM, and at least one physical CPU core per visible GPU. |
+| `progress_endpoint_unreachable`, `progress_empty_timeout`, `progress_endpoint_lost`, or `No response for 120s` | The temporary test instance did not provide progress. | Check public TCP reachability, container startup, Docker/NVIDIA runtime, daemon logs, and the support bundle. |
+| UDP echo failure | TCP may work, but the public UDP path failed. | Forward UDP for the same direct port range and test from outside the LAN. |
+| System requirements failure | The container could not confirm core host resources. | Check RAM, CPU cores, GPU visibility, and container logs in the bundle. |
+| ResNet, ECC, or `gpu-burn` failure | GPU compute, memory, ECC, thermal, or stability issue. | Check `nvidia-smi`, Xid/NVRM logs, thermals, power, and rerun after fixing hardware/driver issues. |
+| `failed to inject CDI devices` or `nvidia-container-cli` | Docker could not inject GPUs into the container. | Confirm `nvidia-smi` and a normal Docker GPU container both work. |
+| `nccl_failed` | Multi-GPU communication failed. | Check CUDA/NCCL compatibility, PCIe/NVLink topology, P2P, Xid logs, and Fabric Manager on NVSwitch systems. |
+
 <a id="vericode-8" />
 ## vericode=8 And Port Networking Issues
 

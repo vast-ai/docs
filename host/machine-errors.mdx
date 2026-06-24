@@ -18,9 +18,19 @@ Do not reset machine identity, force-refresh machine specs with internal scripts
 
 ## What Machine Errors Mean
 
-Machine errors usually mean the host software or platform detected a problem with networking, Docker, NVIDIA runtime, GPU health, storage, VM support, or self-test runtime behavior. Some errors affect verification or listing eligibility. Others are informational symptoms that need logs before the cause is clear.
+Machine errors usually mean the host software or platform detected a problem with networking, Docker, NVIDIA runtime, GPU health, storage, VM support, or self-test runtime behavior.
+
+Errors have different impact levels. Some de-verify the whole machine and take it off the market until the error clears. Some only disable VM GPU-passthrough offers while container rentals can remain listed. Some are logged against a single rental attempt and do not change the machine's listing state by themselves.
 
 Resolved errors may take time to clear because the host daemon and platform need to observe healthy state again. Do not assume immediate clearing after a single fix or reboot.
+
+## Listing Impact
+
+| Impact | What happens | Examples | What to do |
+| --- | --- | --- | --- |
+| Machine de-verified | The machine is marked unverified and taken off the market until the error clears. | Port networking issues, Docker/NVIDIA runtime errors, GPU PCIe/ECC faults, Docker daemon unavailable, XFS project quota errors | Fix the host-side cause, verify the host is healthy, then allow the platform to refresh. |
+| VM offers disabled | The machine can stay listed for container rentals, but VM GPU-passthrough rentals are disabled while the VM condition persists. | IOMMU changes, GDM holding a GPU, VM memory preflight failure, machine authentication denied while fetching VM secrets | Fix the VM-specific prerequisite, then wait for the machine to report clean state again. |
+| Logged only | The message is recorded against a specific rental attempt and does not de-verify or unlist the machine by itself. | Container create, build, volume, template-update, or secrets-service messages | Use the message as support context if the rental failed or repeats. |
 
 ## Quick Lookup
 
@@ -44,7 +54,9 @@ Resolved errors may take time to clear because the host daemon and platform need
 | Full client storage, `no space left on device` | Docker storage capacity | [Full client storage](#full-client-storage) |
 | Machine not found or not rentable | Offer/listing/rentability state | [Machine not rentable](#machine-not-rentable) |
 | Red machine error / unhealthy / deverified | Machine health or platform state | [Generic red machine error](#generic-red-machine-error) |
-| VM/IOMMU/GDM/KVM guest driver error | VM host support | [VM and IOMMU errors](#vm-and-iommu-errors) |
+| `<admin-set>` | Manual Vast admin review flag | [Admin-set machine error](#admin-set-machine-error) |
+| IOMMU, GDM, machine does not support VMs, VM memory preflight, or VM secrets HTTP 401 | VM host support | [VM offer errors](#vm-offer-errors) |
+| Container create, build, volume, template update, or secrets-service message | Single rental attempt | [Rental-attempt messages](#rental-attempt-messages) |
 
 <a id="port-networking-issues" />
 ## Port Networking Issues
@@ -250,14 +262,55 @@ A red machine error means the host software or platform detected a machine-healt
 
 If the host looks healthy but the console state remains wrong, collect logs and escalate to Vast support. Do not assume support can manually verify ordinary machines; verification and most eligibility checks are automated.
 
+<a id="admin-set-machine-error" />
+## Admin-Set Machine Error
+
+`<admin-set>` means a Vast administrator manually flagged the machine for investigation. This is not an automatic host self-test result.
+
+Do not try to clear this by resetting machine identity or running internal scripts. Review the visible console message, collect host logs and recent-change details, then follow up with Vast support.
+
+<a id="vm-offer-errors" />
 <a id="vm-and-iommu-errors" />
-## VM And IOMMU Errors
+## VM Offer Errors
 
-VM-related messages such as “machine does not support VMs,” unexpected configuration changes, IOMMU grouping failures, or KVM guest driver test failures need host-specific review.
+VM-related messages can disable VM GPU-passthrough offers while leaving ordinary container rentals listed. These errors clear after the underlying condition is fixed and the machine reports clean state again, but exact timing can vary.
 
-Check VM prerequisites, BIOS/IOMMU settings, GPU isolation, and whether the machine configuration changed after listing. VM entries still need backend/support review before the public reference should give exact clearing or deverification timing.
+| Message | Likely cause | Start here |
+| --- | --- | --- |
+| `IOMMU config or Nvidia DRM Modeset has changed to no longer support VMs` | IOMMU or passthrough setup changed, a GPU shares an incompatible IOMMU group, or NVIDIA DRM modeset became enabled. | Check BIOS IOMMU/VT-d/AMD-Vi, GPU isolation, and NVIDIA modeset settings. |
+| `GDM is on; VMs will no longer work.` | GDM is running and holding a GPU, which conflicts with VFIO passthrough. | Disable the display manager for VM-capable headless hosting, then reboot or re-check GPU ownership. |
+| `Error: machine does not support VMs.` | A VM failed because hardware virtualization or IOMMU is not enabled or available. | Enable Intel VT-d or AMD-Vi/IOMMU in BIOS if the hardware supports it. |
+| `Error: Unexpected configuration change; cannot assign GPUs to VMs.` | GPU IOMMU grouping changed since verification. | Review BIOS, kernel, driver, and GPU-slot changes made after listing. |
+| `Error: Machine incompatible with VMs after host change. Please destroy the instance and find a new machine.` | Host configuration changed and the machine no longer meets VM-passthrough prerequisites. | Treat this as VM-specific incompatibility; do not reset machine identity to work around it. |
+| `Error: unable to complete out-of-memory-check` | VM preflight could not confirm enough usable host memory. | Check host RAM pressure, reserved memory, and whether too many workloads are active. |
+| `Secrets fetch failed: machine authentication denied (HTTP 401)` | Machine credentials were rejected while fetching instance secrets. | Collect logs and escalate if it repeats; do not use machine-ID reset workflows. |
+| `Error: GPU error, unable to start instance.` | A GPU error blocked VM startup. Repeated occurrences can disable VM offers. | Check GPU health, driver/NVML state, Xid logs, and VM prerequisites. |
 
 See [VMs & IOMMU](/host/vms).
+
+<a id="rental-attempt-messages" />
+## Rental-Attempt Messages
+
+Some messages are logged against a specific rental attempt and do not change the machine's verification or listing by themselves. They can still explain why a specific rental failed.
+
+| Message | Meaning |
+| --- | --- |
+| `Error: Internal error.` | Unexpected internal error while creating the container. |
+| `Error: container is mounted` | A leftover mount from a previous run blocked the operation. |
+| `Error: Requested volume does not exist: <name>` | The requested storage volume was deleted or never existed. |
+| `docker_build(): <inner error>` | Docker build failed and wrapped the build's own output. |
+| `Waiting for template update` | Transitional state while the image or template updates. This is not a machine fault by itself. |
+| `unknown` | The failed operation did not provide a more specific message. |
+| `Secrets fetch failed: network/subprocess error` | The secrets service could not be reached because of network or local subprocess failure before a response. |
+| `Secrets fetch failed: empty response` | The secrets service returned an empty body. |
+| `Secrets fetch failed: instance not found or access denied (HTTP 404)` | The instance was not found, or access was denied. |
+| `Secrets fetch failed: bad request (HTTP 400)` | The secrets request was malformed. |
+| `Secrets fetch rate limited (HTTP 429)` | The secrets service rate-limited the request. |
+| `Secrets fetch failed: server error (HTTP <code>)` | The secrets service returned a 5xx server error. |
+| `Secrets fetch failed: unexpected HTTP <code>` | The secrets service returned another non-success status. |
+| `Secrets fetch JSON parse error` | The secrets response was not valid JSON. |
+
+If one of these repeats across rentals, collect the exact message, timestamp, instance details, and host logs before asking for help.
 
 <a id="collect-logs" />
 ## What To Collect
