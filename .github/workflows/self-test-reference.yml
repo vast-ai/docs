@@ -1,0 +1,105 @@
+name: Self-test reference check
+
+on:
+  repository_dispatch:
+    types:
+      - self-test-reference-source-updated
+  pull_request:
+    paths:
+      - 'host/self-test-reference.mdx'
+      - 'host/how-to-self-test.mdx'
+      - 'host/verification-stages.mdx'
+      - 'scripts/generate_self_test_reference.py'
+      - 'docs.json'
+      - 'package.json'
+      - '.github/workflows/self-test-reference.yml'
+  workflow_dispatch:
+    inputs:
+      vast_cli_ref:
+        description: 'vast-ai/vast-cli ref to generate from'
+        required: false
+        default: 'master'
+      self_test_ref:
+        description: 'vast-ai/self-test ref to generate from'
+        required: false
+        default: 'main'
+
+jobs:
+  verify-self-test-reference:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout docs
+        uses: actions/checkout@v4
+        with:
+          path: docs
+
+      - name: Decide whether private source repos can be checked out
+        id: source-access
+        env:
+          SOURCE_TOKEN: ${{ secrets.VAST_DOCS_SOURCE_TOKEN }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ "$HEAD_REPO" != "${{ github.repository }}" ] && [ -z "$SOURCE_TOKEN" ]; then
+            echo "can_verify=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping self-test reference sync check for fork PR because VAST_DOCS_SOURCE_TOKEN is unavailable. Run workflow_dispatch or use an upstream branch to verify private source repos."
+          else
+            echo "can_verify=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout vast-cli source
+        if: steps.source-access.outputs.can_verify == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: vast-ai/vast-cli
+          ref: ${{ github.event.client_payload.vast_cli_ref || github.event.inputs.vast_cli_ref || 'master' }}
+          path: vast-cli-source
+          token: ${{ secrets.VAST_DOCS_SOURCE_TOKEN || github.token }}
+
+      - name: Checkout self-test source
+        if: steps.source-access.outputs.can_verify == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: vast-ai/self-test
+          ref: ${{ github.event.client_payload.self_test_ref || github.event.inputs.self_test_ref || 'main' }}
+          path: self-test-source
+          token: ${{ secrets.VAST_DOCS_SOURCE_TOKEN || github.token }}
+
+      - uses: actions/setup-python@v5
+        if: steps.source-access.outputs.can_verify == 'true'
+        with:
+          python-version: '3.11'
+
+      - name: Regenerate self-test reference
+        if: steps.source-access.outputs.can_verify == 'true'
+        working-directory: docs
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 npm run generate-self-test-reference -- \
+            --vast-cli ../vast-cli-source \
+            --self-test ../self-test-source
+
+      - name: Fail if generated page is out of sync
+        if: steps.source-access.outputs.can_verify == 'true'
+        working-directory: docs
+        run: |
+          if ! git diff --quiet host/self-test-reference.mdx; then
+            echo "::error::host/self-test-reference.mdx is out of sync with vast-ai/vast-cli or vast-ai/self-test."
+            echo "::error::Run 'npm run generate-self-test-reference -- --vast-cli PATH_TO_VAST_CLI --self-test PATH_TO_SELF_TEST' and commit the result."
+            git diff --stat host/self-test-reference.mdx
+            git diff -- host/self-test-reference.mdx
+            exit 1
+          fi
+
+      - name: Fail if Python bytecode was generated
+        if: steps.source-access.outputs.can_verify == 'true'
+        working-directory: docs
+        run: |
+          if find scripts -name '__pycache__' -o -name '*.pyc' | grep -q .; then
+            echo "::error::Generated Python bytecode should not be committed or produced by the docs generation check."
+            find scripts -name '__pycache__' -o -name '*.pyc'
+            exit 1
+          fi
+
+      - name: Report skipped private-source validation
+        if: steps.source-access.outputs.can_verify != 'true'
+        run: |
+          echo "Self-test reference sync check skipped because this fork PR cannot access private source repositories."
