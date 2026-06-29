@@ -1,0 +1,133 @@
+---
+title: "Host Teams"
+sidebarTitle: "Host Teams"
+description: "How team context affects host machines, permissions, earnings, and payouts."
+"canonical": "/host/host-teams"
+personas:
+  - business-owner
+  - headless-operator
+  - pro-operator
+---
+
+<div className="persona-chips"><span className="persona-chip">Business</span><span className="persona-chip">Headless / DC</span><span className="persona-chip">Pro Operator</span></div>
+
+Use this page when multiple people manage a hosting operation. For general team setup, use [Teams Quickstart](/guides/teams/teams-quickstart), [Teams Overview](/guides/teams/teams-overview), [Teams Roles](/guides/teams/teams-roles), and [Managing Teams](/guides/teams/managing-teams).
+
+This page covers only the host-specific parts: machine ownership, install context, machine permissions, earnings, payouts, and wrong-account recovery.
+
+## Team Context
+
+A team is its own Vast account. When you switch into a team with the Context Switcher, actions are performed as the team account instead of your personal account.
+
+Before doing any host operation, confirm the active context in the console:
+
+- Copying the host install command.
+- Creating an API key for a host daemon, CLI, SDK, or automation.
+- Registering, listing, unlisting, repricing, or deleting machines.
+- Reviewing earnings, invoices, or payout history.
+- Configuring the payout account.
+
+If you are in the wrong context, machines, API keys, earnings, and payout settings can end up attached to the wrong account.
+
+## Machines And Teams
+
+Machines registered while you are operating in a team context belong to the team account. Their offers, listings, pricing, maintenance windows, and rental history are managed through that team context.
+
+Machines registered while you are operating in a personal account context belong to that personal account unless they are migrated or re-registered through a supported flow.
+
+<Warning>
+Do not assume that switching context moves existing machines, active rentals, earnings, or payout history. If you need to move an existing host operation from an individual account to a team, contact Vast support before changing install keys, deleting machines, or reinstalling the daemon.
+</Warning>
+
+## Install In The Right Context
+
+When installing a team-owned host:
+
+1. Switch to the intended team in the Context Switcher.
+2. Confirm the team is host-enabled and the hosting agreement flow is complete.
+3. Open the [host setup page](https://cloud.vast.ai/host/setup/) in that team context.
+4. Copy a fresh install command from that page.
+5. Run the command on the host.
+6. Confirm the new machine appears under the team's Machines page.
+
+Do not reuse a setup command copied from a personal account, another team, an old note, shell history, or a screenshot. Setup commands can include account-specific machine installation keys. See [Installing Host Software](/host/installing-host-software#install-command).
+
+If the generated command contains `undefined`, uses the wrong account, or the installed machine appears as unauthenticated, stop and regenerate the command from the intended team context. If the problem persists after switching context, refreshing the setup page, and re-accepting any required agreement flow, contact support with the team name, account email, and screenshots of the setup-page state.
+
+## Machine Roles
+
+Host teams should grant machine access intentionally. Check the actual permissions on the role, especially if your team uses custom roles.
+
+| Role or permission | Host machine access |
+| --- | --- |
+| Member with `machine_read` | Can view team machines and machine state. Cannot register machines, list/unlist, change price, set min bid, or schedule maintenance. |
+| Manager or custom role with `machine_read` + `machine_write` | Can register and manage team machines, including listing, unlisting, price changes, min-bid changes, default jobs, cleanup, and maintenance. |
+| Owner | Can manage machines like a Manager and can also administer or delete the team account. |
+
+For the full permission reference, see [API Permissions](/api-reference/permissions). For role setup, see [Teams Roles](/guides/teams/teams-roles).
+
+## API Keys For Host Teams
+
+Create host automation keys while switched into the team context. A key created in your personal account is not a team key, even if you are a member of the team.
+
+Use a team key or role with:
+
+- `machine_read` for read-only machine dashboards.
+- `machine_read` and `machine_write` for host registration, listing, repricing, maintenance, cleanup, and daemon workflows.
+- `billing_read` only for operators who need earnings, invoice, or payout-history visibility.
+- `billing_write` only for people or automation allowed to change billing or transfer credit.
+
+If a host command returns `403`, `machine_api_key does not have machine registration rights`, or another permission error, check that the key was created in the team context and that the role grants the needed machine permission. See [Manage API keys](/guides/reference/api-keys) and [API Permissions](/api-reference/permissions).
+
+## Earnings And Payouts
+
+Rental earnings from team-owned machines accrue to the team account, not to the individual operator who installed or managed the machine.
+
+Earnings and payout visibility is role-gated:
+
+| Access | What it allows |
+| --- | --- |
+| `billing_read` | View team earnings, invoices, and payout history. |
+| `billing_write` | Change billing-related settings or transfer credit where supported. |
+| Owner or billing administrator | Configure the team payout account. |
+
+The payout account is configured on the team account. Individual members do not receive separate payouts for team-owned machine rentals.
+
+For payout timing, invoices, and provider setup, see [Host Payouts](/host/payment). For credit transfer into or out of a team, use the general [Teams Quickstart](/guides/teams/teams-quickstart) and billing documentation instead of treating it as a host-machine setting.
+
+## Recommended Business Setup
+
+For a hosting business or multi-operator fleet:
+
+- Run hosting under a dedicated host team account.
+- Keep personal client rentals separate from host operations.
+- Give day-to-day operators Manager access or a custom role with `machine_read` and `machine_write`.
+- Add `billing_read` only for people who need earnings or invoice visibility.
+- Reserve Owner access for the business principal or accountable administrator.
+- Create team API keys for automation in team context, then rotate and revoke them like production secrets.
+
+For machine automation after setup, see [Fleet Operations](/host/fleet-operations).
+
+## Wrong Context Troubleshooting
+
+| Symptom | Likely cause | What to do |
+| --- | --- | --- |
+| Install command contains `undefined` or uses an unexpected host/account ID | Setup page generated a command from the wrong or incomplete context. | Switch to the intended team, refresh the setup page, complete any agreement flow, and copy a fresh command. Contact support if it still generates incorrectly. |
+| Machine appears under the individual account instead of the team | The install command or API key came from the personal account context. | Do not keep listing from the wrong account. If there are no active rentals, prepare to re-register under the team context or ask support about the supported migration path. |
+| Existing rigs and payout history need to move from individual to team | Existing machines, earnings, and payout history may require account-level migration support. | Contact support before deleting, reinstalling, or changing payout setup. Include machine IDs, account email, intended team, and whether active rentals exist. |
+| `403` or `machine_api_key does not have machine registration rights` | The key or role lacks `machine_write`, or the key was created in personal context. | Create or select a team-context key with `machine_read` and `machine_write`, then rerun from the intended context. |
+| Team API key keeps being created under the personal account | The Keys page or CLI is still operating in personal context. | Switch to the team in the Context Switcher before creating the key. Verify the key is associated with the team before using it for host automation. |
+| Unauthenticated machine or wrong-account errors | Daemon, CLI, or setup flow is using a key from the wrong context. | Switch context, regenerate the setup command or API key, update the CLI/daemon configuration, then confirm the machine appears under the intended team. |
+
+## Related
+
+| Topic | Read next |
+| --- | --- |
+| Create a team | [Teams Quickstart](/guides/teams/teams-quickstart) |
+| Team account basics | [Teams Overview](/guides/teams/teams-overview) |
+| Roles and custom roles | [Teams Roles](/guides/teams/teams-roles) |
+| Team administration | [Managing Teams](/guides/teams/managing-teams) |
+| API key setup | [Manage API keys](/guides/reference/api-keys) |
+| Permission categories | [API Permissions](/api-reference/permissions) |
+| Install command | [Installing Host Software](/host/installing-host-software#install-command) |
+| Payouts | [Host Payouts](/host/payment) |
