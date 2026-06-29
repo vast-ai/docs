@@ -1,0 +1,220 @@
+---
+title: "Common Errors & Diagnostics"
+sidebarTitle: "Errors & Diagnostics"
+description: "Common host errors and diagnostic collection paths."
+"canonical": "/host/common-errors-diagnostics"
+personas:
+  - pro-operator
+  - headless-operator
+---
+
+<div className="persona-chips"><span className="persona-chip">Pro Operator</span><span className="persona-chip">Headless / DC</span></div>
+
+Use this page to collect logs and diagnose host health issues. For exact Machines-page error strings and what they usually mean, start with [Machine Error Reference](/host/machine-errors).
+
+## Common Dashboard Messages
+
+| Message | Start here |
+| --- | --- |
+| `Port issue` or `Port Networking Issues` | [Machine Errors: Port Networking Issues](/host/machine-errors#port-networking-issues) |
+| `vericode=8` with another visible message | [Machine Error Reference](/host/machine-errors) |
+| TCP works but UDP fails | [Machine Errors: TCP works but UDP fails](/host/machine-errors#tcp-works-but-udp-fails) |
+| `GPU PCIE issue` or repeated AER messages | [Machine Errors: GPU PCIe Issue](/host/machine-errors#gpu-pcie-issue) |
+| `failed to inject CDI devices` or `unresolvable CDI devices` | [Machine Errors: CDI Device Injection](/host/machine-errors#cdi-device-injection) |
+| `bad bandwidthtest2` | [Machine Errors: bad bandwidthtest2](/host/machine-errors#bad-bandwidthtest2) |
+| `nvidia-smi` fails or NVML mismatch | [`nvidia-smi` Fails](#nvidia-smi-fails) |
+
+<a id="logs" />
+## Logs
+
+Installer logs are written to `vast_host_install.log` in the directory where you launched the installer, not under `/var/lib/vastai_kaalia`.
+
+```bash
+cat vast_host_install.log
+```
+
+If the installer created a compressed log archive:
+
+```bash
+tar -xzvf vastai_install_logs.tar.gz
+cat vast_host_install.log
+```
+
+The host daemon log is:
+
+```bash
+sudo tail -n 100 /var/lib/vastai_kaalia/kaalia.log
+```
+
+For self-test failures, the CLI can create a diagnostic bundle. The normal command is:
+
+```bash
+vastai self-test machine <machine_id>
+```
+
+Failure bundles are saved by default under:
+
+```text
+/tmp/vast_selftest_<machine_id>_<timestamp>.tar.gz
+```
+
+You can override the output directory:
+
+```bash
+vastai self-test machine <machine_id> \
+  --support-bundle-dir /path/to/output
+```
+
+Bundles can include:
+
+- `self-test-output.log`
+- `self-test-result.json`
+- `manifest.json`
+- `collection-errors.json`
+- `instance/show-instance.json`
+- `instance/container.log`
+- `instance/daemon.log`
+
+For a quick SSH check:
+
+```bash
+systemctl is-active vastai.service vast_metrics.service docker nvidia-persistenced.service
+sudo journalctl -u vastai.service -n 80 --no-pager
+sudo journalctl -u vast_metrics.service -n 80 --no-pager
+sudo tail -n 100 /var/lib/vastai_kaalia/kaalia.log
+sudo cat /var/lib/vastai_kaalia/host_port_range
+```
+
+Services should be `active`, logs should not show restart loops or repeated fatal errors, and the configured port range should match the forwarded ports.
+
+<a id="gpu-kernel-logs" />
+## GPU, PCIe, And AER Kernel Logs
+
+Use kernel logs to distinguish a normal container/runtime error from a machine-health problem:
+
+- **NVRM**: NVIDIA kernel driver messages.
+- **Xid**: NVIDIA GPU fault, reset, or error codes.
+- **PCIe**: the bus/link between the GPU, motherboard, and CPU.
+- **AER**: PCIe Advanced Error Reporting messages. Repeated AER messages can point to risers, slots, power, BIOS lane settings, cabling, motherboard, or GPU hardware issues.
+
+Check the current boot:
+
+```bash
+sudo journalctl -k -b --no-pager | grep -Ei 'NVRM|Xid|AER|PCIe|fallen|GPU has fallen'
+sudo dmesg -T | grep -Ei 'NVRM|Xid|AER|PCIe|fallen|GPU has fallen'
+```
+
+Treat repeated Xid, NVRM, PCIe, or AER errors as host hardware/driver health signals, not as isolated self-test messages.
+
+<a id="gpu-pcie-issue" />
+## GPU PCIE Issue / AER
+
+`GPU PCIE issue` means the PCIe link should be investigated. Corrected AER at boot can be harmless, but repeated AER messages, uncorrectable AER, errors under load, downgraded PCIe links under load, Xid 79, or `bad bandwidthtest2` point to a real hardware path problem.
+
+Inspect risers, slots, cables, contacts, power, BIOS lane settings, motherboard health, and GPU health before listing again.
+
+Search kernel and syslog history for AER/PCIe evidence:
+
+```bash
+sudo journalctl -k -b --no-pager | grep -Ei 'AER|PCIe Bus Error|pcieport|NVRM|Xid'
+sudo journalctl -k -b -1 --no-pager | grep -Ei 'AER|PCIe Bus Error|pcieport|NVRM|Xid'
+sudo dmesg -T | grep -Ei 'AER|PCIe Bus Error|pcieport|NVRM|Xid'
+sudo grep -Ei 'AER|PCIe Bus Error|pcieport|NVRM|Xid' /var/log/syslog /var/log/syslog.1 /var/log/kern.log /var/log/kern.log.1 2>/dev/null
+sudo zgrep -Ei 'AER|PCIe Bus Error|pcieport|NVRM|Xid' /var/log/syslog.*.gz /var/log/kern.log.*.gz 2>/dev/null
+```
+
+While reproducing under load, watch live kernel messages in another SSH session:
+
+```bash
+sudo journalctl -kf | grep --line-buffered -Ei 'AER|PCIe Bus Error|pcieport|NVRM|Xid'
+```
+
+Correlate timestamps with self-test runs, rentals, `gpu-burn`, or other load tests. Repeated messages during load are much more concerning than a small number of corrected messages during boot.
+
+<a id="red-error" />
+## Red Machine Error
+
+The Machines page shows red errors detected by the host software or platform. Fix the specific cause, then allow the platform to refresh. Do not assume immediate clearing after a single fix or reboot. For exact message meanings, see [Machine Error Reference](/host/machine-errors).
+
+<a id="port-issue" />
+## Port Issue / Port Networking Issues
+
+`Port issue`, `Port Networking Issues`, and self-test progress timeouts usually mean a direct-port reachability problem. `vericode=8` means a host-facing machine error is present; use the exact visible message to decide whether it is a port issue or another machine error. For port-networking cases, confirm the configured host port range, forward the same range to the host LAN IP, and test from outside the LAN because same-LAN tests can be misleading.
+
+Forward both TCP and UDP. CGNAT, double NAT without a real public forwarding path, no inbound public IP, blocked inbound ports, or incompatible IPv6-only service are not supported hosting setups. See [Network & Ports](/host/network-ports) for the full checklist.
+
+<a id="docker-cache" />
+## Full Client Storage
+
+Try cleaning Docker build cache and old unused images. For expired or deleted rentals that did not release storage, run [vastai cleanup machine](/host/cli/cleanup-machine).
+
+<a id="nvidia-smi-fails" />
+## `nvidia-smi` Fails
+
+Treat this as a GPU or driver health problem. Check driver load, PCIe visibility, reboot state after updates, NVML mismatch, and NVRM/Xid/PCIe logs. Do not list a machine that cannot reliably report GPU state.
+
+<a id="nvml-mismatch" />
+## NVML Driver/Library Mismatch
+
+This usually means the NVIDIA userspace library and loaded kernel module are different versions. Plan downtime, reboot first, then reinstall or repair the NVIDIA driver stack if needed.
+
+<a id="gpu-falls-off-bus" />
+## GPU Falls Off The PCIe Bus
+
+Check NVRM, Xid, and PCIe/AER logs. Power-cycle, then inspect PSU capacity, cables, risers, slots, PCIe lane settings, thermals, and any overclock/undervolt. Fix repeated bus drops before listing again.
+
+<a id="bad-bandwidthtest2" />
+## `bad bandwidthtest2`
+
+Treat this as a machine health or verification error. Check PCIe bandwidth, lane configuration, GPU seating, thermals, power, driver/NVML health, Xid errors, Docker GPU runtime behavior, and self-test output. Rerun self-test after fixes.
+
+<a id="failed-cdi" />
+## Failed To Inject CDI Devices
+
+This points to GPU device injection or container runtime setup. First confirm the host can see every GPU and Docker can inject those GPUs into a normal container:
+
+```bash
+nvidia-smi -L
+sudo docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi -L
+```
+
+If the machine is idle and not rented, you can also run a short load test with a GPU burn image you trust:
+
+```bash
+sudo docker run --rm --gpus all oguzpastirmaci/gpu-burn 60
+```
+
+If the container test fails, gather diagnostics, check Docker/NVIDIA runtime/CDI configuration, and inspect daemon/container logs. Do not assume regenerating CDI configuration fixes an unhealthy GPU, driver, or PCIe link. Escalate with logs if containers still cannot receive GPUs.
+
+<a id="collect-logs" />
+## Before Asking For Help
+
+Include:
+
+- Account context and exact command.
+- The affected machine record in the console, relevant offer/contract context if support asks, and whether the account is the host account.
+- Exact timestamps with timezone.
+- Exact error strings, screenshots, or CLI output.
+- What changed recently: reboot, driver, kernel, Docker, BIOS, storage, router, or ISP.
+- Host OS, GPU model/count, NVIDIA driver version, and Docker storage mount output.
+- Tested external IP and port for networking issues.
+- Self-test support bundle when available.
+- Installer log, daemon log, and relevant kernel log excerpts.
+
+Review bundles before sharing them. Share sensitive machine/account details only in the appropriate support channel.
+
+<a id="escalate-support" />
+## Escalate To Vast Support
+
+Escalate account conversion, hosting agreement, payout, API permission, backend machine record, ghost machine, suspected backend bug, or platform-state mismatch issues.
+
+Local Ubuntu, Docker, GPU driver, hardware, power, thermals, and consumer networking are primarily host responsibilities. Vast hosting requires direct public inbound TCP/UDP reachability; CGNAT or double NAT without a real public forwarding path is not a supported hosting network setup.
+
+## Related Pages
+
+| Topic | Read next |
+| --- | --- |
+| Install failures | [Installing Host Software](/host/installing-host-software#install-failures) |
+| Machine error strings | [Machine Error Reference](/host/machine-errors) |
+| Self-test errors | [Self-Test Reference](/host/self-test-reference) |
+| Connectivity | [Network & Ports](/host/network-ports) |

@@ -1,0 +1,106 @@
+---
+title: "Self-Test Reference"
+sidebarTitle: "Self-Test Reference"
+description: "Lookup reference for self-test failures, meanings, and next actions."
+"canonical": "/host/self-test-reference"
+personas:
+  - pro-operator
+  - headless-operator
+---
+
+<div className="persona-chips"><span className="persona-chip">Pro Operator</span><span className="persona-chip">Headless / DC</span></div>
+
+Use this reference to look up self-test failures, understand what they usually mean, and choose the next diagnostic step. Each failure has its own anchor so CLI errors and support replies can link directly to it.
+
+## Quick Error Lookup
+
+Use the exact message printed by the CLI. Fix the host-side cause, then rerun self-test.
+
+| Message or stage | Usually means | Host action |
+| --- | --- | --- |
+| `Machine not found or not rentable` | The machine is not testable from the current account or has no rentable offer. | Check listing state, active offers, account/API key, reliability, red errors, and missing machine details. |
+| `Reliability <= 0.90` | The machine has not met the reliability gate. | Keep the host online and stable; use diagnostic mode only for troubleshooting, not verification proof. |
+| `Authorization Error`, `HTTP 401`, or missing permission | The API key cannot inspect the machine or offer. | Use a host-enabled account/API key with the needed machine and offer permissions. |
+| `CUDA compatibility` failure | Driver/runtime support is too old for the self-test image. | Update or repair the NVIDIA driver stack, then confirm Docker GPU access. |
+| Direct ports below requirement | The machine does not expose enough direct ports for the listed GPUs. | Configure and forward at least 3 TCP/UDP ports per listed GPU for self-test; use more headroom for production hosting. |
+| PCIe bandwidth failure or `bad bandwidthtest2` | GPU transfer or PCIe health is below the gate. | Check PCIe lanes, risers, slots, power, thermals, Xid/AER logs, and GPU seating. |
+| Upload/download bandwidth failure | Network throughput is below the machine requirement. | Check ISP/datacenter bandwidth, routing, host load, and repeated speed results. |
+| VRAM, RAM, or physical CPU core failure | Hardware resources do not meet the listed GPU requirement. | Confirm visible GPUs, host RAM, and at least one physical CPU core per visible GPU. |
+| `progress_endpoint_unreachable`, `progress_empty_timeout`, `progress_endpoint_lost`, or `No response for 120s` | The temporary test instance did not provide progress. | Check public TCP reachability, container startup, Docker/NVIDIA runtime, daemon logs, and the support bundle. |
+| UDP echo failure | TCP may work, but the public UDP path failed. | Forward UDP for the same direct port range and test from outside the LAN. |
+| System requirements failure | The container could not confirm core host resources. | Check RAM, CPU cores, GPU visibility, and container logs in the bundle. |
+| ResNet, ECC, or `gpu-burn` failure | GPU compute, memory, ECC, thermal, or stability issue. | Check `nvidia-smi`, Xid/NVRM logs, thermals, power, and rerun after fixing hardware/driver issues. |
+| `failed to inject CDI devices` or `nvidia-container-cli` | Docker could not inject GPUs into the container. | Confirm `nvidia-smi` and a normal Docker GPU container both work. |
+| `nccl_failed` | Multi-GPU communication failed. | Check CUDA/NCCL compatibility, PCIe/NVLink topology, P2P, Xid logs, and Fabric Manager on NVSwitch systems. |
+
+<a id="vericode-8" />
+## vericode=8 And Port Networking Issues
+
+[Glossary: vericode](/host/glossary#vericode)
+
+`vericode=8` means the machine has a host-facing `error_msg` in the platform state. If the visible message is `Port Networking Issues`, `Port issue`, or similar wording, treat it as a direct-port or connectivity problem. Other `vericode=8` cases can point to Docker/NVIDIA runtime, CDI, PCIe, daemon, or other machine errors, so use the exact console message when choosing the next fix.
+
+For port-networking cases, common causes include closed external ports, forwarding to the wrong LAN IP, CGNAT or double NAT without a real public forwarding path, no inbound public IP, firewall rules, TCP/UDP mismatch, asymmetric protocol handling, or a stale port range. Test the public IP:port if available, verify router and host firewall rules, then rerun the self-test after fixing the network path. See [Network & Ports](/host/network-ports) for the full connectivity checklist and [Machine Error Reference](/host/machine-errors) for non-port `vericode=8` errors.
+
+<a id="no-response-120s" />
+## No response for 120s
+
+A `no response` or progress timeout means the CLI could not get usable progress from the temporary self-test instance after it was created. Newer CLI output may show a more specific code such as `progress_endpoint_unreachable`, `progress_empty_timeout`, or `progress_endpoint_lost`. Start with connectivity and startup checks:
+
+- Inspect the tested external IP:port if the CLI printed one.
+- Confirm router or firewall forwarding to the host LAN IP.
+- Retry from an outside network to rule out NAT hairpinning; see [testing from outside your LAN](/host/network-ports#test-ports-outside-lan).
+- Inspect the diagnostic bundle for instance status, container logs, and daemon logs.
+
+Other likely causes include container startup failure, Docker/NVIDIA runtime stalls, host daemon stalls, GPU or system hangs, or upload instability.
+
+<a id="machine-not-rentable" />
+## Machine not found or not rentable
+
+This can mean the machine is already rented in a way that hides the expected offer, has zero active on-demand offers, is offline or unlisted, is not visible to the account running the test, is deverified or below a threshold, or has offer-side error metadata.
+
+Start with:
+
+1. Open the Machines page for the host account.
+2. Confirm the machine is listed, online, not currently rented, and has active offers.
+3. Check reliability, verification state, red machine errors, and missing details such as ports, RAM, upload speed, and download speed.
+4. Confirm the CLI is authenticated to the same host-enabled account.
+5. Search directly for the machine ID; see [Why Isn't My Machine in Search?](/host/not-in-search#check-machine-listed).
+6. If the console state looks wrong after refresh and rerun, collect logs and escalate to support.
+
+<a id="nccl-failed" />
+## `nccl_failed`
+
+`nccl_failed` means the temporary self-test instance could not initialize and synchronize NCCL workers across the visible GPUs. Treat this as a multi-GPU communication failure, not as proof of one specific root cause.
+
+Start with:
+
+1. Inspect the self-test support bundle for the NCCL error output.
+2. Confirm every GPU is visible with `nvidia-smi` and Docker GPU access.
+3. Check driver/CUDA/PyTorch/NCCL compatibility.
+4. Check GPU peer-to-peer communication, PCIe/NVLink topology, Xid errors, and any GPU reset or bus errors.
+5. On HGX, DGX, or other NVSwitch systems, check Fabric Manager/NVLSM on the host. The self-test container can show NCCL symptoms, but it cannot confirm whether host services such as `nvidia-fabricmanager` are running or healthy.
+
+Useful host-side checks for NVSwitch systems include:
+
+```bash
+systemctl status nvidia-fabricmanager
+journalctl -u nvidia-fabricmanager --since "-24h"
+nvidia-smi -q | grep -i -A 2 Fabric
+nvidia-smi topo -m
+```
+
+Fabric state should normally show completed/successful registration on systems where NVIDIA exposes fabric state through NVML. If Fabric Manager is not applicable to the hardware, focus on driver/runtime compatibility, PCIe/NVLink topology, and the raw NCCL error.
+
+<a id="warnings-ignore" />
+## Which warnings can be ignored?
+
+Avoid ignoring warnings by default. One clear self-test advisory is that mapping more than the minimum number of direct ports per GPU is not itself a self-test gate. For production hosting, about 100 forwarded TCP/UDP ports per listed GPU is still practical headroom because individual instances can use many ports and old mappings may overlap with new starts. Red machine errors, self-test failures, NVML/Xid errors, port networking issues, and not-visible/rentable states should be investigated.
+
+## Reliability below the preflight gate
+
+Reliability greater than 0.9 is a self-test and verification gate; if the machine is at or below it, the self-test can fail before renting the temporary instance. See [Reliability & Uptime](/host/reliability-uptime#reliability-threshold).
+
+## Errors not specific to the self-test
+
+For `bad bandwidthtest2`, CDI device injection failures, NVML mismatches, and other machine-health errors, see [Machine Error Reference](/host/machine-errors) and [Common Errors & Diagnostics](/host/common-errors-diagnostics).
