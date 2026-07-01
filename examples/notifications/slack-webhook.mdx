@@ -1,0 +1,347 @@
+---
+title: "Send Notifications to Slack"
+slug: "vast-notifications-slack-webhook"
+createdAt: "Tue Jun 30 2026 00:00:00 GMT+0000 (Coordinated Universal Time)"
+updatedAt: "Tue Jun 30 2026 00:00:00 GMT+0000 (Coordinated Universal Time)"
+---
+
+Use this example to send Vast.ai notification webhooks into a Slack channel. Vast.ai sends a standard notification payload, and the adapter below verifies the Vast.ai signature before converting it into a Slack message.
+
+The flow is:
+
+```text
+Vast.ai notification -> your HTTPS webhook URL -> local adapter -> Slack
+```
+
+## Prerequisites
+
+- A Vast.ai API key from [Keys](https://cloud.vast.ai/manage-keys/)
+- A Slack workspace where you can create an incoming webhook
+- Python 3.10 or newer
+- A public HTTPS URL that forwards to your local machine for testing, such as Tunnelmole, ngrok, or Cloudflare Tunnel
+
+## Review Notification Settings
+
+Open [Account Settings](https://cloud.vast.ai/account/) and review **Notification Settings**. The notification groups shown here are the same event groups you can subscribe to through the API.
+
+<Frame caption="Notification Settings">
+  ![Notification Settings page with Account, Billing, and Instance notification groups](/images/console-notifications-settings.png)
+</Frame>
+
+## Create a Slack Incoming Webhook
+
+Create a Slack incoming webhook for the channel that should receive Vast.ai notifications. Slack's own setup guide is here: [Sending messages using incoming webhooks](https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks).
+
+When Slack gives you the webhook URL, keep it private. Anyone who has that URL can post into the selected channel.
+
+## Create the Adapter
+
+Create a working directory and install the only Python dependency:
+
+```bash
+mkdir vast-slack-notifications
+cd vast-slack-notifications
+python3 -m venv .venv
+. .venv/bin/activate
+pip install requests
+```
+
+Create `vast_slack_adapter.py`:
+
+```python
+#!/usr/bin/env python3
+import hashlib
+import hmac
+import json
+import os
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+import requests
+
+
+SLACK_WEBHOOK_URL = os.environ["SLACK_WEBHOOK_URL"]
+VAST_WEBHOOK_SECRET = os.environ["VAST_WEBHOOK_SECRET"]
+PORT = int(os.environ.get("PORT", "8787"))
+MAX_SIGNATURE_AGE_SECONDS = 300
+
+CONSOLE = os.environ.get("VAST_CONSOLE", "https://cloud.vast.ai")
+ACTION_URLS = {
+    "low_credit": f"{CONSOLE}/billing/",
+    "billing_failed": f"{CONSOLE}/billing/",
+    "payment_receipt": f"{CONSOLE}/billing/",
+    "instance_created": f"{CONSOLE}/instances/",
+    "instance_started": f"{CONSOLE}/instances/",
+    "instance_stopped": f"{CONSOLE}/instances/",
+    "instance_offline": f"{CONSOLE}/instances/",
+    "instance_online": f"{CONSOLE}/instances/",
+    "outbid": f"{CONSOLE}/instances/",
+    "upcoming_downtime": f"{CONSOLE}/instances/",
+    "webhook_test": CONSOLE,
+}
+
+
+def verify_vast_signature(headers, raw_body: bytes) -> bool:
+    timestamp = headers.get("X-Vast-Timestamp", "")
+    signature = headers.get("X-Vast-Signature-256", "")
+
+    if not timestamp or not signature.startswith("sha256="):
+        return False
+
+    try:
+        age = abs(time.time() - int(timestamp))
+    except ValueError:
+        return False
+
+    if age > MAX_SIGNATURE_AGE_SECONDS:
+        return False
+
+    signed = timestamp.encode("utf-8") + b"." + raw_body
+    digest = hmac.new(
+        VAST_WEBHOOK_SECRET.encode("utf-8"),
+        signed,
+        hashlib.sha256,
+    ).hexdigest()
+    return hmac.compare_digest(signature, f"sha256={digest}")
+
+
+def slack_message(payload: dict) -> dict:
+    subject = payload.get("subject") or "Vast.ai notification"
+    message = payload.get("message") or json.dumps(payload, sort_keys=True)
+    notif_type = payload.get("notif_type") or "notification"
+    event_id = payload.get("event_id")
+    action_url = ACTION_URLS.get(notif_type, CONSOLE)
+
+    details = [f"type={notif_type}"]
+    if event_id:
+        details.append(f"event_id={event_id}")
+
+    return {
+        "text": f"{subject}\n{message}\n{action_url}\n{' '.join(details)}"
+    }
+
+
+class Handler(BaseHTTPRequestHandler):
+    def _json(self, status: int, body: dict):
+        data = json.dumps(body).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def do_GET(self):
+        if self.path == "/health":
+            self._json(200, {"ok": True})
+            return
+        self._json(404, {"ok": False, "error": "not_found"})
+
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length", "0") or "0")
+        raw_body = self.rfile.read(length)
+
+        if not verify_vast_signature(self.headers, raw_body):
+            self._json(401, {"ok": False, "error": "invalid_signature"})
+            return
+
+        try:
+            payload = json.loads(raw_body.decode("utf-8") or "{}")
+        except json.JSONDecodeError:
+            self._json(400, {"ok": False, "error": "invalid_json"})
+            return
+
+        if not isinstance(payload, dict):
+            self._json(400, {"ok": False, "error": "invalid_payload"})
+            return
+
+        response = requests.post(
+            SLACK_WEBHOOK_URL,
+            json=slack_message(payload),
+            timeout=10,
+        )
+        if response.status_code >= 400:
+            self._json(502, {"ok": False, "slack_status": response.status_code})
+            return
+
+        print(
+            f"forwarded notif_type={payload.get('notif_type')} "
+            f"event_id={payload.get('event_id')}",
+            flush=True,
+        )
+        self._json(200, {"ok": True})
+
+    def log_message(self, fmt, *args):
+        print(f"{self.address_string()} - {fmt % args}", flush=True)
+
+
+if __name__ == "__main__":
+    print(f"listening on http://127.0.0.1:{PORT}", flush=True)
+    ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+```
+
+## Create the Vast.ai Webhook
+
+From here you use three terminals, all in the `vast-slack-notifications` directory: the **adapter terminal** you just used, a **control terminal** for Vast.ai API calls, and a **tunnel terminal** for `tmole`.
+
+Create the webhook first. The adapter needs this webhook's signing secret before it can start, and `tmole` only starts once the adapter is already listening — so you create the webhook with a temporary URL now and point it at the tunnel once the tunnel is up.
+
+In the **control terminal**, set your Vast.ai API key and create the webhook:
+
+```bash
+cd vast-slack-notifications
+
+read -rsp "Vast.ai API key: " VAST_API_KEY
+export VAST_API_KEY
+echo
+
+cat > create-webhook.json <<JSON
+{
+  "name": "Slack notifications",
+  "webhook_url": "https://example.com/replace-after-tunnel",
+  "event_types": [
+    "client:low_credit",
+    "client:instance_created",
+    "client:instance_started",
+    "client:instance_stopped",
+    "client:outbid",
+    "client:upcoming_downtime"
+  ]
+}
+JSON
+
+curl --fail-with-body -sS \
+  -X POST "https://console.vast.ai/api/v0/webhooks/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data @create-webhook.json | tee vast-webhook.json
+```
+
+The response includes the webhook ID and signing secret. Export the ID for the later API calls:
+
+```bash
+export WEBHOOK_ID="$(
+  python3 -c 'import json; print(json.load(open("vast-webhook.json"))["webhook"]["id"])'
+)"
+```
+
+<Warning>
+The signing secret (`webhook_secret`) is saved in `vast-webhook.json`. Store it securely — Vast.ai returns it only when the webhook is created or its secret is rotated, not on list or update responses.
+</Warning>
+
+You can create the same webhook from the console, but the API flow is best for this example because the adapter needs the signing secret.
+
+<Frame caption="Create webhook">
+  ![Create webhook modal with webhook name and webhook URL fields](/images/console-notification-webhook.png)
+</Frame>
+
+## Start the Adapter
+
+In the **adapter terminal** (where the virtual environment is active), load the signing secret from `vast-webhook.json`, set your Slack webhook URL, and start the adapter:
+
+```bash
+export VAST_WEBHOOK_SECRET="$(
+  python3 -c 'import json; print(json.load(open("vast-webhook.json"))["webhook"]["webhook_secret"])'
+)"
+
+read -rsp "Slack incoming webhook URL: " SLACK_WEBHOOK_URL
+export SLACK_WEBHOOK_URL
+echo
+
+python3 vast_slack_adapter.py
+```
+
+The adapter prints `listening on http://127.0.0.1:8787` and listens only on `127.0.0.1`. Leave it running; the HTTPS tunnel you start next forwards public Vast.ai deliveries to that local port.
+
+## Expose the Adapter Over HTTPS
+
+Vast.ai requires an HTTPS webhook URL. This example uses `tmole`; if you use another tunnel, run the equivalent command and copy the HTTPS URL it prints.
+
+Because `tmole` only starts once something is listening on the port, start it now that the adapter is running. In the **tunnel terminal**:
+
+```bash
+tmole 8787
+```
+
+Copy the HTTPS URL it prints, such as `https://xxxxxx.tunnelmole.net`.
+
+## Point the Webhook at Your Tunnel
+
+In the **control terminal**, set the tunnel URL and update the webhook so Vast.ai delivers to it:
+
+```bash
+read -rp "Public HTTPS webhook URL: " PUBLIC_WEBHOOK_URL
+export PUBLIC_WEBHOOK_URL
+
+cat > update-webhook.json <<JSON
+{
+  "webhook_url": "$PUBLIC_WEBHOOK_URL"
+}
+JSON
+
+curl --fail-with-body -sS \
+  -X PUT "https://console.vast.ai/api/v0/webhooks/$WEBHOOK_ID/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data @update-webhook.json
+```
+
+## Send a Test Delivery
+
+In the **control terminal**, send Vast.ai's built-in test event:
+
+```bash
+curl --fail-with-body -sS \
+  -X POST "https://console.vast.ai/api/v0/webhooks/$WEBHOOK_ID/test/" \
+  -H "Authorization: Bearer $VAST_API_KEY"
+```
+
+The adapter should print a forwarded event, and the Slack channel should receive a Vast.ai webhook test message.
+
+## Trigger a Real Notification
+
+After the test event works, trigger one of the subscribed events:
+
+- Create an instance to receive `client:instance_created`.
+- Start an instance to receive `client:instance_started`.
+- Stop an instance to receive `client:instance_stopped`.
+- Keep low-balance notifications enabled to receive `client:low_credit` when your configured threshold is reached.
+
+You can list available notification types at any time:
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  "https://console.vast.ai/api/v0/notification-types/"
+```
+
+## Clean Up
+
+In the **control terminal**, delete the webhook when you are done testing:
+
+```bash
+curl --fail-with-body -sS \
+  -X DELETE "https://console.vast.ai/api/v0/webhooks/$WEBHOOK_ID/" \
+  -H "Authorization: Bearer $VAST_API_KEY"
+```
+
+Then stop the adapter and the HTTPS tunnel.
+
+## Workflow Builder Variant
+
+If you use a Slack Workflow Builder webhook trigger instead of a Slack incoming webhook, set the workflow's expected variables first. Then change the adapter's `slack_message` return value to match those variables, for example:
+
+```python
+return {
+    "vast_notification_message": f"{subject}\n{message}",
+    "vast_action_url": action_url,
+}
+```
+
+Do not point a Vast.ai webhook straight at the Slack URL — Slack expects its own message format, so the adapter must sit in between. The adapter also gives you control over message shape and signature verification.
+
+## Production Notes
+
+- Deploy the adapter on a stable HTTPS endpoint before using it for production alerts.
+- Verify `X-Vast-Signature-256` before forwarding or acting on any event.
+- Deduplicate deliveries by `event_id`; webhook delivery is at-least-once.
+- Return `2xx` only after your adapter accepts the event.
