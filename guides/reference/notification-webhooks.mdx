@@ -7,13 +7,13 @@ description: "Send Vast.ai notification events to your own HTTPS endpoint for au
 
 Notification webhooks deliver Vast.ai notification events to an HTTPS endpoint you operate. They are grouped under the notification system because they use the same notification types and preferences as email and in-app notifications.
 
-Use webhooks when a notification should become an action: page an operator when a hosted machine fails verification, update your dashboard when an instance starts, or pause automation when a low-balance event fires.
+Use webhooks when a notification should become an action: update your dashboard when an instance starts, pause automation when a low-balance event fires, or trigger cleanup when an instance is outbid. The same mechanics apply to host events — see [Host Notifications](/host/notifications).
 
 ## How Webhooks Fit Into Notifications
 
 A webhook subscribes to one or more notification type keys. When a matching event is produced and the webhook channel is enabled for that notification type, Vast.ai sends a signed `POST` request to your webhook URL.
 
-Creating or updating a webhook for an event also enables the webhook channel for that event in your notification preferences.
+Subscribing a webhook to an event automatically turns on the webhook channel for that event in your notification preferences.
 
 ## Create a Webhook in the Console
 
@@ -24,7 +24,7 @@ Creating or updating a webhook for an event also enables the webhook channel for
 5. Enter a webhook name and an HTTPS URL.
 6. Click **Create**, then click **Save** on the notification settings form.
 
-Existing webhooks appear below the notification groups. You can edit the name or URL, delete the webhook, or remove a webhook badge from an individual notification event.
+Existing webhooks appear below the notification groups. You can edit the name or URL, delete the webhook, or unsubscribe the webhook from an individual event.
 
 <Frame caption="Create webhook">
   ![Create webhook modal with webhook name and webhook URL fields](/images/console-notification-webhook.png)
@@ -34,53 +34,27 @@ Existing webhooks appear below the notification groups. You can edit the name or
 Webhook changes are saved when you save the notification settings form. If you close the page before saving, the form changes are not persisted.
 </Warning>
 
-## Create a Webhook With the API
+## Manage Webhooks With the API
 
-List the available notification types first:
+This guide covers the delivery behavior you need to integrate safely — signing, retries, limits, and the receiver pattern. The API calls themselves (request bodies, response schemas, status codes) are documented in the API reference:
 
-```bash
-curl -H "Authorization: Bearer $VAST_API_KEY" \
-  "https://console.vast.ai/api/v0/notification-types/"
-```
-
-Create a webhook by passing an HTTPS URL and at least one event key:
-
-```bash
-curl -X POST "https://console.vast.ai/api/v0/webhooks/" \
-  -H "Authorization: Bearer $VAST_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Ops notifications",
-    "webhook_url": "https://example.com/vast/webhooks",
-    "event_types": ["client:low_credit", "host:machine_offline"]
-  }'
-```
-
-The response includes the webhook and its signing secret:
-
-```json
-{
-  "success": true,
-  "webhook": {
-    "id": 42,
-    "user_id": 123,
-    "name": "Ops notifications",
-    "webhook_url": "https://example.com/vast/webhooks",
-    "event_types": ["client:low_credit", "host:machine_offline"],
-    "webhook_secret": "<WEBHOOK_SECRET>",
-    "created_at": 1772490000.0,
-    "updated_at": 1772490000.0
-  },
-  "enabled_notification_preferences": [
-    "client:low_credit",
-    "host:machine_offline"
-  ]
-}
-```
+| Task | API reference |
+| --- | --- |
+| Discover subscribable event keys | [List notification types](/api-reference/notifications/list-notification-types) |
+| Create a webhook | [Create notification webhook](/api-reference/notifications/create-notification-webhook) |
+| List your webhooks | [List notification webhooks](/api-reference/notifications/list-notification-webhooks) |
+| Update a webhook | [Update notification webhook](/api-reference/notifications/update-notification-webhook) |
+| Delete a webhook | [Delete notification webhook](/api-reference/notifications/delete-notification-webhook) |
+| Rotate the signing secret | [Rotate notification webhook secret](/api-reference/notifications/rotate-notification-webhook-secret) |
+| Send a test delivery | [Test notification webhook](/api-reference/notifications/test-notification-webhook) |
 
 <Warning>
-Store `webhook_secret` when it is returned. It is revealed on creation and after secret rotation, not on normal list or update responses.
+The signing secret is returned only when a webhook is created and when the secret is rotated — not on list or update responses. Store it immediately.
 </Warning>
+
+<Note>
+The test endpoint sends a `webhook_test` event with the same request format and signature headers as a real delivery. It does not create an inbox notification and is not retried.
+</Note>
 
 ## Webhook Limits and Validation
 
@@ -95,7 +69,7 @@ Store `webhook_secret` when it is returned. It is revealed on creation and after
 | Name | Optional through the API, 120 characters maximum, no control characters |
 | Events | `event_types` must contain at least one valid event key |
 
-Use full event keys such as `client:low_credit` and `host:machine_offline`. Full keys avoid ambiguity when a similar event exists for both renters and hosts.
+Use full notification type keys such as `client:low_credit` and `client:outbid`. Because a similar event can exist for both renters and hosts, the full key — including its `client:` or `host:` prefix — avoids ambiguity. Host webhooks use `host:` keys, documented in [Host Notifications](/host/notifications).
 
 ## Event Payload
 
@@ -111,6 +85,10 @@ Vast.ai sends a JSON `POST` request:
   "timestamp": 1772490000.123
 }
 ```
+
+<Note>
+The payload's `notif_type` is the short slug (for example `low_credit`), without the `client:` or `host:` context prefix used in subscription keys. If you subscribe one webhook to both a `client:` and a `host:` variant of the same event, use a dedicated webhook per context to tell them apart reliably.
+</Note>
 
 Headers:
 
@@ -152,7 +130,12 @@ def verify_vast_signature(headers, raw_body: bytes, webhook_secret: str) -> bool
         return False
 
     # Reject old requests to reduce replay risk.
-    if abs(time.time() - int(timestamp)) > 300:
+    try:
+        age = abs(time.time() - int(timestamp))
+    except ValueError:
+        return False
+
+    if age > 300:
         return False
 
     signed = timestamp.encode("utf-8") + b"." + raw_body
@@ -169,7 +152,7 @@ Do not parse and re-serialize JSON before verification. Use the raw request body
 
 ## Retry Behavior
 
-Your endpoint should return a `2xx` status only after it has accepted the event.
+Return a `2xx` status only once you have safely accepted the event — that is, verified the signature and enqueued it.
 
 | Your response | Vast.ai behavior |
 | --- | --- |
@@ -184,50 +167,6 @@ Webhook delivery uses a 10 second request timeout. Design receivers to do minima
 <Tip>
 Webhook delivery is at-least-once. Store `event_id` and ignore duplicates before triggering side effects.
 </Tip>
-
-## Manage Webhooks With the API
-
-List webhooks:
-
-```bash
-curl -H "Authorization: Bearer $VAST_API_KEY" \
-  "https://console.vast.ai/api/v0/webhooks/"
-```
-
-Update a webhook:
-
-```bash
-curl -X PUT "https://console.vast.ai/api/v0/webhooks/42/" \
-  -H "Authorization: Bearer $VAST_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Primary ops notifications",
-    "event_types": ["client:low_credit", "client:outbid"]
-  }'
-```
-
-Delete a webhook:
-
-```bash
-curl -X DELETE "https://console.vast.ai/api/v0/webhooks/42/" \
-  -H "Authorization: Bearer $VAST_API_KEY"
-```
-
-Rotate the signing secret:
-
-```bash
-curl -X POST "https://console.vast.ai/api/v0/webhooks/42/rotate-secret/" \
-  -H "Authorization: Bearer $VAST_API_KEY"
-```
-
-Test a webhook:
-
-```bash
-curl -X POST "https://console.vast.ai/api/v0/webhooks/42/test/" \
-  -H "Authorization: Bearer $VAST_API_KEY"
-```
-
-The test endpoint sends a `webhook_test` event with the same request format and signature headers as a real delivery. It does not create an inbox notification and is not retried.
 
 ## Recommended Receiver Pattern
 

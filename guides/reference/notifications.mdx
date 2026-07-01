@@ -1,20 +1,26 @@
 ---
 title: "Notifications"
 sidebarTitle: "Notifications"
-description: "Choose which Vast.ai account, billing, instance, and host events reach you by email, in the console, or through webhooks."
+description: "Choose which Vast.ai account, billing, and instance events reach you by email, in the console, or through webhooks."
 "canonical": "/guides/reference/notifications"
 ---
 
-Notifications let you decide which Vast.ai events should interrupt you, and where they should go. A renter may only need low-balance and instance lifecycle alerts in the console. A host may want machine health alerts by email. An automated platform can subscribe to the same events through webhooks and route them into its own incident, billing, or orchestration system.
+import NotificationChannels from '/snippets/notifications/channels.mdx';
 
-The notification system is shared across the web console and the API. The console gives users a settings page for choosing events and destinations. The API gives developers access to the same notification types, preferences, inbox, and webhook tools.
+Notifications let you decide which Vast.ai events you want to be told about, and where those messages go. A renter may only need low-balance and instance lifecycle alerts in the console. An automated platform can subscribe to the same events through webhooks and route them into its own incident, billing, or orchestration system.
+
+The notification system is shared across the web console and the API. The console gives you a settings page for choosing events and destinations. The API gives developers access to the same notification types, preferences, inbox, and webhook tools.
+
+<Note>
+This page covers renter notifications. If you also provide machines on Vast.ai, see [Host Notifications](/host/notifications) for host machine, verification, and maintenance events.
+</Note>
 
 ## Where to Find Notification Settings
 
 Open [Account Settings](https://cloud.vast.ai/account/) and go to **Notification Settings**.
 
-<Frame caption="Notification and Webhook Settings">
-  ![Notification and Webhook Settings page with Account, Billing, and Instance notification groups](/images/console-notifications-settings.png)
+<Frame caption="Notification Settings">
+  ![Notification Settings page with Account, Billing, and Instance notification groups](/images/console-notifications-settings.png)
 </Frame>
 
 The page groups events by the part of Vast.ai they affect:
@@ -24,28 +30,17 @@ The page groups events by the part of Vast.ai they affect:
 | **Account** | Email verification, password resets, email changes, team invitations, and similar account events |
 | **Billing** | Low balance, payment receipts, billing failures, and other payment events |
 | **Instance** | Instance creation, startup, stops, resumes, outbid events, offline/online state, contract end dates, downtime, and disk warnings |
-| **Host** | Hosted machine health, verification failures, renter reports, maintenance, host disk warnings, and host-side contract events |
 
-Some events are only shown when they apply to your account. For example, host events are only relevant if you provide machines on Vast.ai.
+Some events are only shown when they apply to your account. For example, team-invitation events only appear if you belong to a team.
 
-## How Delivery Works
-
-Each notification type has channel preferences. Today, the main public channels are:
-
-| Channel | Use it for |
-| --- | --- |
-| **Email** | Human-readable messages for events you want in your inbox |
-| **In-app** | Console notification inbox entries for supported events |
-| **Webhooks** | Machine-readable HTTP events for your own systems |
-
-Some emails are mandatory because they are tied to account access, billing safety, or imminent service impact. Mandatory email notifications cannot be fully disabled from the settings page.
+<NotificationChannels />
 
 ## Update Notifications in the Console
 
 1. Open **Account Settings**.
 2. Go to **Notification Settings**.
-3. Review each Account, Billing, Instance, and Host section.
-4. Remove optional email badges for events you do not want by email.
+3. Review each Account, Billing, and Instance section.
+4. Turn off email for any optional event you do not want in your inbox.
 5. For low-balance notifications, set the credit threshold that should trigger the warning.
 6. Select events that should be sent to a webhook, then create or edit the webhook destination.
 7. Click **Save**.
@@ -61,73 +56,26 @@ Webhooks are part of the notification system. They use the same event catalog an
 Use webhooks when you want to:
 
 - Trigger cleanup or orchestration when an instance changes state.
-- Route host machine alerts into your monitoring stack.
 - Mirror billing or account events into your own tools.
 - Build an audit trail outside the Vast console.
 
 See [Notification Webhooks](/guides/reference/notification-webhooks) for setup, payloads, signing, retries, and API examples.
 
-## Programmatic Access
-
-Use these endpoints when building your own notification settings UI or automation:
-
-| Endpoint | Purpose |
-| --- | --- |
-| `GET /api/v0/notification-types/` | Discover available notification types, display names, and default channel settings |
-| `GET /api/v0/users/{user_id}/notification-prefs/` | Read the authenticated user's notification preferences |
-| `PUT /api/v0/users/{user_id}/notification-prefs/` | Replace notification preferences |
-| `GET /api/v0/notifications/inbox/` | Read the current in-app notification inbox |
-| `PUT /api/v0/notifications/inbox/` | Mark in-app notifications as seen using a timestamp returned by the API |
-| `GET /api/v0/webhooks/` | List notification webhooks |
-| `POST /api/v0/webhooks/` | Create a notification webhook |
-
-All of these endpoints require an API key:
-
-```bash
-curl -H "Authorization: Bearer $VAST_API_KEY" \
-  "https://console.vast.ai/api/v0/notification-types/"
-```
-
 ## Notification Type Keys
 
-Notification types are identified by a `key`, such as `client:low_credit` or `host:machine_offline`.
+Notification types are identified by a `key` with a context prefix. Renter events use the `client:` prefix, such as `client:low_credit` or `client:outbid`.
 
-Use the full `key` when subscribing webhooks or updating preferences. Some events can exist in both renter and host contexts, so the full key avoids ambiguity.
-
-```json
-{
-  "key": "client:low_credit",
-  "slug": "low_credit",
-  "context": "client",
-  "topic": "billing",
-  "display_name": "Low balance notifications",
-  "default_preferences": {
-    "email": true,
-    "webhooks": false
-  },
-  "mandatory_email": false
-}
-```
+Use the full `key` when subscribing webhooks or updating preferences. Because a similar event can exist for both renters and hosts, the full key avoids ambiguity. For the complete list of types, display names, and default channel settings, call [`GET /notification-types/`](/api-reference/notifications/list-notification-types).
 
 ## In-App Inbox
 
-The console can show an in-app notification inbox for supported events. The inbox is a capped, expiring list of recent notifications. It is useful for status and workflow events, but email and webhooks are the durable channels for messages you need to retain outside the console.
+The console can show an in-app notification inbox for supported events. The inbox holds a limited number of recent notifications, and older entries drop off over time. It is useful for status and workflow events, but email and webhooks are the durable channels for messages you need to retain outside the console.
 
-Read the inbox:
+To read or mark the inbox programmatically, see the [Notifications API](/api-reference/notifications/get-notification-inbox).
 
-```bash
-curl -H "Authorization: Bearer $VAST_API_KEY" \
-  "https://console.vast.ai/api/v0/notifications/inbox/"
-```
+## Programmatic Access
 
-The response includes `seen_through_at`. Send that exact value back when marking the batch as seen:
-
-```bash
-curl -X PUT "https://console.vast.ai/api/v0/notifications/inbox/" \
-  -H "Authorization: Bearer $VAST_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"seen_through_at": 1772490000.123}'
-```
+Building your own notification settings UI or automation? The full set of notification, preference, inbox, and webhook endpoints is documented in the [Notifications API](/api-reference/notifications/list-notification-types).
 
 ## Good Defaults
 
@@ -137,7 +85,6 @@ Start with this setup:
 | --- | --- |
 | Renting GPU instances manually | Keep low balance, outbid, downtime, and contract end date emails enabled |
 | Running automated workloads | Add a webhook for instance lifecycle, downtime, outbid, and billing events |
-| Hosting machines | Keep machine error, verification, report, maintenance, and low-disk alerts enabled |
 | Building your own platform on Vast.ai | Use notification type keys, verify webhook signatures, and deduplicate by `event_id` |
 
-Review the settings periodically, especially after adding hosted machines, enabling autobilling, or connecting a new automation workflow.
+Review the settings periodically, especially after enabling autobilling or connecting a new automation workflow.
