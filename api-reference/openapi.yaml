@@ -18,13 +18,16 @@ info:
   contact:
     name: Vast.ai Support
     url: https://discord.gg/vast
+  license:
+    name: Vast.ai Terms of Service
+    url: https://vast.ai/terms/
 servers:
 - url: https://console.vast.ai
   description: Production server
 security:
 - BearerAuth: []
 paths:
-  /api/v0/instances/{id}/ssh/:
+  /api/v0/instances/{id}/ssh:
     post:
       summary: attach ssh-key
       description: 'Attaches an SSH key to the specified instance, allowing SSH access
@@ -87,7 +90,61 @@ paths:
                 $ref: '#/components/schemas/Error'
       tags:
       - Instances
-  /api/v0/commands/copy_direct/:
+      operationId: attachSshKey
+    get:
+      summary: show ssh-keys
+      description: 'Retrieves the SSH keys associated with a specific instance.
+
+
+        CLI Usage: `vastai show ssh-keys <instance_id>`'
+      security:
+      - BearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: The ID of the instance to retrieve SSH keys for.
+        example: 17816188
+      responses:
+        '200':
+          description: Success response with SSH keys
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  ssh_keys:
+                    type: string
+                    description: JSON string containing array of SSH key objects
+                    example: '[{"id": 1, "name": "my-key", "public_key": "ssh-rsa
+                      AAAA..."}]'
+        '400':
+          description: Bad Request - Invalid instance ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized - Invalid or missing authentication
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Instance not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      tags:
+      - Instances
+      operationId: showSshKeys
+  /api/v0/commands/copy_direct:
     delete:
       summary: cancel copy
       description: 'Cancel a remote copy operation specified by the destination ID
@@ -238,7 +295,7 @@ paths:
       x-rateLimit: 3.5
       tags:
       - Instances
-  /api/v0/machines/{machine_id}/cancel_maint/:
+  /api/v0/machines/{machine_id}/cancel_maint:
     put:
       summary: cancel maint
       description: 'Cancel a scheduled maintenance window for a specified machine.
@@ -295,7 +352,8 @@ paths:
       - BearerAuth: []
       tags:
       - Machines
-  /api/v0/commands/rclone/:
+      operationId: cancelMaint
+  /api/v0/commands/rclone:
     delete:
       summary: cancel sync
       description: 'Cancels an in-progress remote sync operation identified by the
@@ -367,6 +425,7 @@ paths:
                     example: No such instance.
       tags:
       - Instances
+      operationId: cancelSync
     post:
       summary: cloud copy
       description: 'Starts a cloud copy operation by sending a command to the remote
@@ -434,7 +493,8 @@ paths:
       - BearerAuth: []
       tags:
       - Instances
-  /api/v0/instances/bid_price/{id}/:
+      operationId: cloudCopy
+  /api/v0/instances/bid_price/{id}:
     put:
       summary: change bid
       description: 'Change the current bid price of an instance to a specified price.
@@ -527,7 +587,8 @@ paths:
                     example: API requests too frequent endpoint threshold=5.5
       tags:
       - Instances
-  /api/v0/machines/{machine_id}/cleanup/:
+      operationId: changeBid
+  /api/v0/machines/{machine_id}/cleanup:
     put:
       summary: cleanup machine
       description: 'This endpoint removes expired contracts on a specified machine,
@@ -608,7 +669,8 @@ paths:
                     example: API requests too frequent endpoint threshold=8
       tags:
       - Machines
-  /api/v0/auth/apikeys/:
+      operationId: cleanupMachine
+  /api/v0/auth/apikeys:
     post:
       summary: create api-key
       description: 'Creates a new API key with specified permissions for the authenticated
@@ -713,6 +775,7 @@ paths:
                     example: API requests too frequent endpoint threshold=2.0
       tags:
       - Accounts
+      operationId: createApiKey
     get:
       summary: show api keys
       description: 'Retrieves all API keys associated with the authenticated user.
@@ -777,7 +840,8 @@ paths:
                     example: API requests too frequent endpoint threshold=1.0
       tags:
       - Accounts
-  /api/v0/workergroups/:
+      operationId: showApiKeys
+  /api/v0/workergroups:
     post:
       summary: create workergroup
       description: 'Creates a new workergroup configuration that manages worker instances
@@ -906,6 +970,7 @@ paths:
                     example: API requests too frequent endpoint threshold=4.0
       tags:
       - Serverless
+      operationId: createWorkergroup
     get:
       summary: show workergroup
       description: 'Retrieves the list of workergroups associated with the authenticated
@@ -1018,7 +1083,8 @@ paths:
                     example: API requests too frequent endpoint threshold=2.0
       tags:
       - Serverless
-  /api/v0/endptjobs/:
+      operationId: showWorkergroup
+  /api/v0/endptjobs:
     post:
       summary: create endpoint
       description: 'This endpoint creates a new job processing endpoint with specified
@@ -1116,6 +1182,7 @@ paths:
                     example: API requests too frequent endpoint threshold=4.0
       tags:
       - Serverless
+      operationId: createEndpoint
     get:
       summary: show endpoints
       description: 'Retrieve a list of endpoint jobs for the authenticated user.
@@ -1216,7 +1283,8 @@ paths:
                     example: API requests too frequent endpoint threshold=3.0
       tags:
       - Serverless
-  /api/v0/secrets/:
+      operationId: showEndpoints
+  /api/v0/secrets:
     post:
       summary: create env-var
       description: 'Creates a new encrypted environment variable for the authenticated
@@ -1308,6 +1376,7 @@ paths:
                     example: API requests too frequent endpoint threshold=3.0
       tags:
       - Accounts
+      operationId: createEnvVar
     delete:
       summary: delete env var
       description: 'Deletes an environment variable associated with the authenticated
@@ -1428,6 +1497,7 @@ paths:
                     example: API requests too frequent endpoint threshold=5.0
       tags:
       - Accounts
+      operationId: showEnvVars
     put:
       summary: update env var
       description: 'Updates the value of an existing environment variable for the
@@ -1505,7 +1575,8 @@ paths:
                     example: API requests too frequent endpoint threshold=3.0
       tags:
       - Accounts
-  /api/v0/asks/{id}/:
+      operationId: updateEnvVar
+  /api/v0/asks/{id}:
     put:
       summary: create instance
       description: 'Creates a new instance by accepting an "ask" contract from a provider.
@@ -1819,7 +1890,8 @@ paths:
                   detail:
                     type: string
                     example: API requests too frequent endpoint threshold=4.5
-  /api/v0/ssh/:
+      operationId: createInstance
+  /api/v0/ssh:
     post:
       summary: create ssh-key
       description: 'Creates a new SSH key and associates it with your account.
@@ -1874,9 +1946,10 @@ paths:
                         format: date-time
                         example: '2023-01-01T12:00:00Z'
                       deleted_at:
-                        type: string
+                        type:
+                        - string
+                        - 'null'
                         format: date-time
-                        nullable: true
                         example: null
         '400':
           description: Bad Request
@@ -1913,6 +1986,7 @@ paths:
                     example: API requests too frequent endpoint threshold=1.0
       tags:
       - Accounts
+      operationId: createSshKey
     get:
       summary: show ssh keys
       description: 'Retrieve a list of SSH keys associated with the authenticated
@@ -1952,9 +2026,10 @@ paths:
                       format: date-time
                       description: The timestamp when the SSH key was created.
                     deleted_at:
-                      type: string
+                      type:
+                      - string
+                      - 'null'
                       format: date-time
-                      nullable: true
                       description: The timestamp when the SSH key was deleted, if
                         applicable.
         '401':
@@ -1966,7 +2041,7 @@ paths:
       - BearerAuth: []
       tags:
       - Accounts
-  /api/v0/users/:
+  /api/v0/users:
     post:
       summary: create subaccount
       description: 'Creates either a standalone user account or a subaccount under
@@ -2097,6 +2172,7 @@ paths:
                     example: API requests too frequent endpoint threshold=3.0
       tags:
       - Accounts
+      operationId: createSubaccount
     put:
       summary: set user
       description: 'Updates the user data for the authenticated user.
@@ -2171,7 +2247,8 @@ paths:
                     example: API requests too frequent endpoint threshold=5.0
       tags:
       - Accounts
-  /api/v0/team/:
+      operationId: setUser
+  /api/v0/team:
     post:
       summary: create team
       description: 'Creates a new [team](https://docs.vast.ai/documentation/teams/teams-overview)
@@ -2207,7 +2284,6 @@ paths:
               type: object
               required:
               - team_name
-              - permissions
               properties:
                 team_name:
                   type: string
@@ -2260,6 +2336,7 @@ paths:
                   msg:
                     type: string
                     example: Invalid user key
+      operationId: createTeam
     delete:
       summary: destroy team
       description: 'Deletes a team and all associated data including API keys, rights,
@@ -2330,7 +2407,8 @@ paths:
                     msg: Team owner not found
       tags:
       - Team
-  /api/v0/team/roles/:
+      operationId: destroyTeam
+  /api/v0/team/roles:
     post:
       summary: create team role
       description: 'Creates a new role within a team. Only team owners or managers
@@ -2411,7 +2489,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /api/v0/template/:
+      operationId: createTeamRole
+  /api/v0/template:
     post:
       summary: create template
       description: 'Creates a new template for launching instances.
@@ -2542,8 +2621,9 @@ paths:
                   type: boolean
                   description: Whether the template is private (not publicly searchable)
                 volume_info:
-                  type: object
-                  nullable: true
+                  type:
+                  - object
+                  - 'null'
                   description: 'UI hint for volume configuration. Note: This does
                     not affect instance creation - use `volume_info` in the instance
                     creation request to actually attach volumes.
@@ -2608,6 +2688,7 @@ paths:
           description: Rate limit exceeded
         '401':
           description: Unauthorized - invalid or missing API key
+      operationId: createTemplate
     delete:
       summary: delete template
       description: 'Deletes an existing template.
@@ -2653,6 +2734,7 @@ paths:
           description: Unauthorized - invalid or missing API key
         '404':
           description: Template not found
+      operationId: deleteTemplate
     put:
       summary: edit template
       description: 'Edits an existing template in place.
@@ -2728,6 +2810,7 @@ paths:
           description: Unauthorized - invalid or missing API key
         '404':
           description: Template not found
+      operationId: editTemplate
     get:
       summary: search templates
       description: 'Searches for templates using filter-based queries.
@@ -2826,7 +2909,8 @@ paths:
                     example: API requests too frequent endpoint threshold=3.0
       tags:
       - Search
-  /api/v0/auth/apikeys/{id}/:
+      operationId: searchTemplates
+  /api/v0/auth/apikeys/{id}:
     delete:
       summary: delete api key
       description: 'Deletes an existing API key belonging to the authenticated user.
@@ -2902,7 +2986,8 @@ paths:
                     example: API requests too frequent endpoint threshold=2.0
       tags:
       - Accounts
-  /api/v0/workergroups/{id}/:
+      operationId: deleteApiKey
+  /api/v0/workergroups/{id}:
     delete:
       summary: delete workergroup
       description: 'Deletes an existing workergroup.
@@ -3009,6 +3094,7 @@ paths:
                     example: API requests too frequent endpoint threshold=3.0
       tags:
       - Serverless
+      operationId: deleteWorkergroup
     put:
       summary: update workergroup
       description: 'Updates the properties of an existing workergroup based on the
@@ -3133,7 +3219,8 @@ paths:
                     example: API requests too frequent endpoint threshold=2.0
       tags:
       - Serverless
-  /api/v0/endptjobs/{id}/:
+      operationId: updateWorkergroup
+  /api/v0/endptjobs/{id}:
     delete:
       summary: delete endpoint
       description: 'Deletes an endpoint group by ID. Associated workergroups will
@@ -3223,6 +3310,7 @@ paths:
                     example: API requests too frequent endpoint threshold=3.0
       tags:
       - Serverless
+      operationId: deleteEndpoint
     put:
       summary: update endpoint
       description: 'Updates the specified endpoint group with the provided parameters.
@@ -3325,7 +3413,8 @@ paths:
                     example: API requests too frequent endpoint threshold=2.0
       tags:
       - Serverless
-  /api/v0/ssh/{id}/:
+      operationId: updateEndpoint
+  /api/v0/ssh/{id}:
     delete:
       summary: delete ssh key
       description: 'Removes an SSH key from the authenticated user''s account
@@ -3451,7 +3540,8 @@ paths:
                     example: API requests too frequent endpoint threshold=1.0
       tags:
       - Accounts
-  /api/v0/volumes/:
+      operationId: updateSshKey
+  /api/v0/volumes:
     delete:
       summary: delete volume
       description: 'Delete a volume by its ID.
@@ -3530,6 +3620,7 @@ paths:
                     example: API requests too frequent endpoint threshold=5.5
       tags:
       - Volumes
+      operationId: deleteVolume
     put:
       summary: rent volume
       description: 'Rent/create a new volume with specified parameters.
@@ -3572,6 +3663,7 @@ paths:
                     example: V.20118481
       tags:
       - Volumes
+      operationId: rentVolume
     get:
       summary: list volumes
       description: 'Retrieve information about all volumes rented by you.
@@ -3614,7 +3706,8 @@ paths:
                     example: API requests too frequent endpoint threshold=5.5
       tags:
       - Volumes
-  /api/v0/instances/{id}/:
+      operationId: listVolumes
+  /api/v0/instances/{id}:
     delete:
       summary: destroy instance
       description: 'Destroys/deletes an instance permanently. This is irreversible
@@ -3698,6 +3791,7 @@ paths:
       - BearerAuth: []
       tags:
       - Instances
+      operationId: destroyInstance
     put:
       summary: manage instance
       description: 'Manage instance state and labels. The operation is determined
@@ -3778,6 +3872,7 @@ paths:
                     example: API requests too frequent endpoint threshold=1.0
       tags:
       - Instances
+      operationId: manageInstance
     get:
       summary: show instance
       description: 'Retrieves the details of a specific instance for the authenticated
@@ -3832,7 +3927,8 @@ paths:
                     example: API requests too frequent endpoint threshold=2.0
       tags:
       - Instances
-  /api/v0/instances/{id}/ssh/{ssh_key_id}/:
+      operationId: showInstance
+  /api/v0/instances/{id}/ssh/{ssh_key_id}:
     delete:
       summary: detach ssh-key
       description: 'Detaches an SSH key from a specified instance, removing SSH access
@@ -3937,7 +4033,8 @@ paths:
                     example: Error deleting SSH key from instance
       tags:
       - Instances
-  /api/v0/instances/command/{id}/:
+      operationId: detachSshKey
+  /api/v0/instances/command/{id}:
     put:
       summary: execute
       description: 'Executes a constrained remote command on a specified instance.
@@ -4052,7 +4149,8 @@ paths:
                     example: Invalid json_body
       tags:
       - Instances
-  /get_workergroup_logs/:
+      operationId: execute
+  /get_workergroup_logs:
     post:
       servers:
       - url: https://run.vast.ai
@@ -4109,7 +4207,8 @@ paths:
                     12345 not found'
       tags:
       - Serverless
-  /get_workergroup_workers/:
+      operationId: getWorkergroupLogs
+  /get_workergroup_workers:
     post:
       servers:
       - url: https://run.vast.ai
@@ -4180,7 +4279,8 @@ paths:
                     12345 not found'
       tags:
       - Serverless
-  /get_endpoint_logs/:
+      operationId: getWorkergroupWorkers
+  /get_endpoint_logs:
     post:
       servers:
       - url: https://run.vast.ai
@@ -4234,7 +4334,8 @@ paths:
                     vLLM-Qwen3-8B not found'
       tags:
       - Serverless
-  /get_endpoint_workers/:
+      operationId: getEndpointLogs
+  /get_endpoint_workers:
     post:
       servers:
       - url: https://run.vast.ai
@@ -4305,7 +4406,8 @@ paths:
                     vLLM-Qwen3-8B not found'
       tags:
       - Serverless
-  /api/v0/team/invite/:
+      operationId: getEndpointWorkers
+  /api/v0/team/invite:
     post:
       summary: invite team member
       description: 'Sends an invitation email to the specified user to join the team
@@ -4390,7 +4492,8 @@ paths:
                       300 seconds ago.'
       tags:
       - Team
-  /api/v0/machines/create_asks/:
+      operationId: inviteTeamMember
+  /api/v0/machines/create_asks:
     put:
       summary: list machine
       description: 'Creates or updates ask contracts for a machine to list it for
@@ -4493,6 +4596,7 @@ paths:
                     example: Only machine owner can create ask contracts
       tags:
       - Machines
+      operationId: listMachine
   /api/v0/instances/request_logs/{id}:
     put:
       summary: show logs
@@ -4578,7 +4682,8 @@ paths:
                     example: Not authorized to view logs for this instance
       tags:
       - Instances
-  /api/v0/metrics/gpu/current/:
+      operationId: showLogs
+  /api/v0/metrics/gpu/current:
     get:
       summary: show gpu metrics
       description: 'Returns a current snapshot of supply, demand, and pricing across
@@ -4707,7 +4812,8 @@ paths:
                     example: API requests too frequent endpoint threshold=3.0
       tags:
       - Machines
-  /api/v0/metrics/gpu/locations/:
+      operationId: showGpuMetrics
+  /api/v0/metrics/gpu/locations:
     get:
       summary: show gpu locations
       description: 'Returns the geographic distribution of GPUs across the Vast marketplace.
@@ -4776,7 +4882,8 @@ paths:
                     example: API requests too frequent endpoint threshold=3.0
       tags:
       - Machines
-  /api/v0/metrics/gpu/history/:
+      operationId: showGpuLocations
+  /api/v0/metrics/gpu/history:
     get:
       summary: show gpu trends
       description: 'Returns time-series data for GPU supply, demand, and pricing.
@@ -4993,7 +5100,8 @@ paths:
                     example: API requests too frequent endpoint threshold=3.0
       tags:
       - Machines
-  /api/v0/instances/prepay/{id}/:
+      operationId: showGpuTrends
+  /api/v0/instances/prepay/{id}:
     put:
       summary: prepay instance
       description: 'Deposit credits into a reserved instance to receive usage discounts.
@@ -5085,7 +5193,8 @@ paths:
                     example: API requests too frequent endpoint threshold=2.0
       tags:
       - Instances
-  /api/v0/instances/reboot/{id}/:
+      operationId: prepayInstance
+  /api/v0/instances/reboot/{id}:
     put:
       summary: reboot instance
       description: 'Stops and starts a container without losing GPU priority. Updates
@@ -5150,7 +5259,8 @@ paths:
                     example: API requests too frequent endpoint threshold=1.0
       tags:
       - Instances
-  /api/v0/instances/recycle/{id}/:
+      operationId: rebootInstance
+  /api/v0/instances/recycle/{id}:
     put:
       summary: recycle instance
       description: 'Destroys and recreates container in place (from newly pulled image)
@@ -5217,7 +5327,8 @@ paths:
                     example: API requests too frequent endpoint threshold=1.0
       tags:
       - Instances
-  /api/v0/machines/{machine_id}/defjob/:
+      operationId: recycleInstance
+  /api/v0/machines/{machine_id}/defjob:
     delete:
       summary: remove defjob
       description: 'Deletes the default job (background instances) for a specified
@@ -5270,6 +5381,7 @@ paths:
                     example: API requests too frequent endpoint threshold=1.2
       tags:
       - Machines
+      operationId: removeDefjob
   /api/v0/team/members/{id}:
     delete:
       summary: remove team member
@@ -5379,6 +5491,7 @@ paths:
       - BearerAuth: []
       tags:
       - Team
+      operationId: removeTeamMember
   /api/v0/team/roles/{name}:
     delete:
       summary: remove team role
@@ -5472,7 +5585,99 @@ paths:
                   msg:
                     type: string
                     example: Specified role not found
-  /api/v0/machines/{machine_id}/reports/:
+      operationId: removeTeamRole
+    get:
+      summary: show team role
+      description: 'Retrieve details of a specific team role by its name.
+
+
+        CLI Usage: `vastai show team-role <name>`'
+      security:
+      - BearerAuth: []
+      parameters:
+      - name: name
+        in: path
+        required: true
+        description: Name of the team role
+        schema:
+          type: string
+        example: admin
+      responses:
+        '200':
+          description: Success response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    description: Role ID
+                    example: 1
+                  name:
+                    type: string
+                    description: Name of the role
+                    example: admin
+                  permissions:
+                    type: array
+                    description: Permissions associated with the role
+                    items:
+                      type: string
+                    example:
+                    - read
+                    - write
+        '404':
+          description: Role not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      tags:
+      - Team
+      operationId: showTeamRole
+    put:
+      summary: update team role
+      description: 'Update an existing team role with new name and permissions.
+
+
+        CLI Usage: `vastai update team-role <id> --name <new_name> --permissions <new_permissions_json>`'
+      parameters:
+      - name: name
+        in: path
+        required: true
+        description: ID of the role to update.
+        schema:
+          type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: New name for the role.
+                permissions:
+                  type: object
+                  description: JSON encoded permissions for the role.
+              required:
+              - name
+              - permissions
+      responses:
+        '200':
+          description: Successfully updated team role.
+          content:
+            application/json:
+              schema:
+                type: string
+                example: Successfully Updated Team Role For <role_name>
+      security:
+      - BearerAuth: []
+      tags:
+      - Team
+      operationId: updateTeamRole
+  /api/v0/machines/{machine_id}/reports:
     get:
       summary: show reports
       description: 'Retrieves a list of the most recent reports for a given machine.
@@ -5524,7 +5729,8 @@ paths:
                 $ref: '#/components/schemas/Error'
       tags:
       - Machines
-  /route/:
+      operationId: showReports
+  /route:
     post:
       servers:
       - url: https://run.vast.ai
@@ -5636,6 +5842,7 @@ paths:
                     example: Invalid endpoint or missing required parameters
       tags:
       - Serverless
+      operationId: route
   /api/v0/machines/{machine_id}/dnotify:
     put:
       summary: schedule maint
@@ -5733,7 +5940,8 @@ paths:
                     example: API requests too frequent endpoint threshold=2.5
       tags:
       - Machines
-  /api/v0/benchmarks/:
+      operationId: scheduleMaint
+  /api/v0/benchmarks:
     get:
       summary: search benchmarks
       description: 'Retrieve benchmark data based on search parameters.
@@ -5807,7 +6015,8 @@ paths:
                     example: API requests too frequent endpoint threshold=3.0
       tags:
       - Search
-  /api/v0/bundles/:
+      operationId: searchBenchmarks
+  /api/v0/bundles:
     post:
       summary: search offers
       description: 'Search for available GPU machine offers with advanced filtering
@@ -6274,7 +6483,8 @@ paths:
                     example: Invalid user key
       tags:
       - Search
-  /api/v0/volumes/search/:
+      operationId: searchOffers
+  /api/v0/volumes/search:
     post:
       summary: search volumes
       description: 'Search for available volumes based on specified criteria.
@@ -6352,7 +6562,8 @@ paths:
                     example: API requests too frequent endpoint threshold=5.5
       tags:
       - Volumes
-  /api/v0/machines/create_bids/:
+      operationId: searchVolumes
+  /api/v0/machines/create_bids:
     put:
       summary: set defjob
       description: 'Creates default jobs (background instances) for a specified machine
@@ -6451,7 +6662,8 @@ paths:
                     example: API requests too frequent endpoint threshold=2.8
       tags:
       - Machines
-  /api/v0/machines/{machine_id}/minbid/:
+      operationId: setDefjob
+  /api/v0/machines/{machine_id}/minbid:
     put:
       summary: set min-bid
       description: 'Sets the minimum bid price for a specified machine.
@@ -6519,7 +6731,8 @@ paths:
                     example: API requests too frequent endpoint threshold=1.5
       tags:
       - Machines
-  /api/v0/charges/:
+      operationId: setMinBid
+  /api/v0/charges:
     get:
       summary: show charges
       description: 'Shows charges per instance, including GPU, storage, and bandwidth.
@@ -6629,8 +6842,9 @@ paths:
                     description: Total number of contracts matching the filters.
                     example: 14
                   next_token:
-                    type: string
-                    nullable: true
+                    type:
+                    - string
+                    - 'null'
                     description: Pagination cursor for the next page. `null` when
                       no more pages.
                     example: eyJ2YWx1ZXMiOiB7ImlkIjogMTIzNDU2Nzh9fQ==
@@ -6707,8 +6921,9 @@ paths:
                                 - bwu
                                 example: gpu
                               source:
-                                type: string
-                                nullable: true
+                                type:
+                                - string
+                                - 'null'
                                 example: null
                               description:
                                 type: string
@@ -6785,7 +7000,8 @@ paths:
                     example: API requests too frequent endpoint threshold=1.0
       tags:
       - Billing
-  /api/v0/users/cloud_integrations/:
+      operationId: showCharges
+  /api/v0/users/cloud_integrations:
     get:
       summary: show connections
       description: 'Retrieves the list of cloud connections associated with the authenticated
@@ -6832,7 +7048,8 @@ paths:
                     example: API requests too frequent endpoint threshold=2.9
       tags:
       - Accounts
-  /api/v0/deployment/{id}/:
+      operationId: showConnections
+  /api/v0/deployment/{id}:
     get:
       summary: show deployment
       description: 'Returns detailed information about a single deployment, including
@@ -6877,45 +7094,55 @@ paths:
                         type: string
                         example: vastai/base-image:latest
                       endpoint_id:
-                        type: integer
-                        nullable: true
+                        type:
+                        - integer
+                        - 'null'
                         example: 25121
                       endpoint_state:
-                        type: string
-                        nullable: true
+                        type:
+                        - string
+                        - 'null'
                         description: Current state of the endpoint
                         example: active
                       env:
-                        type: string
-                        nullable: true
+                        type:
+                        - string
+                        - 'null'
                         description: Environment variables and port mappings
                       s3_key:
-                        type: string
-                        nullable: true
+                        type:
+                        - string
+                        - 'null'
                         description: S3 object key for the current code version
                       file_hash:
-                        type: string
-                        nullable: true
+                        type:
+                        - string
+                        - 'null'
                         description: Content hash of the deployed code
                       search_params:
-                        type: string
-                        nullable: true
+                        type:
+                        - string
+                        - 'null'
                         description: Search query for instance selection
                       current_version_id:
-                        type: integer
-                        nullable: true
+                        type:
+                        - integer
+                        - 'null'
                       last_healthy_version_id:
-                        type: integer
-                        nullable: true
+                        type:
+                        - integer
+                        - 'null'
                       storage:
                         type: number
                         example: 16.0
                       ttl:
-                        type: number
-                        nullable: true
+                        type:
+                        - number
+                        - 'null'
                       last_client_heartbeat:
-                        type: number
-                        nullable: true
+                        type:
+                        - number
+                        - 'null'
                         description: Unix timestamp of last client heartbeat
                       created_at:
                         type: number
@@ -6947,7 +7174,8 @@ paths:
                     example: API requests too frequent endpoint threshold=3.0
       tags:
       - Serverless
-  /api/v0/deployments/:
+      operationId: showDeployment
+  /api/v0/deployments:
     get:
       summary: show deployments
       description: 'Returns all deployments owned by the authenticated user.
@@ -6985,40 +7213,49 @@ paths:
                           type: string
                           example: vastai/base-image:latest
                         endpoint_id:
-                          type: integer
-                          nullable: true
+                          type:
+                          - integer
+                          - 'null'
                           example: 25121
                         env:
-                          type: string
-                          nullable: true
+                          type:
+                          - string
+                          - 'null'
                           description: Environment variables and port mappings
                         file_hash:
-                          type: string
-                          nullable: true
+                          type:
+                          - string
+                          - 'null'
                           description: Content hash of the deployed code
                         s3_key:
-                          type: string
-                          nullable: true
+                          type:
+                          - string
+                          - 'null'
                           description: S3 object key for the current code version
                         search_params:
-                          type: string
-                          nullable: true
+                          type:
+                          - string
+                          - 'null'
                           description: Search query for instance selection
                         current_version_id:
-                          type: integer
-                          nullable: true
+                          type:
+                          - integer
+                          - 'null'
                         last_healthy_version_id:
-                          type: integer
-                          nullable: true
+                          type:
+                          - integer
+                          - 'null'
                         storage:
                           type: number
                           example: 16.0
                         ttl:
-                          type: number
-                          nullable: true
+                          type:
+                          - number
+                          - 'null'
                         last_client_heartbeat:
-                          type: number
-                          nullable: true
+                          type:
+                          - number
+                          - 'null'
                           description: Unix timestamp of last client heartbeat
                         created_at:
                           type: number
@@ -7044,7 +7281,8 @@ paths:
                     example: API requests too frequent endpoint threshold=3.0
       tags:
       - Serverless
-  /api/v0/instances/balance/{id}/:
+      operationId: showDeployments
+  /api/v0/instances/balance/{id}:
     get:
       summary: show deposit
       description: 'Retrieves the deposit details for a specified instance.
@@ -7101,7 +7339,8 @@ paths:
                     example: API requests too frequent endpoint threshold=3.0
       tags:
       - Billing
-  /api/v0/users/{user_id}/machine-earnings/:
+      operationId: showDeposit
+  /api/v0/users/{user_id}/machine-earnings:
     get:
       summary: show earnings
       description: 'Retrieves the earnings history for a specified time range and
@@ -7234,60 +7473,8 @@ paths:
                     example: API requests too frequent endpoint threshold=2.0
       tags:
       - Billing
-  /api/v0/instances/{instance_id}/ssh/:
-    get:
-      summary: show ssh-keys
-      description: 'Retrieves the SSH keys associated with a specific instance.
-
-
-        CLI Usage: `vastai show ssh-keys <instance_id>`'
-      security:
-      - BearerAuth: []
-      parameters:
-      - name: instance_id
-        in: path
-        required: true
-        schema:
-          type: integer
-        description: The ID of the instance to retrieve SSH keys for.
-        example: 17816188
-      responses:
-        '200':
-          description: Success response with SSH keys
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  ssh_keys:
-                    type: string
-                    description: JSON string containing array of SSH key objects
-                    example: '[{"id": 1, "name": "my-key", "public_key": "ssh-rsa
-                      AAAA..."}]'
-        '400':
-          description: Bad Request - Invalid instance ID
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '401':
-          description: Unauthorized - Invalid or missing authentication
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '404':
-          description: Instance not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      tags:
-      - Instances
-  /api/v1/instances/:
+      operationId: showEarnings
+  /api/v1/instances:
     get:
       summary: show instances
       description: 'Retrieve a paginated list of instances for the authenticated user.
@@ -7380,8 +7567,9 @@ paths:
                       ? ''
                       : 2
                   next_token:
-                    type: string
-                    nullable: true
+                    type:
+                    - string
+                    - 'null'
                     description: Pagination cursor for the next page. `null` when
                       no more pages.
                     example: eyJ2YWx1ZXMiOiB7ImlkIjogMTIzfX0=
@@ -7395,8 +7583,9 @@ paths:
                           type: integer
                           example: 312
                         actual_status:
-                          type: string
-                          nullable: true
+                          type:
+                          - string
+                          - 'null'
                           example: running
                         cur_state:
                           type: string
@@ -7408,20 +7597,24 @@ paths:
                           type: string
                           example: running
                         label:
-                          type: string
-                          nullable: true
+                          type:
+                          - string
+                          - 'null'
                           example: ML Training Job 2025
                         template_id:
-                          type: integer
-                          nullable: true
+                          type:
+                          - integer
+                          - 'null'
                           example: 2048
                         template_hash_id:
-                          type: string
-                          nullable: true
+                          type:
+                          - string
+                          - 'null'
                           example: abcde12345
                         template_name:
-                          type: string
-                          nullable: true
+                          type:
+                          - string
+                          - 'null'
                           example: Tensorflow GPU Template
                         image_uuid:
                           type: string
@@ -7455,8 +7648,9 @@ paths:
                           type: string
                           example: df77e27085bd4b3bd5d9024bdefb9e6df614b27adb0689e9d8f066fce5e01f0c
                         status_msg:
-                          type: string
-                          nullable: true
+                          type:
+                          - string
+                          - 'null'
                           example: success, running nvidia/cuda_11.0.3-devel-ubuntu18.04/ssh
                         public_ipaddr:
                           type: string
@@ -7488,8 +7682,9 @@ paths:
                           format: float
                           example: 1735689600.0
                         uptime_mins:
-                          type: number
-                          nullable: true
+                          type:
+                          - number
+                          - 'null'
                           example: null
                         duration:
                           type: number
@@ -7516,16 +7711,19 @@ paths:
                           format: float
                           example: 0.0
                         mem_limit:
-                          type: number
-                          nullable: true
+                          type:
+                          - number
+                          - 'null'
                           example: 15.71815424
                         mem_usage:
-                          type: number
-                          nullable: true
+                          type:
+                          - number
+                          - 'null'
                           example: 0.00996352
                         vmem_usage:
-                          type: number
-                          nullable: true
+                          type:
+                          - number
+                          - 'null'
                           example: 0.543945
                         gpu_name:
                           type: string
@@ -7540,12 +7738,14 @@ paths:
                           type: integer
                           example: 24576
                         gpu_util:
-                          type: number
-                          nullable: true
+                          type:
+                          - number
+                          - 'null'
                           example: 0.0
                         gpu_temp:
-                          type: number
-                          nullable: true
+                          type:
+                          - number
+                          - 'null'
                           example: 38.999981
                         gpu_frac:
                           type: number
@@ -7591,8 +7791,9 @@ paths:
                           type: integer
                           example: 20002
                         ports:
-                          type: object
-                          nullable: true
+                          type:
+                          - object
+                          - 'null'
                           description: Port mappings. Only present on running instances.
                           additionalProperties:
                             type: array
@@ -7641,12 +7842,14 @@ paths:
                           format: float
                           example: 0.8021
                         dlperf:
-                          type: number
-                          nullable: true
+                          type:
+                          - number
+                          - 'null'
                           example: null
                         dlperf_per_dphtotal:
-                          type: number
-                          nullable: true
+                          type:
+                          - number
+                          - 'null'
                           example: null
                         flops_per_dphtotal:
                           type: number
@@ -7657,16 +7860,18 @@ paths:
                           format: float
                           example: 12.36
                         score:
-                          type: number
-                          nullable: true
+                          type:
+                          - number
+                          - 'null'
                           example: null
                         reliability2:
                           type: number
                           format: float
                           example: 0.9686655
                         os_version:
-                          type: string
-                          nullable: true
+                          type:
+                          - string
+                          - 'null'
                           example: null
                         mobo_name:
                           type: string
@@ -7683,8 +7888,9 @@ paths:
                           type: integer
                           example: 1
                         webpage:
-                          type: string
-                          nullable: true
+                          type:
+                          - string
+                          - 'null'
                           example: null
                         search:
                           type: object
@@ -7715,16 +7921,19 @@ paths:
                           format: float
                           example: 4.94e-05
                         credit_balance:
-                          type: number
-                          nullable: true
+                          type:
+                          - number
+                          - 'null'
                           example: 4792.99
                         credit_discount:
-                          type: number
-                          nullable: true
+                          type:
+                          - number
+                          - 'null'
                           example: 0.37
                         credit_discount_max:
-                          type: number
-                          nullable: true
+                          type:
+                          - number
+                          - 'null'
                           example: 0.4
                         client_run_time:
                           type: number
@@ -7744,8 +7953,9 @@ paths:
                           type: string
                           example: 11 Mon 26 D 6 Hr
                         country_code:
-                          type: string
-                          nullable: true
+                          type:
+                          - string
+                          - 'null'
                           example: null
                         volume_info:
                           type: array
@@ -7788,7 +7998,8 @@ paths:
                     example: API requests too frequent endpoint threshold=1.0
       tags:
       - Instances
-  /api/v1/invoices/:
+      operationId: showInstances
+  /api/v1/invoices:
     get:
       summary: show invoices
       description: 'Returns Stripe top-ups, transfers, payouts, coinbase payments,
@@ -7895,8 +8106,9 @@ paths:
                     description: Total number of invoices matching the filters.
                     example: 42
                   next_token:
-                    type: string
-                    nullable: true
+                    type:
+                    - string
+                    - 'null'
                     description: Token for the next page. `null` when no more pages.
                     example: eyJ2YWx1ZXMiOiB7ImlkIjogMjE4OTM4N30sICJvc19wYWdlIjogMH0=
                   results:
@@ -7910,8 +8122,9 @@ paths:
                           description: Invoice creation time (unix seconds UTC).
                           example: 1761980044.0
                         end:
-                          type: number
-                          nullable: true
+                          type:
+                          - number
+                          - 'null'
                           description: Payment time (unix seconds UTC). `null` if
                             unpaid.
                           example: 1761980301.0
@@ -8025,7 +8238,8 @@ paths:
                     example: API requests too frequent endpoint threshold=3.0
       tags:
       - Billing
-  /api/v0/users/{user_id}/ipaddrs/:
+      operationId: showInvoices
+  /api/v0/users/{user_id}/ipaddrs:
     get:
       summary: show ipaddrs
       description: 'This endpoint retrieves the history of IP address accesses for
@@ -8096,7 +8310,8 @@ paths:
                     example: API requests too frequent endpoint threshold=2.9
       tags:
       - Accounts
-  /api/v0/machines/:
+      operationId: showIpaddrs
+  /api/v0/machines:
     get:
       summary: show machines
       description: 'Fetches data for multiple machines associated with the authenticated
@@ -8139,7 +8354,7 @@ paths:
       - BearerAuth: []
       tags:
       - Machines
-  /api/v0/subaccounts/:
+  /api/v0/subaccounts:
     get:
       summary: show subaccounts
       description: 'Retrieve a list of subaccounts associated with the authenticated
@@ -8176,9 +8391,10 @@ paths:
                           format: date-time
                           description: The timestamp when the subaccount was created.
                         deleted_at:
-                          type: string
+                          type:
+                          - string
+                          - 'null'
                           format: date-time
-                          nullable: true
                           description: The timestamp when the subaccount was deleted,
                             if applicable.
         '401':
@@ -8200,7 +8416,8 @@ paths:
                     example: API requests too frequent endpoint threshold=2.1
       tags:
       - Accounts
-  /api/v0/team/members/:
+      operationId: showSubaccounts
+  /api/v0/team/members:
     get:
       summary: show team members
       description: 'Retrieve a list of team members associated with the authenticated
@@ -8258,97 +8475,8 @@ paths:
                 $ref: '#/components/schemas/Error'
       tags:
       - Team
-  /api/v0/team/roles/{id}/:
-    get:
-      summary: show team role
-      description: 'Retrieve details of a specific team role by its name.
-
-
-        CLI Usage: `vastai show team-role <name>`'
-      security:
-      - BearerAuth: []
-      parameters:
-      - name: id
-        in: path
-        required: true
-        description: Name of the team role
-        schema:
-          type: string
-        example: admin
-      responses:
-        '200':
-          description: Success response
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  id:
-                    type: integer
-                    description: Role ID
-                    example: 1
-                  name:
-                    type: string
-                    description: Name of the role
-                    example: admin
-                  permissions:
-                    type: array
-                    description: Permissions associated with the role
-                    items:
-                      type: string
-                    example:
-                    - read
-                    - write
-        '404':
-          description: Role not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      tags:
-      - Accounts
-    put:
-      summary: update team role
-      description: 'Update an existing team role with new name and permissions.
-
-
-        CLI Usage: `vastai update team-role <id> --name <new_name> --permissions <new_permissions_json>`'
-      parameters:
-      - name: id
-        in: path
-        required: true
-        description: ID of the role to update.
-        schema:
-          type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                  description: New name for the role.
-                permissions:
-                  type: object
-                  description: JSON encoded permissions for the role.
-              required:
-              - name
-              - permissions
-      responses:
-        '200':
-          description: Successfully updated team role.
-          content:
-            application/json:
-              schema:
-                type: string
-                example: Successfully Updated Team Role For <role_name>
-      security:
-      - BearerAuth: []
-      tags:
-      - Team
-  /api/v0/team/roles-full/:
+      operationId: showTeamMembers
+  /api/v0/team/roles-full:
     get:
       summary: show team roles
       description: 'Retrieve a list of all roles for a team, excluding the owner''
@@ -8412,7 +8540,8 @@ paths:
                     example: Invalid user key
       tags:
       - Team
-  /api/v0/users/current/:
+      operationId: showTeamRoles
+  /api/v0/users/current:
     get:
       summary: show user
       description: 'Retrieve information about the current authenticated user, excluding
@@ -8464,7 +8593,8 @@ paths:
                 $ref: '#/components/schemas/Error'
       tags:
       - Accounts
-  /api/v0/deployment/{id}/start/:
+      operationId: showUser
+  /api/v0/deployment/{id}/start:
     post:
       summary: start deployment
       description: 'Starts (or restarts) the endpoint associated with a deployment.
@@ -8520,7 +8650,8 @@ paths:
                     example: API requests too frequent endpoint threshold=2.0
       tags:
       - Serverless
-  /api/v0/deployment/{id}/stop/:
+      operationId: startDeployment
+  /api/v0/deployment/{id}/stop:
     post:
       summary: stop deployment
       description: 'Stops the endpoint associated with a deployment. The deployment
@@ -8576,7 +8707,8 @@ paths:
                     example: API requests too frequent endpoint threshold=2.0
       tags:
       - Serverless
-  /api/v0/commands/transfer_credit/:
+      operationId: stopDeployment
+  /api/v0/commands/transfer_credit:
     put:
       summary: transfer credit
       description: 'Transfers specified amount of credits from the authenticated user''s
@@ -8666,7 +8798,8 @@ paths:
                     example: API requests too frequent endpoint threshold=2.5
       tags:
       - Accounts
-  /api/v0/machines/{machine_id}/asks/:
+      operationId: transferCredit
+  /api/v0/machines/{machine_id}/asks:
     delete:
       summary: unlist machine
       description: 'Removes all ''ask'' type offer contracts for a specified machine,
@@ -8724,7 +8857,8 @@ paths:
                     example: API requests too frequent endpoint threshold=1.8
       tags:
       - Machines
-  /api/v0/volumes/unlist/:
+      operationId: unlistMachine
+  /api/v0/volumes/unlist:
     post:
       summary: unlist volume
       description: 'Remove a volume listing from the marketplace.
@@ -8790,6 +8924,7 @@ paths:
                     example: API requests too frequent endpoint threshold=5.0
       tags:
       - Volumes
+      operationId: unlistVolume
 components:
   schemas:
     Error:
@@ -8956,8 +9091,9 @@ components:
           description: Unique identifier for the instance.
           example: 883
         actual_status:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
           description: Current status of the instance container.
           example: running
         intended_status:
@@ -8973,23 +9109,27 @@ components:
           description: Next scheduled state for the machine contract.
           example: running
         label:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
           description: User-defined label for the instance.
           example: null
         template_id:
-          type: integer
-          nullable: true
+          type:
+          - integer
+          - 'null'
           description: Identifier for the instance template.
           example: null
         template_hash_id:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
           description: Hash identifier for the instance template.
           example: null
         template_name:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
           description: Name of the template (if available).
           example: null
         image_uuid:
@@ -9013,8 +9153,9 @@ components:
           description: Additional environment variables.
           example: []
         onstart:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
           description: Script or command run at container start.
           example: null
         jupyter_token:
@@ -9022,8 +9163,9 @@ components:
           description: Jupyter token for the instance.
           example: 53fc448d6644aa7535c6fa5498cdbedc782753e88d81b44090e54dcf1332ed30
         status_msg:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
           description: Status message for the instance.
           example: null
         local_ipaddrs:
@@ -9065,8 +9207,9 @@ components:
           description: Instance end time (epoch seconds).
           example: 2034617753.0
         uptime_mins:
-          type: number
-          nullable: true
+          type:
+          - number
+          - 'null'
           description: Uptime of the instance in minutes.
           example: null
         duration:
@@ -9101,18 +9244,21 @@ components:
           description: CPU utilization as a fraction.
           example: 0.0
         mem_limit:
-          type: number
-          nullable: true
+          type:
+          - number
+          - 'null'
           description: Memory limit in megabytes.
           example: null
         mem_usage:
-          type: number
-          nullable: true
+          type:
+          - number
+          - 'null'
           description: Memory usage in megabytes.
           example: null
         vmem_usage:
-          type: number
-          nullable: true
+          type:
+          - number
+          - 'null'
           description: Virtual memory usage in megabytes.
           example: null
         gpu_name:
@@ -9132,13 +9278,15 @@ components:
           description: Allocated GPU RAM in MB.
           example: 24564
         gpu_util:
-          type: number
-          nullable: true
+          type:
+          - number
+          - 'null'
           description: GPU utilization as a fraction.
           example: null
         gpu_temp:
-          type: number
-          nullable: true
+          type:
+          - number
+          - 'null'
           description: Current GPU temperature in Celsius.
           example: null
         gpu_frac:
@@ -9308,8 +9456,9 @@ components:
           description: URL to the logo image.
           example: /static/logos/vastai_small2.png
         webpage:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
           description: URL to the instance's webpage, if available.
           example: null
         search:
@@ -9346,13 +9495,15 @@ components:
           description: VRAM cost per hour.
           example: 4.079441760601181e-05
         credit_balance:
-          type: number
-          nullable: true
+          type:
+          - number
+          - 'null'
           description: User's credit balance.
           example: null
         credit_discount:
-          type: number
-          nullable: true
+          type:
+          - number
+          - 'null'
           description: User's credit discount.
           example: null
         credit_discount_max:
