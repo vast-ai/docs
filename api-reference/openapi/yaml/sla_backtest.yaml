@@ -1,0 +1,149 @@
+openapi: 3.0.0
+info:
+  title: Vast.ai API - SLA Backtest
+  description: Replay historical machine earnings through SLA settlement math.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/host/sla_backtest/:
+    get:
+      summary: sla backtest
+      description: |
+        Replays a machine's historical compute earnings and uptime through SLA settlement math
+        to preview premiums and payouts before listing with SLA.
+
+        Requires `machine_read` permission. See [SLA Earnings Backtester](/host/sla-backtester) for usage guide.
+      security:
+      - BearerAuth: []
+      parameters:
+      - name: machine_id
+        in: query
+        required: true
+        schema:
+          type: integer
+        description: ID of your machine.
+      - name: r
+        in: query
+        required: true
+        schema:
+          type: number
+          format: float
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 1
+        description: Reliability target to simulate (0–1). Used as both target and claim.
+      - name: p
+        in: query
+        schema:
+          type: number
+          format: float
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 1
+          default: 0.6667
+        description: Host confidence (0–1). Maps to sla_sigma_x when listing. Default 0.6667 (normal).
+      - name: start_date
+        in: query
+        schema:
+          type: integer
+        description: Range start as Unix epoch seconds. Default is 90 days before end_date.
+      - name: end_date
+        in: query
+        schema:
+          type: integer
+        description: Range end as Unix epoch seconds. Default is now.
+      - name: reliability
+        in: query
+        schema:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        description: Optional flat uptime override (0–1) for all replayed days.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  machine_id:
+                    type: integer
+                  has_data:
+                    type: boolean
+                    description: false when no days in the range had earnings to replay.
+                  start_day:
+                    type: integer
+                    description: UTC day index (days since 1970-01-01).
+                  end_day:
+                    type: integer
+                    description: UTC day index (days since 1970-01-01).
+                  covered_days:
+                    type: integer
+                  skipped_days:
+                    type: integer
+                  reliability:
+                    type: number
+                    format: float
+                  fleet_reliability:
+                    type: number
+                    format: float
+                  params:
+                    type: object
+                  daily_results:
+                    type: array
+                    items:
+                      type: object
+                  summary:
+                    type: object
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    enum:
+                    - invalid_range
+                    - range_too_large
+                    - bad_request
+                    - invalid_params
+                  msg:
+                    type: string
+        '403':
+          description: Forbidden — not machine owner
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: not_owner
+        '404':
+          description: Machine not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: machine_not_found
+        '429':
+          description: Too Many Requests — rate limit exceeded
+      tags:
+      - Host
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer authentication with API key in Authorization header
