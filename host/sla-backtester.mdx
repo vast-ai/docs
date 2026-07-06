@@ -6,7 +6,7 @@ description: "Replay your machine's historical earnings through SLA math to prev
 
 The **SLA earnings backtester** lets you answer a practical question before you list: *if I had offered SLA at reliability **R** with confidence **P**, how would that have affected my earnings on this machine over the last few months?*
 
-It replays your machine's **real historical compute earnings and uptime** through the same v5 SLA math used in production settlement, then compares the simulated result to what you actually earned from SLA (if anything).
+It replays your machine's **real historical compute earnings and uptime** through the same SLA settlement math used in production, then compares the simulated result to what you actually earned from SLA (if anything).
 
 <Note>
 The backtester is available through the API only. You must own the machine and use an API key with **`machine_read`** permission.
@@ -17,16 +17,16 @@ The backtester is available through the API only. You must own the machine and u
 Use the backtester before you enable SLA on a listing, or when you want to tune parameters:
 
 - **Pick a reliability target** — see how often you would have kept premiums vs paid out
-- **Compare confidence levels** — tighter confidence means higher premiums for clients but more risk to you if uptime slips
+- **Compare confidence levels** — tighter confidence means lower premiums for clients but more risk to you if uptime slips
 - **Stress-test bad weeks** — use the optional flat uptime override to see payout size if reliability dropped
-- **Compare to history** — each day includes `historical_sla`, your machine's realized SLA earnings in that period (zero if you were not offering SLA)
+- **Compare to history** — each day includes `historical_sla`, your machine's realized SLA earnings on that day (zero if you were not offering SLA)
 
 For how SLA offers work once listed, see [SLA Offers](/host/sla-offers).
 
 ## How it works
 
 1. You choose a machine, date range, reliability target (`r`), and confidence (`p`).
-2. The API loads per-day earnings from your machine's history (`machine_earns`).
+2. The API loads per-day earnings from your machine's rental history.
 3. For each active day, it computes GPU, storage, and bandwidth earnings plus simulated SLA host earnings.
 4. It returns a day-by-day breakdown and summary totals.
 
@@ -40,7 +40,11 @@ For how SLA offers work once listed, see [SLA Offers](/host/sla-offers).
 GET /api/v0/host/sla_backtest/
 ```
 
-Requires Bearer authentication. Rate limited like other host API endpoints.
+Requires Bearer authentication. This endpoint is rate-limited like other host API endpoints — see [Rate Limits and Errors](/api-reference/rate-limits-and-errors) for retry guidance.
+
+<Note>
+Find your API key under **Account → API Keys** (requires [`machine_read`](/api-reference/permissions) permission). Your machine ID appears on the [Host Machines page](https://cloud.vast.ai/host/machines) or via [`vastai show machines`](/host/cli/show-machines).
+</Note>
 
 ### Query parameters
 
@@ -48,7 +52,7 @@ Requires Bearer authentication. Rate limited like other host API endpoints.
 | --- | --- | --- |
 | `machine_id` | Yes | ID of your machine |
 | `r` | Yes | Reliability target to simulate (0–1). Used as both target and claim. Example: `0.95` = 95%. |
-| `p` | No | Host confidence (0–1). Maps to the same spread used when listing with `sla_sigma_x`. Default: ~0.67 (normal confidence). |
+| `p` | No | Host confidence (0–1). Maps to the same spread used when listing with `sla_sigma_x` — see [Confidence values](#confidence-values-p) below. Default: `0.6667` (normal confidence, ≈ 67%). |
 | `start_date` | No | Range start as Unix epoch seconds. Default: 90 days before `end_date`. |
 | `end_date` | No | Range end as Unix epoch seconds. Default: now. |
 | `reliability` | No | Optional flat uptime override (0–1) for all replayed days. Ignores historical uptime — useful for what-if analysis ("what if every day had 90% uptime?"). |
@@ -60,6 +64,7 @@ Requires Bearer authentication. Rate limited like other host API endpoints.
 | Default lookback | 90 days |
 | Maximum range | 366 days (inclusive) |
 | Ownership | Must own the machine |
+| Rate limits | Per-endpoint; see [Rate Limits and Errors](/api-reference/rate-limits-and-errors) |
 
 ### Example request
 
@@ -135,7 +140,8 @@ A successful response looks like this (fields abbreviated):
 
 | Field | Meaning |
 | --- | --- |
-| `has_data` | `true` if at least one day in the range had earnings to replay |
+| `has_data` | `true` if at least one day in the range had earnings to replay. When `false`, `daily_results` is empty and summary totals are zero. |
+| `start_day`, `end_day` | UTC day indices (days since January 1, 1970). Same encoding as `daily_results[].day`. Multiply by 86400 for a Unix timestamp. |
 | `covered_days` | Days with rental activity replayed through SLA math |
 | `skipped_days` | Days in the range with no activity (zero-filled in `daily_results`) |
 | `reliability` | Actual uptime ratio over the range (`total uptime / total active time`) |
@@ -202,7 +208,8 @@ Higher confidence (higher `p`) → tighter spread → lower premiums for clients
 | --- | --- | --- |
 | 400 | `invalid_range` | `start_date` is after `end_date` |
 | 400 | `range_too_large` | More than 366 days requested |
-| 400 | `invalid_params` | Invalid `r`, `p`, or other SLA parameter |
+| 400 | `bad_request` | Invalid or out-of-range `r`, `p`, or other query parameter |
+| 400 | `invalid_params` | Valid parameters but SLA math could not run (for example, insufficient history) |
 | 403 | `not_owner` | Machine belongs to another host |
 | 404 | `machine_not_found` | Invalid `machine_id` |
 
@@ -217,5 +224,5 @@ Higher confidence (higher `p`) → tighter spread → lower premiums for clients
 ## Related documentation
 
 - [SLA Offers](/host/sla-offers) — listing parameters, economics, and risk scenarios
-- [SLA Coverage (clients)](/guides/instances/choosing/sla-coverage) — how clients search and pay for SLA
+- [SLA Backtest API](/api-reference/host/sla-backtest) — formal API reference for this endpoint
 - [API permissions](/api-reference/permissions) — `machine_read` scope required
