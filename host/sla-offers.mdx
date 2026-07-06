@@ -1,0 +1,167 @@
+---
+title: "SLA Offers"
+description: "Offer reliability guarantees on your machines, set SLA parameters, and understand how premiums and payouts work."
+"canonical": "/host/sla-offers"
+---
+
+Vast.ai lets hosts attach a **Service Level Agreement (SLA)** to a machine listing. An SLA is reliability insurance: the client pays a small daily premium, and if uptime falls short of the agreed target, the client receives a payout from your earnings.
+
+This page explains how SLA offers work from the host side — what you are promising, how pricing is calculated, and what happens when uptime is good or bad.
+
+<Note>
+SLA settlement uses the **v5 asymmetric insurance model**. Premiums and payouts are settled daily based on measured uptime.
+</Note>
+
+## How it works (plain English)
+
+Think of an SLA offer as three linked ideas:
+
+1. **Reliability target** — the uptime level the listing is priced around (for example, 95% or 99%).
+2. **Your reliability claim** — what you believe your machine will actually deliver.
+3. **Your confidence** — how sure you are about that claim. A tight confidence means you stand behind a narrow range; a wide confidence means you admit more uncertainty and clients pay a higher premium.
+
+When a client rents with SLA enabled:
+
+- They pay **compute** (GPU, storage, bandwidth) plus a **daily SLA premium**.
+- Each day, Vast measures how long the instance was online and settles the SLA.
+- **Good uptime** → you keep the premium for that day.
+- **Bad uptime** → you pay the client from your earnings (up to the day's compute charges plus premium).
+
+Under honest pricing, a host who delivers what they claim should roughly break even on SLA over time — premiums balance payouts.
+
+## SLA parameters
+
+When you list or update a machine, you can set these fields on the offer (via the host console or the [list machine API](/api-reference/machines/list-machine)):
+
+| Parameter | API field | What it means |
+| --- | --- | --- |
+| Reliability target | `sla_r_target` | The coverage level baked into the offer. Set above `0` to enable SLA. Values are fractions between 0 and 1 (for example, `0.95` = 95%). Legacy alias: `sla_reliability`. |
+| Reliability claim | `sla_r_claim` | Your advertised belief about machine uptime. Defaults to the reliability target if omitted. Must be **≥** the target. |
+| Confidence spread | `sla_sigma_x` | How wide your belief is around the claim. Lower = more confident (cheaper for clients). Defaults to `0.5` if omitted. |
+
+### Confidence presets
+
+If you prefer thinking in confidence rather than `sla_sigma_x`, these presets match the shipped defaults:
+
+| Label | Approx. confidence | `sla_sigma_x` | Effect on premium |
+| --- | --- | --- | --- |
+| High | ~83% | `0.2` | Lowest premiums — you are very sure about your claim |
+| Normal (default) | ~67% | `0.5` | Balanced default |
+| Wide | 50% | `1.0` | Higher premiums — more uncertainty priced in |
+
+### Validation rules
+
+Offers with invalid combinations are rejected at listing time:
+
+- Reliability target and claim must be between 0 and 1 (exclusive of 0 for target).
+- **Target cannot exceed claim** — you cannot promise coverage above what you claim you can deliver.
+- Confidence spread must be positive and at most `3.0`.
+
+## Listing an SLA offer
+
+### Web console
+
+When listing a machine in the [host machines page](https://cloud.vast.ai/host/machines), enable SLA and set your reliability target, claim, and confidence. The console shows how these affect the premium clients will see.
+
+### CLI and API
+
+Pass SLA fields to `vastai list machine` or `PUT /api/v0/machines/create_asks/`:
+
+```bash
+vastai list machine 12345 \
+  --price_gpu 3.50 \
+  --sla_r_target 0.95 \
+  --sla_r_claim 0.99 \
+  --sla_sigma_x 0.5
+```
+
+Minimal example (claim and confidence use defaults):
+
+```json
+{
+  "machine": 12345,
+  "price_gpu": 3.50,
+  "sla_r_target": 0.95
+}
+```
+
+This creates an offer with target `0.95`, claim `0.95`, and confidence spread `0.5`.
+
+<Note>
+Partial updates are supported when editing an existing listing. If you change only one SLA field, the platform re-validates the merged parameters.
+</Note>
+
+## Economics walkthrough
+
+**Setup:** You list an H100 at **$3.50/hr** GPU price with target **95%**, claim **99%**, and normal confidence (`sla_sigma_x = 0.5`).
+
+| Item | Amount |
+| --- | --- |
+| Daily compute (`C`) | ~$84/day ($3.50 × 24 hr) |
+| SLA premium to client | ~**$0.008/hr** (~$0.20/day) |
+
+This premium is what a client searching for 95% reliability would see added to `dph_total`.
+
+### If you meet your claim
+
+| Measured uptime (simplified) | Client net (per day) | You net (per day) |
+| --- | --- | --- |
+| ~100% (excellent day) | −$0.20 (paid premium) | +$0.20 (keep premium) |
+| ~99% (good day) | −$0.17 | +$0.17 |
+
+You keep most or all of the premium.
+
+### If you miss the target
+
+Settlement uses a **blend of recent and historical uptime** (not just a single day's raw percentage), but the direction is the same — worse uptime means larger client payouts:
+
+| Measured uptime (simplified) | Client net (per day) | You net (per day) |
+| --- | --- | --- |
+| At target (~95%) | ~+$42 | ~−$42 |
+| Well below target (~90% or less) | ~+$84 (full compute refund) | ~−$84 |
+
+On a severe outage day, the client is made whole on compute charges for that day. You do not collect the premium for that day either — the client is not charged twice for downtime they already did not pay for.
+
+<Note>
+These examples use simplified single-day uptime for illustration. Production settlement aggregates uptime across multiple time windows (from about 1 day to about 3 years of history), so one bad hour does not always produce the maximum payout, and one good day does not instantly erase a long streak of problems.
+</Note>
+
+## Risk scenarios
+
+### You claim 99% but deliver 99.5%
+
+You outperform your claim. Clients pay small premiums; payouts are rare. You net positive on SLA over time.
+
+### You claim 99% but have an offline day
+
+Clients receive payouts tied to how far measured uptime falls below the target. Extended outages can approach a full-day compute refund. Your reliability score and verification status may also be affected separately from SLA settlement.
+
+### You set target equal to claim (for example, both 95%)
+
+Premiums are **much higher** because you are not offering any headroom below your claim. Clients only buy this when they need coverage exactly at your stated level. Prefer setting **claim above target** (for example, claim 99%, target 95%) for competitive premiums.
+
+### You widen confidence (`sla_sigma_x` → 1.0)
+
+Clients pay more because you admit greater uncertainty. Use this if your uptime history is volatile or the machine is new.
+
+### Scheduled maintenance
+
+Maintenance windows that were scheduled with sufficient notice may be credited back toward uptime, reducing SLA penalties for planned downtime. Unplanned outages count fully.
+
+## Preview earnings before listing
+
+Use the [SLA Earnings Backtester](/host/sla-backtester) to replay your machine's historical earnings through SLA math and compare simulated premiums and payouts before you enable SLA on a listing.
+
+## Tips for competitive SLA offers
+
+- **Set claim above target.** A claim of 99% with a target of 95% produces a much lower premium than matching them both at 95%.
+- **Tighten confidence only when earned.** Use high confidence (`sla_sigma_x ≈ 0.2`) after you have a strong uptime track record on that machine.
+- **Keep the machine online during active contracts.** SLA payouts and verification are separate systems, but both respond to downtime.
+- **Use the [SLA backtester](/host/sla-backtester)** to preview how different targets and confidence levels would have affected past earnings.
+
+## Related documentation
+
+- [SLA Earnings Backtester](/host/sla-backtester) — preview SLA economics on historical earnings
+- [SLA Coverage for Clients](/guides/instances/choosing/sla-coverage) — how clients search, compare, and benefit from SLA offers
+- [Hosting Overview](/host/hosting-overview) — offers, rental contracts, and listing basics
+- [Understanding Verification](/host/understanding-verification) — platform verification (separate from SLA, but related to trust)

@@ -1,0 +1,221 @@
+---
+title: "SLA Earnings Backtester"
+description: "Replay your machine's historical earnings through SLA math to preview premiums and payouts before listing."
+"canonical": "/host/sla-backtester"
+---
+
+The **SLA earnings backtester** lets you answer a practical question before you list: *if I had offered SLA at reliability **R** with confidence **P**, how would that have affected my earnings on this machine over the last few months?*
+
+It replays your machine's **real historical compute earnings and uptime** through the same v5 SLA math used in production settlement, then compares the simulated result to what you actually earned from SLA (if anything).
+
+<Note>
+The backtester is available through the API only. You must own the machine and use an API key with **`machine_read`** permission.
+</Note>
+
+## When to use it
+
+Use the backtester before you enable SLA on a listing, or when you want to tune parameters:
+
+- **Pick a reliability target** — see how often you would have kept premiums vs paid out
+- **Compare confidence levels** — tighter confidence means higher premiums for clients but more risk to you if uptime slips
+- **Stress-test bad weeks** — use the optional flat uptime override to see payout size if reliability dropped
+- **Compare to history** — each day includes `historical_sla`, your machine's realized SLA earnings in that period (zero if you were not offering SLA)
+
+For how SLA offers work once listed, see [SLA Offers](/host/sla-offers).
+
+## How it works
+
+1. You choose a machine, date range, reliability target (`r`), and confidence (`p`).
+2. The API loads per-day earnings from your machine's history (`machine_earns`).
+3. For each active day, it computes GPU, storage, and bandwidth earnings plus simulated SLA host earnings.
+4. It returns a day-by-day breakdown and summary totals.
+
+**Simulated vs listing parameters.** In the backtester, reliability target and claim are both set to **`r`**. When you actually list a machine, you can set **`sla_r_claim` above `sla_r_target`** for lower client premiums. The backtester is conservative: it shows the economics when target and claim match.
+
+**Active vs idle days.** Days with no rental activity (zero compute delta) appear in the results as zero-filled rows but do not count toward `covered_days`. Only days with actual earnings are replayed through SLA math.
+
+## API reference
+
+```
+GET /api/v0/host/sla_backtest/
+```
+
+Requires Bearer authentication. Rate limited like other host API endpoints.
+
+### Query parameters
+
+| Parameter | Required | Description |
+| --- | --- | --- |
+| `machine_id` | Yes | ID of your machine |
+| `r` | Yes | Reliability target to simulate (0–1). Used as both target and claim. Example: `0.95` = 95%. |
+| `p` | No | Host confidence (0–1). Maps to the same spread used when listing with `sla_sigma_x`. Default: ~0.67 (normal confidence). |
+| `start_date` | No | Range start as Unix epoch seconds. Default: 90 days before `end_date`. |
+| `end_date` | No | Range end as Unix epoch seconds. Default: now. |
+| `reliability` | No | Optional flat uptime override (0–1) for all replayed days. Ignores historical uptime — useful for what-if analysis ("what if every day had 90% uptime?"). |
+
+### Limits
+
+| Limit | Value |
+| --- | --- |
+| Default lookback | 90 days |
+| Maximum range | 366 days (inclusive) |
+| Ownership | Must own the machine |
+
+### Example request
+
+```bash
+curl -s -H "Authorization: Bearer YOUR_API_KEY" \
+  "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=12345&r=0.95&p=0.67&start_date=1704067200&end_date=1711929600"
+```
+
+Compare two confidence levels on the same history:
+
+```bash
+# Normal confidence (~67%)
+curl -s -H "Authorization: Bearer YOUR_API_KEY" \
+  "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=12345&r=0.99&p=0.67"
+
+# High confidence (~83%) — tighter spread, lower simulated premiums
+curl -s -H "Authorization: Bearer YOUR_API_KEY" \
+  "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=12345&r=0.99&p=0.83"
+```
+
+Stress-test with flat 90% uptime:
+
+```bash
+curl -s -H "Authorization: Bearer YOUR_API_KEY" \
+  "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=12345&r=0.99&p=0.67&reliability=0.90"
+```
+
+## Reading the response
+
+A successful response looks like this (fields abbreviated):
+
+```json
+{
+  "success": true,
+  "machine_id": 12345,
+  "has_data": true,
+  "start_day": 19723,
+  "end_day": 19812,
+  "covered_days": 45,
+  "skipped_days": 45,
+  "reliability": 0.998500,
+  "fleet_reliability": 0.991200,
+  "params": {
+    "r": 0.95,
+    "p": 0.6667,
+    "sigma_x": 0.5,
+    "reliability": null
+  },
+  "daily_results": [
+    {
+      "day": 19723,
+      "gpu": 84.0,
+      "storage": 2.4,
+      "bandwidth": 0.1,
+      "uptime": 1.0,
+      "sla": 0.18,
+      "historical_sla": 0.0
+    }
+  ],
+  "summary": {
+    "total_gpu": 3780.0,
+    "total_storage": 108.0,
+    "total_bandwidth": 4.5,
+    "total_sla": 8.1,
+    "total_earnings": 3900.6,
+    "total_historical_sla": 0.0,
+    "worst_day_loss": 42.0
+  }
+}
+```
+
+### Top-level fields
+
+| Field | Meaning |
+| --- | --- |
+| `has_data` | `true` if at least one day in the range had earnings to replay |
+| `covered_days` | Days with rental activity replayed through SLA math |
+| `skipped_days` | Days in the range with no activity (zero-filled in `daily_results`) |
+| `reliability` | Actual uptime ratio over the range (`total uptime / total active time`) |
+| `fleet_reliability` | Average reliability across your other machines (context only) |
+
+### Per-day fields (`daily_results`)
+
+| Field | Meaning |
+| --- | --- |
+| `gpu`, `storage`, `bandwidth` | That day's compute earnings breakdown ($) |
+| `uptime` | Uptime fraction for the day (0–1), or your flat override if set |
+| `sla` | **Simulated SLA host earnings** for the day. Positive = you keep premium; negative = you pay the client |
+| `historical_sla` | What you **actually** earned from SLA that day (signed). Zero if you were not offering SLA |
+
+Plot `sla` over time to see which days would have helped or hurt under the chosen parameters. Compare against `historical_sla` to see how simulated economics differ from reality.
+
+### Summary fields
+
+| Field | Meaning |
+| --- | --- |
+| `total_gpu`, `total_storage`, `total_bandwidth` | Compute earnings over covered days |
+| `total_sla` | Net simulated SLA earnings. Positive = SLA would have added income overall |
+| `total_earnings` | Compute + simulated SLA |
+| `total_historical_sla` | Sum of realized historical SLA in the range |
+| `worst_day_loss` | Largest single-day client payout (your worst simulated loss) |
+
+## Interpreting results
+
+### Mostly positive `sla` values
+
+Your historical uptime was strong relative to the target. SLA would likely have been a net positive — small premiums on good days, few payout days.
+
+### Negative `sla` on specific days
+
+Those days had uptime below your chosen target. The magnitude shows how much you would have paid out. If you see clusters of negative days, consider a lower target, wider confidence, or fixing reliability before listing SLA.
+
+### `total_sla` near zero
+
+Break-even territory — premiums and payouts roughly balance. Typical when your actual uptime matches your stated target.
+
+### `total_sla` strongly negative
+
+Under the simulated parameters, SLA would have cost you money over this window. Either improve uptime, lower the target, or widen confidence before listing.
+
+### Using `reliability` override
+
+Setting `reliability=0.90` while keeping `r=0.99` answers: *if every active day had 90% uptime, how bad would SLA payouts get?* Use this to understand tail risk before committing to a high target.
+
+## Confidence values (`p`)
+
+The backtester accepts **`p`** (confidence) instead of `sla_sigma_x`. They map to the same presets used when listing:
+
+| Confidence `p` | Approx. label | Listing equivalent |
+| --- | --- | --- |
+| `0.83` | High | `sla_sigma_x ≈ 0.2` |
+| `0.67` | Normal (default) | `sla_sigma_x ≈ 0.5` |
+| `0.50` | Wide | `sla_sigma_x ≈ 1.0` |
+
+Higher confidence (higher `p`) → tighter spread → lower premiums for clients, but less room for uptime to slip before payouts.
+
+## Error responses
+
+| HTTP | `error` | Cause |
+| --- | --- | --- |
+| 400 | `invalid_range` | `start_date` is after `end_date` |
+| 400 | `range_too_large` | More than 366 days requested |
+| 400 | `invalid_params` | Invalid `r`, `p`, or other SLA parameter |
+| 403 | `not_owner` | Machine belongs to another host |
+| 404 | `machine_not_found` | Invalid `machine_id` |
+
+## Recommended workflow
+
+1. **Run a baseline backtest** on a machine with at least a few weeks of rental history. Use your intended target and normal confidence (`p=0.67`).
+2. **Check `worst_day_loss`** — can you absorb that payout from a bad day?
+3. **Try a higher target** (for example `r=0.99`) and see how `total_sla` changes.
+4. **Run a stress test** with `reliability=0.90` at your intended target.
+5. **List with headroom** — set `sla_r_claim` above `sla_r_target` on the actual offer for better client pricing than the backtester shows (see [SLA Offers](/host/sla-offers)).
+
+## Related documentation
+
+- [SLA Offers](/host/sla-offers) — listing parameters, economics, and risk scenarios
+- [SLA Coverage (clients)](/guides/instances/choosing/sla-coverage) — how clients search and pay for SLA
+- [API permissions](/api-reference/permissions) — `machine_read` scope required
