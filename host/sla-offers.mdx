@@ -9,7 +9,7 @@ Vast.ai lets hosts attach a **Service Level Agreement (SLA)** to a machine listi
 This page explains how SLA offers work from the host side — what you are promising, how pricing is calculated, and what happens when uptime is good or bad.
 
 <Note>
-SLA settlement uses the **v5 asymmetric insurance model**. Premiums and payouts are settled daily based on measured uptime.
+SLA settlement uses an **asymmetric insurance model**: when uptime is good you keep the premium, but when uptime is bad client payouts can exceed the premium you collected that day. Premiums and payouts are settled daily based on measured uptime.
 </Note>
 
 ## How it works (plain English)
@@ -31,7 +31,7 @@ Under honest pricing, a host who delivers what they claim should roughly break e
 
 ## SLA parameters
 
-When you list or update a machine, you can set these fields on the offer (via the host console or the [list machine API](/api-reference/machines/list-machine)):
+When you list or update a machine, you can set these fields on the offer (via the host console, the [list machine CLI](/host/cli/list-machine), or `PUT /api/v0/machines/create_asks/`):
 
 | Parameter | API field | What it means |
 | --- | --- | --- |
@@ -47,14 +47,14 @@ If you prefer thinking in confidence rather than `sla_sigma_x`, these presets ma
 | --- | --- | --- | --- |
 | High | ~83% | `0.2` | Lowest premiums — you are very sure about your claim |
 | Normal (default) | ~67% | `0.5` | Balanced default |
-| Wide | 50% | `1.0` | Higher premiums — more uncertainty priced in |
+| Wide | ~50% | `1.0` | Higher premiums — more uncertainty priced in |
 
 ### Validation rules
 
 Offers with invalid combinations are rejected at listing time:
 
-- Reliability target and claim must be between 0 and 1 (exclusive of 0 for target).
-- **Target cannot exceed claim** — you cannot promise coverage above what you claim you can deliver.
+- The reliability target must be greater than 0 and at most 1.
+- The reliability claim must be between 0 and 1 and must be **≥** the target.
 - Confidence spread must be positive and at most `3.0`.
 
 ## Listing an SLA offer
@@ -65,7 +65,7 @@ When listing a machine in the [host machines page](https://cloud.vast.ai/host/ma
 
 ### CLI and API
 
-Pass SLA fields to `vastai list machine` or `PUT /api/v0/machines/create_asks/`:
+Pass SLA fields to `vastai list machine` or `PUT /api/v0/machines/create_asks/` (this endpoint creates or updates the listing for your machine):
 
 ```bash
 vastai list machine 12345 \
@@ -75,7 +75,7 @@ vastai list machine 12345 \
   --sla_sigma_x 0.5
 ```
 
-Minimal example (claim and confidence use defaults):
+Minimal example (claim and confidence use defaults). Body for `PUT /api/v0/machines/create_asks/`:
 
 ```json
 {
@@ -88,7 +88,7 @@ Minimal example (claim and confidence use defaults):
 This creates an offer with target `0.95`, claim `0.95`, and confidence spread `0.5`.
 
 <Note>
-Partial updates are supported when editing an existing listing. If you change only one SLA field, the platform re-validates the merged parameters.
+Partial updates are supported when editing an existing listing. If you change only one SLA field, the platform re-validates the merged parameters. Set `sla_r_target` to `0` to disable SLA on an existing listing.
 </Note>
 
 ## Economics walkthrough
@@ -100,7 +100,7 @@ Partial updates are supported when editing an existing listing. If you change on
 | Daily compute (`C`) | ~$84/day ($3.50 × 24 hr) |
 | SLA premium to client | ~**$0.008/hr** (~$0.20/day) |
 
-This premium is what a client searching for 95% reliability would see added to `dph_total`.
+This premium is what a client searching for 95% reliability would see added to `dph_total` (dollars per hour, total rental price).
 
 ### If you meet your claim
 
@@ -113,14 +113,14 @@ You keep most or all of the premium.
 
 ### If you miss the target
 
-Settlement uses a **blend of recent and historical uptime** (not just a single day's raw percentage), but the direction is the same — worse uptime means larger client payouts:
+These scenarios show settlement when uptime **drops to or below** the target — they are boundary illustrations, not typical good-uptime days. Settlement uses a **blend of recent and historical uptime** (not just a single day's raw percentage), but the direction is the same — worse uptime means larger client payouts:
 
 | Measured uptime (simplified) | Client net (per day) | You net (per day) |
 | --- | --- | --- |
 | At target (~95%) | ~+$42 | ~−$42 |
 | Well below target (~90% or less) | ~+$84 (full compute refund) | ~−$84 |
 
-On a severe outage day, the client is made whole on compute charges for that day. You do not collect the premium for that day either — the client is not charged twice for downtime they already did not pay for.
+On a severe outage day, the client is made whole on compute charges for that day. You do not collect the premium for that day either — the client is not charged twice for downtime they already did not pay for. Your maximum SLA loss on a single day is capped at that day's compute revenue.
 
 <Note>
 These examples use simplified single-day uptime for illustration. Production settlement aggregates uptime across multiple time windows (from about 1 day to about 3 years of history), so one bad hour does not always produce the maximum payout, and one good day does not instantly erase a long streak of problems.
@@ -146,7 +146,7 @@ Clients pay more because you admit greater uncertainty. Use this if your uptime 
 
 ### Scheduled maintenance
 
-Maintenance windows that were scheduled with sufficient notice may be credited back toward uptime, reducing SLA penalties for planned downtime. Unplanned outages count fully.
+Maintenance windows scheduled through [`vastai schedule maint`](/host/cli/schedule-maint) with sufficient advance notice may be credited back toward uptime, reducing SLA penalties for planned downtime. Unplanned outages count fully.
 
 ## Preview earnings before listing
 
@@ -157,11 +157,11 @@ Use the [SLA Earnings Backtester](/host/sla-backtester) to replay your machine's
 - **Set claim above target.** A claim of 99% with a target of 95% produces a much lower premium than matching them both at 95%.
 - **Tighten confidence only when earned.** Use high confidence (`sla_sigma_x ≈ 0.2`) after you have a strong uptime track record on that machine.
 - **Keep the machine online during active contracts.** SLA payouts and verification are separate systems, but both respond to downtime.
+- **SLA applies to on-demand listings.** [Interruptible](/guides/instances/rental-types) instances use a separate bidding model and are not covered by SLA.
 - **Use the [SLA backtester](/host/sla-backtester)** to preview how different targets and confidence levels would have affected past earnings.
 
 ## Related documentation
 
 - [SLA Earnings Backtester](/host/sla-backtester) — preview SLA economics on historical earnings
-- [SLA Coverage for Clients](/guides/instances/choosing/sla-coverage) — how clients search, compare, and benefit from SLA offers
 - [Hosting Overview](/host/hosting-overview) — offers, rental contracts, and listing basics
 - [Understanding Verification](/host/understanding-verification) — platform verification (separate from SLA, but related to trust)
