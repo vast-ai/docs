@@ -52,7 +52,7 @@ Think of an SLA offer as three linked ideas:
 2. **Your reliability claim** — what you believe your machine will actually deliver.
 3. **Your confidence** — how sure you are about that claim. Tight confidence means you stand behind a narrow range; wide confidence means a wider defensible range and clients pay a higher premium.
 
-When a client rents with SLA enabled:
+When a client rents an on-demand instance on your SLA-listed offer, Vast measures uptime against your published target and claim percentages:
 
 - They pay **compute** (GPU, storage, bandwidth) plus a **small hourly SLA add-on** included in `dph_total`.
 - Each UTC calendar day, Vast measures how long the instance was online and settles the SLA.
@@ -111,7 +111,7 @@ Do not assume the dashboard score equals SLA uptime. Before choosing `sla_r_targ
 
 **This only changes how SLA premiums are priced — it does not change how uptime is measured or what payout you owe.** Use the **High / Normal / Wide** presets in the console UI; only set raw `sla_sigma_x` via API after you have saved once in the console.
 
-If you prefer to think in terms of confidence rather than `sla_sigma_x`, these presets match the shipped defaults. The probability column below describes **pricing preset tightness**, not a guarantee that uptime will meet your claim:
+The **Pricing preset meaning** column below describes what each confidence setting implies for premium sizing — not your uptime target. These presets control pricing spread; the ~83%, ~67%, and ~50% figures describe statistical pricing confidence, not guaranteed uptime:
 
 | Label | Pricing preset meaning | `sla_sigma_x` | Effect on premium |
 | --- | --- | --- | --- |
@@ -234,13 +234,13 @@ This creates an offer with target `0.95`, claim `0.99`, and confidence spread `0
 <Note>
 Partial updates are supported when editing an existing listing. If you change only one SLA field, the platform re-validates the merged parameters. Set `sla_r_target` to `0` to disable SLA on an existing listing.
 
-Omitted non-SLA fields retain their current listing values; only fields present in the request body are updated. Before merging partial SLA updates, read current listing fields from `vastai show machine <id> --raw` (or the machine detail API) and confirm the response includes `sla_r_target`, `sla_r_claim`, `sla_sigma_x`, `price_gpu`, and `end_date`:
+Omitted non-SLA fields retain their current listing values; only fields present in the request body are updated. Read current listing fields from `vastai show machines --raw` (filter with `jq` below). See [Show Machines](/api-reference/machines/show-machines) for the documented REST response shape:
 
 ```bash
 vastai show machines --raw | jq '.machines[] | select(.id == 12345 or .id == "12345") | {id, sla_r_target, sla_r_claim, sla_sigma_x, price_gpu, end_date}'
 ```
 
-Machine `id` may be a string in raw JSON. The response is wrapped in a `machines` array. If SLA fields are missing, use `vastai show machine 12345 --raw` instead.
+Machine `id` may be a string in raw JSON. The response is wrapped in a `machines` array.
 
 Then `PUT /api/v0/machines/create_asks/` with merged fields.
 </Note>
@@ -258,16 +258,18 @@ See [Fleet workflow](/host/sla-backtester#fleet-workflow) in the backtester for 
 ```bash
 export VAST_API_KEY="YOUR_API_KEY"
 for id in $(vastai show machines -q); do
-  current=$(vastai show machine "$id" --raw)
-  curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
+  body=$(vastai show machines --raw | jq -c --arg id "$id" \
+    '.machines[] | select((.id|tostring) == $id) | {machine: (.id|tonumber), price_gpu, end_date, min_chunk, sla_r_target: 0.95, sla_r_claim: 0.99, sla_sigma_x: 0.5}')
+  resp=$(curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
     -H "Authorization: Bearer $VAST_API_KEY" \
     -H "Content-Type: application/json" \
-    -d "$(echo "$current" | jq -c '{machine: (.id|tonumber), price_gpu, end_date, sla_r_target: 0.95, sla_r_claim: 0.99, sla_sigma_x: 0.5}')"
+    -d "$body")
+  echo "machine_id=$id response: $resp"
   sleep 2
 done
 ```
 
-Log `invalid_sla_params` and `machine_locked` responses; back off on HTTP 429.
+Check each response for `success`, `invalid_sla_params`, and `machine_locked` before continuing. Back off on HTTP 429.
 
 **SLA-only update** — include `machine` plus SLA fields; omit unrelated offer fields you intend to keep:
 
@@ -402,7 +404,7 @@ Clients receive payouts tied to how far measured uptime falls below the target. 
 
 ### You set target equal to claim (for example, both 95%)
 
-Premiums are **much higher** because you are not offering any headroom below your claim. Clients only buy this when they need coverage exactly at your stated level. Prefer setting **claim above target** (for example, claim 99%, target 95%) for competitive premiums.
+Premiums are **much higher** because you are not offering any headroom — you are not setting **claim above target**. Clients only buy this when they need coverage exactly at your stated level. Prefer setting **claim above target** (for example, claim 99%, target 95%) for competitive premiums.
 
 ### You widen confidence (`sla_sigma_x` → 1.0)
 
