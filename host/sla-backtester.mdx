@@ -4,9 +4,15 @@ description: "Replay your machine's historical earnings through SLA math to prev
 "canonical": "/host/sla-backtester"
 ---
 
-The **SLA earnings backtester** lets you answer a practical question before you list: *if I had offered SLA at reliability target **`r`** and confidence level **`p`**, how would that have affected my earnings on this machine over the last few months?* (**`r`** = reliability target; **`p`** = host confidence — both defined in [Query parameters](#query-parameters) below.)
+The **SLA (Service Level Agreement) earnings backtester** lets you answer a practical question before you list: *if I had offered SLA at reliability target **`r`** and confidence level **`p`**, how would that have affected my earnings on this machine over the last few months?*
+
+**Console hosts:** use **Set Pricing → SLA** in the web console to preview premiums — you do not need this API.
+
+**API hosts:** this endpoint replays historical earnings through SLA math to estimate premiums and worst-day payout risk before listing. (**`r`** = reliability target; **`p`** = host confidence — both defined in [Query parameters](#query-parameters) below.)
 
 It replays your machine's **real historical compute earnings and uptime** through the same SLA settlement math used in production, then compares the simulated result to what you actually earned from SLA (if anything).
+
+See [Choose your path](#choose-your-path) below.
 
 <Note>
 **Don't want to use the API?** The backtester is optional. Use the web console SLA preview and the economics walkthrough on [SLA Offers](/host/sla-offers#listing-an-sla-offer) to evaluate SLA before listing. The backtester is for hosts who want historical replay via the API.
@@ -57,7 +63,7 @@ For how SLA offers work once listed, see [SLA Offers](/host/sla-offers).
 1. Open **Account → API Keys** in the console and create a key with **`machine_read`** enabled.
 2. Copy the token and use `Authorization: Bearer YOUR_API_KEY` in the examples below. See [Create API Key](/api-reference/accounts/create-api-key) and [Authentication](/api-reference/authentication).
 3. Find your machine ID on the [Host Machines page](https://cloud.vast.ai/host/machines). The machine must have at least a few weeks of rental activity — new or idle machines should use the console **Set Pricing → SLA** preview instead (the backtester returns `has_data: false` without sufficient history).
-4. Run the baseline `curl` below (default date range — no custom dates required) and check `has_data` in the response.
+4. Run the baseline request in [Example request](#example-request) and check `has_data` in the response.
 
 ## API reference
 
@@ -108,8 +114,9 @@ curl -s -H "Authorization: Bearer YOUR_API_KEY" \
 Custom date range (optional — Jan–Apr 2024 for illustration):
 
 ```bash
-# start_date = Jan 1, 2024; end_date = Apr 1, 2024
-# Tip: on Linux, `date -d '2024-01-01' +%s`; on macOS, `date -j -f '%Y-%m-%d' '2024-01-01' +%s`
+# start_date = Jan 1, 2024 UTC; end_date = Apr 1, 2024 UTC
+# Linux: date -u -d '2024-01-01' +%s
+# macOS: date -u -j -f '%Y-%m-%d' '2024-01-01' +%s
 # On Windows, use WSL or an online epoch converter.
 curl -s -H "Authorization: Bearer YOUR_API_KEY" \
   "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=12345&r=0.95&p=0.6667&start_date=1704067200&end_date=1711929600"
@@ -187,7 +194,7 @@ A successful response looks like this (fields abbreviated):
 | Field | Meaning |
 | --- | --- |
 | `has_data` | `true` if at least one day in the range had earnings to replay. When `false`, there was no billable rental activity in the range: `covered_days` is `0`, `skipped_days` equals the number of days in the requested window, `daily_results` contains one zero-filled row per day in the window (not an empty array), summary totals are `0.0`, and top-level `reliability` is `null`. Try a wider window or a machine with more rental history. |
-| `start_day`, `end_day` | UTC day indices (days since January 1, 1970). Same encoding as `daily_results[].day`. Multiply by 86400 for a Unix timestamp. For example, day `19723` × 86400 = `1704067200` = January 1, 2024 UTC. Most hosts can ignore these and use `start_date`/`end_date` in requests. |
+| `start_day`, `end_day` | UTC day indices. The API computes `day = floor(epoch_seconds / 86400)`. Same encoding as `daily_results[].day`. To convert a day index to an approximate UTC date: `date -u -d "@$((day * 86400))" +%Y-%m-%d` (Linux). Do not assume `day × 86400` equals UTC midnight for that calendar day. Most hosts can ignore these and use `start_date`/`end_date` in requests. |
 | `covered_days` | Days with rental activity replayed through SLA math |
 | `skipped_days` | Days in the range with no activity (zero-filled in `daily_results`) |
 | `reliability` | Actual uptime ratio over the range (`total uptime / total active time`) |
@@ -202,7 +209,7 @@ A successful response looks like this (fields abbreviated):
 | `sla` | **Simulated SLA host earnings** for the day. Positive = you keep premium; negative = you pay the client |
 | `historical_sla` | What you **actually** earned from SLA that day (signed). Zero if you were not offering SLA |
 
-Plot `sla` over time to see which days would have helped or hurt under the chosen parameters. Compare against `historical_sla` to see how simulated economics differ from reality.
+Review `sla` day by day in `daily_results` to see which days would have helped or hurt under the chosen parameters. Compare against `historical_sla` to see how simulated economics differ from reality.
 
 ### Summary fields
 
@@ -255,14 +262,16 @@ Higher confidence (higher `p`) → tighter spread → lower premiums for clients
 
 ## Error responses
 
-| HTTP | `error` | Cause |
+| HTTP | `error` / shape | Cause |
 | --- | --- | --- |
-| 401 | — | Missing or invalid Bearer token — see [Authentication](/api-reference/authentication) |
+| 403 | `auth_error` | Authorization header missing or invalid session |
+| 401 | `auth_error` | API key invalid |
+| 401 | authorization `msg` | Valid key but missing `machine_read` (or other scope denial) |
+| 403 | `not_owner` | Machine belongs to another host |
 | 400 | `invalid_range` | `start_date` is after `end_date` |
 | 400 | `range_too_large` | More than 366 days requested |
 | 400 | `bad_request` | Schema, bounds, or unknown-parameter failures (for example, `r` or `p` out of range) |
 | 400 | `invalid_params` | Inputs pass validation but fail inside settlement simulation |
-| 403 | `not_owner` | Machine belongs to another host |
 | 404 | `machine_not_found` | Invalid `machine_id` |
 | 429 | *(rate limited)* | Too many requests — retry with backoff. See [Rate Limits and Errors](/api-reference/rate-limits-and-errors). |
 
