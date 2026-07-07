@@ -52,6 +52,8 @@ Think of an SLA offer as three linked ideas:
 2. **Your reliability claim** — what you believe your machine will actually deliver.
 3. **Your confidence** — how sure you are about that claim. Tight confidence means you stand behind a narrow range; wide confidence means a wider defensible range and clients pay a higher premium.
 
+**Claim headroom:** Set **Claim** higher than **Target** unless you intentionally want higher client premiums. Clients pay based on the gap between claim and target; payouts still use **Target**. Example: Target 95%, Claim 99%.
+
 When a client rents an on-demand instance on your SLA-listed offer, Vast measures uptime against your published target and claim percentages:
 
 - They pay **compute** (GPU, storage, bandwidth) plus a **small hourly SLA add-on** included in `dph_total`.
@@ -82,6 +84,10 @@ When you list or update a machine, set SLA fields via the host console or `PUT /
 | Reliability claim | `sla_r_claim` | — (backtester sets claim = target) | Your advertised belief about machine uptime. Defaults to the reliability target if omitted. Must be **≥** the target. Same bounds as target (greater than 0, at most 0.9999). |
 | Confidence spread | `sla_sigma_x` | `p` (different scale — see [backtester](/host/sla-backtester#confidence-values-p)) | How wide your belief is around the claim. Lower = more confident (cheaper for clients). Defaults to `0.5` if omitted. |
 
+<Warning>
+Do **not** copy numeric `p` values from the SLA Backtester into `sla_sigma_x`. They use different scales. Use the preset mapping table below (for example, Normal → `sla_sigma_x=0.5`, which corresponds to backtester `p=0.6667`).
+</Warning>
+
 <Note title="Terminology">
 | Concept | Console | Listing API | Backtester | Client sees |
 | --- | --- | --- | --- | --- |
@@ -111,13 +117,15 @@ Do not assume the dashboard score equals SLA uptime. Before choosing `sla_r_targ
 
 **This only changes how SLA premiums are priced — it does not change how uptime is measured or what payout you owe.** Use the **High / Normal / Wide** presets in the console UI; only set raw `sla_sigma_x` via API after you have saved once in the console.
 
-The **Pricing preset meaning** column below describes what each confidence setting implies for premium sizing — not your uptime target. These presets control pricing spread; the ~83%, ~67%, and ~50% figures describe statistical pricing confidence, not guaranteed uptime:
+<Note>
+Confidence presets control **pricing weight only**, not your uptime obligation. Your obligation is set by **Target**. The statistical weights in the table below (~83% / ~67% / ~50%) describe pricing confidence — do not treat them as uptime targets.
+</Note>
 
-| Label | Pricing preset meaning | `sla_sigma_x` | Effect on premium |
+| Preset | Pricing effect | `sla_sigma_x` | Risk if you miss claim |
 | --- | --- | --- | --- |
-| High | ~83% | `0.2` | Lowest premiums — you are very sure about your claim |
-| Normal (default) | ~67% | `0.5` | Balanced default |
-| Wide | ~50% | `1.0` | Higher premiums — more uncertainty priced in |
+| **High** | Tightest pricing (lowest client premiums) | `0.2` | Highest premium sensitivity |
+| **Normal** (default) | Balanced | `0.5` | Moderate |
+| **Wide** | Widest pricing band | `1.0` | Lowest premium sensitivity |
 
 Higher preset confidence (tighter spread) → lower client premiums, but less room for uptime to slip before payouts.
 
@@ -156,7 +164,7 @@ Disabling SLA on the offer (setting `sla_r_target` to `0`) prevents new SLA-cove
 1. Open your machine on the [Host Machines page](https://cloud.vast.ai/host/machines) → **Set Pricing**.
 2. Set base listing fields first (GPU price, offer end date, rental types) if this is a new listing.
 3. Expand **SLA**.
-4. Set **Reliability target**, **Reliability claim**, and **Confidence** (or a preset).
+4. Set **Reliability target**, **Reliability claim**, and **Confidence** (or a preset). Set **Claim** higher than **Target** (for example, 99% claim / 95% target) unless you want higher premiums.
 5. Save and confirm the SLA premium preview before listing.
 6. After saving pricing, click **LIST** on the Host Machines page (or confirm the machine status changes to **listed**). Saving pricing alone stores your offer settings; listing publishes the offer to search.
 
@@ -345,7 +353,7 @@ When SLA is enabled on an offer, clients see:
 Verify after listing:
 
 ```bash
-vastai search offers 'machine_id=12345' --raw | jq '.[0] | {dph_total, price_gpu, expected_reliability, reliability}'
+vastai search offers 'machine_id=12345 verified=any' --raw | jq '.offers[0] | {dph_total, expected_reliability, reliability, reliability2}'
 ```
 
 Premium sizing uses internal SLA math — use the console preview or `dph_total` above, not backtester `total_sla`, when claim exceeds target.
@@ -451,13 +459,13 @@ SLA daily settlement (premium kept / payout owed) does not currently emit host w
 **Linux (GNU date):**
 
 ```bash
-vastai show earnings --machine_id <id> --start_date $(date -d '7 days ago' +%F) --end_date $(date +%F)
+vastai show earnings --machine_id <id> --start_date $(date -u -d '7 days ago' +%F) --end_date $(date -u +%F)
 ```
 
 **macOS:**
 
 ```bash
-vastai show earnings --machine_id <id> --start_date $(date -v-7d +%F) --end_date $(date +%F)
+vastai show earnings --machine_id <id> --start_date $(date -u -v-7d +%F) --end_date $(date -u +%F)
 ```
 
 On Windows, use WSL or the API example below. See [`show earnings`](/cli/reference/show-earnings) for all options.
@@ -472,7 +480,7 @@ vastai show earnings --machine_id <id> --start_date $(date -u -d 'yesterday' +%F
 **Linux (GNU date) — seven-day window (do not compare directly to single-day `worst_day_loss`):**
 
 ```bash
-vastai show earnings --machine_id <id> --start_date $(date -d '7 days ago' +%F) --end_date $(date +%F) --raw \
+vastai show earnings --machine_id <id> --start_date $(date -u -d '7 days ago' +%F) --end_date $(date -u +%F) --raw \
   | jq '.per_machine[] | select(.machine_id == <id> or .machine_id == "<id>") | {machine_id, sla_earn}'
 ```
 
@@ -502,7 +510,7 @@ This endpoint is rate-limited — see [Rate Limits and Errors](/api-reference/ra
 When you pass `machid`, use `per_machine[].sla_earn` and `summary.total_sla` for that machine's SLA settlement in the window. Do **not** read `per_day[].sla_earn` for single-machine checks — `per_day[]` is always fleet-wide, even with `?machid=`.
 
 **Quick rules:**
-- **One machine, one UTC day:** use `last_days=1` with `machid` set (or a one-day `start_date`/`end_date` range). There is no per-machine daily SLA series in the API — day-level breakdown for a single machine is easiest in **Host → Billing**.
+- **One machine, one UTC day:** use `last_days=1` with `machid` set, or `sday`/`eday` (UTC day indices). The CLI flags `--start_date` and `--end_date` map internally to those fields — they are not separate REST query parameter names on `machine-earnings/`.
 - **Fleet snapshot:** one request without `machid` returns all machines in `per_machine[]` for the window:
 
 ```bash
