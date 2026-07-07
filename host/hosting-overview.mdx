@@ -38,16 +38,16 @@ Clients have high expectations coming from AWS or GCP. As a host, plan to offer 
 
 ## Offers and Rental Contracts
 
-Hosts can create offers (sometimes called listings) through the CLI command list machine or the machine control panel GUI on the host machines page.
+Hosts can create offers (sometimes called listings) through the CLI command `list machine` or the GUI on the [host machines page](https://cloud.vast.ai/host/machines).
 
 The main offer parameters include:
 
-- the pricing for GPUs,internet,storage
+- the pricing for GPUs, internet, storage
 - the discount schedule param which determines the price difference between [on-demand](/guides/instances/rental-types) and [reserved](/guides/instances/rental-types) instances
 - the min bid price for [interruptible](/guides/instances/rental-types) instances
 - the min_gpu param controlling 'slicing' (explained below)
 - the offer end date, which determines how long the offer accepts new rental contracts
-- optional [SLA (reliability guarantee)](/host/sla-offers) parameters — reliability target, claim, and confidence
+- **SLA (optional):** A reliability guarantee that clients can pay a premium for. Configure via **Set Pricing → SLA** in the console or the REST API — SLA parameters are not yet available in the published CLI/SDK. See [SLA Offers](/host/sla-offers) for parameters and field names.
 
 The offer accepts new rentals until the offer end date. When a client rents an instance on your machine, a rental contract is created from your offer. If your machine has multiple GPUs and you've set min_gpu to allow slicing, multiple clients can rent from the same offer, each creating their own independent rental contract.
 
@@ -59,7 +59,7 @@ Once clients rent your machine, it is very important to honor the terms of each 
 
 ## The Rental Contract
 
-By listing your machine, you create an offer visible to potential clients. A rental contract is created each time a client accepts your offer by renting an instance. The rental contract locks in all of the offer's terms at the time of rental, including pricing, the rental end date, and hardware specs, and those terms cannot be changed afterward. Each rental contract is independent, you may have multiple active rental contracts from different clients on the same machine, each with its own rental end date and pricing.
+By listing your machine, you create an offer visible to potential clients. A rental contract is created each time a client accepts your offer by renting an instance. The rental contract locks in all of the offer's terms at the time of rental, including pricing, the rental end date, and hardware specs, and those terms cannot be changed afterward. Each rental contract is independent. You may have multiple active rental contracts from different clients on the same machine, each with its own rental end date and pricing. SLA terms lock at rent time — see [SLA on extended contracts](/host/sla-offers#sla-on-extended-contracts).
 
 As the host, you are _committing_ to provide the services as advertised in your offer:
 
@@ -107,7 +107,7 @@ You now have two active rental contracts on the same machine at different prices
 
 ### Min GPU
 
-When clicking on the set pricing button, there is a min GPU field. The min GPU field allows you to set the smallest grouping of GPU rentals available on your machine in powers of 2, or down to 1. For example, if you have an 8X 3090 and set min gpu to 2, clients can create instances with 2, 4, or 8 GPUs. If you set min gpus to 1, then clients can make instances with 1, 2, 4 or 8 GPUs.
+When clicking on the set pricing button, there is a min GPU field. The min GPU field allows you to set the smallest grouping of GPU rentals available on your machine in powers of 2, or down to 1. For example, if you have an 8X 3090 and set min GPU to 2, clients can create instances with 2, 4, or 8 GPUs. If you set min GPU to 1, then clients can make instances with 1, 2, 4 or 8 GPUs.
 
 ### On-demand Price
 
@@ -129,7 +129,7 @@ Once that filter is selected, hosts who offer that discount will become easily v
 
 ![](/images/hosting-overview-2.webp)
 
-This discount is not static, but rather scales over time that the user rents the machine for. These values are determined by the individual host(s).
+This discount is not static, but rather scales with the length of time the user rents the machine. These values are determined by individual hosts.
 
 As a host, you can set this number yourself to 0 if you wish to opt out of this feature.
 
@@ -195,7 +195,7 @@ If you have raised the pricing, you cannot extend the current rental contracts.
 
 ## Testing your own machine
 
-It is vital to test your own machine to ensure the ports and software is running smoothly.
+It is vital to test your own machine to ensure the ports and software are running smoothly.
 
 ### Setup a separate client account
 
@@ -235,7 +235,9 @@ Unlisting the offer will prevent new rental contracts from being created, but do
 
 Remember that a single machine may have multiple active rental contracts from different clients, each with its own rental end date. All rental contracts must be honored, you cannot take the machine offline until every active rental contract has ended.
 
-For unplanned or unscheduled maintenance, use the CLI and the schedule maint command. That will notify the client that you **have** to take the machine down and that they should save their work. You can specify a date and duration.
+For unplanned or unscheduled maintenance, use the CLI and the [`vastai schedule maint`](/host/cli/schedule-maint) command. That will notify the client that you **have** to take the machine down and that they should save their work. You can specify a date and duration.
+
+For SLA-listed machines, scheduled downtime may still count against your reliability target. Uptime credit for maintenance is evaluated case by case and is not guaranteed — give at least 24 hours' notice before extended work. When you schedule maintenance, clients may be notified via [Host Notifications](/host/notifications) (including `maintenance_scheduled` webhooks). See [Scheduled maintenance](/host/sla-offers#scheduled-maintenance).
 
 ## Uninstalling
 
@@ -251,17 +253,23 @@ Hosting on Vast will require some Linux knowledge, as you will be maintaining a 
 
 You can create an invoice by going to the "Billing" page, and then click the box for "Include Charges" under "Generate Billing History".
 
-### How do I check if my machine is listed?
+### Why can't I find my machine in search?
 
-If your machine seems unlisted, try this command `vastai search offers 'machine_id=MACHINE_ID verified=any'` to see if the CLI finds it. If there is a result, your machine is properly listed
+If your machine seems unlisted or missing from console search:
+
+- **CLI check:** `vastai search offers 'machine_id=MACHINE_ID verified=any'` — if this returns a result, your machine is listed.
+- **Console search:** There are 10,000+ listings; search shows a small subset. You usually cannot find one specific machine through normal browsing — this is expected.
+- **Ranking check:** Use narrow filters to see similar machines, e.g. `vastai search offers 'gpu_name=RTX_4090 cpu_ram>257 cpu_ram<258'`.
+
+See also [Why is my machine not listed?](#why-is-my-machine-not-listed) below.
 
 ### Can you verify my machine?
 
-Verification is conducted in a randomized and automated fashion. We only run manual verification tests are for datacenters and high end machines.
+Verification is conducted in a randomized and automated fashion. We only run manual verification tests for datacenters and high-end machines.
 
 ### How does verification work?
 
-Verification is mostly for higher end machines, mining rigs may never be verified. Verification is also based on supply vs demand and is machine/gpu specific. Right now the only machines which can expect fast verification are \$10k+: H100 or A100 80GB - if not tested quickly in a day or so let us know. 8x4090, 4xA6000 - should be tested in less than a week, especially if you have a number of them The only manual verification tests are for datacenters and high end machines. For everything else we run more random auto verification roughly about once a week. For datacenter partner inquiries email us at [contact@vast.ai](mailto:contact@vast.ai) directly.
+Verification is mostly for higher end machines, mining rigs may never be verified. Verification is also based on supply vs demand and is machine/GPU specific. Right now the only machines which can expect fast verification are \$10k+: H100 or A100 80GB - if not tested quickly in a day or so let us know. 8x4090, 4xA6000 - should be tested in less than a week, especially if you have a number of them. The only manual verification tests are for datacenters and high-end machines. For everything else we run more random auto verification roughly about once a week. For datacenter partner inquiries email us at [contact@vast.ai](mailto:contact@vast.ai) directly.
 
 ### How do I gain datacenter status?
 
@@ -277,7 +285,7 @@ If the hosting software detects an error, that error message will be listed on y
 
 ### Why is my machine not listed?
 
-You won't be able to see it on the GUI right away, but you can search using the [CLI](/guides/instances/managing-instances).
+You won't be able to see it on the GUI right away, but you can search using the [CLI](/guides/instances/managing-instances). See [Why can't I find my machine in search?](#why-cant-i-find-my-machine-in-search) above for the full checklist.
 
 ### Can I send a message to a client using my machine letting them know that I fixed an issue that they were having?
 
@@ -306,11 +314,3 @@ Prior images are cached.
 ### My storage for clients is somehow full. I just have a few jobs stored in my server and most of them are old and didn't delete once the job finished. A lot of them are really old, can I remove them to free up some space?
 
 We suggest that you try cleaning up the docker build cache, as it sometimes frees up far more space than it claims. You can also clean up old unused images.
-
-### I can't find my machine?
-
-If your machine seems unlisted, try this command  `vastai search offers 'machine_id=MACHINE_ID verified=any'` to see if the CLI finds it. If there is a result, your machine is properly listed.
-
-### Why can't I see my machine on the Search page in the console?
-
-There are over 10,000+ listings on Vast, and search only displays a small subset. You will usually not be able to find any one specific machine through most normal searches. This is expected and intentional behavior of our system. You can use `vastai search offers 'machine_id=MACHINE_ID verified=any'`, to see your machine's listing. If you want to get an understanding of the machines ranking above yours you can use very narrow filters to see what similar machines are ranking above you. For example, something like: `vastai search offers 'gpu_name=RTX_4090 cpu_ram>257 cpu_ram<258'` is a decently constrained search that will most likely include a given machine you are looking for (that fits these filters) amongst others that are similar. Keep in mind our Auto Sort that `search offers` defaults to is comprised of both ranking various factors as well as an element of randomness.

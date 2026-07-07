@@ -4553,14 +4553,20 @@ paths:
                 sla_r_target:
                   type: number
                   format: float
-                  description: "Client reliability coverage target (0\u20131). Values\
-                    \ above 0 enable SLA on the offer.\nLegacy alias: sla_reliability.\n"
+                  minimum: 0
+                  maximum: 0.9999
+                  description: "Client reliability coverage target. Values above 0 enable\
+                    \ SLA on the offer.\nMust be greater than 0 and at most 0.9999\
+                    \ when enabling SLA; exactly 1.0 is rejected.\nSet to 0 to disable\
+                    \ SLA. Legacy alias: sla_reliability.\n"
                 sla_r_claim:
                   type: number
                   format: float
-                  description: "Host reliability claim (0\u20131). Must be greater\
-                    \ than or equal to sla_r_target.\nDefaults to sla_r_target if\
-                    \ omitted.\n"
+                  minimum: 0
+                  maximum: 0.9999
+                  description: "Host reliability claim. Must be greater than 0, at\
+                    \ most 0.9999, and greater than or equal to sla_r_target.\nDefaults\
+                    \ to sla_r_target if omitted.\n"
                 sla_sigma_x:
                   type: number
                   format: float
@@ -4581,15 +4587,42 @@ paths:
                 properties:
                   success:
                     type: boolean
-                  extended:
-                    type: integer
-                    description: Number of client contracts extended to new end date
-                  msg:
-                    type: string
-                    description: Status message if success is false
+                  you_sent:
+                    type: object
+                    description: Echo of the request body
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        machine_id:
+                          type: integer
+                        user_id:
+                          type: integer
+                        extended:
+                          type: integer
+                          description: Number of rental contracts extended
+                        new_contracts:
+                          type: array
+                          items:
+                            type: integer
+                          description: IDs of newly created contracts
+                        upd_contracts:
+                          type: array
+                          items:
+                            type: integer
+                          description: IDs of updated contracts
                 example:
                   success: true
-                  extended: 2
+                  you_sent:
+                    machine: 12345
+                    sla_r_target: 0.95
+                  results:
+                  - machine_id: 12345
+                    user_id: 67890
+                    extended: 1
+                    new_contracts: []
+                    upd_contracts: [1]
         '400':
           description: Bad Request
           content:
@@ -4599,10 +4632,25 @@ paths:
                 properties:
                   error:
                     type: string
-                    example: invalid_args
+                    enum:
+                    - invalid_args
+                    - invalid_sla_params
+                    example: invalid_sla_params
                   msg:
                     type: string
-                    example: Invalid machine id or parameters
+                    example: No such machine(s) for your account
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  msg:
+                    type: string
+                    example: Missing or invalid API key
         '403':
           description: Forbidden
           content:
@@ -4612,10 +4660,13 @@ paths:
                 properties:
                   error:
                     type: string
+                    enum:
+                    - not_authorized
+                    - machine_locked
                     example: not_authorized
                   msg:
                     type: string
-                    example: Only machine owner can create ask contracts
+                    example: API key lacks machine_write permission
       tags:
       - Machines
       operationId: listMachine
@@ -7760,11 +7811,12 @@ paths:
   /api/v0/users/{user_id}/machine-earnings:
     get:
       summary: show earnings
-      description: 'Retrieves the earnings history for a specified time range and
-        optionally per machine.
+      description: |
+        Retrieves the earnings history for a specified time range and optionally per machine.
 
+        **Fleet scope:** `per_day[]` (including `sla_earn`) is always fleet-wide for the authenticated host, even when `machid` is set. For machine-scoped SLA totals, use `per_machine[].sla_earn` and `summary.total_sla`.
 
-        CLI Usage: `vastai show earnings [options]`'
+        CLI Usage: `vastai show earnings [options]`
       security:
       - BearerAuth: []
       parameters:
@@ -7813,6 +7865,9 @@ paths:
                         type: number
                       total_bwd:
                         type: number
+                      total_sla:
+                        type: number
+                        description: Net SLA earnings over the requested window.
                   username:
                     type: string
                   email:
@@ -7857,6 +7912,9 @@ paths:
                           type: number
                         bwd_earn:
                           type: number
+                        sla_earn:
+                          type: number
+                          description: Net SLA earnings for this machine over the window.
                   per_day:
                     type: array
                     items:
@@ -7872,6 +7930,9 @@ paths:
                           type: number
                         bwd_earn:
                           type: number
+                        sla_earn:
+                          type: number
+                          description: Net host SLA settlement for the UTC day. Positive when the host keeps premium income; negative when the host pays the client.
         '400':
           description: Bad Request - Invalid input syntax
           content:
@@ -9014,6 +9075,7 @@ paths:
   /api/v0/host/sla_backtest:
     get:
       summary: sla backtest
+      operationId: slaBacktest
       description: 'Replays a machine''s historical compute earnings and uptime through
         SLA settlement math
 
@@ -9039,9 +9101,9 @@ paths:
           format: float
           minimum: 0
           exclusiveMinimum: true
-          maximum: 1
-        description: "Reliability target to simulate (0\u20131). Used as both target\
-          \ and claim."
+          maximum: 0.9999
+        description: Reliability target to simulate (greater than 0 and at most 0.9999).
+          Used as both target and claim. Exactly 1.0 is rejected.
       - name: p
         in: query
         schema:
@@ -9049,10 +9111,11 @@ paths:
           format: float
           minimum: 0
           exclusiveMinimum: true
+          exclusiveMaximum: true
           maximum: 1
           default: 0.6667
-        description: "Host confidence (0\u20131). Maps to sla_sigma_x when listing.\
-          \ Default 0.6667 (normal)."
+        description: Host confidence (greater than 0 and less than 1). Maps to sla_sigma_x
+          when listing. Default 0.6667 (normal).
       - name: start_date
         in: query
         schema:
@@ -9070,8 +9133,18 @@ paths:
           type: number
           format: float
           minimum: 0
+          exclusiveMinimum: true
           maximum: 1
-        description: "Optional flat uptime override (0\u20131) for all replayed days."
+        description: Optional flat uptime override (greater than 0 and at most 1) for
+          all replayed days. Exactly 0 is rejected.
+      - name: beta
+        in: query
+        schema:
+          type: number
+          format: float
+          default: 0.5
+        description: Backtest-only timescale weighting. Default 0.5 when omitted. Not
+          used in live settlement. Contact support before changing.
       responses:
         '200':
           description: Successful response
@@ -9103,14 +9176,79 @@ paths:
                   fleet_reliability:
                     type: number
                     format: float
+                    description: Average reliability across your machines (including
+                      this one). Context only.
                   params:
                     type: object
+                    properties:
+                      r:
+                        type: number
+                        format: float
+                      p:
+                        type: number
+                        format: float
+                      sigma_x:
+                        type: number
+                        format: float
+                      reliability:
+                        type: number
+                        format: float
+                        nullable: true
+                      beta:
+                        type: number
+                        format: float
                   daily_results:
                     type: array
                     items:
                       type: object
+                      properties:
+                        day:
+                          type: integer
+                        gpu:
+                          type: number
+                          format: float
+                        storage:
+                          type: number
+                          format: float
+                        bandwidth:
+                          type: number
+                          format: float
+                        uptime:
+                          type: number
+                          format: float
+                        sla:
+                          type: number
+                          format: float
+                        historical_sla:
+                          type: number
+                          format: float
                   summary:
                     type: object
+                    properties:
+                      total_gpu:
+                        type: number
+                        format: float
+                      total_storage:
+                        type: number
+                        format: float
+                      total_bandwidth:
+                        type: number
+                        format: float
+                      total_sla:
+                        type: number
+                        format: float
+                      total_earnings:
+                        type: number
+                        format: float
+                      total_historical_sla:
+                        type: number
+                        format: float
+                      worst_day_loss:
+                        type: number
+                        format: float
+                      reserve:
+                        type: number
+                        format: float
         '400':
           description: Bad Request
           content:

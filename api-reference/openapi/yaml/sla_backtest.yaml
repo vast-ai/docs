@@ -10,6 +10,7 @@ paths:
   /api/v0/host/sla_backtest/:
     get:
       summary: sla backtest
+      operationId: slaBacktest
       description: |
         Replays a machine's historical compute earnings and uptime through SLA settlement math
         to preview premiums and payouts before listing with SLA.
@@ -32,8 +33,8 @@ paths:
           format: float
           minimum: 0
           exclusiveMinimum: true
-          maximum: 1
-        description: Reliability target to simulate (0–1). Used as both target and claim.
+          maximum: 0.9999
+        description: Reliability target to simulate (greater than 0 and at most 0.9999). Used as both target and claim. Exactly 1.0 is rejected.
       - name: p
         in: query
         schema:
@@ -41,9 +42,10 @@ paths:
           format: float
           minimum: 0
           exclusiveMinimum: true
+          exclusiveMaximum: true
           maximum: 1
           default: 0.6667
-        description: Host confidence (0–1). Maps to sla_sigma_x when listing. Default 0.6667 (normal).
+        description: Host confidence (greater than 0 and less than 1). Maps to sla_sigma_x when listing. Default 0.6667 (normal).
       - name: start_date
         in: query
         schema:
@@ -60,8 +62,16 @@ paths:
           type: number
           format: float
           minimum: 0
+          exclusiveMinimum: true
           maximum: 1
-        description: Optional flat uptime override (0–1) for all replayed days.
+        description: Optional flat uptime override (greater than 0 and at most 1) for all replayed days. Exactly 0 is rejected.
+      - name: beta
+        in: query
+        schema:
+          type: number
+          format: float
+          default: 0.5
+        description: Backtest-only timescale weighting. Default 0.5 when omitted. Not used in live settlement. Contact support before changing.
       responses:
         '200':
           description: Successful response
@@ -93,14 +103,78 @@ paths:
                   fleet_reliability:
                     type: number
                     format: float
+                    description: Average reliability across your machines (including this one). Context only.
                   params:
                     type: object
+                    properties:
+                      r:
+                        type: number
+                        format: float
+                      p:
+                        type: number
+                        format: float
+                      sigma_x:
+                        type: number
+                        format: float
+                      reliability:
+                        type: number
+                        format: float
+                        nullable: true
+                      beta:
+                        type: number
+                        format: float
                   daily_results:
                     type: array
                     items:
                       type: object
+                      properties:
+                        day:
+                          type: integer
+                        gpu:
+                          type: number
+                          format: float
+                        storage:
+                          type: number
+                          format: float
+                        bandwidth:
+                          type: number
+                          format: float
+                        uptime:
+                          type: number
+                          format: float
+                        sla:
+                          type: number
+                          format: float
+                        historical_sla:
+                          type: number
+                          format: float
                   summary:
                     type: object
+                    properties:
+                      total_gpu:
+                        type: number
+                        format: float
+                      total_storage:
+                        type: number
+                        format: float
+                      total_bandwidth:
+                        type: number
+                        format: float
+                      total_sla:
+                        type: number
+                        format: float
+                      total_earnings:
+                        type: number
+                        format: float
+                      total_historical_sla:
+                        type: number
+                        format: float
+                      worst_day_loss:
+                        type: number
+                        format: float
+                      reserve:
+                        type: number
+                        format: float
         '400':
           description: Bad Request
           content:

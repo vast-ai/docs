@@ -1,6 +1,10 @@
-List details of a single machine with optional pricing and configuration parameters.
+Lists a machine for rent with optional pricing and configuration parameters.
 
 <Note>This is a **host** method, used for managing machines you are renting out on Vast.ai.</Note>
+
+<Note>
+SLA parameters (`sla_r_target`, `sla_r_claim`, `sla_sigma_x`) are **not yet available** in the published Python SDK. To enable SLA on a listing, use `PUT /api/v0/machines/create_asks/` — see [SLA Offers](/host/sla-offers#api-for-automation).
+</Note>
 
 ## Signature
 
@@ -14,56 +18,41 @@ VastAI.list_machine(
     discount_rate: Optional[float] = None,
     min_chunk: Optional[int] = None,
     end_date: Optional[str] = None,
-    sla_r_target: Optional[float] = None,
-    sla_r_claim: Optional[float] = None,
-    sla_sigma_x: Optional[float] = None,
 ) -> str
 ```
 
 ## Parameters
 
 <ParamField path="id" type="int" required>
-  id
+  Machine ID to list.
 </ParamField>
 
 <ParamField path="price_gpu" type="Optional[float]">
-  price_gpu
+  GPU rental price in $/hour for active instances.
 </ParamField>
 
 <ParamField path="price_disk" type="Optional[float]">
-  price_disk
+  Storage price in $/GB/month for inactive instances.
 </ParamField>
 
 <ParamField path="price_inetu" type="Optional[float]">
-  price_inetu
+  Upload bandwidth price in $/GB.
 </ParamField>
 
 <ParamField path="price_inetd" type="Optional[float]">
-  price_inetd
+  Download bandwidth price in $/GB.
 </ParamField>
 
 <ParamField path="discount_rate" type="Optional[float]">
-  discount_rate
+  Max long-term prepay discount rate fraction (default 0.4).
 </ParamField>
 
 <ParamField path="min_chunk" type="Optional[int]">
-  min_chunk
+  Minimum GPUs that must be rented together (GPU slicing).
 </ParamField>
 
 <ParamField path="end_date" type="Optional[str]">
-  end_date
-</ParamField>
-
-<ParamField path="sla_r_target" type="Optional[float]">
-  Reliability coverage target (0–1). Values above 0 enable SLA.
-</ParamField>
-
-<ParamField path="sla_r_claim" type="Optional[float]">
-  Host reliability claim (0–1). Must be ≥ sla_r_target.
-</ParamField>
-
-<ParamField path="sla_sigma_x" type="Optional[float]">
-  Host confidence spread — how wide your belief is around the claim. Must be greater than 0 and at most 3.0. Lower = tighter confidence.
+  Offer expiration (Unix timestamp or MM/DD/YYYY).
 </ParamField>
 
 ## Returns
@@ -76,19 +65,6 @@ VastAI.list_machine(
 from vastai import VastAI
 
 client = VastAI(api_key="YOUR_API_KEY")
-result = client.list_machine(id=12345)
-print(result)
-```
-
-With SLA enabled:
-
-```python
-result = client.list_machine(
-    id=12345,
-    price_gpu=3.50,
-    sla_r_target=0.95,
-    sla_r_claim=0.99,
-    sla_sigma_x=0.5,
-)
+result = client.list_machine(id=12345, price_gpu=3.50)
 print(result)
 ```
