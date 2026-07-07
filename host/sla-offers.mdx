@@ -70,9 +70,13 @@ When you list or update a machine, set SLA fields via the host console or `PUT /
 | Reliability target | Target | `sla_r_target` | `r` | Target % (coverage level) |
 | Reliability claim | Claim | `sla_r_claim` | (set equal to target in backtester) | — |
 | Confidence | Confidence | `sla_sigma_x` | `p` (different scale — do not copy directly) | — |
-| All-in hourly price | — | — | — | `dph_total` in search |
+| All-in hourly price | — | — | — | `dph_total` (dollars per hour total in search — compute plus SLA premium when enabled) |
 
 **Confidence is not an uptime target.** It controls how aggressively premiums are priced around your claim.
+</Note>
+
+<Note>
+**Confidence in one sentence:** The **preset name** (High / Normal / Wide) controls how **tight your claim spread** is around your target, which changes **client premiums** (tighter → lower premiums, wider → higher premiums). In the console, use the labeled presets rather than raw numbers. The ~83% figure describes how often your machine's actual uptime is expected to meet or exceed your claim — not a separate setting.
 </Note>
 
 ### Machine reliability score vs SLA uptime
@@ -127,6 +131,7 @@ Disabling SLA on the offer (setting `sla_r_target` to `0`) prevents new SLA-cove
 2. Expand **SLA**.
 3. Set **Reliability target** (`sla_r_target`), **Reliability claim** (`sla_r_claim`), and **Confidence** (`sla_sigma_x` or a preset).
 4. Save and confirm the SLA premium preview before listing.
+5. After saving pricing, click **LIST** on the Host Machines page (or confirm the machine status changes to **listed**). Saving pricing alone stores your offer settings; listing publishes the offer to search.
 
 #### Web console SLA preview
 
@@ -143,6 +148,8 @@ SLA listing via `vastai list machine` and `VastAI.list_machine()` is **not yet a
 #### Before you start
 
 SLA listing requires the REST API today — CLI and SDK SLA flags are not yet available in published tooling.
+
+Before you call this endpoint, your machine must appear on **Host → Machines** with the daemon connected. This call creates or updates the **offer**, not machine registration. See [Host setup](https://cloud.vast.ai/host/setup/).
 
 1. Open **Account → API Keys** and create a key. See [Create API Key](/api-reference/accounts/create-api-key).
 2. For listing SLA offers, enable **`machine_write`**. For backtesting first, add **`machine_read`**. For post-listing earnings, add **`billing_read`** (one key can include multiple permissions).
@@ -239,7 +246,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
 | Daily compute (`C`) | ~$84/day ($3.50 × 24 hr) |
 | SLA premium to client | ~**$0.008/hr** (~$0.20/day) |
 
-Premium sizing uses internal SLA math. Use the [SLA backtester](/host/sla-backtester) to preview worst-case payout exposure (`worst_day_loss`), not exact client premiums. For client-visible SLA pricing, use the console **Set Pricing → SLA** preview or inspect `dph_total` in search results.
+Premium sizing uses internal SLA math. Use the [SLA backtester](/host/sla-backtester) to preview worst-case payout exposure (`worst_day_loss`), not exact client premiums. For client-visible SLA pricing, use the console **Set Pricing → SLA** preview or inspect **`dph_total`** (dollars per hour total in search — compute plus SLA premium when enabled).
 
 <Note>
 The economics above assume claim (99%) is above target (95%). The [backtester](/host/sla-backtester) is conservative — it sets claim equal to target — so its simulated payouts will differ. Use `worst_day_loss` from the backtester as your tail-risk reference, then adjust expectations when you list with headroom (claim above target). Use the web console SLA preview for the exact premium clients will see in search (`dph_total`).
@@ -249,12 +256,12 @@ This premium is what a client searching for 95% reliability would see added to t
 
 ### If you meet your claim
 
-| Measured uptime (simplified) | Client SLA cost (per day) | You net (per day) |
-| --- | --- | --- |
-| ~100% (excellent day) | −$0.20 (paid premium) | +$0.20 (keep premium) |
-| ~99% (good day) | −$0.17 | +$0.17 |
+In the tables below, **Client pays / receives** uses negative values when the client pays you a premium (money you keep) and positive values when the client receives a payout.
 
-Negative client SLA cost = premium paid by the client. Positive = payout received by the client.
+| Measured uptime (simplified) | Client pays / receives (per day) | You net (per day) |
+| --- | --- | --- |
+| ~100% (excellent day) | −$0.20 (premium paid to you) | +$0.20 (keep premium) |
+| ~99% (good day) | −$0.17 | +$0.17 |
 
 You keep most or all of the premium.
 
@@ -270,7 +277,7 @@ Visible client premiums are lower than backtester output when `sla_r_claim` is a
 
 These scenarios show settlement when uptime **drops to or below** the target — they are boundary illustrations, not typical good-uptime days. Settlement uses a **blend of recent and historical uptime** (not just a single day's raw percentage), but the direction is the same — worse uptime means larger client payouts:
 
-| Measured uptime (simplified) | Client SLA cost (per day) | You net (per day) |
+| Measured uptime (simplified) | Client pays / receives (per day) | You net (per day) |
 | --- | --- | --- |
 | At target (~95%) | ~+$42 | ~−$42 |
 | Well below target (~90% or less) | ~+$84 (full compute refund) | ~−$84 |
@@ -325,9 +332,9 @@ After you enable SLA, premiums and payouts settle on UTC (Coordinated Universal 
 
 ### Console (recommended for day-to-day checks)
 
-1. Open **Host → Billing** (or **Earnings** / **Reports**).
-2. Select the machine and the UTC day range you care about.
-3. Look for SLA premium and payout line items alongside compute earnings. After downtime, compare the affected UTC day(s) to your `worst_day_loss` backtest estimate.
+1. Open **Host → Billing** (or **Earnings** / **Reports**) for the machine and UTC date range.
+2. Look for rows labeled **SLA premium** (client payments you keep) and **SLA payout** (amounts you owe after a miss). Exact menu names may vary; filter by machine ID and date if needed.
+3. After downtime, compare the affected UTC day(s) to your `worst_day_loss` backtest estimate.
 
 ### CLI
 
@@ -344,6 +351,13 @@ vastai show earnings --machine_id <id> --start_date $(date -v-7d +%F) --end_date
 ```
 
 On Windows, use WSL or the API example below. See [`show earnings`](/cli/reference/show-earnings) for all options.
+
+```bash
+vastai show earnings --machine_id <id> --start_date $(date -d '7 days ago' +%F) --end_date $(date +%F) --raw \
+  | jq '.per_machine[] | {machine_id, sla_earn}'
+```
+
+Positive `sla_earn` = net SLA premium you kept that period; negative = net payout you owe. See the sign-convention table in the API subsection below.
 
 ### API (automation)
 
