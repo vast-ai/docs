@@ -82,7 +82,7 @@ When you list or update a machine, set SLA fields via the host console or `PUT /
 </Note>
 
 <Note>
-**Confidence in one sentence:** The **preset name** (High / Normal / Wide) controls how **tightly premiums are priced around the uptime level you claim you will deliver** (your claim), not around the published reliability target clients see in search. In the console, use the labeled presets rather than raw numbers. The ~83% figure describes how often your machine's actual uptime is expected to meet or exceed your claim — not a separate setting.
+**Confidence in one sentence:** The **preset name** (High / Normal / Wide) controls how **tightly premiums are priced around the uptime level you claim you will deliver** (your claim), not around the published reliability target clients see in search. In the console, use the labeled presets rather than raw numbers. The ~83% figure applies to the **High** preset — it describes how often your machine's actual uptime is expected to meet or exceed your claim, not the target percentage itself.
 </Note>
 
 ### Machine reliability score vs SLA uptime
@@ -95,13 +95,15 @@ Do not assume the dashboard score equals SLA uptime. Use **Set Pricing → SLA**
 
 **This only changes how SLA premiums are priced — it does not change how uptime is measured or what payout you owe.**
 
-If you prefer to think in terms of confidence rather than `sla_sigma_x`, these presets match the shipped defaults. At Normal confidence, historical modeling suggests roughly an ~83% chance your machine's measured uptime will meet or exceed your claim — higher confidence means lower client premiums.
+If you prefer to think in terms of confidence rather than `sla_sigma_x`, these presets match the shipped defaults:
 
-| Label | Approx. confidence | `sla_sigma_x` | Effect on premium |
+| Label | Approx. chance uptime meets claim | `sla_sigma_x` | Effect on premium |
 | --- | --- | --- | --- |
 | High | ~83% | `0.2` | Lowest premiums — you are very sure about your claim |
 | Normal (default) | ~67% | `0.5` | Balanced default |
 | Wide | ~50% | `1.0` | Higher premiums — more uncertainty priced in |
+
+Higher preset confidence (tighter spread) → lower client premiums, but less room for uptime to slip before payouts.
 
 ### Validation rules
 
@@ -136,10 +138,11 @@ Disabling SLA on the offer (setting `sla_r_target` to `0`) prevents new SLA-cove
 ### Web console
 
 1. Open your machine on the [Host Machines page](https://cloud.vast.ai/host/machines) → **Set Pricing**.
-2. Expand **SLA**.
-3. Set **Reliability target** (`sla_r_target`), **Reliability claim** (`sla_r_claim`), and **Confidence** (`sla_sigma_x` or a preset).
-4. Save and confirm the SLA premium preview before listing.
-5. After saving pricing, click **LIST** on the Host Machines page (or confirm the machine status changes to **listed**). Saving pricing alone stores your offer settings; listing publishes the offer to search.
+2. Set base listing fields first (GPU price, offer end date, rental types) if this is a new listing.
+3. Expand **SLA**.
+4. Set **Reliability target**, **Reliability claim**, and **Confidence** (or a preset). API field names: `sla_r_target`, `sla_r_claim`, `sla_sigma_x`.
+5. Save and confirm the SLA premium preview before listing.
+6. After saving pricing, click **LIST** on the Host Machines page (or confirm the machine status changes to **listed**). Saving pricing alone stores your offer settings; listing publishes the offer to search.
 
 <Note title="Console vs API">
 In the web console, **Set Pricing → Save** stores SLA settings; clicking **LIST** publishes the offer to search. `PUT /api/v0/machines/create_asks/` performs both steps in one request — it creates or updates the **live listing** (same as pressing **LIST** or running `vastai list machine`), not a save-only draft.
@@ -211,7 +214,17 @@ This creates an offer with target `0.95`, claim `0.99`, and confidence spread `0
 <Note>
 Partial updates are supported when editing an existing listing. If you change only one SLA field, the platform re-validates the merged parameters. Set `sla_r_target` to `0` to disable SLA on an existing listing.
 
-Omitted non-SLA fields retain their current listing values; only fields present in the request body are updated. For fleet automation, prefer read-modify-write: `vastai show machines` → merge → `PUT /api/v0/machines/create_asks/`.
+Omitted non-SLA fields retain their current listing values; only fields present in the request body are updated. For fleet automation, prefer read-modify-write: `vastai show machines --raw` → merge → `PUT /api/v0/machines/create_asks/`.
+
+### Fleet listing workflow
+
+For multiple machines, loop sequentially — do not parallelize without backoff:
+
+1. `PUT /api/v0/machines/create_asks/` with `machine` plus SLA fields and required base pricing.
+2. On `429`, sleep and retry with exponential backoff.
+3. On `invalid_sla_params` or `machine_locked`, log the machine ID and continue or abort per your rollout policy.
+
+See [Fleet workflow](/host/sla-backtester#fleet-workflow) in the backtester for a similar sequential pattern.
 </Note>
 
 **SLA-only update** — include `machine` plus SLA fields; omit unrelated offer fields you intend to keep:
@@ -264,8 +277,10 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
 
 | Item | Amount |
 | --- | --- |
-| Daily compute (`C`) | ~$84/day ($3.50 × 24 hr) |
+| Daily compute (`C`) | ~$84/day ($3.50 × 24 hr GPU only — simplified) |
 | SLA premium to client | ~**$0.008/hr** (~$0.20/day) |
+
+SLA payouts are capped at that UTC day's total billable earnings — GPU, storage, and bandwidth combined — not GPU compute alone. The simplified example below uses GPU-only math for readability; treat `worst_day_loss` from the [SLA backtester](/host/sla-backtester) as the authoritative tail-risk figure before you list.
 
 Premium sizing uses internal SLA math. Use the [SLA backtester](/host/sla-backtester) to preview worst single-day payout exposure (`worst_day_loss`), not exact client premiums. For authoritative client-visible premiums, use **Set Pricing → SLA** in the console or **`dph_total`** in search offers — not backtester `total_sla` when claim exceeds target.
 
@@ -315,7 +330,7 @@ These scenarios show settlement when uptime **drops to or below** the target —
 
 To put the asymmetry in perspective: at ~$0.20/day in premiums, it takes roughly 210 good days to accumulate the $42 you could lose on a single day at the target boundary. The premium is a small fraction of daily compute, while the payout scales against total daily compute revenue.
 
-On a severe outage day, the client is made whole on compute charges for that day. You do not collect the premium for that day either — the client is not charged a premium on top of compute charges for periods when the instance was down. Your maximum SLA loss on any single settlement day is capped at that day's compute revenue.
+On a severe outage day, the client is made whole on compute charges for that day. You do not collect the premium for that day either — the client is not charged a premium on top of compute charges for periods when the instance was down. Your maximum SLA loss on any single settlement day is capped at that day's total billable earnings (GPU, storage, and bandwidth).
 
 ## Risk scenarios
 
@@ -363,9 +378,9 @@ After you enable SLA, premiums and payouts settle on UTC (Coordinated Universal 
 2. Set the date range to include the UTC day you want to review.
 3. Filter by machine ID if available.
 4. Look for SLA line items — **positive** = premium you kept that day; **negative** = payout you owed the client.
+5. After downtime, compare the affected UTC day(s) to your `worst_day_loss` backtest estimate.
 
 **If you don't see SLA rows:** widen the date range (settlement uses UTC day boundaries), confirm the machine had an active on-demand rental that day, and confirm SLA was enabled and the offer was **listed** (not just saved).
-5. After downtime, compare the affected UTC day(s) to your `worst_day_loss` backtest estimate.
 
 <Note>
 SLA daily settlement (premium kept / payout owed) does not currently emit host webhooks. Monitor via console billing or poll `machine-earnings`; settlements align to UTC calendar days.
