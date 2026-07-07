@@ -223,7 +223,7 @@ Review `sla` day by day in `daily_results` to see which days would have helped o
 | `total_sla` | Net simulated SLA earnings. Positive = SLA would have added income overall |
 | `total_earnings` | Compute + simulated SLA |
 | `total_historical_sla` | Sum of realized historical SLA in the range |
-| `worst_day_loss` | Largest single-day client payout (your worst simulated loss) |
+| `worst_day_loss` | Largest single-day client payout (your worst simulated loss). Always a non-negative dollar amount — unlike signed `sla` / `sla_earn` fields |
 | `reserve` | Reserved for future use — ignore in production decisions today. |
 
 ## Interpreting results
@@ -300,7 +300,7 @@ export VAST_API_KEY="YOUR_API_KEY"
 
 ```bash
 for id in $(vastai show machines -q); do
-  resp=$(curl -sf -H "Authorization: Bearer $VAST_API_KEY" \
+  resp=$(curl -s -H "Authorization: Bearer $VAST_API_KEY" \
     "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=$id&r=0.95&p=0.6667" \
     || echo '{"error":"request_failed"}')
   if echo "$resp" | jq -e '.error' >/dev/null 2>&1; then
@@ -308,11 +308,11 @@ for id in $(vastai show machines -q); do
   else
     echo "$resp" | jq '{machine_id: '"$id"', worst_day_loss: .summary.worst_day_loss, total_sla: .summary.total_sla, has_data: .has_data}'
   fi
-  sleep 1
+  sleep 2
 done
 ```
 
-Use a `machine_read` key scoped to the machines you own. On `429`, back off per [Rate Limits and Errors](/api-reference/rate-limits-and-errors). Parallel requests are not recommended unless you implement backoff.
+Expect roughly two seconds per machine minimum (`sleep 2` plus request time). For 50 machines, budget at least a few minutes. Run off-peak before a fleet SLA rollout. On `429`, back off per [Rate Limits and Errors](/api-reference/rate-limits-and-errors). Parallel requests are not recommended unless you implement backoff.
 
 3. Compare `worst_day_loss` and `total_sla` across machines.
 4. Apply `sla_r_claim` headroom when listing via the API (see [SLA Offers](/host/sla-offers#api-for-automation)).

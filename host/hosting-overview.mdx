@@ -16,7 +16,7 @@ Vast is a GPU marketplace. Hosts sell GPU resources on the marketplace. Hosts ar
 
 ## Account setup and hosting agreement
 
-You must create a new account for hosting.  If you are using Vast.ai as a client, do not use the same account. A single client and hosting account is not supported and you will quickly run into issues.
+You must create a new account for hosting. If you are using Vast.ai as a client, do not use the same account. Using the same account for both client and hosting is not supported and you will quickly run into issues.
 
 Once your account is created, open the [host setup guide](https://cloud.vast.ai/host/setup/). There is a link in the first paragraph to the hosting agreement. Read through the agreement. Once you accept, your account will then be converted to a hosting account. You will notice there is now a link to Machines in the navigation, along with some other changes. Your account can now list machines that are running the daemon software.
 
@@ -47,7 +47,7 @@ The main offer parameters include:
 - the min bid price for [interruptible](/guides/instances/rental-types) instances
 - the min_gpu param controlling 'slicing' (explained below) — same concept as CLI `min_chunk` / `-m`
 - the offer end date, which determines how long the offer accepts new rental contracts
-- **SLA (optional):** Uptime coverage for on-demand rentals. Configure in **Set Pricing → SLA**, save pricing, then click **LIST** to publish. SLA can increase earnings on good days but expose you to large payouts on bad days — read [SLA Offers → Economics walkthrough](/host/sla-offers#economics-walkthrough) before enabling. SLA parameters are not yet available in the published CLI/SDK. See [Listing an SLA offer → Web console](/host/sla-offers#web-console).
+- **SLA (optional):** Optional uptime guarantee for on-demand rentals — clients pay a small premium; you may owe payouts if uptime misses your published target. You can list without SLA. See [SLA Offers](/host/sla-offers#economics-walkthrough) before enabling.
 
 The offer accepts new rentals until the offer end date. When a client rents an instance on your machine, a rental contract is created from your offer. If your machine has multiple GPUs and you've set min_gpu to allow slicing, multiple clients can rent from the same offer, each creating their own independent rental contract.
 
@@ -141,15 +141,15 @@ In addition to GPU offers, hosts can create volume offers on machines. A volume 
 
 Allocated storage (that is, storage in use by client rental contracts) is subtracted from the total storage available on a machine, and split up proportionally among the machine's GPUs in remaining GPU offers.
 
-For example, on a machine with 1000Gb of disk available and 2 GPUs, a host can create a volume offer of up to 1000 Gb. 
+For example, on a machine with 1000 GB of disk available and 2 GPUs, a host can create a volume offer of up to 1000 GB.
 
-If they create a volume offer of 500 Gb, and it is not rented, the machine will be available for rent with 2 offers of 1xGPU 500Gb and 1 offer of 2xGPU 1000Gb. 
+If they create a volume offer of 500 GB, and it is not rented, the machine will be available for rent with 2 offers of 1xGPU 500 GB and 1 offer of 2xGPU 1000 GB.
 
-If 200 Gb of the volume offer are rented, the GPU offers will reduce to 2 1xGPU 400Gb offers and 1 2xGPU 800Gb offer. The volume offer will still remain, as there is still available space, and update to offer 300Gb. 
+If 200 GB of the volume offer are rented, the GPU offers will reduce to 2 1xGPU 400 GB offers and 1 2xGPU 800 GB offer. The volume offer will still remain, as there is still available space, and update to offer 300 GB.
 
-Similarly, if stored instances on the machine are taking up 800Gb, the volume offer will reduce to 200Gb.
+Similarly, if stored instances on the machine are taking up 800 GB, the volume offer will reduce to 200 GB.
 
-If stored instances are only taking up 400 Gb, the volume offer will not update, as there is still enough space on the machine to cover the volume offer.
+If stored instances are only taking up 400 GB, the volume offer will not update, as there is still enough space on the machine to cover the volume offer.
 
 ### Listing Volumes
 
@@ -168,7 +168,7 @@ vastai list volume <machine_id> -s <space> -p <price>
 ```
 
 <Warning>
-  Volume offer end dates **must** align with GPU offer end dates.  Setting an end date on a volume will not update if there is an existing GPU offer. Setting a GPU offer end date will update volume offer end dates.
+  Volume offer end dates **must** align with GPU offer end dates. Setting an end date on a volume will not update the GPU offer's end date if a GPU offer already exists. Setting a GPU offer end date will update volume offer end dates.
 </Warning>
 
 Volume offers will be unlisted when the machine is unlisted. They can additionally be unlisted with the command:
@@ -222,8 +222,10 @@ Replace 12345 with your actual machine ID in question. You can see the number of
 Take the ID number from the first column and use that to create a free instance on your own machine. This example loads the latest pytorch image along with both jupyter and ssh direct launch modes.
 
 ```text Text
-./vastai create instance <ID> --image pytorch/pytorch:latest --jupyter --direct --env '-e TZ=PDT -p 22:22 -p 8080:8080'
+vastai create instance <ID> --image pytorch/pytorch:latest --jupyter --direct --env '-e TZ=PDT -p 22:22 -p 8080:8080'
 ```
+
+Use `./vastai` instead of `vastai` when running from the install directory.
 
 You can then look at your [instance tab](https://cloud.vast.ai/instances/) to make sure that pytorch loaded correctly along with jupyter and ssh. Click on the \<\_ button to get the ssh command to connect to the instance. Test the direct ssh command. Click on the open button to test jupyter. If the button is stuck "connecting" then there is most likely a problem with the port configuration on the router in front of the machine. Once finished, destroy the instance.
 
@@ -309,7 +311,7 @@ To get an understanding of prices, check our [Market Stats page](https://cloud.v
 
 ### Why did the reliability on my machine decrease?
 
-If the machine loses connection or if there is a client instance that does not want to start the machine's reliability will drop.
+If the machine loses connection, or if a client instance fails to start, the machine's reliability will drop.
 
 ### How do I minimize my reliability dropping?
 
