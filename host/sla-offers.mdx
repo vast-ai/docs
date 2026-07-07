@@ -46,6 +46,16 @@ SLA can be enabled on a first-time listing, but you still need base listing fiel
 
 ## How it works (plain English)
 
+<Note title="Console hosts — read this first">
+In **Host → Machines → Set Pricing → SLA** you set three knobs only:
+
+- **Target** — the uptime % clients see in search (your public promise).
+- **Claim** — what you expect to deliver (often above Target for pricing headroom).
+- **Confidence** — how tightly you price around that expectation (**High / Normal / Wide** — not an uptime %).
+
+The API field names and backtester aliases below are for automation. Skip them if you use the web console only.
+</Note>
+
 Think of an SLA offer as three linked ideas:
 
 1. **Reliability target** — the uptime level the listing is priced around (for example, 95% or 99%).
@@ -69,7 +79,7 @@ SLA uptime is measured at the **rental contract (instance) level** using platfor
 
 - **Instance fails to start** when a client rents → counts against SLA uptime for that contract.
 - **Machine-level outage** while contracts are active → affects settlement for those contracts.
-- **Brief host reboots** during active rentals may count as downtime depending on duration.
+- **Brief host reboots** during active rentals may count as downtime if they exceed the platform's measurement window for that UTC day. Vast does not publish a fixed second-level threshold in host docs — treat unplanned reboots as SLA risk. For planned work, use [Scheduled maintenance](#scheduled-maintenance) with at least 24 hours' notice when possible.
 - **Scheduled maintenance** may receive credit case by case — see [Scheduled maintenance](#scheduled-maintenance).
 
 On sliced machines, SLA settles **per rental contract**. If one GPU slice fails but others remain healthy, only contracts on the affected slice are measured for downtime.
@@ -115,7 +125,7 @@ Do not assume the dashboard score equals SLA uptime. Before choosing `sla_r_targ
 
 ### Confidence presets
 
-**This only changes how SLA premiums are priced — it does not change how uptime is measured or what payout you owe.** Use the **High / Normal / Wide** presets in the console UI; only set raw `sla_sigma_x` via API after you have saved once in the console.
+**This only changes how SLA premiums are priced — it does not change how uptime is measured or what payout you owe.** Use the **High / Normal / Wide** presets in the console UI. Only set raw `sla_sigma_x` via the API if you need a value outside those presets.
 
 <Note>
 Confidence presets control **pricing weight only**, not your uptime obligation. Your obligation is set by **Target**. The statistical weights in the table below (~83% / ~67% / ~50%) describe pricing confidence — do not treat them as uptime targets.
@@ -167,6 +177,14 @@ Disabling SLA on the offer (setting `sla_r_target` to `0`) prevents new SLA-cove
 4. Set **Reliability target**, **Reliability claim**, and **Confidence** (or a preset). Set **Claim** higher than **Target** (for example, 99% claim / 95% target) unless you want higher premiums.
 5. Save and confirm the SLA premium preview before listing.
 6. After saving pricing, click **LIST** on the Host Machines page (or confirm the machine status changes to **listed**). Saving pricing alone stores your offer settings; listing publishes the offer to search.
+
+#### Updating SLA on an already-listed machine
+
+If the machine is already **listed** (you previously clicked **LIST** or listed via CLI/REST):
+
+1. Open **Host → Machines → Set Pricing → SLA**, set Target, Claim, and Confidence, then click **Save**.
+2. **Save** applies SLA to the live offer — you do not need to click **LIST** again unless this is a brand-new listing that was never published.
+3. Verify in search: `dph_total` includes the SLA add-on and `expected_reliability` matches your Target (see [Search / client-visible fields](#search--client-visible-fields)).
 
 <Note title="Console vs API">
 In the web console, **Set Pricing → Save** stores SLA settings; clicking **LIST** publishes the offer to search. `PUT /api/v0/machines/create_asks/` performs both steps in one request — it creates or updates the **live listing** (same as pressing **LIST** or running `vastai list machine`), not a save-only draft.
@@ -265,8 +283,9 @@ See [Fleet workflow](/host/sla-backtester#fleet-workflow) in the backtester for 
 
 ```bash
 export VAST_API_KEY="YOUR_API_KEY"
+machines=$(vastai show machines --raw)
 for id in $(vastai show machines -q); do
-  body=$(vastai show machines --raw | jq -c --arg id "$id" \
+  body=$(echo "$machines" | jq -c --arg id "$id" \
     '.machines[] | select((.id|tostring) == $id) | {machine: (.id|tonumber), price_gpu, end_date, min_chunk, sla_r_target: 0.95, sla_r_claim: 0.99, sla_sigma_x: 0.5}')
   resp=$(curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
     -H "Authorization: Bearer $VAST_API_KEY" \
@@ -277,7 +296,7 @@ for id in $(vastai show machines -q); do
 done
 ```
 
-Check each response for `success`, `invalid_sla_params`, and `machine_locked` before continuing. Back off on HTTP 429.
+Fetch the fleet once before the loop — do not call `show machines --raw` inside the loop. On fleets of 20+ machines, expect several minutes; back off on HTTP 429.
 
 **SLA-only update** — include `machine` plus SLA fields; omit unrelated offer fields you intend to keep:
 
@@ -434,7 +453,7 @@ Use the [SLA Earnings Backtester](/host/sla-backtester) (API-only; requires a `m
 
 - **Listing rejected (`invalid_sla_params`)** — Re-check target, claim, and `sla_sigma_x` against [validation rules](#validation-rules).
 - **Unexpected payout** — Review uptime; re-run the backtester with a low `reliability` stress value (for example `0.01`).
-- **Severe outage** — Disable SLA on new contracts (`sla_r_target=0`); contact [Discord](https://discord.gg/hSuEbSQ4X8) before relisting.
+- **Severe outage** — Disable SLA on new contracts: open **Host → Machines** → **Set Pricing → SLA**, set target to `0` (or use API `sla_r_target=0`); contact [Discord](https://discord.gg/hSuEbSQ4X8) before relisting.
 
 ## Monitoring SLA after listing
 
