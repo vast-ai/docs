@@ -38,7 +38,7 @@ For how SLA offers work once listed, see [SLA Offers](/host/sla-offers).
 3. For each active day, it computes GPU, storage, and bandwidth earnings plus simulated SLA host earnings.
 4. It returns a day-by-day breakdown and summary totals.
 
-**Simulated vs listing parameters.** In the backtester, reliability target and claim are both set to **`r`**. When you actually list a machine, you can set **`sla_r_claim` above `sla_r_target`** for lower client premiums.
+**Simulated vs listing parameters.** In the backtester, reliability target and claim are both set to **`r`** — the backtester cannot set `sla_r_claim` above `sla_r_target`. Claim-headroom simulation is console-only today. When you actually list a machine, you can set **`sla_r_claim` above `sla_r_target`** for lower client premiums. Workflow: backtest `worst_day_loss` at your target, then verify visible premiums in **Set Pricing → SLA** (or `dph_total` in search) before listing with claim above target.
 
 **Active vs idle days.** **Idle days** are days with no rental earnings on the machine (no active compute rental). These days typically produce no SLA premium or payout in the simulation. Days with no rental activity appear in the results as zero-filled rows but do not count toward `covered_days`. Only days with actual earnings are replayed through SLA math.
 
@@ -280,7 +280,7 @@ Higher confidence (higher `p`) → tighter spread → lower premiums for clients
 
 ## Fleet workflow
 
-For hosts automating fleet review. Console-only hosts can run the baseline `curl` once per machine instead.
+This section is for hosts automating fleet review. Console-only hosts can run the baseline `curl` once per machine instead.
 
 ```bash
 export VAST_API_KEY="YOUR_API_KEY"
@@ -294,7 +294,11 @@ for id in $(vastai show machines -q); do
   resp=$(curl -sf -H "Authorization: Bearer $VAST_API_KEY" \
     "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=$id&r=0.95&p=0.6667" \
     || echo '{"error":"request_failed"}')
-  echo "$resp" | jq '{machine_id: '"$id"', worst_day_loss: .summary.worst_day_loss, total_sla: .summary.total_sla, has_data: .has_data, error: .error}'
+  if echo "$resp" | jq -e '.error' >/dev/null 2>&1; then
+    echo "machine_id=$id error: $(echo "$resp" | jq -r '.error')"
+  else
+    echo "$resp" | jq '{machine_id: '"$id"', worst_day_loss: .summary.worst_day_loss, total_sla: .summary.total_sla, has_data: .has_data}'
+  fi
   sleep 1
 done
 ```
