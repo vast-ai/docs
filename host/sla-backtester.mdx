@@ -282,14 +282,19 @@ Higher confidence (higher `p`) → tighter spread → lower premiums for clients
 
 For hosts automating fleet review. Console-only hosts can run the baseline `curl` once per machine instead.
 
+```bash
+export VAST_API_KEY="YOUR_API_KEY"
+```
+
 1. List machine IDs: `vastai show machines -q` (numeric IDs only) or `vastai show machines --raw | jq -r '.machines[].id'`.
-2. Run backtests **sequentially** (one machine at a time) with a short sleep on `429` responses:
+2. Run backtests **sequentially** (one machine at a time):
 
 ```bash
 for id in $(vastai show machines -q); do
-  curl -s -H "Authorization: Bearer $VAST_API_KEY" \
+  resp=$(curl -sf -H "Authorization: Bearer $VAST_API_KEY" \
     "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=$id&r=0.95&p=0.6667" \
-    | jq '{machine_id: '"$id"', worst_day_loss: .summary.worst_day_loss, total_sla: .summary.total_sla, has_data: .has_data}'
+    || echo '{"error":"request_failed"}')
+  echo "$resp" | jq '{machine_id: '"$id"', worst_day_loss: .summary.worst_day_loss, total_sla: .summary.total_sla, has_data: .has_data, error: .error}'
   sleep 1
 done
 ```
