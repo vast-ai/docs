@@ -28,12 +28,16 @@ See [Choose your path](#choose-your-path) below.
 
 ## When to use it
 
-Use the backtester before you enable SLA on a listing, or when you want to tune parameters. The machine needs at least a few weeks of rental history. If `has_data` is `false`, widen the date range or pick a machine with more activity:
+Use the backtester before you enable SLA on a listing, or when you want to tune parameters. The machine needs at least a few weeks of rental history.
 
-- **Pick a reliability target** — see how often you would have kept premiums or paid them out on historical data
-- **Compare confidence levels** — tighter confidence means lower premiums for clients but more risk to you if uptime slips
-- **Stress-test bad weeks** — use the optional flat uptime override to see payout size if reliability dropped
-- **Compare to history** — each day includes `historical_sla`, your machine's realized SLA earnings on that day (zero if you were not offering SLA)
+If `has_data` is `false`, widen the date range or pick a machine with more rental activity.
+
+Use the backtester to:
+
+- Pick a reliability target and confidence before you enable SLA on a listing
+- Compare how premium and worst-case payout change across targets
+- Stress-test a lower reliability assumption before you commit
+- Compare to history — each day includes `historical_sla`, your machine's realized SLA earnings on that day (zero if you were not offering SLA)
 
 For how SLA offers work once listed, see [SLA Offers](/host/sla-offers).
 
@@ -264,16 +268,12 @@ Higher confidence (higher `p`) → tighter spread → lower premiums for clients
 
 | HTTP | `error` / shape | Cause |
 | --- | --- | --- |
-| 403 | `auth_error` | Authorization header missing or invalid session |
-| 401 | `auth_error` | API key invalid |
-| 401 | authorization `msg` | Valid key but missing `machine_read` (or other scope denial) |
+| 400 | `invalid_range`, `range_too_large`, `bad_request`, `invalid_params` | Invalid query parameters or simulation failure |
 | 403 | `not_owner` | Machine belongs to another host |
-| 400 | `invalid_range` | `start_date` is after `end_date` |
-| 400 | `range_too_large` | More than 366 days requested |
-| 400 | `bad_request` | Schema, bounds, or unknown-parameter failures (for example, `r` or `p` out of range) |
-| 400 | `invalid_params` | Inputs pass validation but fail inside settlement simulation |
 | 404 | `machine_not_found` | Invalid `machine_id` |
 | 429 | *(rate limited)* | Too many requests — retry with backoff. See [Rate Limits and Errors](/api-reference/rate-limits-and-errors). |
+
+For missing or invalid API keys and permission denials (`machine_read`), see [Authentication](/api-reference/authentication).
 
 ## Recommended workflow
 
