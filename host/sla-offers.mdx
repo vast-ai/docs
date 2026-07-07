@@ -4,7 +4,7 @@ description: "Offer reliability guarantees on your machines, set SLA parameters,
 "canonical": "/host/sla-offers"
 ---
 
-Vast.ai lets hosts attach a **Service Level Agreement (SLA)** to a machine listing. An SLA is reliability insurance: the client pays a small hourly SLA add-on included in `dph_total`, and if uptime falls short of the agreed target, the client receives a payout from your earnings.
+Vast.ai lets hosts attach a **Service Level Agreement (SLA)** to a machine listing. An SLA is reliability insurance: the client pays a small hourly SLA add-on included in **`dph_total`** (dollars per hour total in search — base compute plus SLA premium), and if uptime falls short of the agreed target, the client receives a payout from your earnings.
 
 This page explains how SLA offers work from the host side — what you are promising, how pricing is calculated, and what happens when uptime is good or bad.
 
@@ -214,11 +214,13 @@ This creates an offer with target `0.95`, claim `0.99`, and confidence spread `0
 <Note>
 Partial updates are supported when editing an existing listing. If you change only one SLA field, the platform re-validates the merged parameters. Set `sla_r_target` to `0` to disable SLA on an existing listing.
 
-Omitted non-SLA fields retain their current listing values; only fields present in the request body are updated. For fleet automation, read current settings then merge:
+Omitted non-SLA fields retain their current listing values; only fields present in the request body are updated. Before merging partial SLA updates, read current listing fields from `vastai show machine <id> --raw` (or the machine detail API) and confirm the response includes `sla_r_target`, `sla_r_claim`, `sla_sigma_x`, `price_gpu`, and `end_date`:
 
 ```bash
-vastai show machines --raw | jq '.[] | select(.id==12345) | {id, sla_r_target, sla_r_claim, sla_sigma_x, price_gpu, end_date}'
+vastai show machines --raw | jq '.machines[] | select(.id == 12345 or .id == "12345") | {id, sla_r_target, sla_r_claim, sla_sigma_x, price_gpu, end_date}'
 ```
+
+Machine `id` may be a string in raw JSON. The response is wrapped in a `machines` array. If SLA fields are missing, use `vastai show machine 12345 --raw` instead.
 
 Then `PUT /api/v0/machines/create_asks/` with merged fields.
 </Note>
