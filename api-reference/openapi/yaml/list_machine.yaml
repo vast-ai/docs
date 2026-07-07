@@ -64,14 +64,19 @@ paths:
                 sla_r_target:
                   type: number
                   format: float
+                  minimum: 0
+                  maximum: 0.9999
                   description: |
-                    Client reliability coverage target (0–1). Values above 0 enable SLA on the offer.
-                    Legacy alias: sla_reliability.
+                    Client reliability coverage target. Values above 0 enable SLA on the offer.
+                    Must be greater than 0 and at most 0.9999 when enabling SLA; exactly 1.0 is rejected.
+                    Set to 0 to disable SLA. Legacy alias: sla_reliability.
                 sla_r_claim:
                   type: number
                   format: float
+                  minimum: 0
+                  maximum: 0.9999
                   description: |
-                    Host reliability claim (0–1). Must be greater than or equal to sla_r_target.
+                    Host reliability claim. Must be greater than 0, at most 0.9999, and greater than or equal to sla_r_target.
                     Defaults to sla_r_target if omitted.
                 sla_sigma_x:
                   type: number
@@ -93,15 +98,42 @@ paths:
                 properties:
                   success:
                     type: boolean
-                  extended:
-                    type: integer
-                    description: Number of client contracts extended to new end date
-                  msg:
-                    type: string
-                    description: Status message if success is false
+                  you_sent:
+                    type: object
+                    description: Echo of the request body
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        machine_id:
+                          type: integer
+                        user_id:
+                          type: integer
+                        extended:
+                          type: integer
+                          description: Number of rental contracts extended
+                        new_contracts:
+                          type: array
+                          items:
+                            type: integer
+                          description: IDs of newly created contracts
+                        upd_contracts:
+                          type: array
+                          items:
+                            type: integer
+                          description: IDs of updated contracts
                 example:
                   success: true
-                  extended: 2
+                  you_sent:
+                    machine: 12345
+                    sla_r_target: 0.95
+                  results:
+                  - machine_id: 12345
+                    user_id: 67890
+                    extended: 1
+                    new_contracts: []
+                    upd_contracts: [1]
         '400':
           description: Bad Request
           content:
@@ -111,10 +143,25 @@ paths:
                 properties:
                   error:
                     type: string
-                    example: invalid_args
+                    enum:
+                    - invalid_args
+                    - invalid_sla_params
+                    example: invalid_sla_params
                   msg:
                     type: string
-                    example: Invalid machine id or parameters
+                    example: No such machine(s) for your account
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  msg:
+                    type: string
+                    example: Missing or invalid API key
         '403':
           description: Forbidden
           content:
@@ -124,10 +171,13 @@ paths:
                 properties:
                   error:
                     type: string
+                    enum:
+                    - not_authorized
+                    - machine_locked
                     example: not_authorized
                   msg:
                     type: string
-                    example: Only machine owner can create ask contracts
+                    example: API key lacks machine_write permission
       tags:
       - Machines
 components:
