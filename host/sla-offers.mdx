@@ -369,10 +369,13 @@ When SLA is enabled on an offer, clients see:
 - **`expected_reliability`** — the advertised SLA target (maps to your `sla_r_target`).
 - **`reliability` / `reliability2`** — historical machine reliability scores, **not** your SLA target.
 
-Verify after listing:
+**Filter vs response field:** In search queries, the `reliability` filter uses the machine's historical reliability score — not the SLA target. The published SLA target appears in responses as `expected_reliability`. To select SLA-listed offers programmatically, post-filter on `expected_reliability > 0` (or your minimum target); do not use the `reliability` filter as an SLA selector.
+
+Verify after listing — filter the offer you care about; sliced machines often return multiple rows (different `num_gpus`, bid vs on-demand):
 
 ```bash
-vastai search offers 'machine_id=12345 verified=any' --raw | jq '.offers[0] | {dph_total, expected_reliability, reliability, reliability2}'
+vastai search offers 'machine_id=12345 verified=any' --raw \
+  | jq '[.offers[] | select(.is_bid == false) | {id, num_gpus, dph_total, expected_reliability, reliability}]'
 ```
 
 Premium sizing uses internal SLA math — use the console preview or `dph_total` above, not backtester `total_sla`, when claim exceeds target.
@@ -526,7 +529,7 @@ For API automation only — console users can stop after the Console subsection 
 This endpoint is rate-limited — see [Rate Limits and Errors](/api-reference/rate-limits-and-errors). Poll no faster than about one request every two seconds per IP (`threshold=2.0`); back off on HTTP 429. For day-level per-machine reconciliation at scale, prefer console billing reports over high-frequency API polling.
 
 <Warning>
-When you pass `machid`, use `per_machine[].sla_earn` and `summary.total_sla` for that machine's SLA settlement in the window. Do **not** read `per_day[].sla_earn` for single-machine checks — `per_day[]` is always fleet-wide, even with `?machid=`.
+When you pass `machid`, use `per_machine[].sla_earn` for that machine's SLA settlement in the window. Do **not** read `per_day[].sla_earn` for single-machine checks — `per_day[]` is always fleet-wide, even with `?machid=`. Do not assume `summary.total_sla` is machine-scoped when `machid` is set — prefer `per_machine[].sla_earn`.
 
 **Quick rules:**
 - **One machine, one UTC day:** use `last_days=1` with `machid` set, or `sday`/`eday` (UTC day indices). The CLI flags `--start_date` and `--end_date` map internally to those fields — they are not separate REST query parameter names on `machine-earnings/`.
@@ -555,7 +558,7 @@ Do **not** compare `last_days=7` totals to single-day `worst_day_loss` from the 
 
 | Field | Good day (meet target) | Bad day (miss target) |
 | --- | --- | --- |
-| `per_machine[].sla_earn` / `summary.total_sla` | Positive (premium kept) | Negative (payout you owe) |
+| `per_machine[].sla_earn` | Positive (premium kept) | Negative (payout you owe) |
 | Fleet `per_day[].sla_earn` | Positive (premium kept) | Negative (payout you owe) |
 
 - `{user_id}` — Your account ID (from **Account → Profile** in the console, or `vastai show user`).
