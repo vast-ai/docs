@@ -4,7 +4,7 @@ description: "Offer reliability guarantees on your machines, set SLA parameters,
 "canonical": "/host/sla-offers"
 ---
 
-Vast.ai lets hosts attach a **Service Level Agreement (SLA)** to a machine listing. An SLA is reliability insurance: the client pays a small daily premium, and if uptime falls short of the agreed target, the client receives a payout from your earnings.
+Vast.ai lets hosts attach a **Service Level Agreement (SLA)** to a machine listing. An SLA is reliability insurance: the client pays a small hourly SLA add-on included in `dph_total`, and if uptime falls short of the agreed target, the client receives a payout from your earnings.
 
 This page explains how SLA offers work from the host side — what you are promising, how pricing is calculated, and what happens when uptime is good or bad.
 
@@ -13,11 +13,11 @@ SLA settlement is **lopsided by design**: when uptime is good, you keep the prem
 </Note>
 
 <Note title="This page is for hosts">
-Renters: see [Find and rent](/guides/instances/choosing/find-and-rent) and [Pricing](/guides/instances/pricing). SLA applies to **on-demand** rentals only — not interruptible or reserved/prepay.
+**Renters:** SLA coverage, premiums, and credits are not yet documented on our renter guides. Until a dedicated client SLA page ships, see [What your clients see](#what-your-clients-see) below for a brief summary.
 </Note>
 
 <Note title="What your clients see">
-When a client rents a machine with SLA enabled, they pay a small premium on top of the normal hourly rate (`dph_total` in search includes the SLA premium). If uptime falls below the promised target, credits are applied to their account automatically after **UTC daily settlement** — renters should check **Billing** the following UTC day. SLA applies to on-demand rentals only — not [interruptible](/guides/instances/rental-types) instances.
+Clients pay a small hourly SLA add-on included in `dph_total` (for example, ~$0.008/hr on top of the base GPU rate). Premiums and payouts are settled once per UTC calendar day — search and the console show the hourly rate; billing reconciles daily. If uptime falls below the promised target, credits are applied automatically after **UTC daily settlement**. SLA applies to on-demand rentals only — not [interruptible](/guides/instances/rental-types) instances.
 </Note>
 
 ## Choose your path
@@ -53,8 +53,8 @@ Think of an SLA offer as three linked ideas:
 
 When a client rents with SLA enabled:
 
-- They pay **compute** (GPU, storage, bandwidth) plus a **daily SLA premium**.
-- Each day, Vast measures how long the instance was online and settles the SLA.
+- They pay **compute** (GPU, storage, bandwidth) plus a **small hourly SLA add-on** included in `dph_total`.
+- Each UTC calendar day, Vast measures how long the instance was online and settles the SLA.
 - **Good uptime** → you keep the premium for that day.
 - **Bad uptime** → you pay the client from your earnings (up to the day's compute revenue).
 
@@ -188,7 +188,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
   }'
 ```
 
-Set `end_date` so the offer does not stay open indefinitely — especially important for SLA commitments. See [Offer End Date](/host/hosting-overview#offer-end-date).
+Set `end_date` so the offer does not stay open indefinitely — especially important for SLA commitments. See [Offer End Date](/host/hosting-overview#offer-end-date). Convert a calendar date to Unix seconds: `date -u -d '2025-01-01' +%s` (Linux) or `date -u -j -f '%Y-%m-%d' '2025-01-01' +%s` (macOS). The CLI also accepts `MM/DD/YYYY` via `-e`.
 
 <Warning>Open-ended offers (no `end_date`) combined with SLA expose you to indefinite asymmetric payout risk. See [Offer End Date](/host/hosting-overview#offer-end-date).</Warning>
 
@@ -214,7 +214,14 @@ This creates an offer with target `0.95`, claim `0.99`, and confidence spread `0
 <Note>
 Partial updates are supported when editing an existing listing. If you change only one SLA field, the platform re-validates the merged parameters. Set `sla_r_target` to `0` to disable SLA on an existing listing.
 
-Omitted non-SLA fields retain their current listing values; only fields present in the request body are updated. For fleet automation, prefer read-modify-write: `vastai show machines --raw` → merge → `PUT /api/v0/machines/create_asks/`.
+Omitted non-SLA fields retain their current listing values; only fields present in the request body are updated. For fleet automation, read current settings then merge:
+
+```bash
+vastai show machines --raw | jq '.[] | select(.id==12345) | {id, sla_r_target, sla_r_claim, sla_sigma_x, price_gpu, end_date}'
+```
+
+Then `PUT /api/v0/machines/create_asks/` with merged fields.
+</Note>
 
 ### Fleet listing workflow
 
@@ -225,7 +232,6 @@ For multiple machines, loop sequentially — do not parallelize without backoff:
 3. On `invalid_sla_params` or `machine_locked`, log the machine ID and continue or abort per your rollout policy.
 
 See [Fleet workflow](/host/sla-backtester#fleet-workflow) in the backtester for a similar sequential pattern.
-</Note>
 
 **SLA-only update** — include `machine` plus SLA fields; omit unrelated offer fields you intend to keep:
 
@@ -278,7 +284,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
 | Item | Amount |
 | --- | --- |
 | Daily compute (`C`) | ~$84/day ($3.50 × 24 hr GPU only — simplified) |
-| SLA premium to client | ~**$0.008/hr** (~$0.20/day) |
+| SLA premium (client pays) | ~**$0.008/hr** (~$0.20/day at 24 hr) |
 
 SLA payouts are capped at that UTC day's total billable earnings — GPU, storage, and bandwidth combined — not GPU compute alone. The simplified example below uses GPU-only math for readability; treat `worst_day_loss` from the [SLA backtester](/host/sla-backtester) as the authoritative tail-risk figure before you list.
 
@@ -432,7 +438,19 @@ For API automation only — console users can stop after the Console subsection 
 This endpoint is rate-limited — see [Rate Limits and Errors](/api-reference/rate-limits-and-errors). Poll no faster than about one request every two seconds per IP (`threshold=2.0`); back off on HTTP 429. For day-level per-machine reconciliation at scale, prefer console billing reports over high-frequency API polling.
 
 <Warning>
-When you pass `machid`, use `per_machine[].sla_earn` and `summary.total_sla` for that machine's SLA settlement in the window. Do **not** read `per_day[].sla_earn` for single-machine checks — `per_day[]` is always fleet-wide, even with `?machid=`. There is no per-machine daily SLA series in this API; use console day-level reports per machine for reconciliation, or poll `per_machine[].sla_earn` with `last_days=1` per `machid` (mind UTC day boundaries and rate limits). Expect ~N requests per poll cycle for N machines.
+When you pass `machid`, use `per_machine[].sla_earn` and `summary.total_sla` for that machine's SLA settlement in the window. Do **not** read `per_day[].sla_earn` for single-machine checks — `per_day[]` is always fleet-wide, even with `?machid=`.
+
+**Quick rules:**
+- **One machine:** use `per_machine[].sla_earn` with `machid` set.
+- **Fleet:** one request without `machid` returns all machines in `per_machine[]`:
+
+```bash
+curl -s -H "Authorization: Bearer $VAST_API_KEY" \
+  "https://console.vast.ai/api/v0/users/{user_id}/machine-earnings/?last_days=1" \
+  | jq '.per_machine[] | {machine_id, sla_earn}'
+```
+
+Poll no faster than about one request every two seconds. Prefer console billing exports for month-end reconciliation.
 </Warning>
 
 **Machine-scoped window total:**
