@@ -1,0 +1,73 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/deployments/:
+    delete:
+      summary: Delete Deployments by Name
+      tags:
+      - Serverless
+      description: Soft-deletes all deployments matching the given name (and optionally tag), cascading to endpoints and workers.
+      security:
+      - BearerAuth: []
+      x-scope: instance_write
+      x-rateLimit: 2.0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Name of the deployment(s) to delete; required.
+                  example: my-model
+                tag:
+                  type: string
+                  description: Tag variant to restrict deletion to a single deployment; if omitted, all tags under the name
+                    are deleted.
+                  example: v2
+      responses:
+        '200':
+          description: 'Returns {success: true, count: <number_deleted>}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success.
+                  count:
+                    type: integer
+                    description: Number of deployments deleted.
+              example:
+                success: true
+                count: 2
+        '400':
+          description: '"name is required"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: '"No active deployments found for name={name}" (optionally with tag)'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
