@@ -1,0 +1,85 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/team/invite/:
+    post:
+      summary: Invite Team Member
+      tags:
+      - Team
+      description: Sends an email invitation to a user to join the current team with a specified role.
+      security:
+      - BearerAuth: []
+      x-scope: team_write
+      x-rateLimit: 2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  description: Email address of the user to invite
+                  example: user@example.com
+                role:
+                  type: string
+                  description: Role to assign to the new team member
+                  example: developer
+      responses:
+        '200':
+          description: 'Success: {"success": true, "msg": "New invitation sent to <email>"}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success
+                  msg:
+                    type: string
+                    description: Confirmation including the invitee email address
+              example:
+                success: true
+                msg: New invitation sent to user@example.com
+        '400':
+          description: Only a team account can invite; missing email or role param; invitee cannot get owner role; can't invite
+            yourself; invitee is already a member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: '"Sending account must be verified."'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: '"Invalid role choice for invitee" or "Team metadata not found."'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: '"Error: invitation already sent to <email> only <N> seconds ago." (rate limit)'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
