@@ -224,6 +224,7 @@ code{background:#f0f0f6;padding:2px 5px;border-radius:4px}</style></head><body>
 <a class="btn" href="/__review__/export/feedback.md">Download Markdown</a>
 <a class="btn" href="/__review__/export/feedback.json">Download JSON</a>
 </p>
+<p><b>The 8 blocking questions</b> the team needs answered live at <a href="/review-questions">/review-questions</a> — comment on them there like any other page.</p>
 <p>When you're done reviewing, send back the CSV <i>or</i> the JSON file — either can be imported into Jira for record keeping.</p>
 <p><a href="/host/hosting-overview">← Back to the docs preview</a></p>
 </body></html>`;
@@ -663,6 +664,9 @@ const OVERLAY_JS = String.raw`
       '</div>' +
       '<div id="list"></div>' +
       '<footer>' +
+        '<div class="exports" style="border-bottom:1px solid #e7eaf1;padding-bottom:8px">' +
+          '<a href="/review-questions" style="background:#4a5cf0;color:#fff;border-color:#4a5cf0">&#9888; The 8 blocking questions &mdash; answer here</a>' +
+        '</div>' +
         '<div class="exports">Export: ' +
           '<a href="/__review__/export/feedback.csv">CSV (Jira)</a>' +
           '<a href="/__review__/export/feedback.md">Markdown</a>' +
