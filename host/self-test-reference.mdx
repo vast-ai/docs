@@ -97,9 +97,35 @@ Fabric state should normally show completed/successful registration on systems w
 
 Avoid ignoring warnings by default. One clear self-test advisory is that mapping more than the minimum number of direct ports per GPU is not itself a self-test gate. For production hosting, about 100 forwarded TCP/UDP ports per listed GPU is still practical headroom because individual instances can use many ports and old mappings may overlap with new starts. Red machine errors, self-test failures, NVML/Xid errors, port networking issues, and not-visible/rentable states should be investigated.
 
+<a id="reliability" />
 ## Reliability below the preflight gate
 
 Reliability greater than 0.9 is a self-test and verification gate; if the machine is at or below it, the self-test can fail before renting the temporary instance. See [Reliability & Uptime](/host/reliability-uptime#reliability-threshold).
+
+<a id="auth-error" />
+## Authorization Error or HTTP 401
+
+The API key running the self-test cannot inspect the machine or its offer. Confirm the CLI is authenticated to the host-enabled account that owns the machine, and that the API key has machine and offer permissions. For key handling, see [Host Account Security](/host/account-security-for-hosts).
+
+<a id="direct-ports" />
+## Direct ports below requirement
+
+The machine does not expose enough direct ports for its listed GPUs. The self-test gate is at least 3 forwarded TCP and UDP ports per listed GPU; production hosting should use far more headroom. See [Network & Ports](/host/network-ports#ports-per-gpu) for the port formula and forwarding checklist.
+
+<a id="bandwidth" />
+## Upload or download bandwidth failure
+
+Measured network throughput is below the machine's requirement, which scales with total GPU VRAM. Check ISP or datacenter bandwidth, routing, and host load, and compare repeated speed results. The canonical bandwidth requirement lives in [Verification Stages: requirements](/host/verification-stages#additional-requirements-for-verification).
+
+<a id="insufficient-resources" />
+## VRAM, RAM, or CPU core failure
+
+Hardware resources do not meet the listed GPU requirement: more than 7 GB VRAM per GPU, system RAM close to total GPU VRAM, and at least one physical CPU core per visible GPU. Confirm all GPUs are visible with `nvidia-smi` and compare host RAM and core counts against the gates in [Verification Stages: requirements](/host/verification-stages#additional-requirements-for-verification).
+
+<a id="system-requirements" />
+## System requirements failure
+
+The temporary test container could not confirm core host resources. Check available RAM, CPU cores, and GPU visibility from inside a container, and read the container logs in the diagnostic bundle; see [Host Diagnostics](/host/common-errors-diagnostics#logs).
 
 ## Errors not specific to the self-test
 
