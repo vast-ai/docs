@@ -1,0 +1,102 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/tfa/:
+    post:
+      summary: Log In with 2FA
+      tags:
+      - Accounts
+      description: Verifies a 2FA code (SMS, TOTP, email, or backup code) and creates a 24-hour 2FA session key on success.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 1.1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tfa_method_id:
+                  type: integer
+                  description: ID of a specific configured 2FA method to verify against, when the user has multiple methods
+                    of the same type
+                  example: 3
+                code:
+                  type: string
+                  description: The 2FA verification code received by the user
+                  example: '123456'
+                secret:
+                  type: string
+                  description: The tfa_secret token issued during the prior auth step (required for UI flow and SMS CLI flow)
+                  example: abc123secret
+                tfa_method:
+                  type: string
+                  description: The 2FA method being verified
+                  example: totp
+                  enum:
+                  - sms
+                  - totp
+                  - email
+                backup_code:
+                  type: string
+                  description: One-time-use backup code (e.g. ABCD-EFGH-IJKL) that bypasses normal 2FA verification
+                  example: ABCD-EFGH-1234
+                admin:
+                  type: boolean
+                  description: Request an admin-privileged session; only effective for admin users
+                  example: false
+      responses:
+        '200':
+          description: Returns formatted user object; includes session_key if called from CLI, backup_codes_remaining if a
+            backup code was used, and legacy_tfa_user flag if applicable.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_key:
+                    type: string
+                    description: Unhashed 2FA session API key (returned only for CLI / Bearer-token callers)
+                  backup_codes_remaining:
+                    type: integer
+                    description: Number of remaining backup codes if a backup code was used
+                  legacy_tfa_user:
+                    type: boolean
+                    description: Present and true if the user is on the legacy 2FA system
+        '400':
+          description: Invalid tfa_method ("invalid_tfa_method"), SMS 2FA has no phone number ("2fa_login_failed"), invalid
+            2FA code ("2fa_verification_failed"), or 2FA token expired ("2fa_expired").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing auth value ("missing_auth_value"), invalid backup code ("invalid_backup_code"), or bearer token
+            invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many failed 2FA attempts, method locked ("tfa_locked") or Twilio rate limited ("twilio_rate_limited").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
