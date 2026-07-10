@@ -1,0 +1,644 @@
+openapi: 3.0.0
+info:
+  title: Vast.ai Notifications API
+  description: Manage notification types, preferences, in-app notifications, and notification webhooks.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/notification-types/:
+    get:
+      summary: list notification types
+      description: |
+        List the notification types available to the authenticated user, including their display names, contexts, topics, and default channel settings.
+      security:
+      - BearerAuth: []
+      tags:
+      - Notifications
+      responses:
+        '200':
+          description: Notification types returned successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  notification_types:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NotificationType'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v0/users/{user_id}/notification-prefs/:
+    get:
+      summary: get notification preferences
+      description: Read notification preferences for the authenticated user.
+      security:
+      - BearerAuth: []
+      tags:
+      - Notifications
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ID of the authenticated user.
+      responses:
+        '200':
+          description: Notification preferences returned successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  notification_preferences:
+                    $ref: '#/components/schemas/NotificationPreferences'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: update notification preferences
+      description: Replace notification preferences for the authenticated user.
+      security:
+      - BearerAuth: []
+      tags:
+      - Notifications
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ID of the authenticated user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - notification_preferences
+              properties:
+                notification_preferences:
+                  $ref: '#/components/schemas/NotificationPreferences'
+            example:
+              notification_preferences:
+                client:
+                  low_credit:
+                    email: true
+                    webhooks: false
+      responses:
+        '200':
+          description: Notification preferences updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  notification_preferences:
+                    $ref: '#/components/schemas/NotificationPreferences'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  # HIDDEN: in-app notification inbox endpoints — no console UI yet. Uncomment this block and run `npm run build-openapi` to re-enable.
+#  /api/v0/notifications/inbox/:
+#    get:
+#      summary: get notification inbox
+#      description: Read recent in-app notifications for the authenticated user.
+#      security:
+#      - BearerAuth: []
+#      tags:
+#      - Notifications
+#      responses:
+#        '200':
+#          description: Inbox returned successfully
+#          content:
+#            application/json:
+#              schema:
+#                type: object
+#                properties:
+#                  success:
+#                    type: boolean
+#                    example: true
+#                  notifications:
+#                    type: array
+#                    items:
+#                      $ref: '#/components/schemas/InAppNotification'
+#                  last_seen_at:
+#                    type: number
+#                    format: float
+#                    nullable: true
+#                  seen_through_at:
+#                    type: number
+#                    format: float
+#                    nullable: true
+#                  unread_count:
+#                    type: integer
+#                    example: 2
+#        '401':
+#          description: Unauthorized
+#          content:
+#            application/json:
+#              schema:
+#                $ref: '#/components/schemas/Error'
+#    put:
+#      summary: mark notification inbox as seen
+#      description: Mark in-app notifications as seen using a timestamp returned by the inbox endpoint.
+#      security:
+#      - BearerAuth: []
+#      tags:
+#      - Notifications
+#      requestBody:
+#        required: true
+#        content:
+#          application/json:
+#            schema:
+#              type: object
+#              required:
+#              - seen_through_at
+#              properties:
+#                seen_through_at:
+#                  type: number
+#                  format: float
+#                  description: Timestamp returned by `GET /api/v0/notifications/inbox/`.
+#            example:
+#              seen_through_at: 1772490000.123
+#      responses:
+#        '200':
+#          description: Inbox marked seen successfully
+#          content:
+#            application/json:
+#              schema:
+#                type: object
+#                properties:
+#                  success:
+#                    type: boolean
+#                    example: true
+#                  last_seen_at:
+#                    type: number
+#                    format: float
+#        '400':
+#          description: Bad Request
+#          content:
+#            application/json:
+#              schema:
+#                $ref: '#/components/schemas/Error'
+#        '401':
+#          description: Unauthorized
+#          content:
+#            application/json:
+#              schema:
+#                $ref: '#/components/schemas/Error'
+  /api/v0/webhooks/:
+    get:
+      summary: list notification webhooks
+      description: List notification webhooks for the authenticated user.
+      security:
+      - BearerAuth: []
+      tags:
+      - Notifications
+      responses:
+        '200':
+          description: Webhooks returned successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  webhooks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NotificationWebhook'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: create notification webhook
+      description: |
+        Create a notification webhook for one or more notification type keys. The response includes the signing secret; store it immediately.
+      security:
+      - BearerAuth: []
+      tags:
+      - Notifications
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationWebhookCreateRequest'
+            example:
+              name: Ops notifications
+              webhook_url: https://example.com/vast/webhooks
+              event_types:
+              - client:low_credit
+              - host:machine_offline
+      responses:
+        '200':
+          description: Webhook created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  webhook:
+                    $ref: '#/components/schemas/NotificationWebhookWithSecret'
+                  enabled_notification_preferences:
+                    type: array
+                    items:
+                      type: string
+                    example:
+                    - client:low_credit
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v0/webhooks/{id}/:
+    put:
+      summary: update notification webhook
+      description: Update a notification webhook's name, URL, or event subscriptions.
+      security:
+      - BearerAuth: []
+      tags:
+      - Notifications
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Webhook ID.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationWebhookUpdateRequest'
+            example:
+              name: Primary ops notifications
+              event_types:
+              - client:low_credit
+              - client:outbid
+      responses:
+        '200':
+          description: Webhook updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  webhook:
+                    $ref: '#/components/schemas/NotificationWebhook'
+                  enabled_notification_preferences:
+                    type: array
+                    items:
+                      type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: delete notification webhook
+      description: Delete a notification webhook.
+      security:
+      - BearerAuth: []
+      tags:
+      - Notifications
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Webhook ID.
+      responses:
+        '200':
+          description: Webhook deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v0/webhooks/{id}/rotate-secret/:
+    post:
+      summary: rotate notification webhook secret
+      description: Rotate the webhook signing secret. Store the returned secret immediately.
+      security:
+      - BearerAuth: []
+      tags:
+      - Notifications
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Webhook ID.
+      responses:
+        '200':
+          description: Webhook secret rotated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  webhook:
+                    $ref: '#/components/schemas/NotificationWebhookWithSecret'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v0/webhooks/{id}/test/:
+    post:
+      summary: test notification webhook
+      description: Send a test delivery to the webhook URL using the same request format and signature headers as normal webhook delivery.
+      security:
+      - BearerAuth: []
+      tags:
+      - Notifications
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Webhook ID.
+      responses:
+        '200':
+          description: Test delivery accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  msg:
+                    type: string
+                    example: Test webhook delivered
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: API key must be provided in the Authorization header
+  schemas:
+    NotificationType:
+      type: object
+      properties:
+        key:
+          type: string
+          description: Full notification type key.
+          example: client:low_credit
+        slug:
+          type: string
+          example: low_credit
+        context:
+          type: string
+          enum:
+          - client
+          - host
+        topic:
+          type: string
+          nullable: true
+          example: billing
+        category:
+          type: string
+          example: billing
+        display_name:
+          type: string
+          example: Low balance notifications
+        default_preferences:
+          type: object
+          additionalProperties:
+            type: boolean
+          example:
+            email: true
+            webhooks: false
+        mandatory_email:
+          type: boolean
+          example: false
+    NotificationPreferences:
+      type: object
+      additionalProperties:
+        type: object
+        additionalProperties:
+          type: object
+          additionalProperties:
+            type: boolean
+      example:
+        client:
+          low_credit:
+            email: true
+            webhooks: false
+  # HIDDEN: InAppNotification schema (used only by the hidden inbox endpoints). Uncomment with the inbox block above to re-enable.
+#    InAppNotification:
+#      type: object
+#      properties:
+#        event_id:
+#          type: string
+#          example: 7e9a2c4e6f9e4a24a53b77c2d8e3f0aa
+#        notif_type:
+#          type: string
+#          example: low_credit
+#        subject:
+#          type: string
+#          example: Warning - Your Vast.ai Credit Balance Is Getting Low
+#        message:
+#          type: string
+#          example: Your Vast.ai balance is below your configured threshold.
+#        timestamp:
+#          type: number
+#          format: float
+#          example: 1772490000.123
+    NotificationWebhook:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 42
+        user_id:
+          type: integer
+          example: 123
+        name:
+          type: string
+          nullable: true
+          example: Ops notifications
+        webhook_url:
+          type: string
+          format: uri
+          example: https://example.com/vast/webhooks
+        event_types:
+          type: array
+          items:
+            type: string
+          example:
+          - client:low_credit
+          - host:machine_offline
+        created_at:
+          type: number
+          format: float
+          example: 1772490000.0
+        updated_at:
+          type: number
+          format: float
+          example: 1772490000.0
+    NotificationWebhookWithSecret:
+      allOf:
+      - $ref: '#/components/schemas/NotificationWebhook'
+      - type: object
+        properties:
+          webhook_secret:
+            type: string
+            description: Secret used to verify `X-Vast-Signature-256`.
+            example: <WEBHOOK_SECRET>
+    NotificationWebhookCreateRequest:
+      type: object
+      required:
+      - webhook_url
+      - event_types
+      properties:
+        name:
+          type: string
+          nullable: true
+          maxLength: 120
+        webhook_url:
+          type: string
+          format: uri
+          maxLength: 2048
+        event_types:
+          type: array
+          minItems: 1
+          items:
+            type: string
+    NotificationWebhookUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+          maxLength: 120
+        webhook_url:
+          type: string
+          format: uri
+          maxLength: 2048
+        event_types:
+          type: array
+          minItems: 1
+          items:
+            type: string
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+        msg:
+          type: string
