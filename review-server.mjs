@@ -43,6 +43,9 @@ const PR_URL = 'https://github.com/vast-ai/docs/pull/185';
 const TRACEABILITY_URL = 'https://github.com/jjziets/docs/blob/CON-1584-host-cli-api-sdk/REVIEW-TRACEABILITY.md';
 const PR_LABEL = 'docs-pr185-review';
 const JIRA_BASE_URL = 'https://vastai.atlassian.net/browse/';
+const FEEDBACK_EXPORT_FORMAT = 'vast-docs-review-feedback';
+const FEEDBACK_EXPORT_VERSION = 1;
+const MAX_IMPORT_ITEMS = 50000;
 
 // Review-only provenance. This data is served only by the :4000 review proxy;
 // it is never injected into the Mintlify MDX served directly on :3000.
@@ -294,6 +297,71 @@ function readAllItems() {
   return { items: all, reviewers };
 }
 
+function feedbackExportPayload() {
+  const { items, reviewers } = readAllItems();
+  return {
+    format: FEEDBACK_EXPORT_FORMAT,
+    version: FEEDBACK_EXPORT_VERSION,
+    generatedAt: new Date().toISOString(),
+    pr: PR_URL,
+    reviewers,
+    items,
+  };
+}
+
+function importFeedbackPayload(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('expected a JSON feedback export object');
+  }
+  if (payload.format != null && payload.format !== FEEDBACK_EXPORT_FORMAT) {
+    throw new Error(`unsupported feedback format: ${String(payload.format)}`);
+  }
+  if (payload.version != null && payload.version !== FEEDBACK_EXPORT_VERSION) {
+    throw new Error(`unsupported feedback version: ${String(payload.version)}`);
+  }
+  if (!Array.isArray(payload.items)) throw new Error('expected an items[] array');
+  if (payload.items.length > MAX_IMPORT_ITEMS) {
+    throw new Error(`too many feedback items (maximum ${MAX_IMPORT_ITEMS})`);
+  }
+
+  const fallbackReviewer = typeof payload.reviewer === 'string' ? payload.reviewer.trim() : '';
+  const groups = new Map();
+  const seenIds = new Set();
+  for (let index = 0; index < payload.items.length; index += 1) {
+    const item = payload.items[index];
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      throw new Error(`item ${index + 1} must be an object`);
+    }
+    const id = typeof item.id === 'string' ? item.id.trim() : '';
+    if (!id || id.length > 200) throw new Error(`item ${index + 1} has an invalid id`);
+    if (seenIds.has(id)) throw new Error(`duplicate feedback item id: ${id}`);
+    seenIds.add(id);
+    const reviewer = typeof item.reviewer === 'string' && item.reviewer.trim()
+      ? item.reviewer.trim()
+      : fallbackReviewer;
+    if (!reviewer || reviewer.length > 200) {
+      throw new Error(`item ${index + 1} is missing a valid reviewer`);
+    }
+    if (item.updatedAt != null && typeof item.updatedAt !== 'string') {
+      throw new Error(`item ${index + 1} has an invalid updatedAt`);
+    }
+    const normalized = { ...item, id, reviewer };
+    if (!groups.has(reviewer)) groups.set(reviewer, []);
+    groups.get(reviewer).push(normalized);
+  }
+
+  const states = [];
+  for (const [reviewer, items] of groups) {
+    states.push({ reviewer, received: items.length, stored: writeReviewerState(reviewer, items) });
+  }
+  return {
+    ok: true,
+    imported: payload.items.length,
+    reviewerCount: states.length,
+    reviewers: states,
+  };
+}
+
 // ---------------------------------------------------------------- exports
 const PRIORITY_MAP = { Blocker: 'Highest', Major: 'High', Minor: 'Medium', Nit: 'Low' };
 
@@ -400,19 +468,52 @@ function statusPage() {
   return `<!doctype html><html><head><meta charset="utf-8"><title>PR 185 review feedback</title>
 <style>body{font:15px/1.5 system-ui,sans-serif;max-width:640px;margin:40px auto;padding:0 16px;color:#1a1a2e}
 h1{font-size:22px} table{border-collapse:collapse;margin:12px 0}td,th{border:1px solid #ccc;padding:6px 14px;text-align:left}
-a.btn{display:inline-block;margin:4px 8px 4px 0;padding:8px 14px;border:1px solid #4a5cf0;border-radius:8px;color:#4a5cf0;text-decoration:none;font-weight:600}
+.btn{display:inline-block;margin:4px 8px 4px 0;padding:8px 14px;border:1px solid #4a5cf0;border-radius:8px;color:#4a5cf0;background:#fff;text-decoration:none;font:600 14px system-ui;cursor:pointer}
+.btn.primary{background:#4a5cf0;color:#fff}.muted{color:#687086}#importResult{min-height:24px;font-weight:600}
 code{background:#f0f0f6;padding:2px 5px;border-radius:4px}</style></head><body>
 <h1>Vast.ai docs review — PR 185 feedback</h1>
 <p><b>${items.length}</b> item(s), <b>${open}</b> open. Feedback files live in <code>${esc(FEEDBACK_DIR)}</code>.</p>
 <table><tr><th>Reviewer</th><th>Items</th></tr>${rows}</table>
 <p>
-<a class="btn" href="/__review__/export/feedback.csv">Download CSV (Jira import)</a>
-<a class="btn" href="/__review__/export/feedback.md">Download Markdown</a>
-<a class="btn" href="/__review__/export/feedback.json">Download JSON</a>
+<a class="btn primary" href="/__review__/export/feedback.json" download>Save JSON</a>
+<button class="btn" id="importJson" type="button">Import JSON</button>
+<input id="importJsonFile" type="file" accept="application/json,.json" hidden>
 </p>
+<p class="muted">JSON is the restorable backup for every page and reviewer. Import merges it with current feedback; newer item timestamps win.</p>
+<p>Other exports: <a href="/__review__/export/feedback.csv">CSV (Jira import)</a> · <a href="/__review__/export/feedback.md">Markdown</a></p>
+<p id="importResult" role="status" aria-live="polite"></p>
 <p><b>Reviewer inputs and Jira sources</b> are shown for each page inside the review panel. The combined list remains available at <a href="/review-questions">/review-questions</a>, with the implemented-versus-open evidence in the <a href="${TRACEABILITY_URL}">traceability audit</a>.</p>
-<p>When you're done reviewing, send back the CSV <i>or</i> the JSON file — either can be imported into Jira for record keeping.</p>
+<p>When you're done reviewing, send the JSON file back to restore all feedback, or use the CSV for Jira import.</p>
 <p><a href="/host/hosting-overview">← Back to the docs preview</a></p>
+<script>
+(function () {
+  var button = document.getElementById('importJson');
+  var input = document.getElementById('importJsonFile');
+  var result = document.getElementById('importResult');
+  button.addEventListener('click', function () { input.click(); });
+  input.addEventListener('change', async function () {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    try {
+      var payload = JSON.parse(await file.text());
+      var count = payload && Array.isArray(payload.items) ? payload.items.length : 0;
+      if (!confirm('Import ' + count + ' feedback item(s)? Existing newer items will be kept.')) return;
+      result.textContent = 'Importing…';
+      var response = await fetch('/__review__/api/import', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload)
+      });
+      var data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Import failed');
+      result.textContent = 'Imported ' + data.imported + ' item(s) for ' + data.reviewerCount + ' reviewer(s). Reloading…';
+      setTimeout(function () { location.reload(); }, 700);
+    } catch (error) {
+      result.textContent = 'Import failed: ' + String(error && error.message ? error.message : error);
+    } finally {
+      input.value = '';
+    }
+  });
+})();
+</script>
 </body></html>`;
 }
 
@@ -478,17 +579,19 @@ const OVERLAY_JS = String.raw`
     saveTimer = setTimeout(pushToServer, 700);
   }
   function pushToServer() {
-    if (!reviewer) { saveStatus = 'offline'; renderSaveStatus(); return; }
-    fetch(API + '/state', {
+    if (!reviewer) { saveStatus = 'offline'; renderSaveStatus(); return Promise.resolve(false); }
+    return fetch(API + '/state', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ reviewer: reviewer, items: items })
     }).then(function (r) {
       saveStatus = r.ok ? 'saved' : 'offline';
       renderSaveStatus();
+      return r.ok;
     }).catch(function () {
       saveStatus = 'offline';
       renderSaveStatus();
+      return false;
     });
   }
   function mergeServerState() {
@@ -525,6 +628,47 @@ const OVERLAY_JS = String.raw`
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'hidden') flushNow();
   });
+
+  function saveJsonBackup() {
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    persistLocal();
+    var sync = reviewer ? pushToServer() : Promise.resolve(true);
+    sync.then(function (ok) {
+      if (!ok && reviewer) toast('Browser feedback could not sync; saving the server backup');
+      var link = document.createElement('a');
+      link.href = '/__review__/export/feedback.json';
+      link.download = 'pr185-docs-feedback.json';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      if (ok || !reviewer) toast('Saved JSON backup');
+    });
+  }
+
+  function importJsonBackup(file) {
+    if (!file) return;
+    file.text().then(function (text) {
+      var payload = JSON.parse(text);
+      var count = payload && Array.isArray(payload.items) ? payload.items.length : 0;
+      if (!confirm('Import ' + count + ' feedback item(s)? Existing newer items will be kept.')) return null;
+      var sync = reviewer ? pushToServer() : Promise.resolve(true);
+      return sync.then(function () {
+        return fetch(API + '/import', {
+          method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload)
+        });
+      });
+    }).then(function (response) {
+      if (!response) return null;
+      return response.json().then(function (data) {
+        if (!response.ok) throw new Error(data.error || 'Import failed');
+        toast('Imported ' + data.imported + ' item(s) for ' + data.reviewerCount + ' reviewer(s)');
+        if (reviewer) mergeServerState();
+        return data;
+      });
+    }).catch(function (error) {
+      toast('Import failed: ' + String(error && error.message ? error.message : error));
+    });
+  }
 
   // ---------------- text index + anchoring ----------------
   function skipNode(el) {
@@ -876,7 +1020,9 @@ const OVERLAY_JS = String.raw`
     '.empty{color:#8a93a6;text-align:center;padding:30px 10px}' +
     '#panel footer{border-top:1px solid #e7eaf1;padding:10px 14px;display:flex;flex-direction:column;gap:8px;background:#f7f8fc}' +
     '.exports{display:flex;gap:8px;align-items:center;flex-wrap:wrap}' +
-    '.exports a{color:#4a5cf0;font-weight:600;text-decoration:none;font-size:12px;border:1px solid #c9d0f5;border-radius:6px;padding:4px 9px}' +
+    '.exports a,.exports button{color:#4a5cf0;background:#fff;font-weight:600;text-decoration:none;font:600 12px system-ui;border:1px solid #c9d0f5;border-radius:6px;padding:4px 9px;cursor:pointer}' +
+    '.exports .primary{background:#4a5cf0;color:#fff;border-color:#4a5cf0}' +
+    '.exports .label{font-size:11px;color:#687086}' +
     '#saveStatus{font-size:11px;color:#8a93a6}' +
     '#composer,#nameModal{position:fixed;z-index:2147483003;top:50%;left:50%;transform:translate(-50%,-50%);width:420px;max-width:92vw;' +
       'display:none;flex-direction:column;gap:10px;background:#fff;color:#1a1a2e;border-radius:14px;padding:18px;box-shadow:0 12px 48px rgba(0,0,0,.3);font-size:13px}' +
@@ -924,10 +1070,13 @@ const OVERLAY_JS = String.raw`
           '<a href="/review-questions" style="background:#4a5cf0;color:#fff;border-color:#4a5cf0">All reviewer inputs and Jira gates</a>' +
           '<a href="${TRACEABILITY_URL}" target="_blank" rel="noopener noreferrer">Traceability audit</a>' +
         '</div>' +
-        '<div class="exports">Export: ' +
+        '<div class="exports">' +
+          '<button id="saveJson" class="primary" type="button">Save JSON</button>' +
+          '<button id="importJson" type="button">Import JSON</button>' +
+          '<input id="importJsonFile" type="file" accept="application/json,.json" hidden>' +
+          '<span class="label">Other exports:</span>' +
           '<a href="/__review__/export/feedback.csv">CSV (Jira)</a>' +
           '<a href="/__review__/export/feedback.md">Markdown</a>' +
-          '<a href="/__review__/export/feedback.json">JSON</a>' +
           '<a href="/__review__/" target="_blank">Status</a>' +
         '</div>' +
         '<div id="saveStatus"></div>' +
@@ -1140,6 +1289,13 @@ const OVERLAY_JS = String.raw`
   });
   $('closePanel').addEventListener('click', closePanel);
   $('editWho').addEventListener('click', openNameModal);
+  $('saveJson').addEventListener('click', saveJsonBackup);
+  $('importJson').addEventListener('click', function () { $('importJsonFile').click(); });
+  $('importJsonFile').addEventListener('change', function (e) {
+    var file = e.target.files && e.target.files[0];
+    importJsonBackup(file);
+    e.target.value = '';
+  });
   $('allPages').addEventListener('change', function (e) { showAllPages = e.target.checked; renderList(); });
   $('addPageNote').addEventListener('click', function () {
     pending = null; editingId = null;
@@ -1341,8 +1497,18 @@ async function handleReviewRoute(req, res, url) {
     }
     return;
   }
+  if (p === '/__review__/api/import' && req.method === 'POST') {
+    try {
+      const payload = JSON.parse((await readBody(req, 8 * 1024 * 1024)).toString('utf8'));
+      sendJson(res, 200, importFeedbackPayload(payload));
+    } catch (e) {
+      sendJson(res, 400, { error: String(e.message || e) });
+    }
+    return;
+  }
   if (p.startsWith('/__review__/export/')) {
-    const { items, reviewers } = readAllItems();
+    const exportPayload = feedbackExportPayload();
+    const { items, reviewers } = exportPayload;
     const kind = p.split('/').pop();
     if (kind === 'feedback.csv') {
       res.writeHead(200, {
@@ -1368,7 +1534,7 @@ async function handleReviewRoute(req, res, url) {
         'content-disposition': 'attachment; filename="pr185-docs-feedback.json"',
         'cache-control': 'no-store',
       });
-      res.end(JSON.stringify({ generatedAt: new Date().toISOString(), pr: PR_URL, reviewers, items }, null, 2));
+      res.end(JSON.stringify(exportPayload, null, 2));
       return;
     }
   }
