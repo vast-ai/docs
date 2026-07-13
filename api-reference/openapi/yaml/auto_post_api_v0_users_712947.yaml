@@ -1,0 +1,133 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/users/:
+    post:
+      summary: Create User Account
+      tags:
+      - Accounts
+      description: Register a new user account with username, email, password, and optional captcha, SSH key, and promo code.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 3
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  description: User's email address
+                  maxLength: 64
+                  example: user@example.com
+                  pattern: ^(?!.*@vast)[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$
+                username:
+                  type: string
+                  description: Desired username
+                  maxLength: 64
+                  example: testuser123
+                password:
+                  type: string
+                  description: Account password
+                  maxLength: 256
+                  example: securepass123
+                host_only:
+                  type: boolean
+                  description: If true, account is restricted to host functionality only
+                  example: true
+                parent_id:
+                  type: string
+                  description: Parent account ID for subaccounts. Use "me" for current user.
+                  example: me
+                ssh_key:
+                  type: string
+                  description: Optional SSH public key
+                  maxLength: 4096
+                captcha:
+                  type: string
+                  description: Captcha token (required for non-subaccounts)
+                  maxLength: 8192
+              required:
+              - email
+              - username
+              - password
+      responses:
+        '200':
+          description: Account created successfully; returns formatted user object with API key
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    description: User ID
+                  username:
+                    type: string
+                    description: Username
+                  email:
+                    type: string
+                    description: Email address
+                  api_key:
+                    type: string
+                    description: API key (populated for subaccounts)
+                  key_id:
+                    type: integer
+                    description: Active API key ID
+                  balance:
+                    type: number
+                    description: Account credit balance (USD)
+                  credit:
+                    type: number
+                    description: Promotional credit balance (USD)
+                  email_verified:
+                    type: boolean
+                    description: Whether the email has been verified
+                  host_only:
+                    type: boolean
+                    description: Whether this is a host-only account
+                  ssh_key:
+                    type: string
+                    description: Default SSH public key
+                  can_pay:
+                    type: boolean
+                    description: Whether a payment method is on file
+                  has_billing:
+                    type: boolean
+                    description: Whether a Stripe payment method exists
+        '400':
+          description: 'Invalid email: "Failed to create account."'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden email domain containing 'support.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 'Username or email already exists: "Failed to create account."'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
