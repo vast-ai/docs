@@ -250,11 +250,13 @@ const OVERLAY_JS = String.raw`
   var reviewer = '';
   var items = [];
   var pending = null;      // selection captured but not yet saved
+  var selectionDraft = null; // latest page selection, kept until commented on or cleared
   var editingId = null;
   var showAllPages = false;
   var saveStatus = 'idle'; // idle | saving | saved | offline
   var saveTimer = null;
   var anchorTimer = null;
+  var selectionTimer = null;
 
   try { reviewer = localStorage.getItem(LS_REVIEWER) || ''; } catch (e) {}
   try { items = JSON.parse(localStorage.getItem(LS_ITEMS) || '[]'); } catch (e) { items = []; }
@@ -479,18 +481,42 @@ const OVERLAY_JS = String.raw`
   }
 
   // ---------------- selection capture ----------------
-  var selBtnData = null;
-  function hideSelBtn() { selBtn.style.display = 'none'; selBtnData = null; }
+  function hideSelBtn() { selBtn.style.display = 'none'; }
+  function clearSelectionDraft() {
+    selectionDraft = null;
+    hideSelBtn();
+    renderSelectionDraft();
+  }
+  function positionSelectionButton(rect) {
+    // The panel has its own persistent selection action. Avoid placing the
+    // transient button underneath it when a reviewer selects text nearby.
+    if (panel && panel.classList.contains('open')) { hideSelBtn(); return; }
+    selBtn.style.visibility = 'hidden';
+    selBtn.style.display = 'flex';
+    var width = selBtn.offsetWidth || 190;
+    var height = selBtn.offsetHeight || 36;
+    var x = rect.left + (rect.width / 2) - (width / 2);
+    var y = rect.bottom + 8;
+    x = Math.max(8, Math.min(x, window.innerWidth - width - 8));
+    if (y + height > window.innerHeight - 8) y = rect.top - height - 8;
+    y = Math.max(8, Math.min(y, window.innerHeight - height - 8));
+    selBtn.style.left = x + 'px';
+    selBtn.style.top = y + 'px';
+    selBtn.style.visibility = 'visible';
+  }
   function onSelectionSettled() {
     var sel = document.getSelection();
     if (!sel || sel.isCollapsed || sel.rangeCount === 0) { hideSelBtn(); return; }
     var anchor = sel.anchorNode;
+    var anchorRoot = anchor && anchor.getRootNode ? anchor.getRootNode() : null;
+    if (anchorRoot === shadow) { hideSelBtn(); return; }
     if (anchor && host.contains(anchor.nodeType === 1 ? anchor : anchor.parentNode)) { hideSelBtn(); return; }
     if (anchor === host) { hideSelBtn(); return; }
     var quote = sel.toString().replace(/\s+$/,'').replace(/^\s+/,'');
     if (quote.length < 2 || quote.length > 2000) { hideSelBtn(); return; }
     var range = sel.getRangeAt(0);
-    var rect = range.getBoundingClientRect();
+    var rects = range.getClientRects();
+    var rect = rects.length ? rects[rects.length - 1] : range.getBoundingClientRect();
     if (!rect || (rect.width === 0 && rect.height === 0)) { hideSelBtn(); return; }
 
     var index = buildTextIndex();
@@ -500,15 +526,12 @@ const OVERLAY_JS = String.raw`
     if (s >= 0) prefix = index.text.slice(Math.max(0, s - 40), s);
     if (e >= 0) suffix = index.text.slice(e, e + 40);
 
-    selBtnData = {
+    selectionDraft = {
       quote: quote, prefix: prefix, suffix: suffix,
       heading: nearestHeading(range)
     };
-    var x = Math.min(rect.right + 6, window.innerWidth - 130);
-    var y = Math.min(Math.max(rect.bottom + 6, 10), window.innerHeight - 44);
-    selBtn.style.left = Math.max(8, x) + 'px';
-    selBtn.style.top = y + 'px';
-    selBtn.style.display = 'flex';
+    renderSelectionDraft();
+    positionSelectionButton(rect);
   }
   function nearestHeading(range) {
     var hs = document.querySelectorAll('h1, h2, h3, h4');
@@ -525,6 +548,7 @@ const OVERLAY_JS = String.raw`
                           // back/forward navigation mid-typing cannot mislabel the item
   function saveItem(fields) {
     var it;
+    var consumedSelection = false;
     if (editingId) {
       it = items.filter(function (x) { return x.id === editingId; })[0];
       if (!it) return;
@@ -533,6 +557,7 @@ const OVERLAY_JS = String.raw`
       it.comment = fields.comment;
       it.updatedAt = nowIso();
     } else {
+      consumedSelection = !!(pending && pending.quote);
       it = {
         id: uid(),
         reviewer: reviewer,
@@ -554,6 +579,7 @@ const OVERLAY_JS = String.raw`
     }
     pending = null;
     editingId = null;
+    if (consumedSelection) clearSelectionDraft();
     scheduleSave();
     scheduleAnchor();
     renderAll();
@@ -595,10 +621,11 @@ const OVERLAY_JS = String.raw`
       'padding:10px 16px;border:none;border-radius:999px;background:#4a5cf0;color:#fff;font-size:14px;font-weight:600;' +
       'cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.25)}' +
     '#pill:hover{background:#3a49d6}' +
+    '#pill.selection-ready{background:#1a1a2e;box-shadow:0 0 0 3px rgba(255,209,102,.85),0 4px 16px rgba(0,0,0,.25)}' +
     '#pill .count{background:rgba(255,255,255,.25);border-radius:999px;padding:1px 8px;font-size:12px}' +
     '#selbtn{position:fixed;z-index:2147483001;display:none;align-items:center;gap:6px;padding:7px 12px;' +
       'border:none;border-radius:8px;background:#1a1a2e;color:#fff;font-size:13px;font-weight:600;cursor:pointer;' +
-      'box-shadow:0 4px 14px rgba(0,0,0,.3)}' +
+      'box-shadow:0 0 0 3px rgba(255,209,102,.85),0 4px 14px rgba(0,0,0,.3);white-space:nowrap}' +
     '#panel{position:fixed;top:0;right:0;bottom:0;width:380px;max-width:95vw;z-index:2147483002;display:none;' +
       'flex-direction:column;background:#fff;color:#1a1a2e;border-left:1px solid #d5d9e4;box-shadow:-6px 0 24px rgba(0,0,0,.12);font-size:13px}' +
     '#panel.open{display:flex}' +
@@ -611,6 +638,18 @@ const OVERLAY_JS = String.raw`
     '.filters{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 14px;border-bottom:1px solid #e7eaf1}' +
     '.filters label{display:flex;align-items:center;gap:6px;cursor:pointer;color:#5c677d}' +
     '.filters .primary{background:#4a5cf0;border-color:#4a5cf0;color:#fff;font-weight:600}' +
+    '#selectionTools{padding:10px 14px;border-bottom:1px solid #e7eaf1;background:#f7f8ff}' +
+    '#selectionTools .selection-empty{color:#5c677d;line-height:1.45}' +
+    '#selectionTools .selection-ready-body{display:none;gap:8px;flex-direction:column}' +
+    '#selectionTools.ready .selection-empty{display:none}' +
+    '#selectionTools.ready .selection-ready-body{display:flex}' +
+    '.selection-title{display:flex;align-items:center;justify-content:space-between;gap:8px}' +
+    '.selection-title b{color:#1a1a2e}' +
+    '.selection-title button{border:0;background:none;color:#5c677d;cursor:pointer;font-size:12px;padding:0}' +
+    '#selectionQuote{margin:0;padding:6px 10px;border-left:3px solid #ffd166;background:#fff9e8;color:#5c5233;' +
+      'font-style:italic;max-height:72px;overflow:auto;white-space:pre-wrap}' +
+    '#commentSelection{align-self:flex-start;border:0;border-radius:7px;padding:7px 11px;background:#4a5cf0;color:#fff;' +
+      'font-size:12px;font-weight:700;cursor:pointer}' +
     '#list{flex:1;overflow-y:auto;padding:10px 14px}' +
     '.pagegroup{margin:14px 0 6px;font-weight:700;font-size:12px;color:#5c677d;text-transform:uppercase;letter-spacing:.4px}' +
     '.card{border:1px solid #e0e4ee;border-radius:10px;padding:10px 12px;margin-bottom:10px;background:#fbfcfe}' +
@@ -652,7 +691,7 @@ const OVERLAY_JS = String.raw`
   var wrap = document.createElement('div');
   wrap.innerHTML =
     '<style>' + css + '</style>' +
-    '<button id="pill" type="button">&#128172; Review <span class="count" id="pillCount">0</span></button>' +
+    '<button id="pill" type="button"><span id="pillLabel">&#128172; Review</span> <span class="count" id="pillCount">0</span></button>' +
     '<button id="selbtn" type="button">&#128172; Comment on selection</button>' +
     '<div id="overlaybg"></div>' +
     '<div id="panel">' +
@@ -661,6 +700,14 @@ const OVERLAY_JS = String.raw`
       '<div class="filters">' +
         '<label><input type="checkbox" id="allPages"> all pages</label>' +
         '<button id="addPageNote" class="primary">+ Page note</button>' +
+      '</div>' +
+      '<div id="selectionTools" aria-live="polite">' +
+        '<div class="selection-empty"><b>Comment on exact wording</b><br>Select text on the page. Your selection will stay here while you write feedback.</div>' +
+        '<div class="selection-ready-body">' +
+          '<div class="selection-title"><b>Selected text</b><button id="clearSelection" type="button">Clear</button></div>' +
+          '<blockquote id="selectionQuote"></blockquote>' +
+          '<button id="commentSelection" type="button">&#128172; Add comment to selection</button>' +
+        '</div>' +
       '</div>' +
       '<div id="list"></div>' +
       '<footer>' +
@@ -731,6 +778,15 @@ const OVERLAY_JS = String.raw`
     };
     $('saveStatus').textContent = map[saveStatus] || '';
   }
+  function renderSelectionDraft() {
+    var box = $('selectionTools');
+    if (!box) return;
+    var ready = !!(selectionDraft && selectionDraft.quote);
+    box.classList.toggle('ready', ready);
+    $('selectionQuote').textContent = ready ? selectionDraft.quote : '';
+    pill.classList.toggle('selection-ready', ready);
+    $('pillLabel').innerHTML = ready ? '&#128172; Selected text' : '&#128172; Review';
+  }
   function cardHtml(it) {
     var eid = esc(it.id); // ids can arrive from shared feedback files — never trust them in markup
     var found = !!anchoredRanges[it.id];
@@ -775,9 +831,9 @@ const OVERLAY_JS = String.raw`
     listEl.innerHTML = html;
   }
   function renderWho() { $('who').textContent = reviewer || '—'; }
-  function renderAll() { renderBadge(); renderList(); renderWho(); renderSaveStatus(); }
+  function renderAll() { renderBadge(); renderList(); renderWho(); renderSaveStatus(); renderSelectionDraft(); }
 
-  function openPanel() { panel.classList.add('open'); renderAll(); }
+  function openPanel() { panel.classList.add('open'); hideSelBtn(); renderAll(); }
   function closePanel() { panel.classList.remove('open'); }
   function openComposer(title, quote) {
     if (!reviewer) { pendingAfterName = function () { openComposer(title, quote); }; openNameModal(); return; }
@@ -819,13 +875,21 @@ const OVERLAY_JS = String.raw`
     pending = null; editingId = null;
     openComposer('Page note — ' + location.pathname, '');
   });
-  selBtn.addEventListener('click', function () {
-    pending = selBtnData;
+  function beginSelectionComment() {
+    if (!selectionDraft || !selectionDraft.quote) return;
+    pending = selectionDraft;
     hideSelBtn();
     var sel = document.getSelection();
     if (sel) sel.removeAllRanges();
     editingId = null;
     openComposer('Comment on selection', pending ? pending.quote : '');
+  }
+  selBtn.addEventListener('click', beginSelectionComment);
+  $('commentSelection').addEventListener('click', beginSelectionComment);
+  $('clearSelection').addEventListener('click', function () {
+    var sel = document.getSelection();
+    if (sel) sel.removeAllRanges();
+    clearSelectionDraft();
   });
   $('composerCancel').addEventListener('click', closeComposer);
   $('composerSave').addEventListener('click', function () {
@@ -887,6 +951,10 @@ const OVERLAY_JS = String.raw`
   document.addEventListener('keyup', function (e) {
     if (e.shiftKey || e.key === 'Shift') setTimeout(onSelectionSettled, 30);
   });
+  document.addEventListener('selectionchange', function () {
+    if (selectionTimer) clearTimeout(selectionTimer);
+    selectionTimer = setTimeout(onSelectionSettled, 120);
+  });
   // click on a highlight opens the panel scrolled to that card
   document.addEventListener('click', function (e) {
     var path = e.composedPath ? e.composedPath() : [];
@@ -908,7 +976,7 @@ const OVERLAY_JS = String.raw`
 
   // SPA navigation: re-anchor highlights when the route or DOM changes
   function onNavigate() {
-    hideSelBtn();
+    clearSelectionDraft();
     scheduleAnchor();
     setTimeout(renderAll, 450);
   }
