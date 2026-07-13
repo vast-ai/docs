@@ -92,21 +92,22 @@ test('Host Teams shows its Jira sources and only its page blockers', async () =>
   assert.ok(context.blockers.every((item) => item.issue.url.startsWith('https://vastai.atlassian.net/browse/')));
 });
 
-test('Self-Test reference links both epics and implementation issues', async () => {
+test('Self-Test reference links both epics without stale implementation blockers', async () => {
   const context = await contextFor('/host/self-test-reference');
   assert.deepEqual(context.epics.map((issue) => issue.key), ['CON-1187', 'CON-1509']);
   for (const key of ['CON-1515', 'CON-1513', 'CON-1510', 'CON-1583', 'CON-1419']) {
     assert.ok(context.issues.some((issue) => issue.key === key), `missing ${key}`);
   }
-  assert.equal(context.blockers.length, 5);
-  assert.ok(context.blockers.some((item) => item.question.includes('actual-versus-required')));
-  assert.ok(context.blockers.some((item) => item.question.includes('source-repository dispatch')));
+  assert.equal(context.blockers.length, 1);
+  assert.ok(context.blockers.some((item) => item.question.includes('queue and wait-time')));
+  assert.ok(context.blockers.every((item) => !item.question.includes('actual-versus-required')));
+  assert.ok(context.blockers.every((item) => !item.question.includes('source-repository dispatch')));
 });
 
-test('Diagnostics surfaces the missing dump-logs documentation decision', async () => {
+test('Diagnostics no longer reports merged dump-logs documentation as missing', async () => {
   const context = await contextFor('/host/common-errors-diagnostics');
   assert.ok(context.issues.some((issue) => issue.key === 'CON-1519'));
-  assert.ok(context.blockers.some((item) => item.question.includes('vastai dump-logs')));
+  assert.ok(context.blockers.every((item) => !item.question.includes('vastai dump-logs')));
 });
 
 test('Network page receives network blockers without unrelated Teams blockers', async () => {

@@ -125,9 +125,7 @@ const PAGE_REVIEW_CONTEXTS = [
     paths: ['/host/common-errors-diagnostics'],
     epics: ['CON-1187', 'CON-1509'], issues: ['CON-1531', 'CON-1517', 'CON-1519', 'CON-1514', 'CON-1510'],
     blockers: [
-      { issue: 'CON-1510', owner: 'Support / SRE / Engineering', question: 'Who owns and consumes diagnostic bundles long term?' },
       { issue: 'CON-1519', owner: 'Security / Engineering', question: 'Which host-local artifacts can be collected safely, and which must remain opt-in?' },
-      { issue: 'CON-1519', owner: 'CLI / Docs', question: 'Should Host Diagnostics document the merged vastai dump-logs command and its opt-in local-host artifact behavior before publication?' },
       { issue: 'CON-1514', owner: 'Backend', question: 'Which daemon, Docker, and port diagnostics can the backend expose directly?' },
     ],
   },
@@ -146,10 +144,6 @@ const PAGE_REVIEW_CONTEXTS = [
     issues: ['CON-1515', 'CON-1513', 'CON-1510', 'CON-1512', 'CON-1514', 'CON-1519', 'CON-1583', 'CON-1502', 'CON-1419'],
     blockers: [
       { issue: 'CON-1515', owner: 'Product / Backend', question: 'Confirm the authoritative verification queue and wait-time facts.' },
-      { issue: 'CON-1515', owner: 'CLI / Docs', question: 'Should the generated actual-versus-required checks and stable failure-code reference from docs PR 145 be restored before publication?' },
-      { issue: 'CON-1513', owner: 'CLI / Self-Test maintainers', question: 'Should generated docs be treated as current before source-repository dispatch automation is wired?' },
-      { issue: 'CON-1583', owner: 'Self-Test maintainers', question: 'Confirm final public wording for B300 RAM caps.' },
-      { issue: 'CON-1419', owner: 'Self-Test maintainers', question: 'Confirm final public wording for older-GPU image selection.' },
     ],
   },
   {
@@ -175,10 +169,7 @@ const PAGE_REVIEW_CONTEXTS = [
   {
     paths: ['/host/common-host-questions'],
     epics: ['CON-1187'], issues: ['CON-1517'],
-    blockers: [
-      { issue: 'CON-1517', owner: 'Docs / Support', question: 'Confirm the support-analysis artifacts and refresh date used as the source of truth.' },
-      { issue: 'CON-1517', owner: 'Product owners', question: 'Confirm the remaining hardware, install, verification, pricing, payout, and escalation answers linked from this page.' },
-    ],
+    blockers: [],
   },
   {
     paths: ['/review-questions'],
