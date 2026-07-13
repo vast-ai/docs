@@ -1,11 +1,12 @@
-# The 8 blocking inputs — what we need from reviewers
+# Reviewer inputs and Jira gates
 
 > Temporary review aid — removed before merge, like `review-server.mjs`.
 >
-> These are the eight decisions/confirmations that finish the Host Docs epic
-> (CON-1187). The writing is done; every item below is a **decision, review, or
-> confirmation from your side** — nothing here is writing work. The first two
-> unblock everything else.
+> The eight cross-cutting decisions below gate the Host Docs review. A current
+> Jira audit also found page-specific questions for account setup, Network &
+> Ports, Self-Test, and Host Diagnostics. Those appear beside the comments on
+> the affected page in the port 4000 review panel, with direct Jira links.
+> The first two decisions below unblock the review sequence.
 >
 > **Three ways to answer — pick whichever is easiest:**
 > 1. Comment inline on this file in the [PR #185 diff](https://github.com/vast-ai/docs/pull/185/files).
@@ -94,6 +95,35 @@ Blocks: Host Teams page publication. Detail: CON-1581.
 Do the generated `host/cli/*` and `host/sdk/*` reference pages need persona chips, or are generated reference pages exempt? All 39 authored pages are tagged and chip-synced (now lint-enforced via `npm run check-persona-chips`); the 33 generated pages are currently exempt by convention.
 
 Blocks: the literal reading of CON-1518's "tag every page"; the only remaining implementation wrinkle. Detail: CON-1518 (2026-06-29 comment).
+
+## Additional page-specific Jira gates
+
+These are intentionally shown on the affected page instead of expanding every
+reviewer's checklist. Open the review panel on that page to see the questions,
+owner, status, and direct Jira links.
+
+- **Account and installation:** setup-page machine installation key wording,
+  dedicated host account guidance, team registration permissions, and the
+  installer screenshot — [CON-1584](https://vastai.atlassian.net/browse/CON-1584),
+  [CON-1581](https://vastai.atlassian.net/browse/CON-1581), and
+  [CON-1518](https://vastai.atlassian.net/browse/CON-1518).
+- **Network & Ports:** per-GPU versus per-instance port wording, TCP/UDP
+  behavior, port release timing, and exact failed-port evidence —
+  [CON-1514](https://vastai.atlassian.net/browse/CON-1514).
+- **Verification / Self-Test:** queue facts, restoring the generated
+  actual-versus-required/stable-code reference from docs PR #145,
+  source-to-doc dispatch automation, B300 RAM-cap wording, and older-GPU image
+  selection —
+  [CON-1515](https://vastai.atlassian.net/browse/CON-1515),
+  [CON-1513](https://vastai.atlassian.net/browse/CON-1513),
+  [CON-1583](https://vastai.atlassian.net/browse/CON-1583), and
+  [CON-1419](https://vastai.atlassian.net/browse/CON-1419).
+- **Host Diagnostics:** diagnostic-bundle ownership, safe host-local artifacts,
+  documenting the merged `vastai dump-logs` workflow, and backend-visible
+  daemon/Docker/port evidence —
+  [CON-1510](https://vastai.atlassian.net/browse/CON-1510),
+  [CON-1519](https://vastai.atlassian.net/browse/CON-1519), and
+  [CON-1514](https://vastai.atlassian.net/browse/CON-1514).
 
 ---
 

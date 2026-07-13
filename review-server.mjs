@@ -41,6 +41,200 @@ const TARGET = new URL(argValue('--target', 'http://localhost:3000'));
 const FEEDBACK_DIR = path.resolve(argValue('--dir', './review-feedback'));
 const PR_URL = 'https://github.com/vast-ai/docs/pull/185';
 const PR_LABEL = 'docs-pr185-review';
+const JIRA_BASE_URL = 'https://vastai.atlassian.net/browse/';
+
+// Review-only provenance. This data is served only by the :4000 review proxy;
+// it is never injected into the Mintlify MDX served directly on :3000.
+const JIRA_ISSUES = Object.freeze({
+  'CON-1187': { title: 'Host Docs ++', status: 'TO REVIEW' },
+  'CON-1509': { title: 'Self-Test Improvements', status: 'To Do' },
+  'CON-1584': { title: 'Host account docs and CLI/API/SDK intro', status: 'BLOCKED' },
+  'CON-1581': { title: 'Host Teams', status: 'BLOCKED' },
+  'CON-1531': { title: 'Machine Error Reference', status: 'BLOCKED' },
+  'CON-1518': { title: 'Host docs IA and sidebar restructure', status: 'TO REVIEW' },
+  'CON-1517': { title: 'Common Host questions and topics', status: 'TO REVIEW' },
+  'CON-1516': { title: 'Supported Hardware', status: 'DOING NOW' },
+  'CON-1515': { title: 'Verification / Self-Test Reference', status: 'TO REVIEW' },
+  'CON-1514': { title: 'Commonly reported Self-Test issues', status: 'TO REVIEW' },
+  'CON-1513': { title: 'Generate Verification docs from Self-Test code', status: 'TO REVIEW' },
+  'CON-1512': { title: 'Self-Test --ignore-requirements messaging', status: 'QA Passed' },
+  'CON-1510': { title: 'Self-Test explanations and error handling', status: 'TESTING' },
+  'CON-1502': { title: 'Fix Self-Test image family', status: 'QA Passed' },
+  'CON-1419': { title: 'Support older GPU architectures in Self-Test', status: 'TO REVIEW' },
+  'CON-1256': { title: 'Business, pricing, and listing optimization', status: 'TO REVIEW' },
+  'CON-1077': { title: 'Headless Hosting Guide', status: 'TO REVIEW' },
+  'CON-1583': { title: 'Lower Self-Test RAM requirement for B300', status: 'TO REVIEW' },
+  'CON-1519': { title: 'Self-Test diagnostic log bundles', status: 'TO REVIEW' },
+});
+
+const PAGE_REVIEW_CONTEXTS = [
+  {
+    paths: ['/host/hosting-overview', '/host/quickstart', '/host/persona-decision-guide'],
+    epics: ['CON-1187'], issues: ['CON-1518'],
+    blockers: [
+      { issue: 'CON-1518', owner: 'Docs owners', question: 'Approve or modify the lifecycle sidebar and P0/P1/P2 ordering.' },
+      { issue: 'CON-1518', owner: 'Docs owners', question: 'Keep, restyle, or remove the visible persona chips?' },
+    ],
+  },
+  {
+    paths: ['/host/account-hosting-agreement', '/host/account-security-for-hosts'],
+    epics: ['CON-1187'], issues: ['CON-1584', 'CON-1581'],
+    blockers: [
+      { issue: 'CON-1584', owner: 'Product', question: 'Confirm that setup-page machine installation keys are account-specific and distinct from normal API keys.' },
+      { issue: 'CON-1584', owner: 'Product', question: 'Confirm the dedicated-host-account guidance and escalation path for stale or wrong-account state.' },
+    ],
+  },
+  {
+    paths: ['/host/cli-api-sdk', '/host/fleet-operations'], prefixes: ['/host/cli/', '/host/sdk/'],
+    epics: ['CON-1187'], issues: ['CON-1584', 'CON-1518'],
+    blockers: [
+      { issue: 'CON-1584', owner: 'Engineering', question: 'Confirm the exact team API-key flow and permissions for host registration and automation.' },
+      { issue: 'CON-1518', owner: 'Docs owners', question: 'Do generated Host CLI/SDK reference pages require persona metadata, or are they exempt?' },
+    ],
+  },
+  {
+    paths: ['/host/host-teams'],
+    epics: ['CON-1187'], issues: ['CON-1581', 'CON-1584'],
+    blockers: [
+      { issue: 'CON-1581', owner: 'Engineering', question: 'What happens to machines, accrued earnings, and payout history when an individual host moves to a team?' },
+      { issue: 'CON-1581', owner: 'Engineering', question: 'Is the team-context undefined host-id/API-key installation issue fixed?' },
+      { issue: 'CON-1581', owner: 'Engineering', question: 'What is the exact flow for granting machine registration rights to a team key or custom role?' },
+      { issue: 'CON-1581', owner: 'Engineering', question: 'Can a custom role grant billing_read without machine_write?' },
+    ],
+  },
+  {
+    paths: ['/host/installing-host-software'],
+    epics: ['CON-1187'], issues: ['CON-1518', 'CON-1584', 'CON-1581'],
+    blockers: [
+      { issue: 'CON-1518', owner: 'Product', question: 'Approve the Host Installer Wizard screenshot or provide a replacement asset.' },
+      { issue: 'CON-1584', owner: 'Product', question: 'Confirm the public wording for setup-page machine installation keys.' },
+      { issue: 'CON-1581', owner: 'Engineering', question: 'Confirm the correct team-context installation and registration-key flow.' },
+    ],
+  },
+  {
+    paths: ['/host/machine-errors'],
+    epics: ['CON-1187'], issues: ['CON-1531', 'CON-1517'],
+    blockers: [
+      { issue: 'CON-1531', owner: 'Backend source owner', question: 'Is the host-visible machine-error catalog complete, and which fields/UI surfaces expose each error?' },
+      { issue: 'CON-1531', owner: 'Backend source owner', question: 'What clears each error, including the actual heartbeat/TTL and Self-Test behavior?' },
+      { issue: 'CON-1531', owner: 'Backend source owner', question: 'Which logged-only or admin-only errors are appropriate for public docs?' },
+      { issue: 'CON-1531', owner: 'Product / Console', question: 'Should UI links target raw error strings, normalized categories, or both?' },
+    ],
+  },
+  {
+    paths: ['/host/common-errors-diagnostics'],
+    epics: ['CON-1187', 'CON-1509'], issues: ['CON-1531', 'CON-1517', 'CON-1519', 'CON-1514', 'CON-1510'],
+    blockers: [
+      { issue: 'CON-1510', owner: 'Support / SRE / Engineering', question: 'Who owns and consumes diagnostic bundles long term?' },
+      { issue: 'CON-1519', owner: 'Security / Engineering', question: 'Which host-local artifacts can be collected safely, and which must remain opt-in?' },
+      { issue: 'CON-1519', owner: 'CLI / Docs', question: 'Should Host Diagnostics document the merged vastai dump-logs command and its opt-in local-host artifact behavior before publication?' },
+      { issue: 'CON-1514', owner: 'Backend', question: 'Which daemon, Docker, and port diagnostics can the backend expose directly?' },
+    ],
+  },
+  {
+    paths: ['/host/network-ports'],
+    epics: ['CON-1187', 'CON-1509'], issues: ['CON-1517', 'CON-1514'],
+    blockers: [
+      { issue: 'CON-1514', owner: 'Backend / Networking', question: 'Confirm the per-GPU port requirement, TCP/UDP behavior, and per-instance versus total-host port-range wording.' },
+      { issue: 'CON-1514', owner: 'Backend / Networking', question: 'Are reserved ports released on stop, destroy, or cleanup?' },
+      { issue: 'CON-1514', owner: 'Backend / Networking', question: 'Can the backend expose the exact failed ports and protocol-level results?' },
+    ],
+  },
+  {
+    paths: ['/host/self-test-reference', '/host/how-to-self-test', '/host/understanding-verification', '/host/verification-stages'],
+    epics: ['CON-1187', 'CON-1509'],
+    issues: ['CON-1515', 'CON-1513', 'CON-1510', 'CON-1512', 'CON-1514', 'CON-1519', 'CON-1583', 'CON-1502', 'CON-1419'],
+    blockers: [
+      { issue: 'CON-1515', owner: 'Product / Backend', question: 'Confirm the authoritative verification queue and wait-time facts.' },
+      { issue: 'CON-1515', owner: 'CLI / Docs', question: 'Should the generated actual-versus-required checks and stable failure-code reference from docs PR 145 be restored before publication?' },
+      { issue: 'CON-1513', owner: 'CLI / Self-Test maintainers', question: 'Should generated docs be treated as current before source-repository dispatch automation is wired?' },
+      { issue: 'CON-1583', owner: 'Self-Test maintainers', question: 'Confirm final public wording for B300 RAM caps.' },
+      { issue: 'CON-1419', owner: 'Self-Test maintainers', question: 'Confirm final public wording for older-GPU image selection.' },
+    ],
+  },
+  {
+    paths: ['/host/supported-hardware', '/host/hardware-prep'],
+    epics: ['CON-1187', 'CON-1509'], issues: ['CON-1516', 'CON-1583', 'CON-1419'],
+    blockers: [
+      { issue: 'CON-1516', owner: 'Product', question: 'Confirm exact GPU-family coverage, OS/cgroup guidance, and the CPU rule shared by docs, CLI, and Self-Test.' },
+      { issue: 'CON-1583', owner: 'Self-Test maintainers', question: 'Confirm how the B300 RAM cap should be explained to hosts.' },
+    ],
+  },
+  {
+    paths: ['/host/pricing-your-listing', '/host/market-metrics', '/host/optimization-guide', '/host/earning', '/host/payment', '/host/datacenter-status', '/host/guide-to-taxes'],
+    epics: ['CON-1187'], issues: ['CON-1256'],
+    blockers: [
+      { issue: 'CON-1256', owner: 'Solutions Engineering / Business', question: 'Review pricing, sales-process, datacenter, Secure Cloud, payment, and tax positioning.' },
+      { issue: 'CON-1256', owner: 'Docs owners', question: 'Confirm Gobind as reviewer and content owner for this page family.' },
+    ],
+  },
+  {
+    paths: ['/host/headless-install'],
+    epics: ['CON-1187'], issues: ['CON-1077'], blockers: [],
+  },
+  {
+    paths: ['/host/common-host-questions'],
+    epics: ['CON-1187'], issues: ['CON-1517'],
+    blockers: [
+      { issue: 'CON-1517', owner: 'Docs / Support', question: 'Confirm the support-analysis artifacts and refresh date used as the source of truth.' },
+      { issue: 'CON-1517', owner: 'Product owners', question: 'Confirm the remaining hardware, install, verification, pricing, payout, and escalation answers linked from this page.' },
+    ],
+  },
+  {
+    paths: ['/review-questions'],
+    epics: ['CON-1187', 'CON-1509'],
+    issues: ['CON-1584', 'CON-1581', 'CON-1531', 'CON-1518', 'CON-1517', 'CON-1515', 'CON-1514', 'CON-1513', 'CON-1510', 'CON-1256'],
+    blockers: [],
+  },
+];
+
+function normalizeReviewPath(rawPath) {
+  let pathname = String(rawPath || '/').split(/[?#]/, 1)[0] || '/';
+  try { pathname = decodeURIComponent(pathname); } catch { /* keep raw safe path */ }
+  if (!pathname.startsWith('/')) pathname = '/' + pathname;
+  if (pathname.length > 1) pathname = pathname.replace(/\/+$/, '');
+  return pathname;
+}
+
+function issueDetails(key) {
+  const issue = JIRA_ISSUES[key] || { title: key, status: '' };
+  return { key, title: issue.title, status: issue.status, url: JIRA_BASE_URL + encodeURIComponent(key) };
+}
+
+function reviewContextForPath(rawPath) {
+  const pathname = normalizeReviewPath(rawPath);
+  const matched = PAGE_REVIEW_CONTEXTS.filter((entry) =>
+    (entry.paths || []).includes(pathname) || (entry.prefixes || []).some((prefix) => pathname.startsWith(prefix))
+  );
+  const epicKeys = [];
+  const issueKeys = [];
+  const blockers = [];
+  const seenBlockers = new Set();
+  const addUnique = (list, value) => { if (value && !list.includes(value)) list.push(value); };
+
+  if (pathname.startsWith('/host/') && !matched.length) addUnique(epicKeys, 'CON-1187');
+  for (const entry of matched) {
+    for (const key of entry.epics || []) addUnique(epicKeys, key);
+    for (const key of entry.issues || []) addUnique(issueKeys, key);
+    for (const blocker of entry.blockers || []) {
+      const fingerprint = `${blocker.issue || ''}\n${blocker.question || ''}`;
+      if (seenBlockers.has(fingerprint)) continue;
+      seenBlockers.add(fingerprint);
+      blockers.push({
+        question: blocker.question,
+        owner: blocker.owner || '',
+        issue: blocker.issue ? issueDetails(blocker.issue) : null,
+      });
+    }
+  }
+  return {
+    pathname,
+    matched: matched.length > 0,
+    epics: epicKeys.map(issueDetails),
+    issues: issueKeys.map(issueDetails),
+    blockers,
+  };
+}
 
 fs.mkdirSync(FEEDBACK_DIR, { recursive: true });
 
@@ -224,7 +418,7 @@ code{background:#f0f0f6;padding:2px 5px;border-radius:4px}</style></head><body>
 <a class="btn" href="/__review__/export/feedback.md">Download Markdown</a>
 <a class="btn" href="/__review__/export/feedback.json">Download JSON</a>
 </p>
-<p><b>The 8 blocking questions</b> the team needs answered live at <a href="/review-questions">/review-questions</a> — comment on them there like any other page.</p>
+<p><b>Reviewer inputs and Jira sources</b> are shown for each page inside the review panel. The combined list remains available at <a href="/review-questions">/review-questions</a>.</p>
 <p>When you're done reviewing, send back the CSV <i>or</i> the JSON file — either can be imported into Jira for record keeping.</p>
 <p><a href="/host/hosting-overview">← Back to the docs preview</a></p>
 </body></html>`;
@@ -257,6 +451,8 @@ const OVERLAY_JS = String.raw`
   var saveTimer = null;
   var anchorTimer = null;
   var selectionTimer = null;
+  var contextRequest = 0;
+  var pageContext = { epics: [], issues: [], blockers: [] };
 
   try { reviewer = localStorage.getItem(LS_REVIEWER) || ''; } catch (e) {}
   try { items = JSON.parse(localStorage.getItem(LS_ITEMS) || '[]'); } catch (e) { items = []; }
@@ -638,6 +834,26 @@ const OVERLAY_JS = String.raw`
     '.filters{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 14px;border-bottom:1px solid #e7eaf1}' +
     '.filters label{display:flex;align-items:center;gap:6px;cursor:pointer;color:#5c677d}' +
     '.filters .primary{background:#4a5cf0;border-color:#4a5cf0;color:#fff;font-weight:600}' +
+    '.context-count{background:#fff1b8;color:#6b4f00;border-radius:999px;padding:1px 7px;font-size:11px;font-weight:800}' +
+    '#jiraContext{padding:10px 14px;border-bottom:1px solid #e7eaf1;background:#f8f9fc;color:#384056}' +
+    '#jiraContext[hidden]{display:none}' +
+    '.jira-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px}' +
+    '.jira-title b{color:#1a1a2e;font-size:12px}' +
+    '.jira-title a{font-size:11px;color:#4a5cf0;text-decoration:none;font-weight:700}' +
+    '.jira-links{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px}' +
+    '.jira-link{display:inline-flex;align-items:center;gap:4px;border:1px solid #c9d0e2;border-radius:999px;padding:3px 7px;' +
+      'background:#fff;color:#34405a;text-decoration:none;font-size:11px;font-weight:700}' +
+    '.jira-link.epic{border-color:#8d9af1;background:#f0f2ff;color:#3446ba}' +
+    '.jira-link.blocked{border-color:#efaaa5;background:#fff2f0;color:#a12620}' +
+    '.jira-status{font-size:9px;font-weight:700;opacity:.72;text-transform:uppercase}' +
+    '.jira-blockers{margin-top:6px;border:1px solid #efd28a;border-radius:8px;background:#fff9e8;padding:7px 9px}' +
+    '.jira-blockers summary{cursor:pointer;color:#6b4f00;font-weight:800;font-size:11px}' +
+    '.jira-blockers ul{margin:7px 0 0;padding-left:18px}' +
+    '.jira-blockers li{margin:0 0 7px;line-height:1.35;color:#5c5233}' +
+    '.jira-blockers li:last-child{margin-bottom:0}' +
+    '.jira-blockers a{color:#4a5cf0;text-decoration:none;font-weight:800;white-space:nowrap}' +
+    '.jira-owner{display:block;color:#8a6f2f;font-size:10px;margin-top:2px}' +
+    '.jira-clear{font-size:11px;color:#687188}' +
     '#selectionTools{padding:10px 14px;border-bottom:1px solid #e7eaf1;background:#f7f8ff}' +
     '#selectionTools .selection-empty{color:#5c677d;line-height:1.45}' +
     '#selectionTools .selection-ready-body{display:none;gap:8px;flex-direction:column}' +
@@ -691,7 +907,7 @@ const OVERLAY_JS = String.raw`
   var wrap = document.createElement('div');
   wrap.innerHTML =
     '<style>' + css + '</style>' +
-    '<button id="pill" type="button"><span id="pillLabel">&#128172; Review</span> <span class="count" id="pillCount">0</span></button>' +
+    '<button id="pill" type="button"><span id="pillLabel">&#128172; Review</span> <span id="jiraCount" class="context-count" hidden></span> <span class="count" id="pillCount">0</span></button>' +
     '<button id="selbtn" type="button">&#128172; Comment on selection</button>' +
     '<div id="overlaybg"></div>' +
     '<div id="panel">' +
@@ -701,6 +917,7 @@ const OVERLAY_JS = String.raw`
         '<label><input type="checkbox" id="allPages"> all pages</label>' +
         '<button id="addPageNote" class="primary">+ Page note</button>' +
       '</div>' +
+      '<section id="jiraContext" hidden aria-live="polite"></section>' +
       '<div id="selectionTools" aria-live="polite">' +
         '<div class="selection-empty"><b>Comment on exact wording</b><br>Select text on the page. Your selection will stay here while you write feedback.</div>' +
         '<div class="selection-ready-body">' +
@@ -712,7 +929,7 @@ const OVERLAY_JS = String.raw`
       '<div id="list"></div>' +
       '<footer>' +
         '<div class="exports" style="border-bottom:1px solid #e7eaf1;padding-bottom:8px">' +
-          '<a href="/review-questions" style="background:#4a5cf0;color:#fff;border-color:#4a5cf0">&#9888; The 8 blocking questions &mdash; answer here</a>' +
+          '<a href="/review-questions" style="background:#4a5cf0;color:#fff;border-color:#4a5cf0">All reviewer inputs and Jira gates</a>' +
         '</div>' +
         '<div class="exports">Export: ' +
           '<a href="/__review__/export/feedback.csv">CSV (Jira)</a>' +
@@ -787,6 +1004,66 @@ const OVERLAY_JS = String.raw`
     pill.classList.toggle('selection-ready', ready);
     $('pillLabel').innerHTML = ready ? '&#128172; Selected text' : '&#128172; Review';
   }
+  function jiraLinkHtml(issue, isEpic) {
+    if (!issue || !issue.key || !issue.url) return '';
+    var classes = 'jira-link' + (isEpic ? ' epic' : '') + (issue.status === 'BLOCKED' ? ' blocked' : '');
+    return '<a class="' + classes + '" href="' + esc(issue.url) + '" target="_blank" rel="noopener noreferrer"' +
+      ' title="' + esc(issue.title || issue.key) + '">' + esc(issue.key) +
+      (issue.status ? ' <span class="jira-status">' + esc(issue.status) + '</span>' : '') + '</a>';
+  }
+  function renderPageContext() {
+    var box = $('jiraContext');
+    var epics = pageContext && Array.isArray(pageContext.epics) ? pageContext.epics : [];
+    var issues = pageContext && Array.isArray(pageContext.issues) ? pageContext.issues : [];
+    var blockers = pageContext && Array.isArray(pageContext.blockers) ? pageContext.blockers : [];
+    var count = $('jiraCount');
+    count.hidden = blockers.length === 0;
+    count.textContent = blockers.length ? '\u26A0 ' + blockers.length : '';
+    if (!epics.length && !issues.length && !blockers.length) {
+      box.hidden = true;
+      box.innerHTML = '';
+      return;
+    }
+    var html = '<div class="jira-title"><b>Jira context for this page</b><a href="/review-questions">all review inputs</a></div>';
+    html += '<div class="jira-links">';
+    epics.forEach(function (issue) { html += jiraLinkHtml(issue, true); });
+    issues.forEach(function (issue) { html += jiraLinkHtml(issue, false); });
+    html += '</div>';
+    if (blockers.length) {
+      html += '<details class="jira-blockers" open><summary>' + blockers.length +
+        ' unresolved reviewer input' + (blockers.length === 1 ? '' : 's') + '</summary><ul>';
+      blockers.forEach(function (blocker) {
+        html += '<li>' + esc(blocker.question || 'Review input needed.');
+        if (blocker.issue && blocker.issue.url) {
+          html += ' <a href="' + esc(blocker.issue.url) + '" target="_blank" rel="noopener noreferrer">' +
+            esc(blocker.issue.key) + '</a>';
+        }
+        if (blocker.owner) html += '<span class="jira-owner">Owner: ' + esc(blocker.owner) + '</span>';
+        html += '</li>';
+      });
+      html += '</ul></details>';
+    } else {
+      html += '<div class="jira-clear">No page-specific blocker is recorded; use the linked Jira source for scope.</div>';
+    }
+    box.innerHTML = html;
+    box.hidden = false;
+  }
+  function loadPageContext() {
+    var requestedPath = location.pathname;
+    var requestId = ++contextRequest;
+    fetch(API + '/context?path=' + encodeURIComponent(requestedPath))
+      .then(function (r) { if (!r.ok) throw new Error('context request failed'); return r.json(); })
+      .then(function (data) {
+        if (requestId !== contextRequest || requestedPath !== location.pathname) return;
+        pageContext = data || { epics: [], issues: [], blockers: [] };
+        renderPageContext();
+      })
+      .catch(function () {
+        if (requestId !== contextRequest) return;
+        pageContext = { epics: [], issues: [], blockers: [] };
+        renderPageContext();
+      });
+  }
   function cardHtml(it) {
     var eid = esc(it.id); // ids can arrive from shared feedback files — never trust them in markup
     var found = !!anchoredRanges[it.id];
@@ -831,7 +1108,7 @@ const OVERLAY_JS = String.raw`
     listEl.innerHTML = html;
   }
   function renderWho() { $('who').textContent = reviewer || '—'; }
-  function renderAll() { renderBadge(); renderList(); renderWho(); renderSaveStatus(); renderSelectionDraft(); }
+  function renderAll() { renderBadge(); renderList(); renderWho(); renderSaveStatus(); renderSelectionDraft(); renderPageContext(); }
 
   function openPanel() { panel.classList.add('open'); hideSelBtn(); renderAll(); }
   function closePanel() { panel.classList.remove('open'); }
@@ -977,6 +1254,9 @@ const OVERLAY_JS = String.raw`
   // SPA navigation: re-anchor highlights when the route or DOM changes
   function onNavigate() {
     clearSelectionDraft();
+    pageContext = { epics: [], issues: [], blockers: [] };
+    renderPageContext();
+    loadPageContext();
     scheduleAnchor();
     setTimeout(renderAll, 450);
   }
@@ -995,6 +1275,7 @@ const OVERLAY_JS = String.raw`
 
   // ---------------- boot ----------------
   renderAll();
+  loadPageContext();
   scheduleAnchor();
   if (reviewer) { mergeServerState(); saveStatus = 'saved'; }
   renderSaveStatus();
@@ -1042,6 +1323,10 @@ async function handleReviewRoute(req, res, url) {
   if (p === '/__review__/overlay.js') {
     res.writeHead(200, { 'content-type': 'application/javascript; charset=utf-8', 'cache-control': 'no-store' });
     res.end(OVERLAY_JS);
+    return;
+  }
+  if (p === '/__review__/api/context' && req.method === 'GET') {
+    sendJson(res, 200, reviewContextForPath(url.searchParams.get('path') || '/'));
     return;
   }
   if (p === '/__review__/api/state' && req.method === 'GET') {
