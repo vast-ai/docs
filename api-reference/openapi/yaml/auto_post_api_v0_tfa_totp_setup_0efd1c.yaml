@@ -1,0 +1,59 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/tfa/totp-setup/:
+    post:
+      summary: Set Up TOTP 2FA
+      tags:
+      - Accounts
+      description: Generates a TOTP secret and provisioning URI for authenticator-app 2FA setup; client should display as
+        QR code then confirm via the confirm-new endpoint.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 1.1
+      responses:
+        '200':
+          description: Returns {secret, provisioning_uri} for display to the user (QR code / manual entry).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  secret:
+                    type: string
+                    description: Base32-encoded TOTP secret to be entered into an authenticator app
+                  provisioning_uri:
+                    type: string
+                    description: otpauth:// URI suitable for generating a QR code
+              example:
+                secret: JBSWY3DPEHPK3PXP
+                provisioning_uri: otpauth://totp/vast.ai:user%40example.com?secret=JBSWY3DPEHPK3PXP&issuer=vast.ai
+        '401':
+          description: User is not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Team user attempting 2FA action in team context ("team_user_forbidden").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
