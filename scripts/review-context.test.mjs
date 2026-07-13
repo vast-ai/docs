@@ -139,5 +139,6 @@ test('Only the review proxy injects the overlay', async () => {
   assert.match(reviewHtml, /__review__\/overlay\.js/);
   const overlay = await (await fetch(`${reviewOrigin}/__review__/overlay.js`)).text();
   assert.match(overlay, /Jira context for this page/);
+  assert.match(overlay, /REVIEW-TRACEABILITY\.md/);
   assert.match(overlay, /\/context\?path=/);
 });

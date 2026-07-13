@@ -2,6 +2,10 @@
 
 > Temporary review aid — removed before merge, like `review-server.mjs`.
 >
+> Start with the [Host docs review traceability audit](./REVIEW-TRACEABILITY.md)
+> to see what is implemented, what still needs sign-off, and the CON-1519
+> bundle-ownership decisions for the meeting.
+>
 > The eight cross-cutting decisions below gate the Host Docs review. A current
 > Jira audit also found page-specific questions for account setup, Network &
 > Ports, Self-Test, and Host Diagnostics. Those appear beside the comments on
@@ -110,17 +114,18 @@ owner, status, and direct Jira links.
 - **Network & Ports:** per-GPU versus per-instance port wording, TCP/UDP
   behavior, port release timing, and exact failed-port evidence —
   [CON-1514](https://vastai.atlassian.net/browse/CON-1514).
-- **Verification / Self-Test:** queue facts, restoring the generated
-  actual-versus-required/stable-code reference from docs PR #145,
-  source-to-doc dispatch automation, B300 RAM-cap wording, and older-GPU image
-  selection —
+- **Verification / Self-Test:** confirm the authoritative verification queue
+  and wait-time facts. The generated actual-versus-required/stable-code
+  reference, source drift workflow, B300 RAM-cap wording, and older-GPU image
+  selection are now present in PR #185 —
   [CON-1515](https://vastai.atlassian.net/browse/CON-1515),
   [CON-1513](https://vastai.atlassian.net/browse/CON-1513),
   [CON-1583](https://vastai.atlassian.net/browse/CON-1583), and
   [CON-1419](https://vastai.atlassian.net/browse/CON-1419).
-- **Host Diagnostics:** diagnostic-bundle ownership, safe host-local artifacts,
-  documenting the merged `vastai dump-logs` workflow, and backend-visible
-  daemon/Docker/port evidence —
+- **Host Diagnostics:** decide diagnostic-bundle intake, retention, first
+  triage, diagnostic ownership, and safe host-local artifact policy. The merged
+  `vastai dump-logs` workflow is documented; backend-only daemon/Docker/port
+  evidence remains a platform question —
   [CON-1510](https://vastai.atlassian.net/browse/CON-1510),
   [CON-1519](https://vastai.atlassian.net/browse/CON-1519), and
   [CON-1514](https://vastai.atlassian.net/browse/CON-1514).

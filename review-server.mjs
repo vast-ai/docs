@@ -40,6 +40,7 @@ const PORT = parseInt(argValue('--port', '4000'), 10);
 const TARGET = new URL(argValue('--target', 'http://localhost:3000'));
 const FEEDBACK_DIR = path.resolve(argValue('--dir', './review-feedback'));
 const PR_URL = 'https://github.com/vast-ai/docs/pull/185';
+const TRACEABILITY_URL = 'https://github.com/jjziets/docs/blob/CON-1584-host-cli-api-sdk/REVIEW-TRACEABILITY.md';
 const PR_LABEL = 'docs-pr185-review';
 const JIRA_BASE_URL = 'https://vastai.atlassian.net/browse/';
 
@@ -409,7 +410,7 @@ code{background:#f0f0f6;padding:2px 5px;border-radius:4px}</style></head><body>
 <a class="btn" href="/__review__/export/feedback.md">Download Markdown</a>
 <a class="btn" href="/__review__/export/feedback.json">Download JSON</a>
 </p>
-<p><b>Reviewer inputs and Jira sources</b> are shown for each page inside the review panel. The combined list remains available at <a href="/review-questions">/review-questions</a>.</p>
+<p><b>Reviewer inputs and Jira sources</b> are shown for each page inside the review panel. The combined list remains available at <a href="/review-questions">/review-questions</a>, with the implemented-versus-open evidence in the <a href="${TRACEABILITY_URL}">traceability audit</a>.</p>
 <p>When you're done reviewing, send back the CSV <i>or</i> the JSON file — either can be imported into Jira for record keeping.</p>
 <p><a href="/host/hosting-overview">← Back to the docs preview</a></p>
 </body></html>`;
@@ -921,6 +922,7 @@ const OVERLAY_JS = String.raw`
       '<footer>' +
         '<div class="exports" style="border-bottom:1px solid #e7eaf1;padding-bottom:8px">' +
           '<a href="/review-questions" style="background:#4a5cf0;color:#fff;border-color:#4a5cf0">All reviewer inputs and Jira gates</a>' +
+          '<a href="${TRACEABILITY_URL}" target="_blank" rel="noopener noreferrer">Traceability audit</a>' +
         '</div>' +
         '<div class="exports">Export: ' +
           '<a href="/__review__/export/feedback.csv">CSV (Jira)</a>' +
@@ -1015,7 +1017,7 @@ const OVERLAY_JS = String.raw`
       box.innerHTML = '';
       return;
     }
-    var html = '<div class="jira-title"><b>Jira context for this page</b><a href="/review-questions">all review inputs</a></div>';
+    var html = '<div class="jira-title"><b>Jira context for this page</b><span><a href="/review-questions">review inputs</a> &middot; <a href="${TRACEABILITY_URL}" target="_blank" rel="noopener noreferrer">traceability</a></span></div>';
     html += '<div class="jira-links">';
     epics.forEach(function (issue) { html += jiraLinkHtml(issue, true); });
     issues.forEach(function (issue) { html += jiraLinkHtml(issue, false); });
