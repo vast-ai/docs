@@ -1,0 +1,74 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/serverless/endpoints/spend:
+    get:
+      summary: Get Endpoint Groups Hourly Spend
+      tags:
+      - Serverless
+      description: Returns the current hourly spend for all serverless endpoint groups belonging to the authenticated user.
+      security:
+      - BearerAuth: []
+      x-scope: user_read
+      x-rateLimit: 2
+      responses:
+        '200':
+          description: 'Returns {success: true, endpoints: [{id, hourly_spend}], data_timestamp} where hourly_spend is a float
+            or null if unavailable.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success
+                  endpoints:
+                    type: array
+                    description: List of endpoint groups with their current hourly spend
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          description: Endpoint group ID
+                        hourly_spend:
+                          type: number
+                          description: Estimated hourly spend in USD; null if data is unavailable
+                  data_timestamp:
+                    type: number
+                    description: Unix epoch timestamp when the response was generated
+                required:
+                - success
+                - endpoints
+                - data_timestamp
+              example:
+                success: true
+                endpoints:
+                - id: 42
+                  hourly_spend: 0.15
+                - id: 43
+                  hourly_spend: null
+                data_timestamp: 1700000000.123
+        '401':
+          description: Authentication required or user is blacklisted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
