@@ -1,0 +1,88 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/volumes/:
+    delete:
+      summary: Delete Volume
+      tags:
+      - Volumes
+      description: Deletes the specified volume by ID, provided it is not currently attached to any running instances.
+      security:
+      - BearerAuth: []
+      x-scope: instance_write
+      x-rateLimit: 2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  description: ID of the volume to delete
+                  example: 100
+      responses:
+        '200':
+          description: 'Volume successfully deleted: {"success": true}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: true when the volume was deleted.
+                required:
+                - success
+              example:
+                success: true
+        '400':
+          description: 'Missing or invalid id parameter; error: "invalid id", msg: "id must refer to a valid volume id"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 'Caller does not own the volume; error: "Unauthorized", msg: "You are not authorized to delete this
+            volume"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 'No volume found matching the given ID; error: "invalid id", msg: "could not find a listed volume matching
+            id"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 'Volume is still attached to active instances; error: "volume in use", msg: "existing instances use
+            that volume!"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 'Internal error locating network disk mount; error: "internal error", msg: "Internal error. Please
+            contact Vast support."'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
