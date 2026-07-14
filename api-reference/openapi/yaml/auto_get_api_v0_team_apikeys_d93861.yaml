@@ -1,0 +1,94 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/team/apikeys/:
+    get:
+      summary: Get Team API Keys
+      tags:
+      - Team
+      description: Returns all active API keys for team members grouped by role, showing which member holds each key.
+      security:
+      - BearerAuth: []
+      x-scope: team_write
+      x-rateLimit: 2
+      responses:
+        '200':
+          description: '{"success": true, "keys_found": N, "keys": {<rights_id>: [{id, user_id, username, key, key_type, created_at,
+            role_name}]}} or {"success": false, "msg": "No active team API keys found."}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: True if keys were found, false if none
+                  keys_found:
+                    type: integer
+                    description: Total number of active keys returned (present when keys exist)
+                  keys:
+                    type: object
+                    description: Map of rights_id to array of key objects for that role
+                    additionalProperties:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                            description: API key record ID
+                          user_id:
+                            type: integer
+                            description: ID of the key owner
+                          username:
+                            type: string
+                            description: Full name or username of the key owner
+                          key:
+                            type: string
+                            description: Key value (always empty string for security)
+                          key_type:
+                            type: string
+                            description: 'Type of key: ''team'' or ''api'''
+                          created_at:
+                            type: number
+                            description: Unix timestamp of key creation
+                          role_name:
+                            type: string
+                            description: Name of the role associated with this key
+                  msg:
+                    type: string
+                    description: Present when no keys are found
+              example:
+                success: true
+                keys_found: 1
+                keys:
+                  '7':
+                  - id: 200
+                    user_id: 101
+                    username: alice
+                    key: ''
+                    key_type: team
+                    created_at: 1700000000
+                    role_name: team_manager
+        '404':
+          description: '"Cannot Retrieve Team Keys: User is not a team account" or "Team owner not found for team"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
