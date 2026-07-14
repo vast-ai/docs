@@ -1,0 +1,112 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/tfa/:
+    delete:
+      summary: Remove 2FA Method
+      tags:
+      - Accounts
+      description: Removes a specific 2FA method after verifying with an existing method or backup code; disables 2FA entirely
+        if no methods remain.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 1.1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                target_id:
+                  type: integer
+                  description: ID of the 2FA method to remove
+                  example: 7
+                tfa_method_id:
+                  type: integer
+                  description: ID of the 2FA method used to authenticate this removal request
+                  example: 7
+                code:
+                  type: string
+                  description: Verification code from the authenticating 2FA method
+                  example: '654321'
+                secret:
+                  type: string
+                  description: tfa_secret token from the prior step (required for SMS/email)
+                  example: abc123secret
+                tfa_method:
+                  type: string
+                  description: Method type used to authenticate the removal request
+                  example: totp
+                  enum:
+                  - sms
+                  - totp
+                  - email
+                backup_code:
+                  type: string
+                  description: One-time-use backup code that can authorize the removal instead of a normal code
+                  example: ABCD-EFGH-1234
+                delete_legacy:
+                  type: boolean
+                  description: Set to true to disable legacy SMS 2FA (requires email verification); for accounts that predate
+                    the current 2FA system
+                  example: false
+      responses:
+        '200':
+          description: 'Returns {msg: "2FA method removed", remaining_methods} or {msg: "2FA Successfully Disabled"} if all
+            methods are removed.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  msg:
+                    type: string
+                    description: '"2FA Successfully Disabled" if all methods removed, or "2FA method removed"'
+                  remaining_methods:
+                    type: integer
+                    description: Number of active 2FA methods remaining after deletion (present when 2FA is not fully disabled)
+              example:
+                msg: 2FA method removed
+                remaining_methods: 1
+        '400':
+          description: Missing code or backup_code ("missing_auth_value"), invalid params, legacy deletion requires email
+            verification, email 2FA cannot be removed, invalid tfa_method, or invalid 2FA code ("2fa_verification_failed").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Not authenticated or invalid backup code ("invalid_backup_code").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Team user attempting 2FA action in team context ("team_user_forbidden").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many failed 2FA attempts, method locked ("tfa_locked") or Twilio rate limited ("twilio_rate_limited").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
