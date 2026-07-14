@@ -1,0 +1,89 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/machines/defrag_offers/:
+    put:
+      summary: Defragment Machine GPU Offers
+      tags:
+      - Machines
+      description: Recomputes and defragments GPU contract assignments for specified machines to consolidate offer slots.
+      security:
+      - BearerAuth: []
+      x-scope: machine_write
+      x-rateLimit: 2.8
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                machine_ids:
+                  type: array
+                  description: List of machine IDs whose GPU offer assignments should be recomputed. Accepts an integer, a
+                    comma-separated string, or a JSON array of integers.
+                  example:
+                  - 12345
+                  - 67890
+      responses:
+        '200':
+          description: 'Returns {success: true, defragmented: [...], n0, n1, n2} on success, or {success: false, defragmented:
+            null} if no valid machine_ids provided'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Whether defragmentation was performed
+                  defragmented:
+                    type: array
+                    items:
+                      type: integer
+                    description: List of machine IDs that were defragmented
+                  n0:
+                    type: integer
+                    description: Count metric from recompute operation
+                  n1:
+                    type: integer
+                    description: Count metric from recompute operation
+                  n2:
+                    type: integer
+                    description: Count metric from recompute operation
+              example:
+                success: true
+                defragmented:
+                - 12345
+                - 12346
+                n0: 4
+                n1: 2
+                n2: 0
+        '400':
+          description: 'Invalid machine_ids value: "machine_ids must be integers" or "machine_ids must be comma-separated
+            integers" or "machine_ids must be a list of integers or comma-separated string"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: '"Invalid/unauthorized machine_ids" when provided machine_ids do not belong to the authenticated user'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
