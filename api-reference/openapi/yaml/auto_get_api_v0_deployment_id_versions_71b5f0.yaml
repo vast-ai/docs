@@ -1,0 +1,93 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/deployment/{id}/versions/:
+    get:
+      summary: List Deployment Versions
+      tags:
+      - Serverless
+      description: Returns all stored file versions for a deployment, ordered by creation date descending.
+      security:
+      - BearerAuth: []
+      x-scope: instance_read
+      x-rateLimit: 2.0
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Numeric ID of the deployment whose versions to list.
+      responses:
+        '200':
+          description: 'Returns {success: true, versions: [{id, file_hash, version_label, file_size, created_at, last_used_at},
+            ...]}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success.
+                  versions:
+                    type: array
+                    description: List of version objects.
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          description: Version ID.
+                        file_hash:
+                          type: string
+                          description: Hash of the deployment blob.
+                        version_label:
+                          type: string
+                          description: Human-readable version label.
+                        file_size:
+                          type: integer
+                          description: Size of the blob in bytes.
+                        created_at:
+                          type: number
+                          description: Unix timestamp of version creation.
+                        last_used_at:
+                          type: number
+                          description: Unix timestamp when this version was last made active.
+              example:
+                success: true
+                versions:
+                - id: 3
+                  file_hash: abc123
+                  version_label: v2
+                  file_size: 204800
+                  created_at: 1700000000
+                  last_used_at: 1700001000
+        '400':
+          description: '"Invalid deployment ID"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: '"Deployment {deployment_id} not found."'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
