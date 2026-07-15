@@ -1,0 +1,74 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/team/:
+    post:
+      summary: Create Team
+      tags:
+      - Team
+      description: Creates a new team account for the authenticated user, optionally transferring an initial credit balance
+        to the new team.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                team_name:
+                  type: string
+                  description: Display name for the new team; must be unique across all usernames.
+                  example: my-ml-team
+                transfer_credit:
+                  type: number
+                  description: Credits to transfer from personal account to team
+                  example: 0
+      responses:
+        '200':
+          description: 'Success: {"success": true, "msg": "Team Successfully Created!"}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success
+                  msg:
+                    type: string
+                    description: Human-readable confirmation message
+              example:
+                success: true
+                msg: Team Successfully Created!
+        '400':
+          description: Cannot create a team within a team; transfer credit must be a positive number; not enough credit to
+            transfer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Team creation returned a null primary key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
