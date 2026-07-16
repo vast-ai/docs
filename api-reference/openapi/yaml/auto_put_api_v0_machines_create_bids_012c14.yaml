@@ -1,0 +1,127 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/machines/create_bids/:
+    put:
+      summary: Create Host Background Jobs
+      tags:
+      - Machines
+      description: Creates host-owned background (bid) container jobs on a specified machine, replacing any existing host
+        default jobs.
+      security:
+      - BearerAuth: []
+      x-scope: machine_write
+      x-rateLimit: 2.8
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                machine:
+                  type: integer
+                  description: ID of the machine to create jobs for.
+                  example: 12345
+                price_gpu:
+                  type: number
+                  format: float
+                  description: Price per GPU per day.
+                  example: 0.5
+                price_inetu:
+                  type: number
+                  format: float
+                  description: Price for internet upload.
+                  example: 0.1
+                price_inetd:
+                  type: number
+                  format: float
+                  description: Price for internet download.
+                  example: 0.1
+                image:
+                  type: string
+                  description: Docker image to use for the job.
+                  example: vastai/tensorflow
+                args:
+                  type: array
+                  items:
+                    type: string
+                  description: Arguments for the Docker image.
+                  example:
+                  - --arg1
+                  - --arg2
+                args_str:
+                  type: string
+                  description: Command-line arguments as a single shell-quoted string (parsed via shlex). Mutually exclusive
+                    with args.
+                  example: --train --epochs 10
+                use_ssh:
+                  type: boolean
+                  description: Whether to enable SSH access on the created background job containers.
+                  example: false
+                onstart:
+                  type: string
+                  description: Shell command to run when the container starts.
+                  example: bash /start.sh
+                env:
+                  type: object
+                  description: Key-value pairs of environment variables to inject into the container.
+                  example:
+                    MY_VAR: value
+              required:
+              - machine
+              - price_gpu
+              - price_inetu
+              - price_inetd
+              - image
+      responses:
+        '200':
+          description: 'Returns {success: false, msg: "only the owner can create default bid contracts for a machine."} if
+            not machine owner (no HTTP error code set)'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Whether the operation succeeded
+                  machine_id:
+                    type: integer
+                    description: ID of the machine on which bids were created
+                  user_id:
+                    type: integer
+                    description: ID of the authenticated user
+                  you_sent:
+                    type: object
+                    description: Echo of the request body
+              example:
+                success: true
+                machine_id: 12345
+                user_id: 9876
+                you_sent:
+                  machine: 12345
+                  image: pytorch/pytorch:latest
+        '400':
+          description: Missing or invalid machine_id ("Missing or invalid machine id, must be integer"), invalid image ("Missing
+            or invalid image, must be string"), or conflicting args ("Please only use args or args_str") or invalid shlex
+            params
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
