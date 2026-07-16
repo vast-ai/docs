@@ -1,0 +1,74 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/users/{user_id}/templates/:
+    delete:
+      summary: Delete Template
+      tags:
+      - Accounts
+      description: Soft-deletes a template owned by the authenticated user, provided no other users currently have an active
+        relationship to it.
+      security:
+      - BearerAuth: []
+      x-scope: instance_write
+      x-rateLimit: 0.9
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ID of the user requesting deletion (URL path parameter)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                template_id:
+                  type: integer
+                  description: ID of the template to delete; must be an integer and owned by the authenticated user
+                  example: 12345
+      responses:
+        '200':
+          description: 'Returns {success: true, msg: "Template {id} Deleted Successfully"}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success
+                  msg:
+                    type: string
+                    description: E.g. "Template 123 Deleted Successfully"
+        '400':
+          description: 'Missing or non-integer template_id: "Invalid Template ID or User ID" or "Template ID must be integer";
+            or others still use it: "Cannot Delete Template. Other Users are still using it."'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 'User is not the template creator: {success: false, msg: "Templates can ONLY be Deleted by their Creator"}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
