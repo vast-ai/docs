@@ -1,0 +1,62 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/instances/{id}/:
+    delete:
+      summary: Delete Instance
+      tags:
+      - Instances
+      description: Permanently deletes a single instance, refunding any prepay deposit and cleaning up logs and API keys.
+      security:
+      - BearerAuth: []
+      x-scope: instance_write
+      x-rateLimit: 3
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ID of the instance to destroy
+      responses:
+        '200':
+          description: 'Returns deletion result with success status; on not-found returns {success: false, error: "no_such_instance",
+            msg: "Instance {id} not found."} with status 404.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                    description: Whether the destruction was successful
+                  msg:
+                    type: string
+                    description: Optional status message
+                    example: Instance destroyed successfully
+              example:
+                success: true
+        '400':
+          description: 'Returns {error: "invalid_args", msg: "invalid instance_id"} when the id path param is not a valid
+            integer.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
