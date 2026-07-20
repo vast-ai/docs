@@ -1,0 +1,92 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/commands/rclone/:
+    post:
+      summary: Start Remote Rclone Copy
+      tags:
+      - Instances
+      description: Initiates a cloud storage copy via rclone by sending a task to the host machine.
+      security:
+      - BearerAuth: []
+      x-scope: instance_write
+      x-rateLimit: 3.5
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                instance_id:
+                  type: string
+                  description: ID of the instance.
+                src:
+                  type: string
+                  description: Source path for the copy operation.
+                dst:
+                  type: string
+                  description: Destination path for the copy operation.
+                selected:
+                  type: string
+                  description: ID of the cloud connection.
+                transfer:
+                  type: string
+                  description: Type of transfer (e.g., "Instance To Cloud" or "Cloud To Instance").
+                flags:
+                  type: array
+                  items:
+                    type: string
+                  description: Additional flags for the operation.
+      responses:
+        '200':
+          description: Returns the result of the cloud copy execution. A success response can also mean controller delivery
+            is uncertain after a read timeout or unparseable acknowledgement; the one-time handoff remains active so the provider
+            host can complete it.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: True when copy was initiated
+                  msg:
+                    type: string
+                    description: Human-readable status message
+                  result_url:
+                    type: string
+                    description: S3 URL to poll for copy progress/logs, or null
+              example:
+                success: true
+                msg: Sending Command... Please Wait
+                result_url: https://s3.amazonaws.com/bucket/instance_logs/abc.log
+        '400':
+          description: 'Returns {success: false, error: "invalid_args", msg: "Hugging Face cloud sync is disabled"} when the
+            selected connection is Hugging Face while the feature is disabled.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: 'Returns {success: false, msg: "Could Not Dispatch Cloud Copy"} when the cloud copy command cannot
+            be dispatched to the provider host.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
