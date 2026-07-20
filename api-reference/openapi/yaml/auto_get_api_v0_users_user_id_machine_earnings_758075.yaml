@@ -1,0 +1,237 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/users/{user_id}/machine-earnings/:
+    get:
+      summary: Get Machine Earnings
+      tags:
+      - Billing
+      description: Returns aggregated host earnings data broken down by day and machine for a specified date range.
+      security:
+      - BearerAuth: []
+      x-scope: billing_read
+      x-rateLimit: 2
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: The ID of the user.
+      - name: sday
+        in: query
+        schema:
+          type: integer
+        description: Start day for the earnings report.
+      - name: eday
+        in: query
+        schema:
+          type: integer
+        description: End day for the earnings report.
+      - name: machid
+        in: query
+        schema:
+          type: integer
+        description: Optional machine ID to filter earnings.
+      - name: last_days
+        in: query
+        schema:
+          type: integer
+        description: Number of days to look back from today.
+      responses:
+        '200':
+          description: Success; returns {sday, eday, summary, per_day, per_machine, username, email, fullname, address fields,
+            current balance}
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sday:
+                    type: integer
+                    description: Start day index (days since Unix epoch).
+                  eday:
+                    type: integer
+                    description: End day index (days since Unix epoch).
+                  summary:
+                    type: object
+                    description: Aggregate totals across all machines and days in the window.
+                    properties:
+                      total_gpu:
+                        type: number
+                        description: Total GPU earnings (USD).
+                      total_stor:
+                        type: number
+                        description: Total storage earnings (USD).
+                      total_bwu:
+                        type: number
+                        description: Total bandwidth-upload earnings (USD).
+                      total_bwd:
+                        type: number
+                        description: Total bandwidth-download earnings (USD).
+                      total_sla:
+                        type: number
+                        description: Total SLA earnings (USD).
+                      avg_reliability:
+                        type: number
+                        description: Average uptime reliability ratio across the window, or null.
+                  username:
+                    type: string
+                    description: Account username.
+                  email:
+                    type: string
+                    description: Account email address.
+                  fullname:
+                    type: string
+                    description: Account full name.
+                  address1:
+                    type: string
+                    description: Billing address line 1.
+                  address2:
+                    type: string
+                    description: Billing address line 2.
+                  city:
+                    type: string
+                    description: Billing city.
+                  zip:
+                    type: string
+                    description: Billing ZIP/postal code.
+                  country:
+                    type: string
+                    description: Billing country.
+                  taxinfo:
+                    type: string
+                    description: Tax identification information.
+                  current:
+                    type: object
+                    description: Current account balance and fee snapshot.
+                    properties:
+                      balance:
+                        type: number
+                        description: Current account balance (USD).
+                      service_fee:
+                        type: number
+                        description: Outstanding service fee amount (USD).
+                      total:
+                        type: number
+                        description: Balance plus service fee (USD).
+                      credit:
+                        type: number
+                        description: Current credit amount (USD).
+                  per_machine:
+                    type: array
+                    description: Earnings delta per machine over the window.
+                    items:
+                      type: object
+                      properties:
+                        machine_id:
+                          type: integer
+                          description: Machine identifier.
+                        gpu_earn:
+                          type: number
+                          description: GPU earnings for this machine (USD).
+                        sto_earn:
+                          type: number
+                          description: Storage earnings for this machine (USD).
+                        bwu_earn:
+                          type: number
+                          description: Bandwidth-upload earnings for this machine (USD).
+                        bwd_earn:
+                          type: number
+                          description: Bandwidth-download earnings for this machine (USD).
+                        sla_earn:
+                          type: number
+                          description: SLA earnings for this machine (USD).
+                        reliability:
+                          type: number
+                          description: Uptime reliability ratio for this machine, or null.
+                  per_day:
+                    type: array
+                    description: Earnings broken down by day.
+                    items:
+                      type: object
+                      properties:
+                        day:
+                          type: integer
+                          description: Day index (days since Unix epoch).
+                        gpu_earn:
+                          type: number
+                          description: GPU earnings for this day (USD).
+                        sto_earn:
+                          type: number
+                          description: Storage earnings for this day (USD).
+                        bwu_earn:
+                          type: number
+                          description: Bandwidth-upload earnings for this day (USD).
+                        bwd_earn:
+                          type: number
+                          description: Bandwidth-download earnings for this day (USD).
+                        sla_earn:
+                          type: number
+                          description: SLA earnings for this day (USD).
+                        reliability:
+                          type: number
+                          description: Reliability ratio for this day, or null.
+              example:
+                sday: 19900
+                eday: 19900
+                summary:
+                  total_gpu: 12.34
+                  total_stor: 0.5
+                  total_bwu: 0.02
+                  total_bwd: 0.01
+                  total_sla: 0.1
+                  avg_reliability: 0.9987
+                username: myhostuser
+                email: host@example.com
+                fullname: Host User
+                address1: 123 Main St
+                address2: null
+                city: San Francisco
+                zip: '94105'
+                country: US
+                taxinfo: null
+                current:
+                  balance: 45
+                  service_fee: 0
+                  total: 45
+                  credit: 0
+                per_machine:
+                - machine_id: 1234
+                  gpu_earn: 12.34
+                  sto_earn: 0.5
+                  bwu_earn: 0.02
+                  bwd_earn: 0.01
+                  sla_earn: 0.1
+                  reliability: 0.9987
+                per_day:
+                - day: 19900
+                  gpu_earn: 12.34
+                  sto_earn: 0.5
+                  bwu_earn: 0.02
+                  bwd_earn: 0.01
+                  sla_earn: 0.1
+                  reliability: 0.9987
+        '400':
+          description: 'Invalid input syntax for date parameters; returns {"success": false, "msg": "Invalid input syntax:
+            <error>"}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
