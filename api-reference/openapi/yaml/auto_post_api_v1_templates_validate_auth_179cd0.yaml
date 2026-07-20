@@ -1,0 +1,72 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v1/templates/validate-auth:
+    post:
+      summary: Validate Registry Auth
+      tags:
+      - Templates
+      description: Validate Docker registry credentials and return a list of repositories accessible with those credentials.
+      security:
+      - BearerAuth: []
+      x-scope: user_read
+      x-rateLimit: 2.0
+      responses:
+        '200':
+          description: 'Success: returns {"success": true, "authenticated": true, "repositories": [...]} with the list of
+            accessible repository names.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: true on successful authentication
+                  authenticated:
+                    type: boolean
+                    description: true when credentials were accepted by the registry
+                  repositories:
+                    type: array
+                    items:
+                      type: string
+                    description: List of accessible repository names in "namespace/name" format
+                required:
+                - success
+                - authenticated
+                - repositories
+              example:
+                success: true
+                authenticated: true
+                repositories:
+                - myorg/myimage
+                - myorg/otherapp
+        '400':
+          description: 'Bad request: raised with {"success": false, "error": "invalid_args", "msg": "..."} for invalid server,
+            username, or token; or {"success": false, "error": "auth_failed", "msg": "..."} when registry authentication fails.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 'Unauthorized: authentication required; no authenticated user found for the request.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
