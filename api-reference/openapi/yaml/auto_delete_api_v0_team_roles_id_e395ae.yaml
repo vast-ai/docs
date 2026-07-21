@@ -1,0 +1,83 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/team/roles/{id}/:
+    delete:
+      summary: Delete Team Role
+      tags:
+      - Team
+      description: Deletes a team role, provided no team members are currently assigned to it.
+      security:
+      - BearerAuth: []
+      x-scope: team_write
+      x-rateLimit: 2
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Name of the role to delete (used when role_id is absent).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role_id:
+                  type: integer
+                  description: Numeric ID of the role to delete; takes precedence over id if provided.
+                  example: 7
+      responses:
+        '200':
+          description: '{"status": "success", "message": "Role <name> removed from team"} or {"status": "failure", "message":
+            "No role was removed from the team"}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: '"success" if role was deleted, "failure" otherwise'
+                  message:
+                    type: string
+                    description: Human-readable result message
+              example:
+                status: success
+                message: Role developer removed from team
+        '400':
+          description: '"Missing ''id'' (role name) or ''role_id'' parameter"; "Cannot delete role if there are team members
+            with the role"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: '"You can only delete team roles from the team context"; "Cannot delete the owner role"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: '"Role not found"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
