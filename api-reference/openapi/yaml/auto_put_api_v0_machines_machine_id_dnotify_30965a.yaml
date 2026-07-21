@@ -1,0 +1,115 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/machines/{machine_id}/dnotify:
+    put:
+      summary: Schedule Machine Maintenance
+      tags:
+      - Machines
+      description: Schedules a maintenance window for a single machine and sends downtime warning emails to affected instance
+        clients and a confirmation to the host.
+      security:
+      - BearerAuth: []
+      x-scope: machine_write
+      x-rateLimit: 2.5
+      parameters:
+      - name: machine_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ID of the machine to schedule maintenance for.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sdate:
+                  type: string
+                  format: date-time
+                  description: Start date and time of the maintenance window.
+                  example: '2023-10-30T14:00:00Z'
+                duration:
+                  type: integer
+                  description: Duration of the maintenance window in hours.
+                  example: 2
+                maintenance_reason:
+                  type: string
+                  description: Reason for the maintenance.
+                  example: Routine hardware check
+                maintenance_category:
+                  type: string
+                  description: Category of the maintenance.
+                  enum:
+                  - power
+                  - internet
+                  - disk
+                  - gpu
+                  - software
+                  - other
+                  example: software
+              required:
+              - sdate
+              - duration
+      responses:
+        '200':
+          description: '{success: true, machine_id, notifications_sent, you_sent: "N notifications sent"} on success.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: true on success
+                  machine_id:
+                    type: integer
+                    description: ID of the machine scheduled for maintenance
+                  notifications_sent:
+                    type: integer
+                    description: Number of client notification emails sent
+                  you_sent:
+                    type: string
+                    description: Human-readable summary of notifications sent
+              example:
+                success: true
+                machine_id: 1001
+                notifications_sent: 3
+                you_sent: 3 notifications sent
+        '400':
+          description: '"maintenance_category can only be one of (power, internet, disk, gpu, software, other)" for invalid
+            category, "Missing machine_id" when machine_id is unparseable, or "duration must be a positive number" when duration
+            is invalid.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: '"No such machine id" when the machine does not exist or is not owned by the caller.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: '"Missing sdate" when the sdate parameter is not provided.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
