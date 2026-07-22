@@ -1,0 +1,70 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/volumes/copy/:
+    post:
+      summary: Copy Volume
+      tags:
+      - Volumes
+      description: Clones an existing volume (src_id) into a new volume provisioned from a destination ask (dst_id), optionally
+        resizing.
+      security:
+      - BearerAuth: []
+      x-scope: instance_write
+      x-rateLimit: 1
+      responses:
+        '200':
+          description: Successful response from volume creation with copy operation (shape determined by create_volume helper)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: true on success.
+                  volume_name:
+                    type: string
+                    description: Identifier of the newly created destination volume (e.g. "V.67890").
+                required:
+                - success
+                - volume_name
+              example:
+                success: true
+                volume_name: V.67890
+        '400':
+          description: 'Missing src_id/dst_id, or requested size is smaller than source volume; error: "invalid_args"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 'Source volume not found or not owned by caller; error: "unauthorized", msg: "Unauthorized to access
+            volume {id}, or it does not exist"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 'Internal error retrieving source disk contract or machine, or volume creation failed; msg: "error
+            500: Please contact vast.ai support"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
