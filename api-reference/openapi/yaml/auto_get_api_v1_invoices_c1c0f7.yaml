@@ -1,0 +1,119 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v1/invoices/:
+    get:
+      summary: List Invoices (v1)
+      tags:
+      - Billing
+      description: Returns paginated, formatted invoices for the authenticated user within a required date range, with a next_token
+        for keyset pagination.
+      security:
+      - BearerAuth: []
+      x-scope: billing_read
+      x-rateLimit: 3
+      parameters:
+      - name: select_filters
+        in: query
+        required: true
+        description: '**`when`** (required). Date range in unix seconds (UTC). Operators: `gte`, `gt`, `lte`, `lt`.
+
+
+          **`service`** (optional). Filter by payment service: `transfer`, `stripe_payments`, `bitpay`, `coinbase`, `crypto.com`,
+          `instance_prepay`, `paypal_manual`, `wise_manual`. Operators: `eq`, `neq`, `in`, `notin`.
+
+
+          **Examples**:
+
+          ```json
+
+          // January 2026, all services
+
+          {"when":{"gte":1767225600,"lte":1769903999}}
+
+
+          // Only PayPal and Wise payouts
+
+          {"when":{"gte":1767225600,"lte":1769903999},"service":{"in":["paypal_manual","wise_manual"]}}
+
+
+          // Everything except crypto
+
+          {"when":{"gte":1767225600,"lte":1769903999},"service":{"notin":["bitpay","coinbase","crypto.com"]}}
+
+          ```
+
+          '
+        schema:
+          type: string
+      - name: order_by
+        in: query
+        required: false
+        description: 'Sort results by column. Columns: `paid_on`, `amount_cents`, `when`. Direction: `asc` or `desc` (default
+          `desc`).
+
+
+          Example: `[{"col":"paid_on","dir":"desc"}]`
+
+          '
+        schema:
+          type: string
+      - name: latest_first
+        in: query
+        required: false
+        description: Sort newest invoices first. If `order_by` is also set, `order_by` takes precedence.
+        schema:
+          type: boolean
+          default: true
+          example: true
+      - name: limit
+        in: query
+        required: false
+        description: Max results per page.
+        schema:
+          type: integer
+          minimum: 1
+          default: 60
+          example: 20
+      - name: after_token
+        in: query
+        required: false
+        description: 'Pass the `next_token` value from the previous response to fetch the next page of results. When the response
+          returns `next_token: null`, there are no more pages.'
+        schema:
+          type: string
+          example: eyJ2YWx1ZXMiOiB7ImlkIjogMjY3MjU5N30sICJvc19wYWdlIjogMH0=
+      responses:
+        '200':
+          description: 'Invalid date range or no results: {"success": false, "error": "Invalid date range", ...} or {"success":
+            true, "count": 0, "results": [], ...}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: True when request succeeded
+                  count:
+                    type: integer
+                    description: Number of formatted results returned
+                  total:
+                    type: integer
+                    description: Total matching invoices
+                  results:
+                    type: array
+                    items:
+                      type: object
+                    description: Formatted invoice entries with start, end, type, source, description, amount, metadata, and
+                      items fields
+                  next_token:
+                    type: string
+                    description: Cursor for the next page, or null
