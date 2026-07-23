@@ -1,0 +1,86 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/team/transfer/:
+    put:
+      summary: Transfer Team Ownership
+      tags:
+      - Team
+      description: Transfers ownership of the current team to another existing team member who holds a manager role.
+      security:
+      - BearerAuth: []
+      x-scope: team_write
+      x-rateLimit: 2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                new_team_owner_id:
+                  type: integer
+                  description: User ID of the team member who will become the new owner; must currently be a manager on the
+                    team.
+                  example: 5678
+                delete_billing:
+                  type: boolean
+                  description: When true, removes all payment methods and billing info from the team account during the transfer.
+                  example: false
+      responses:
+        '200':
+          description: 'Success: {"success": true, "msg": "Team Successfully Transferred!"}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success
+                  msg:
+                    type: string
+                    description: Human-readable confirmation message
+              example:
+                success: true
+                msg: Team Successfully Transferred!
+        '400':
+          description: New team owner id required; new and old owner must differ; new owner must be a member with manager
+            permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: '"Only the Team''s Owner may transfer ownership of the team"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: '"Team owner not found" or the specified new owner does not exist'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: '"Failed to transfer team ownership" with error detail'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
