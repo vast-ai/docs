@@ -29,9 +29,10 @@ SLA settlement is **asymmetric by design**: when reliability is strong relative 
 
 **Pre-flight checklist (before tuning claim/confidence):**
 
-- Confirm SLA is enabled for your account (contact [Discord](https://discord.gg/hSuEbSQ4X8) / support if unsure).
+- Confirm SLA is enabled for your account. In the console, open **Set Pricing → SLA** on a machine — if the panel is missing or listing returns `sla_not_approved`, contact [Discord](https://discord.gg/hSuEbSQ4X8) before configuring a fleet. Test one machine before looping fleet scripts.
 - Ensure your host daemon is current per the [host setup guide](https://cloud.vast.ai/host/setup/).
 - If listing fails with `sla_not_approved` or `sla_daemon_outdated`, resolve eligibility before changing SLA parameters.
+- **Planned maintenance:** SLA credit for scheduled downtime requires the [CLI](/cli/hello-world) (`vastai schedule maint`). If you rely on the web console only, install the CLI before enabling SLA, or accept that planned-maintenance credits may not be available until you do.
 
 Complete [host setup](https://cloud.vast.ai/host/setup/) first. A healthy machine appears on **Host → Machines** with no red error status.
 
@@ -172,7 +173,7 @@ Disabling SLA on the offer (setting `sla_r_claim` to `0`) prevents new SLA-cover
 1. Open your machine on the [Host Machines page](https://cloud.vast.ai/host/machines) → **Set Pricing**.
 2. Set base listing fields first (GPU price, offer end date, rental types) if this is a new listing.
 3. Expand **SLA**.
-4. Set **Claim** and **Confidence** (spread). Example: claim **99%** with normal confidence.
+4. Set **Claim** and **Confidence**. For your first listing, choose **Normal** (`sla_sigma_x ≈ 0.5`) unless your uptime history is volatile — see [Confidence values](#confidence-values) for risk tradeoffs.
 5. Save and confirm the SLA charge preview before listing.
 6. After saving pricing, click **LIST** on the Host Machines page (or confirm the machine status changes to **listed**). Saving pricing alone stores your offer settings; listing publishes the offer to search.
 
@@ -426,7 +427,15 @@ Clients pay more because you admit greater uncertainty. Use this if your reliabi
 
 Maintenance windows scheduled through [`vastai schedule maint`](/host/cli/schedule-maint) may be credited back toward reliability, reducing SLA penalties for planned downtime. Unplanned outages count fully toward SLA settlement.
 
-**Console-only hosts:** SLA credit for planned downtime requires scheduling maintenance at least 24 hours ahead. Today this is done via the CLI (`vastai schedule maint`). Install the CLI before enabling SLA if you rely on planned maintenance credits.
+Schedule at least 24 hours ahead when possible:
+
+```bash
+vastai schedule maint MACHINE_ID --sdate "2026-08-01 02:00:00" --duration 2
+```
+
+See [CLI install](/cli/hello-world) if you have not set up the CLI. Credits for planned maintenance are evaluated on a case-by-case basis and are not guaranteed.
+
+**Console-only hosts:** install the CLI before enabling SLA if you rely on planned maintenance credits.
 
 <Warning>
 Planned maintenance credit is not guaranteed. The platform evaluates advance notice (generally at least 24 hours recommended) and maintenance duration when determining credit eligibility. **Treat any scheduled downtime as a potential SLA credit event when modeling risk.** Contact support via [Discord](https://discord.gg/hSuEbSQ4X8) or email [contact@vast.ai](mailto:contact@vast.ai) before extended maintenance on an SLA-listed machine to confirm credit eligibility.
