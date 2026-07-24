@@ -14,7 +14,7 @@ paths:
         Creates or updates ask contracts for a machine to list it for rent on the vast.ai platform.
         Allows setting offer pricing, rental types, end dates, discount rates, and SLA parameters.
 
-        SLA request-body fields (`sla_r_target`, `sla_r_claim`, `sla_sigma_x`) are supported on this REST endpoint. The published CLI and SDK do not yet expose them — use the host console (**Set Pricing → SLA**) or REST/`curl` until CLI/SDK support ships.
+        SLA request-body fields (`sla_r_claim`, `sla_sigma_x`, optional `sla_max_beta`) are supported on this REST endpoint. SLA activates when `sla_r_claim > 0`. Host-sent `sla_r_target` / legacy `sla_reliability` are ignored — clients choose coverage at search/rent time. The published CLI and SDK do not yet expose SLA fields — use the host console (**Set Pricing → SLA**) or REST/`curl` until CLI/SDK support ships.
 
         CLI Usage (non-SLA fields): `vastai list machine <machine_id> [options]`
       security:
@@ -63,33 +63,37 @@ paths:
                   type: number
                   format: float
                   description: Maximum discount rate allowed for prepaid credits
-                sla_r_target:
-                  type: number
-                  format: float
-                  minimum: 0
-                  maximum: 0.9999
-                  description: |
-                    Client reliability coverage target. Values above 0 enable SLA on the offer.
-                    Must be greater than 0 and at most 0.9999 when enabling SLA; exactly 1.0 is rejected.
-                    Set to 0 to disable SLA. Legacy alias: sla_reliability.
                 sla_r_claim:
                   type: number
                   format: float
                   minimum: 0
                   maximum: 0.9999
                   description: |
-                    Host reliability claim. Must be greater than 0, at most 0.9999, and greater than or equal to sla_r_target.
-                    Defaults to sla_r_target if omitted.
+                    Host reliability claim. Values above 0 enable SLA on the offer.
+                    Must be greater than 0 and at most 0.9999 when enabling SLA; exactly 1.0 is rejected.
+                    Set to 0 to disable SLA on new rentals.
                 sla_sigma_x:
                   type: number
                   format: float
                   description: |
                     Host confidence spread — how wide your belief is around the claim.
-                    Must be greater than 0 and at most 3.0. Defaults to 0.5.
+                    Must be greater than 0 and at most 3.0. Defaults to 0.5 when enabling SLA.
+                sla_max_beta:
+                  type: number
+                  format: float
+                  description: |
+                    Optional term capping how path-dependent a client's timescale mix can be.
+                    Must be in (0, 1) and at least the default beta derived at your claim.
+                sla_r_target:
+                  type: number
+                  format: float
+                  description: |
+                    Ignored on asks. Client coverage target is supplied at search/rent time
+                    (`target_reliability`), not set by the host.
                 sla_reliability:
                   type: number
                   format: float
-                  description: Legacy alias for sla_r_target.
+                  description: Legacy alias for sla_r_target; ignored on asks.
       responses:
         '200':
           description: Successful response
@@ -129,7 +133,8 @@ paths:
                   success: true
                   you_sent:
                     machine: 12345
-                    sla_r_target: 0.95
+                    sla_r_claim: 0.99
+                    sla_sigma_x: 0.5
                   results:
                   - machine_id: 12345
                     user_id: 67890
@@ -148,6 +153,8 @@ paths:
                     enum:
                     - invalid_args
                     - invalid_sla_params
+                    - sla_not_approved
+                    - sla_daemon_outdated
                     example: invalid_sla_params
                   msg:
                     type: string
