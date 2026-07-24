@@ -1,6 +1,6 @@
-Schedule upcoming maint window
+Schedule an upcoming maintenance window
 
-<Note>This is a **host** command, used for managing machines you are renting out on Vast.ai.</Note>
+<Note>This is a **host** command, used for managing machines you are renting out on Vast.ai. First time? Install the CLI via [CLI hello world](/cli/hello-world), then confirm with `vastai --help`.</Note>
 
 ## Usage
 
@@ -23,7 +23,7 @@ vastai schedule maint id [--sdate START_DATE --duration DURATION --maintenance_c
 </ParamField>
 
 <ParamField path="--duration" type="number">
-  maintenance duration in hours
+  Maintenance duration in hours. Prefer whole hours for REST compatibility (OpenAPI `duration` is an integer). The CLI may accept fractional values (for example `0.5`).
 </ParamField>
 
 <ParamField path="--maintenance_category" type="string" default="not provided">
@@ -45,15 +45,17 @@ The same `schedule maint` command is used for both **planned** and **emergency**
 If SLA is enabled and you need planned downtime during an active rental, schedule at least 24 hours in advance. See [SLA Offers → Scheduled maintenance](/host/sla-offers#scheduled-maintenance).
 
 ```bash
-vastai schedule maint 8207 --sdate 1785549600 --duration 2 --maintenance_category software
+# Replace MACHINE_ID; set --sdate to a future UTC epoch (≥24h ahead for planned credit review)
+# Linux: date -u -d '2026-08-01 02:00:00' +%s
+vastai schedule maint MACHINE_ID --sdate 1785549600 --duration 2 --maintenance_category software
 ```
 
 ### Emergency or unplanned maintenance
 
-If the machine must go offline without adequate notice, still run `schedule maint` to notify renters — but expect full SLA settlement exposure when SLA is enabled.
+If the machine must go offline without adequate notice, still run `schedule maint` to notify renters — but expect full SLA settlement exposure when SLA is enabled. Use the current UTC epoch for `--sdate` and an integer `--duration` (hours):
 
 ```bash
-vastai schedule maint 8207 --sdate 1677562671 --duration 0.5 --maintenance_category power
+vastai schedule maint MACHINE_ID --sdate "$(date -u +%s)" --duration 1 --maintenance_category power
 ```
 
 ## Examples
