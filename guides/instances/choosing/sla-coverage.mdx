@@ -9,7 +9,7 @@ Some Vast.ai offers include a **Service Level Agreement (SLA)** — a reliabilit
 This page explains SLA from the renter side: how to find SLA offers, how pricing works, and when you get credited.
 
 <Note>
-**SLA is opt-in.** Coverage applies only when you set a reliability target in Search before you rent (console or `target_reliability` in API/CLI). Renting without a target means **no SLA charge and no SLA credits**, even on offers where the host has enabled SLA.
+**SLA is opt-in.** In the console, set a reliability target in Search before you rent. Via API/CLI, pass `target_reliability` on **create-instance** (and in search when pricing). Renting without a target means **no SLA charge and no SLA credits**, even on offers where the host has enabled SLA.
 </Note>
 
 <Note>
@@ -44,7 +44,7 @@ total ≈ GPU + storage + bandwidth + SLA charge
 | --- | --- |
 | Your reliability target | Higher target → higher SLA charge |
 | Host SLA claim | Maximum reliability the host advertises on the listing (`expected_reliability`). Higher claim → lower SLA charge at a given target |
-| Host confidence | Host pricing setting that affects SLA charge size (tighter = lower charge at a given target) |
+| Host confidence | Host-side pricing setting that affects SLA charge size. **Not shown on offer cards** — compare offers using `dph_total` or the SLA charge line in the price breakdown |
 
 **Rule of thumb:** pick a target **at or below** the host's claim for the best value. Asking for 99% coverage on a host who only claims 95% costs much more than asking for 95% on a host who claims 99%.
 
@@ -63,9 +63,10 @@ Searching with **target reliability 95%** on an offer where the host **claims 99
 ### In the web console
 
 1. Open [Search](https://cloud.vast.ai/create/) and confirm **On-demand** is selected (SLA does not apply to interruptible rentals).
-2. In the search filters panel, set your **reliability target** (exact label matches the current UI—typically under advanced or SLA filters).
-3. Review offers that show an **SLA charge** line in the price breakdown. If you do not see an SLA charge before clicking **RENT**, you do not have coverage.
-4. Rent as usual. Your target is locked at rent time.
+2. In the left/top **search filters** panel, find the **reliability target** / SLA filter control (label matches the current UI). Set your target (for example 95%).
+3. Optionally filter to SLA-enabled offers if that control is available.
+4. Review offers that show an **SLA charge** line in the price breakdown. If you do not see an SLA charge before clicking **RENT**, you do not have coverage.
+5. Rent as usual. Your target is locked at rent time.
 
 CLI and API examples below use the same filters.
 
@@ -117,10 +118,10 @@ Always compare **`dph_total`**, not just GPU price, when SLA matters. Search ran
 ### API automation
 
 <Warning>
-Searching without `target_reliability`, then calling create-instance on that offer ID, does **not** add SLA retroactively. SLA terms are locked only when `target_reliability` is set in the **same** search request used to select the offer.
+SLA coverage is locked at **create-instance** time via `target_reliability` on `PUT /api/v0/asks/{id}/`. Searching with a target only prices offers; renting without passing `target_reliability` on create-instance produces a **non-SLA** contract.
 </Warning>
 
-**REST search example** (filter shape differs from CLI query strings — see [Search Offers](/api-reference/search/search-offers)):
+**1. Search** (prices `dph_total` at your target — include storage explicitly; REST defaults to 8 GB, CLI `--storage` defaults to 5 GiB):
 
 ```bash
 curl -s -X POST "https://console.vast.ai/api/v0/bundles/" \
@@ -129,19 +130,31 @@ curl -s -X POST "https://console.vast.ai/api/v0/bundles/" \
   -d '{
     "limit": 20,
     "type": "ondemand",
+    "allocated_storage": 50,
     "target_reliability": {"eq": 0.95},
     "has_sla": {"eq": true},
     "expected_reliability": {"gte": 0.99}
   }'
 ```
 
-1. **Search** with your target as above (and optionally `has_sla` / `expected_reliability`).
-2. **Rent** the chosen offer with `PUT /api/v0/asks/{id}/` ([Create Instance](/api-reference/instances/create-instance)) — no SLA fields on create-instance.
-3. **Verify** via show-instances: confirm `target_reliability > 0` and note `search.slaPremiumPerHour`.
+**2. Rent** the chosen offer ID and pass the **same** target:
 
-If your automation splits search and rent across workers, pass the search parameters (or offer ID plus confirmed `dph_total` and `target_reliability`) explicitly between steps — do not assume account-wide defaults apply SLA.
+```bash
+curl -s -X PUT "https://console.vast.ai/api/v0/asks/OFFER_ID/" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "image": "pytorch/pytorch:latest",
+    "disk": 50,
+    "target_reliability": 0.95
+  }'
+```
 
-Hold `--storage` / allocated storage constant when comparing `dph_total` across runs.
+See [Create Instance](/api-reference/instances/create-instance) and [Search Offers](/api-reference/search/search-offers).
+
+**3. Verify** via show-instances: confirm `target_reliability > 0`. For running instances, check `instance.slaPremiumPerHour`; search-context snapshots use `search.slaPremiumPerHour`.
+
+Hold `allocated_storage` / `--storage` constant when comparing `dph_total` across runs or between CLI and REST.
 
 ## What happens after you rent
 
@@ -209,7 +222,7 @@ Production settlement uses the multi-window reliability blend described above, n
 
 Show-instances output may include `target_reliability` and price fields under `search` / `instance` (including `slaPremiumPerHour`).
 
-To find SLA-covered instances, inspect returned objects for `target_reliability > 0` (or filter in your client). The show-instances API does **not** support a `has_sla` query parameter. Where your API key supports it, you may also try `select_filters` on `sla_r_target` / `target_reliability` — see [Show Instances](/api-reference/instances/show-instances).
+To find SLA-covered instances, filter client-side from the show-instances response (`target_reliability > 0`, `instance.slaPremiumPerHour`). Server-side `select_filters` on SLA fields is not guaranteed for all API keys — do not depend on it in production automation.
 
 <details>
 <summary>API integrators — field aliases</summary>

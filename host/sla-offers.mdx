@@ -32,7 +32,7 @@ SLA settlement is **asymmetric by design**: when reliability is strong relative 
 - Confirm SLA is enabled for your account. In the console, open **Set Pricing → SLA** on a machine — if the panel is missing or listing returns `sla_not_approved`, contact [Discord](https://discord.gg/hSuEbSQ4X8) before configuring a fleet. Test one machine before looping fleet scripts.
 - Ensure your host daemon is current per the [host setup guide](https://cloud.vast.ai/host/setup/).
 - If listing fails with `sla_not_approved` or `sla_daemon_outdated`, resolve eligibility before changing SLA parameters.
-- **Planned maintenance:** SLA credit for scheduled downtime requires the [CLI](/cli/hello-world) (`vastai schedule maint`). If you rely on the web console only, install the CLI before enabling SLA, or accept that planned-maintenance credits may not be available until you do.
+- **Planned maintenance:** SLA credit for scheduled downtime requires the [CLI](/cli/hello-world) or [REST schedule-maintenance API](/api-reference/machines/schedule-maint) (`vastai schedule maint`). The web console can configure SLA pricing, but **scheduling maintenance requires CLI or REST**. Install the CLI before enabling SLA if you plan maintenance windows.
 
 Complete [host setup](https://cloud.vast.ai/host/setup/) first. A healthy machine appears on **Host → Machines** with no red error status.
 
@@ -425,17 +425,21 @@ Clients pay more because you admit greater uncertainty. Use this if your reliabi
 
 ### Scheduled maintenance
 
-Maintenance windows scheduled through [`vastai schedule maint`](/host/cli/schedule-maint) may be credited back toward reliability, reducing SLA penalties for planned downtime. Unplanned outages count fully toward SLA settlement.
+**Planned SLA maintenance (may earn credit):** Schedule at least 24 hours in advance with [`vastai schedule maint`](/host/cli/schedule-maint) (or the [REST schedule-maintenance API](/api-reference/machines/schedule-maint)). Include `--sdate`, `--duration`, and `--maintenance_category planned`. Credit eligibility is evaluated on a case-by-case basis.
 
-Schedule at least 24 hours ahead when possible:
+**CLI `--sdate` uses Unix epoch seconds (UTC)**; the REST body uses ISO 8601 UTC:
 
 ```bash
-vastai schedule maint MACHINE_ID --sdate "2026-08-01 02:00:00" --duration 2
+# Example: 2026-08-01 02:00:00 UTC → epoch seconds
+# Linux: date -u -d '2026-08-01 02:00:00' +%s
+vastai schedule maint MACHINE_ID --sdate 1785549600 --duration 2 --maintenance_category planned
 ```
 
-See [CLI install](/cli/hello-world) if you have not set up the CLI. Credits for planned maintenance are evaluated on a case-by-case basis and are not guaranteed.
+REST equivalent: `PUT /api/v0/machines/{machine_id}/dnotify` with `"sdate": "2026-08-01T02:00:00Z"` — see [Schedule Maintenance](/api-reference/machines/schedule-maint).
 
-**Console-only hosts:** install the CLI before enabling SLA if you rely on planned maintenance credits.
+**Emergency or unplanned downtime:** Notify clients if possible using `schedule maint`, but expect **full SLA settlement exposure**. Advance-notice credits do not apply to unplanned outages.
+
+See [CLI install](/cli/hello-world) if you have not set up the CLI.
 
 <Warning>
 Planned maintenance credit is not guaranteed. The platform evaluates advance notice (generally at least 24 hours recommended) and maintenance duration when determining credit eligibility. **Treat any scheduled downtime as a potential SLA credit event when modeling risk.** Contact support via [Discord](https://discord.gg/hSuEbSQ4X8) or email [contact@vast.ai](mailto:contact@vast.ai) before extended maintenance on an SLA-listed machine to confirm credit eligibility.
@@ -511,7 +515,7 @@ Positive `sla_earn` = net SLA charge you kept that period; negative = net credit
 
 `GET /api/v0/users/{user_id}/machine-earnings/` returns SLA fields alongside compute earnings. Requires a **`billing_read`** API key. See [`show earnings`](/api-reference/billing/show-earnings).
 
-This endpoint is rate-limited — see [Rate Limits and Errors](/api-reference/rate-limits-and-errors). Poll no faster than about one request every two seconds per IP (`threshold=2.0`); back off on HTTP 429.
+This endpoint is rate-limited — see [Rate Limits and Errors](/api-reference/rate-limits-and-errors). Poll at most about once every two seconds per IP; back off on HTTP 429.
 
 <Warning>
 When you pass `machid`, use `per_machine[].sla_earn` for that machine's SLA settlement in the window. Do **not** read `per_day[].sla_earn` for single-machine checks — `per_day[]` is always fleet-wide, even with `?machid=`.
