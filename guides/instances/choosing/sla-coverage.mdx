@@ -14,6 +14,14 @@ This page explains SLA from the renter side: how to find SLA offers, how pricing
 <Warning>
 `target_reliability` is **not yet** available on the published `vastai create instance` CLI or Python SDK `create_instance()`. Searching with `target_reliability` only affects quoted pricing — it does **not** enable SLA on the contract unless you pass the same value at create-instance via **REST** or the **web console**.
 </Warning>
+
+## Choose your path
+
+| Goal | Start here |
+| --- | --- |
+| Rent with SLA in the console | [Finding SLA offers → In the web console](#in-the-web-console) |
+| Understand charges and credits | [How pricing works](#how-pricing-works) → [What happens after you rent](#what-happens-after-you-rent) |
+| Automate search → rent → verify | [API automation](#api-automation) (REST; CLI cannot rent with SLA yet) |
 </Note>
 
 <Note>
@@ -68,7 +76,7 @@ Searching with **target reliability 95%** on an offer where the host **claims 99
 
 1. Open [Search](https://cloud.vast.ai/create/) and confirm **On-demand** is selected (SLA does not apply to interruptible rentals).
 2. In Search filters (left filter bar), set **Reliability target** to your desired coverage level — for example **95%** or **99%**. If you do not set a target, you are not opting into SLA.
-3. Optionally filter to SLA-enabled offers (`has_sla` / SLA-enabled control) if available — separate from **Reliability target**.
+3. Optionally narrow to host SLA listings with an SLA-enabled / `has_sla` filter if shown. That filter only restricts which offers appear — it does **not** replace setting **Reliability target**. If you do not see a separate SLA toggle, set Reliability target and confirm the SLA charge line before rent.
 4. Before you click **RENT**, confirm the price breakdown shows an **SLA charge** line. No SLA charge means no SLA coverage for that rental.
 5. Rent as usual. Your target is locked at rent time.
 
@@ -164,8 +172,9 @@ See [Create Instance](/api-reference/instances/create-instance) and [Search Offe
 | --- | --- | --- |
 | Target on a non-SLA offer | HTTP 400 `invalid_args` | Search with `has_sla=true`; confirm `expected_reliability` |
 | Target out of range / invalid | HTTP 400 `invalid_args` | Use `0 < target_reliability < 1`; stay at or below a realistic host claim |
-| Offer gone / not rentable | HTTP 404/410 `no_such_ask` | Re-search and rent a current offer ID |
-| Price mismatch after stale quote | HTTP 400 `invalid_price` | Re-search with the same `target_reliability` and storage, then rent again |
+| Offer unavailable / stale | HTTP 404 `invalid_args` (check `msg` for `no_such_ask`) | Re-search and rent a current offer ID |
+| Offer no longer exists | HTTP 410 `no_such_ask` | Re-search for a new offer ID |
+| Price mismatch after stale quote | HTTP 400 `invalid_price` | Re-search with the same `target_reliability` and storage (`allocated_storage` / `--storage`), then rent again |
 
 Hold `allocated_storage` / `--storage` constant when comparing `dph_total` across runs or between CLI and REST.
 
@@ -237,7 +246,9 @@ Production settlement uses the multi-window reliability blend described above, n
 2. Open **price details** (or the instance billing panel) and confirm an **SLA charge** line is present.
 3. If the UI shows your **reliability target**, confirm it matches what you selected at search time. If you do not see a target or SLA charge, you likely rented without SLA coverage.
 
-### API / CLI
+### API integrators
+
+CLI can search with `target_reliability` but cannot enable or verify SLA on contracts today. Use the web console or REST for rent and post-rent verification.
 
 Console users: open **Instances** → select your instance → **price details** to confirm the SLA charge and target. Skip the block below if you do not use the API.
 
