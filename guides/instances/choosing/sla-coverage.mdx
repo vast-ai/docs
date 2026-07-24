@@ -62,10 +62,10 @@ Searching with **target reliability 95%** on an offer where the host **claims 99
 
 ### In the web console
 
-1. Open [Search](https://cloud.vast.ai/create/).
-2. Set your **reliability target** in Search filters (and optionally filter to SLA-enabled offers). Exact control labels match the UI.
-3. Confirm the price breakdown shows an **SLA charge** line and that **total $/hr** includes it before you rent.
-4. The target you set here is what locks in at rent time.
+1. Open [Search](https://cloud.vast.ai/create/) and confirm **On-demand** is selected (SLA does not apply to interruptible rentals).
+2. In the search filters panel, set your **reliability target** (exact label matches the current UI—typically under advanced or SLA filters).
+3. Review offers that show an **SLA charge** line in the price breakdown. If you do not see an SLA charge before clicking **RENT**, you do not have coverage.
+4. Rent as usual. Your target is locked at rent time.
 
 CLI and API examples below use the same filters.
 
@@ -116,11 +116,32 @@ Always compare **`dph_total`**, not just GPU price, when SLA matters. Search ran
 
 ### API automation
 
-1. **Search** with `target_reliability` set (and optionally `has_sla=true`, `expected_reliability>=…`) in the same request you use to pick an offer.
-2. **Rent** the offer ID from that search response so pricing and contract terms match `dph_total`.
-3. **Verify** on the new instance: `target_reliability` and related SLA fields in show-instances output.
+<Warning>
+Searching without `target_reliability`, then calling create-instance on that offer ID, does **not** add SLA retroactively. SLA terms are locked only when `target_reliability` is set in the **same** search request used to select the offer.
+</Warning>
 
-`target_reliability` is a **search-time** parameter; create-instance does not accept separate SLA fields — terms come from the search context used before rent.
+**REST search example** (filter shape differs from CLI query strings — see [Search Offers](/api-reference/search/search-offers)):
+
+```bash
+curl -s -X POST "https://console.vast.ai/api/v0/bundles/" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "limit": 20,
+    "type": "ondemand",
+    "target_reliability": {"eq": 0.95},
+    "has_sla": {"eq": true},
+    "expected_reliability": {"gte": 0.99}
+  }'
+```
+
+1. **Search** with your target as above (and optionally `has_sla` / `expected_reliability`).
+2. **Rent** the chosen offer with `PUT /api/v0/asks/{id}/` ([Create Instance](/api-reference/instances/create-instance)) — no SLA fields on create-instance.
+3. **Verify** via show-instances: confirm `target_reliability > 0` and note `search.slaPremiumPerHour`.
+
+If your automation splits search and rent across workers, pass the search parameters (or offer ID plus confirmed `dph_total` and `target_reliability`) explicitly between steps — do not assume account-wide defaults apply SLA.
+
+Hold `--storage` / allocated storage constant when comparing `dph_total` across runs.
 
 ## What happens after you rent
 
@@ -149,14 +170,15 @@ Scheduled maintenance with adequate notice may be credited toward reliability. U
 
 Using the H100 example ($84/day compute, ~$0.20/day SLA charge, target 95%, host claim 99%):
 
-| Day's measured reliability (simplified) | What you pay | What you receive | Extra cost vs no SLA |
+| Scenario | Approx. SLA charge | Approx. settlement credit | Net vs no SLA (approx.) |
 | --- | --- | --- | --- |
-| Excellent (~100%) | $84 compute + $0.20 SLA charge | — | −$0.20 (you paid the SLA charge) |
-| Good (~99%) | $84 + $0.20 | Often none / small credit | Roughly −$0.20 to −$0.17 |
-| At target (~95%) | $84 + $0.20 | ~$42 credit | ~+$42 |
-| Severe outage (~90% or less) | $84 + $0.20 | ~$84 credit | ~+$84 |
+| Above target (excellent / good day) | ~$0.20/day | $0 (often) | **−$0.20** (you paid the SLA charge) |
+| Near / below target on blended measure (~95%) | ~$0.20/day | ~$42 | **+$41.80** (net credit after SLA charge) |
+| Severe shortfall (~90% or less) | ~$0.20/day | ~$84 | **+$83.80** |
 
-Negative values in the last column mean you paid a small SLA charge on top of compute; positive values mean you received a settlement credit. Strong-uptime days often yield no credit in production settlement.
+**How to read “Net vs no SLA”:** negative = you paid more than without SLA; positive = you received a net credit versus renting the same offer without SLA coverage.
+
+Production settlement can issue credits even when a single daily snapshot looks close to your target, because measurement uses the blended daily reliability calculation.
 
 <Note>
 Production settlement uses the multi-window reliability blend described above, not a single raw daily percentage. Treat these rows as directional, not exact invoice amounts.
@@ -177,18 +199,17 @@ Production settlement uses the multi-window reliability blend described above, n
 
 ## Viewing SLA on active instances
 
-On the [Instances](https://cloud.vast.ai/instances/) page, price details for SLA rentals include the SLA charge rate alongside GPU and storage costs.
+### In the web console
 
-Show-instances output may include:
+1. Open **Instances** and select your running instance.
+2. Open **price details** (or the instance billing panel) and confirm an **SLA charge** line is present.
+3. If the UI shows your **reliability target**, confirm it matches what you selected at search time. If you do not see a target or SLA charge, you likely rented without SLA coverage.
 
-| Field | Meaning |
-| --- | --- |
-| `target_reliability` | Your coverage target |
-| `sla_r_claim` | Host's claim |
-| `sla_sigma_x` | Host's confidence spread |
-| `search.slaPremiumPerHour` | Current SLA charge rate (API field name) |
+### API / CLI
 
-To find SLA-covered instances, inspect returned objects for `target_reliability > 0` (or filter in your client). The show-instances API does **not** support a `has_sla` query parameter.
+Show-instances output may include `target_reliability` and price fields under `search` / `instance` (including `slaPremiumPerHour`).
+
+To find SLA-covered instances, inspect returned objects for `target_reliability > 0` (or filter in your client). The show-instances API does **not** support a `has_sla` query parameter. Where your API key supports it, you may also try `select_filters` on `sla_r_target` / `target_reliability` — see [Show Instances](/api-reference/instances/show-instances).
 
 <details>
 <summary>API integrators — field aliases</summary>
