@@ -68,7 +68,7 @@ Searching with **target reliability 95%** on an offer where the host **claims 99
 
 1. Open [Search](https://cloud.vast.ai/create/) and confirm **On-demand** is selected (SLA does not apply to interruptible rentals).
 2. In Search filters (left filter bar), set **Reliability target** to your desired coverage level — for example **95%** or **99%**. If you do not set a target, you are not opting into SLA.
-3. Optionally filter to SLA-enabled offers if that control is available.
+3. Optionally filter to SLA-enabled offers (`has_sla` / SLA-enabled control) if available — separate from **Reliability target**.
 4. Before you click **RENT**, confirm the price breakdown shows an **SLA charge** line. No SLA charge means no SLA coverage for that rental.
 5. Rent as usual. Your target is locked at rent time.
 
@@ -156,7 +156,16 @@ curl -s -X PUT "https://console.vast.ai/api/v0/asks/OFFER_ID/" \
 
 See [Create Instance](/api-reference/instances/create-instance) and [Search Offers](/api-reference/search/search-offers).
 
+**API key permissions:** create a scoped key with `misc` (search/bundles), `instance_write` (create-instance), and preferably `instance_read` (verify show-instances). See [Authentication](/api-reference/authentication) and [Permissions](/api-reference/permissions).
+
 **3. Verify** via show-instances: confirm `target_reliability > 0`. For running instances, check `instance.slaPremiumPerHour`; search-context snapshots use `search.slaPremiumPerHour`.
+
+| Symptom | Typical response | What to do |
+| --- | --- | --- |
+| Target on a non-SLA offer | HTTP 400 `invalid_args` | Search with `has_sla=true`; confirm `expected_reliability` |
+| Target out of range / invalid | HTTP 400 `invalid_args` | Use `0 < target_reliability < 1`; stay at or below a realistic host claim |
+| Offer gone / not rentable | HTTP 404/410 `no_such_ask` | Re-search and rent a current offer ID |
+| Price mismatch after stale quote | HTTP 400 `invalid_price` | Re-search with the same `target_reliability` and storage, then rent again |
 
 Hold `allocated_storage` / `--storage` constant when comparing `dph_total` across runs or between CLI and REST.
 
