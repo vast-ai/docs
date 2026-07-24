@@ -1,0 +1,86 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/instances/{id}/:
+    put:
+      summary: Update Instance
+      tags:
+      - Instances
+      description: Updates the target state (running/stopped) or label of a single instance.
+      security:
+      - BearerAuth: []
+      x-scope: instance_write
+      x-rateLimit: 1
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: The ID of the instance to start.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label:
+                  type: string
+                  description: Text label to assign to the instance
+                  example: My ML Training Job
+                state:
+                  type: string
+                  description: The desired state of the instance.
+                  enum:
+                  - running
+      responses:
+        '200':
+          description: 'Returns {success: true} on update, or {success: false, error: "resources_unavailable", msg: "Required
+            resources are currently unavailable, state change queued."} when the machine cannot start.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: True when update was applied
+                  error:
+                    type: string
+                    description: Error code if success is false
+                  msg:
+                    type: string
+                    description: Human-readable message
+              example:
+                success: true
+        '400':
+          description: 'Returns {success: false, error: "missing_billing", msg: "You lack credit, see the billing page."}
+            for credit issues, {error: "invalid_args", msg: "label_too_long"} for oversized labels, or {success: false, msg:
+            "Invalid target state"} for bad state.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 'Returns {success: false, error: "no_such_instance", msg: "Instance {id} not found."} when the instance
+            doesn''t exist or isn''t owned by the user.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
