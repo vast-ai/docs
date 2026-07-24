@@ -54,7 +54,9 @@ paths:
           required: false
           description: |
             JSON object of column filters. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `in`, `notin`.
-            Filterable columns: `actual_status`, `gpu_name`, `verification`, `id`, `label`, and other columns stored directly on the contract record. Computed fields (e.g. `dph_total`, `num_gpus`) are not filterable and return 400.
+            Filterable columns: `actual_status`, `gpu_name`, `verification`, `id`, `label`, and other columns stored directly on the contract record
+            (including `sla_r_claim` and `sla_r_target` / `target_reliability` when present). Computed fields (e.g. `dph_total`, `num_gpus`, `has_sla`) are not filterable and return 400.
+            To find SLA-covered instances, filter client-side on `target_reliability > 0` or use `select_filters` on `sla_r_target` if supported for your key.
           schema:
             type: string
             default: '{}'
@@ -332,7 +334,36 @@ paths:
                         dph_total:
                           type: number
                           format: float
+                          description: Total $/hour including storage (and SLA charge when applicable).
                           example: 0.8021
+                        target_reliability:
+                          type: number
+                          format: float
+                          nullable: true
+                          description: Client SLA coverage target locked at rent time. Null or 0 when the rental has no SLA.
+                          example: 0.95
+                        sla_r_claim:
+                          type: number
+                          format: float
+                          nullable: true
+                          description: Host reliability claim for this SLA contract.
+                          example: 0.99
+                        sla_sigma_x:
+                          type: number
+                          format: float
+                          nullable: true
+                          description: Host confidence spread for this SLA contract.
+                          example: 0.5
+                        search:
+                          type: object
+                          description: Price breakdown for search-context costs (may include slaPremiumPerHour).
+                          additionalProperties: true
+                          properties:
+                            slaPremiumPerHour:
+                              type: number
+                              format: float
+                              description: SLA charge rate in $/hour (API field name).
+                              example: 0.008
                         dlperf:
                           type: number
                           nullable: true
