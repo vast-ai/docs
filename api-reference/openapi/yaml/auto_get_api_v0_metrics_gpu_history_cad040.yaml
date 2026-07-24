@@ -1,0 +1,244 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/metrics/gpu/history/:
+    get:
+      summary: Get GPU Supply and Pricing History
+      tags:
+      - Machines
+      description: Returns time-series supply/demand, pricing percentiles, and performance stats for one or more GPU types
+        over a specified time range.
+      security:
+      - BearerAuth: []
+      x-scope: machine_read
+      x-rateLimit: 2.0
+      parameters:
+      - name: gpu_name
+        in: query
+        required: false
+        description: Comma-separated GPU names (e.g. "RTX 4090, H100_SXM") or "all". Defaults to RTX 5090, 4090, and 3090.
+        schema:
+          type: string
+          example: RTX 4090
+      - name: verified
+        in: query
+        required: false
+        description: Filter by verification status
+        schema:
+          type: string
+          enum:
+          - 'yes'
+          - 'no'
+          - all
+          default: 'yes'
+      - name: hosting_type
+        in: query
+        required: false
+        description: Filter by hosting type
+        schema:
+          type: string
+          enum:
+          - all
+          - secure_cloud
+          - community
+          default: all
+      - name: num_gpus
+        in: query
+        required: false
+        description: GPU count bucket or "all"
+        schema:
+          type: string
+          default: all
+      - name: start
+        in: query
+        required: false
+        description: Unix timestamp for range start
+        schema:
+          type: integer
+      - name: end
+        in: query
+        required: false
+        description: Unix timestamp for range end
+        schema:
+          type: integer
+      - name: step
+        in: query
+        required: false
+        description: Seconds between data points (e.g. 3600 for hourly)
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: 'Success. Returns `{success: true, gpus: {<gpu_name>: {supply_demand: {timestamps, rented_verified,
+            avail_verified, rented_unverified, avail_unverified, total}, pricing: {timestamps, rented_p10, rented_median,
+            rented_p90, avail_p10, avail_median, avail_p90}, stats: {tflops, dlperf, tflops_per_dollar, dlperf_per_dollar}}}}`.
+            Returns `needs_machine: true` with empty gpus if host has no active machines.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success
+                  needs_machine:
+                    type: boolean
+                    description: True when caller is a host with no active machines; gpus will be empty
+                  gpus:
+                    type: object
+                    description: Map of GPU name to its time-series data
+                    additionalProperties:
+                      type: object
+                      properties:
+                        supply_demand:
+                          type: object
+                          description: Time-series availability counts
+                          properties:
+                            timestamps:
+                              type: array
+                              items:
+                                type: integer
+                              description: Unix epoch timestamps for each data point
+                            bucket_size:
+                              type: integer
+                              description: GPUs per rig for bucketed queries; 1 when num_gpus=all
+                            total:
+                              type: array
+                              items:
+                                type: integer
+                              description: Total machine count per timestamp
+                            available:
+                              type: array
+                              items:
+                                type: integer
+                              description: Available machine count (alias for avail_verified+avail_unverified)
+                            rented_verified:
+                              type: array
+                              items:
+                                type: integer
+                              description: Rented verified machine count per timestamp
+                            avail_verified:
+                              type: array
+                              items:
+                                type: integer
+                              description: Available verified machine count per timestamp
+                            rented_unverified:
+                              type: array
+                              items:
+                                type: integer
+                              description: Rented unverified machine count per timestamp
+                            avail_unverified:
+                              type: array
+                              items:
+                                type: integer
+                              description: Available unverified machine count per timestamp
+                            total_gpus:
+                              type: array
+                              items:
+                                type: integer
+                              description: Raw total GPU count per timestamp
+                            rented_verified_gpus:
+                              type: array
+                              items:
+                                type: integer
+                              description: Raw rented verified GPU count per timestamp
+                            avail_verified_gpus:
+                              type: array
+                              items:
+                                type: integer
+                              description: Raw available verified GPU count per timestamp
+                            rented_unverified_gpus:
+                              type: array
+                              items:
+                                type: integer
+                              description: Raw rented unverified GPU count per timestamp
+                            avail_unverified_gpus:
+                              type: array
+                              items:
+                                type: integer
+                              description: Raw available unverified GPU count per timestamp
+                        pricing:
+                          type: object
+                          description: Time-series price percentiles per GPU-hour
+                          properties:
+                            timestamps:
+                              type: array
+                              items:
+                                type: integer
+                              description: Unix epoch timestamps
+                            rented_p10:
+                              type: array
+                              items:
+                                type: number
+                              description: 10th-percentile price for rented GPUs
+                            rented_median:
+                              type: array
+                              items:
+                                type: number
+                              description: Median price for rented GPUs
+                            rented_p90:
+                              type: array
+                              items:
+                                type: number
+                              description: 90th-percentile price for rented GPUs
+                            avail_p10:
+                              type: array
+                              items:
+                                type: number
+                              description: 10th-percentile price for available GPUs
+                            avail_median:
+                              type: array
+                              items:
+                                type: number
+                              description: Median price for available GPUs
+                            avail_p90:
+                              type: array
+                              items:
+                                type: number
+                              description: 90th-percentile price for available GPUs
+                        stats:
+                          type: object
+                          description: Latest performance statistics
+                          properties:
+                            tflops:
+                              type: number
+                              description: Latest 90th-percentile TFLOPS
+                            dlperf:
+                              type: number
+                              description: Latest 90th-percentile deep-learning performance score
+                            tflops_per_dollar:
+                              type: number
+                              description: TFLOPS per dollar at current median available price
+                            dlperf_per_dollar:
+                              type: number
+                              description: DL performance per dollar at current median available price
+        '400':
+          description: 'Invalid or missing parameters. Possible messages: "gpu_name is required", "verified must be ''yes'',
+            ''no'', or ''all''", "hosting_type must be ''all'', ''secure_cloud'', or ''community''", "start, end, and step
+            must be integers", "start must be <= end"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: 'Caller is not a host or admin: "Host or admin access required"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
