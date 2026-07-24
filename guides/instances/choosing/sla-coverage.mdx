@@ -9,7 +9,11 @@ Some Vast.ai offers include a **Service Level Agreement (SLA)** — a reliabilit
 This page explains SLA from the renter side: how to find SLA offers, how pricing works, and when you get credited.
 
 <Note>
-**SLA is opt-in.** In the console, set a reliability target in Search before you rent. Via API/CLI, pass `target_reliability` on **create-instance** (and in search when pricing). Renting without a target means **no SLA charge and no SLA credits**, even on offers where the host has enabled SLA.
+**SLA is opt-in.** In the console, set a reliability target in Search before you rent. Via the **REST API**, pass `target_reliability` on **create-instance** (`PUT /api/v0/asks/{id}/`). Renting without a target means **no SLA charge and no SLA credits**, even on offers where the host has enabled SLA.
+
+<Warning>
+`target_reliability` is **not yet** available on the published `vastai create instance` CLI or Python SDK `create_instance()`. Searching with `target_reliability` only affects quoted pricing — it does **not** enable SLA on the contract unless you pass the same value at create-instance via **REST** or the **web console**.
+</Warning>
 </Note>
 
 <Note>
@@ -63,7 +67,7 @@ Searching with **target reliability 95%** on an offer where the host **claims 99
 ### In the web console
 
 1. Open [Search](https://cloud.vast.ai/create/) and confirm **On-demand** is selected (SLA does not apply to interruptible rentals).
-2. In the **search filters** panel, set **Reliability target** (or the current SLA / reliability filter control) to your desired level — for example **95%** or **99%**. If you do not set a target, you are not opting into SLA.
+2. In Search filters (left filter bar), set **Reliability target** to your desired coverage level — for example **95%** or **99%**. If you do not set a target, you are not opting into SLA.
 3. Optionally filter to SLA-enabled offers if that control is available.
 4. Before you click **RENT**, confirm the price breakdown shows an **SLA charge** line. No SLA charge means no SLA coverage for that rental.
 5. Rent as usual. Your target is locked at rent time.
@@ -118,7 +122,7 @@ Always compare **`dph_total`**, not just GPU price, when SLA matters. Search ran
 ### API automation
 
 <Warning>
-SLA coverage is locked at **create-instance** time via `target_reliability` on `PUT /api/v0/asks/{id}/`. Searching with a target only prices offers; renting without passing `target_reliability` on create-instance produces a **non-SLA** contract.
+SLA coverage is locked at **create-instance** time via `target_reliability` on `PUT /api/v0/asks/{id}/` (REST). Searching with a target only prices offers. The published CLI/SDK create-instance path does **not** accept `target_reliability` yet — use REST or the console to rent with SLA.
 </Warning>
 
 **1. Search** (prices `dph_total` at your target — include storage explicitly; REST defaults to 8 GB, CLI `--storage` defaults to 5 GiB):
@@ -171,7 +175,9 @@ When you rent an SLA-backed offer **with a target set**:
 Billing continues during downtime. You are still charged for **compute, storage, and the SLA charge** while the contract exists and the instance is unavailable. Leaving a broken instance running continues those charges until you destroy it.
 </Warning>
 
-If you qualify for compensation, a **settlement credit** is applied after daily settlement (UTC), typically within a few hours after UTC midnight for the prior day — not in the same hour as the outage. Destroying ends future daily charges; final SLA settlement still posts when the contract closes.
+**Stop vs destroy:** Stopping pauses compute but storage and contract charges can continue. **Destroying the instance** ends future daily charges; final SLA settlement still posts when the contract closes. If you abandon a failed host, destroy only after saving any data you need.
+
+If you qualify for compensation, a **settlement credit** is applied after daily settlement (UTC), typically within a few hours after UTC midnight for the prior day — not in the same hour as the outage.
 
 ### How reliability is measured
 
@@ -224,12 +230,14 @@ Production settlement uses the multi-window reliability blend described above, n
 
 ### API / CLI
 
+Console users: open **Instances** → select your instance → **price details** to confirm the SLA charge and target. Skip the block below if you do not use the API.
+
+<details>
+<summary>API integrators: field names and filters</summary>
+
 Show-instances output may include `target_reliability` and price fields under `search` / `instance` (including `slaPremiumPerHour`).
 
 To find SLA-covered instances, filter **client-side** from the show-instances response (`target_reliability > 0`, `instance.slaPremiumPerHour`). Prefer client-side filtering in production. OpenAPI documents optional `select_filters` on stored fields such as `sla_r_target` / `target_reliability` when present; computed fields (for example `has_sla`) are not filterable. Do not rely on `select_filters` alone for SLA detection.
-
-<details>
-<summary>API integrators — response field names (parsers only; console users can skip)</summary>
 
 | Client-visible concept | API / raw field |
 | --- | --- |
