@@ -231,28 +231,17 @@ You can then look at your [instance tab](https://cloud.vast.ai/instances/) to ma
 
 ## Maintenance
 
-The proper way to perform maintenance on your machine is to wait until all active rental contracts have ended or the machine has no running instances.
-
-Unlisting the offer will prevent new rental contracts from being created, but does not affect existing ones. However if you have active rental contracts, you could set the offer end date to match the latest rental end date, allowing new clients to rent instances that end at the same date. Once the end date is reached, you can then unlist the machine and then perform maintenance.
-
 Remember that a single machine may have multiple active rental contracts from different clients, each with its own rental end date. All rental contracts must be honored.
 
-You have two maintenance paths:
+Unlisting the offer prevents new rentals but does not end existing ones. If you have active contracts, you can set the offer end date to match the latest rental end date so new clients rent instances that end together. Once that date is reached, unlist and perform maintenance.
 
-1. **After contracts end:** Take the machine offline once every active rental contract has ended (default path).
-2. **During active SLA contracts:** Use planned maintenance via [`vastai schedule maint`](/host/cli/schedule-maint) with at least 24 hours’ notice. See [SLA Offers → Scheduled maintenance](/host/sla-offers#scheduled-maintenance) for credit rules.
+Use these paths in order:
 
-For unplanned or unscheduled maintenance, use the CLI and the [`vastai schedule maint`](/host/cli/schedule-maint) command. That will notify the client that you **have** to take the machine down and that they should save their work. You can specify a date and duration.
+1. **Preferred (no active renters):** Wait until all contracts have ended, then take the machine offline.
+2. **Planned SLA maintenance (active renters):** If SLA is enabled, use [`vastai schedule maint`](/host/cli/schedule-maint) with a start time at least 24 hours in the future. See [SLA Offers → Scheduled maintenance](/host/sla-offers#scheduled-maintenance) for credit eligibility.
+3. **Emergency or unplanned downtime:** Use [`vastai schedule maint`](/host/cli/schedule-maint) immediately to notify renters. Full SLA settlement exposure may apply.
 
-### If you have SLA enabled on this machine
-
-SLA-listed machines have additional maintenance obligations:
-
-- Give at least **24 hours' notice** before planned downtime when possible.
-- Use [`vastai schedule maint`](/host/cli/schedule-maint) and configure [Host Notifications](/host/notifications) for `host:maintenance_scheduled` if you want your own alerts.
-- Uptime credits during maintenance are evaluated case by case — see [Scheduled maintenance](/host/sla-offers#scheduled-maintenance).
-
-General maintenance guidance above applies to all hosts regardless of SLA.
+The same `schedule maint` command supports planned and emergency notifications; advance notice and duration determine SLA credit eligibility. Optional: configure [Host Notifications](/host/notifications) for `host:maintenance_scheduled`.
 
 ## Uninstalling
 
@@ -268,16 +257,14 @@ Hosting on Vast will require some Linux knowledge, as you will be maintaining a 
 
 You can create an invoice by going to the "Billing" page, and then click the box for "Include Charges" under "Generate Billing History".
 
-### Why can't I find my machine in search?
+### Why can't I find my machine in search? / Why is my machine not listed?
 
 If your machine seems unlisted or missing from console search:
 
-- Confirm **Listed** status on **Host → Machines**.
-- **CLI check:** `vastai search offers 'machine_id=MACHINE_ID verified=any'` — if this returns a result, your machine is listed.
+- Confirm **Listed** status on **Host → Machines** (console).
+- **CLI check:** `vastai search offers 'machine_id=MACHINE_ID verified=any'` — if this returns a result, your machine is listed. The GUI may lag behind CLI visibility.
 - Individual machines can be hard to find in broad console search; looking up by `machine_id` is the reliable check.
 - **Ranking check:** Use narrow filters to see similar machines, e.g. `vastai search offers 'gpu_name=RTX_4090 cpu_ram>257 cpu_ram<258'`.
-
-See also [Why is my machine not listed?](#why-is-my-machine-not-listed) below.
 
 ### Can you verify my machine?
 
@@ -298,10 +285,6 @@ You can use the [uninstall script](https://s3.amazonaws.com/vast.ai/uninstall)
 ### What is this red error message on my machine?
 
 If the hosting software detects an error, that error message will be listed on your machine in the machines page. Once the cause of the error has been resolved, most error messages will be automatically cleared after 1-2 hours. The quickest way to learn more about resolving specific error messages is to check out the hosting channels in [our discord](https://discord.gg/hSuEbSQ4X8).
-
-### Why is my machine not listed?
-
-You won't be able to see it on the GUI right away, but you can search using the [CLI](/guides/instances/managing-instances). See [Why can't I find my machine in search?](#why-cant-i-find-my-machine-in-search) above for the full checklist.
 
 ### Can I send a message to a client using my machine letting them know that I fixed an issue that they were having?
 

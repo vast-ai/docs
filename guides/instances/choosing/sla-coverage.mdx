@@ -63,9 +63,9 @@ Searching with **target reliability 95%** on an offer where the host **claims 99
 ### In the web console
 
 1. Open [Search](https://cloud.vast.ai/create/) and confirm **On-demand** is selected (SLA does not apply to interruptible rentals).
-2. In the left/top **search filters** panel, find the **reliability target** / SLA filter control (label matches the current UI). Set your target (for example 95%).
+2. In the **search filters** panel, set **Reliability target** (or the current SLA / reliability filter control) to your desired level — for example **95%** or **99%**. If you do not set a target, you are not opting into SLA.
 3. Optionally filter to SLA-enabled offers if that control is available.
-4. Review offers that show an **SLA charge** line in the price breakdown. If you do not see an SLA charge before clicking **RENT**, you do not have coverage.
+4. Before you click **RENT**, confirm the price breakdown shows an **SLA charge** line. No SLA charge means no SLA coverage for that rental.
 5. Rent as usual. Your target is locked at rent time.
 
 CLI and API examples below use the same filters.
@@ -167,7 +167,11 @@ When you rent an SLA-backed offer **with a target set**:
 
 ### What you pay during an outage
 
-You are still charged for **compute and the SLA charge** for the rental day while the instance is unavailable. If you qualify for compensation, a **settlement credit** is applied after daily settlement (UTC), typically within a few hours after UTC midnight for the prior day — not in the same hour as the outage.
+<Warning>
+Billing continues during downtime. You are still charged for **compute, storage, and the SLA charge** while the contract exists and the instance is unavailable. Leaving a broken instance running continues those charges until you destroy it.
+</Warning>
+
+If you qualify for compensation, a **settlement credit** is applied after daily settlement (UTC), typically within a few hours after UTC midnight for the prior day — not in the same hour as the outage. Destroying ends future daily charges; final SLA settlement still posts when the contract closes.
 
 ### How reliability is measured
 
@@ -177,7 +181,7 @@ Each day, the platform tracks how long your instance was online. Settlement cons
 - A pattern of unreliable uptime produces larger credits over time.
 - One strong day after a weak week does not instantly reset everything.
 
-Scheduled maintenance with adequate notice may be credited toward reliability. Unplanned outages count fully.
+Scheduled maintenance with adequate advance notice (typically 24+ hours) may be credited toward reliability on a case-by-case basis. Check **Instances** status and any client notifications during downtime to distinguish planned maintenance from an unexpected outage. Unplanned outages count fully.
 
 ### Credit scenarios (simplified)
 
@@ -222,19 +226,18 @@ Production settlement uses the multi-window reliability blend described above, n
 
 Show-instances output may include `target_reliability` and price fields under `search` / `instance` (including `slaPremiumPerHour`).
 
-To find SLA-covered instances, filter client-side from the show-instances response (`target_reliability > 0`, `instance.slaPremiumPerHour`). Server-side `select_filters` on SLA fields is not guaranteed for all API keys — do not depend on it in production automation.
+To find SLA-covered instances, filter **client-side** from the show-instances response (`target_reliability > 0`, `instance.slaPremiumPerHour`). Prefer client-side filtering in production. OpenAPI documents optional `select_filters` on stored fields such as `sla_r_target` / `target_reliability` when present; computed fields (for example `has_sla`) are not filterable. Do not rely on `select_filters` alone for SLA detection.
 
 <details>
-<summary>API integrators — field aliases</summary>
+<summary>API integrators — response field names (parsers only; console users can skip)</summary>
 
-| Console / concept | API / raw field |
+| Client-visible concept | API / raw field |
 | --- | --- |
-| Host SLA claim | `expected_reliability` on offers; `sla_r_claim` on contracts |
-| Host confidence | `sla_sigma_x` |
+| Your reliability target | `target_reliability` |
 | SLA charge rate | `search.slaPremiumPerHour` / `instance.slaPremiumPerHour` |
-| Your target | `target_reliability` |
+| Host SLA claim (offers / contracts) | `expected_reliability` / `sla_r_claim` |
 
-These fields appear in CLI `--raw` output when SLA is active. Confirm against a live `--raw` response before building parsers.
+Host confidence is a host-side pricing setting and is **not shown on offer cards** — compare offers using `dph_total` or the SLA charge line. Confirm field names against a live `--raw` response before building parsers.
 </details>
 
 ## When SLA is not available
