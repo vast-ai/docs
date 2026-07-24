@@ -4,9 +4,17 @@ description: "Rent GPU instances with reliability guarantees. Learn how SLA char
 "canonical": "/guides/instances/choosing/sla-coverage"
 ---
 
-Some Vast.ai offers include a **Service Level Agreement (SLA)** — a reliability guarantee bundled with your on-demand rental. You choose a reliability **target** when you search, pay a small hourly **SLA charge** on top of compute, and if measured reliability falls short of that target, you receive settlement credits.
+Some Vast.ai offers include a **Service Level Agreement (SLA)** — a reliability guarantee you can add to an **on-demand** rental. You choose a reliability **target** when you search, pay a small hourly **SLA charge** on top of compute, and if measured reliability falls short of that target, you receive settlement credits.
 
 This page explains SLA from the renter side: how to find SLA offers, how pricing works, and when you get credited.
+
+<Note>
+**SLA is opt-in.** Coverage applies only when you set a reliability target in Search before you rent (console or `target_reliability` in API/CLI). Renting without a target means **no SLA charge and no SLA credits**, even on offers where the host has enabled SLA.
+</Note>
+
+<Note>
+SLA applies to **on-demand rentals only** — not interruptible/bid or reserved/prepay contracts. See [Instance Pricing](/guides/instances/pricing).
+</Note>
 
 <Note>
 You do not post escrow or collateral for SLA. You pay the SLA charge while the instance runs. Settlement happens automatically on a daily cadence.
@@ -14,33 +22,31 @@ You do not post escrow or collateral for SLA. You pay the SLA charge while the i
 
 ## What SLA protects
 
-SLA is a **contractual, per-rental** reliability guarantee with automatic daily settlement. It is **not** the same as [verification](/host/understanding-verification) or the **reliability score** shown on offer cards — those are platform trust signals.
+SLA is a **contractual, per-rental** reliability guarantee with automatic daily settlement. It is **not** the same as verification or the **reliability score** on offer cards — those are platform trust signals (see [Machine Tiers](/guides/instances/choosing/find-and-rent#machine-tiers)).
 
 For SLA-covered on-demand contracts:
 
-- Compute is billed for the **intended** rental day (offline time is tracked as an outage in reliability measurements).
-- **Settlement credits** compensate you when measured reliability falls short of your chosen target.
-- On strong-reliability days, you simply pay the SLA charge with no credit.
+- You are charged for **compute and the SLA charge** for the rental day, including periods when the instance is unavailable.
+- Offline time is tracked as an outage in reliability measurements.
+- If you qualify for compensation, a **settlement credit** posts after daily settlement (UTC) — typically within a few hours after UTC midnight for the prior day — not in the same hour as the outage.
 
 SLA is most useful for **long-running production workloads** where unexpected downtime has a real cost beyond the hourly rate.
 
 ## How pricing works
 
-Total hourly cost with SLA:
+Total hourly cost with SLA (`dph_total` = all-in dollars per hour in search):
 
 ```
 total ≈ GPU + storage + bandwidth + SLA charge
 ```
 
-The SLA charge depends on:
+| Factor | What it means for you |
+| --- | --- |
+| Your reliability target | Higher target → higher SLA charge |
+| Host SLA claim | Maximum reliability the host advertises on the listing (`expected_reliability`). Higher claim → lower SLA charge at a given target |
+| Host confidence | Host pricing setting that affects SLA charge size (tighter = lower charge at a given target) |
 
-| Factor | Where it comes from | Effect |
-| --- | --- | --- |
-| Your reliability target | Your search filter (`target_reliability`) | Higher target → higher SLA charge |
-| Host reliability claim | `expected_reliability` on the offer | Higher claim → lower SLA charge (at a given target) |
-| Host confidence | Derived from `sla_sigma_x` on the offer | Tighter confidence → lower SLA charge |
-
-**Rule of thumb:** pick a target **at or below** the host's claim for the best value. If you ask for 99% coverage on a host who only claims 95%, the SLA charge is much higher than asking for 95% on a host who claims 99%.
+**Rule of thumb:** pick a target **at or below** the host's claim for the best value. Asking for 99% coverage on a host who only claims 95% costs much more than asking for 95% on a host who claims 99%.
 
 ### Example: H100 at $3.50/hr GPU
 
@@ -50,21 +56,30 @@ Searching with **target reliability 95%** on an offer where the host **claims 99
 | --- | --- |
 | GPU compute | $3.50/hr |
 | SLA charge | ~$0.008/hr |
-| **Total** | ~$3.51/hr |
-
-The SLA charge is a small fraction of compute when the host's claim comfortably exceeds your target.
+| **Total (`dph_total`)** | ~$3.51/hr |
 
 ## Finding SLA offers
 
-### Search filters
+### In the web console
 
-Use these filters in [Search](https://cloud.vast.ai/create/) or the [search offers API](/api-reference/search/search-offers):
+1. Open [Search](https://cloud.vast.ai/create/).
+2. Set your **reliability target** in Search filters (and optionally filter to SLA-enabled offers). Exact control labels match the UI.
+3. Confirm the price breakdown shows an **SLA charge** line and that **total $/hr** includes it before you rent.
+4. The target you set here is what locks in at rent time.
+
+CLI and API examples below use the same filters.
+
+### Search filters
 
 | Filter | Meaning | Example |
 | --- | --- | --- |
 | `target_reliability` | Your desired reliability level. Also drives SLA charge calculation and ranking. | `target_reliability=0.95` |
 | `has_sla` | Restrict to offers with (or without) SLA enabled. | `has_sla=true` |
 | `expected_reliability` | Filter by the host's advertised claim. | `expected_reliability>=0.99` |
+
+<Note>
+**API integrators:** `reliability` is the historical machine score, not the host’s SLA claim. Use `has_sla=true` and/or `expected_reliability` to find SLA listings.
+</Note>
 
 **CLI examples:**
 
@@ -80,37 +95,45 @@ When you set `target_reliability`, search results include:
 
 | Response field | Meaning |
 | --- | --- |
-| `search.slaPremiumPerHour` | SLA charge for this offer at your target (API field name; this is the SLA charge rate) |
+| `search.slaPremiumPerHour` | SLA charge for this offer at your target (API field name) |
 | `dph_total` | Total hourly cost **including** the SLA charge |
 | `expected_reliability` | Host's reliability claim |
 
-Hover the price breakdown on an offer card to see GPU, storage, bandwidth, and the SLA charge separately.
+Hover over the price breakdown on an offer card to see GPU, storage, bandwidth, and the SLA charge separately.
 
 <Note>
-When you search with an SLA target, **reserved-instance discounts are not applied** to the displayed total. SLA charges are never discounted.
+When you search with an SLA target, reserved-instance discounts may not apply to the displayed total. Confirm in the console price breakdown. SLA charges are never discounted.
 </Note>
 
 ### Comparing offers
-
-Two offers at the same GPU price can have very different SLA costs:
 
 | Offer | GPU/hr | Host claim | Your target | SLA charge/hr |
 | --- | --- | --- | --- | --- |
 | A | $3.50 | 99% | 95% | ~$0.008 |
 | B | $3.50 | 95% | 95% | much higher |
 
-Offer A is dramatically cheaper on SLA because the host claims more headroom above your target. Always compare **`dph_total`**, not just GPU price, when SLA matters.
+Always compare **`dph_total`**, not just GPU price, when SLA matters. Search ranking also accounts for SLA cost.
 
-Search ranking also accounts for SLA cost — offers with expensive coverage at your target rank lower per dollar of performance.
+### API automation
+
+1. **Search** with `target_reliability` set (and optionally `has_sla=true`, `expected_reliability>=…`) in the same request you use to pick an offer.
+2. **Rent** the offer ID from that search response so pricing and contract terms match `dph_total`.
+3. **Verify** on the new instance: `target_reliability` and related SLA fields in show-instances output.
+
+`target_reliability` is a **search-time** parameter; create-instance does not accept separate SLA fields — terms come from the search context used before rent.
 
 ## What happens after you rent
 
-When you rent an SLA-backed offer:
+When you rent an SLA-backed offer **with a target set**:
 
-1. **Contract terms lock in** — your reliability target, the host's claim, and confidence spread are fixed for that rental.
+1. **Contract terms lock in** — your reliability target, the host's claim, and confidence are fixed for that rental.
 2. **Daily billing** — you pay compute plus the SLA charge each day.
 3. **Daily settlement** — Vast measures reliability across multiple timescales and calculates any SLA credit.
-4. **Credits appear in billing** — positive credits improve your balance; strong days mean you paid the SLA charge with no credit.
+4. **Credits appear in billing** — settlement credits improve your balance; strong days mean you paid the SLA charge with no credit.
+
+### What you pay during an outage
+
+You are still charged for **compute and the SLA charge** for the rental day while the instance is unavailable. If you qualify for compensation, a **settlement credit** is applied after daily settlement (UTC), typically within a few hours after UTC midnight for the prior day — not in the same hour as the outage.
 
 ### How reliability is measured
 
@@ -126,12 +149,14 @@ Scheduled maintenance with adequate notice may be credited toward reliability. U
 
 Using the H100 example ($84/day compute, ~$0.20/day SLA charge, target 95%, host claim 99%):
 
-| Day's measured reliability (simplified) | What you pay | What you receive | Your net vs no-SLA baseline |
+| Day's measured reliability (simplified) | What you pay | What you receive | Extra cost vs no SLA |
 | --- | --- | --- | --- |
-| Excellent (~100%) | $84 compute + $0.20 SLA charge | — | −$0.20 |
-| Good (~99%) | $84 + $0.20 | Small credit | Roughly −$0.17 |
+| Excellent (~100%) | $84 compute + $0.20 SLA charge | — | −$0.20 (you paid the SLA charge) |
+| Good (~99%) | $84 + $0.20 | Often none / small credit | Roughly −$0.20 to −$0.17 |
 | At target (~95%) | $84 + $0.20 | ~$42 credit | ~+$42 |
 | Severe outage (~90% or less) | $84 + $0.20 | ~$84 credit | ~+$84 |
+
+Negative values in the last column mean you paid a small SLA charge on top of compute; positive values mean you received a settlement credit. Strong-uptime days often yield no credit in production settlement.
 
 <Note>
 Production settlement uses the multi-window reliability blend described above, not a single raw daily percentage. Treat these rows as directional, not exact invoice amounts.
@@ -143,11 +168,18 @@ Production settlement uses the multi-window reliability blend described above, n
 - Credits accumulate on your instance charges and transfer to your account balance.
 - When your contract ends, any remaining unsettled days are resolved at close.
 
+## If your instance goes down
+
+1. Save work and check **Instances** for host/maintenance status.
+2. Remember: compute and SLA charges continue until settlement; credits apply to the **previous UTC day**, not the current hour.
+3. After settlement, check **Account → Billing** (Charges / billing history) for SLA line items.
+4. If credits still look wrong **48 hours** after the outage day, contact support via [Discord](https://discord.gg/hSuEbSQ4X8) or [contact@vast.ai](mailto:contact@vast.ai).
+
 ## Viewing SLA on active instances
 
 On the [Instances](https://cloud.vast.ai/instances/) page, price details for SLA rentals include the SLA charge rate alongside GPU and storage costs.
 
-The [show instances API](/api-reference/instances/show-instances) exposes SLA fields on each contract:
+Show-instances output may include:
 
 | Field | Meaning |
 | --- | --- |
@@ -156,10 +188,24 @@ The [show instances API](/api-reference/instances/show-instances) exposes SLA fi
 | `sla_sigma_x` | Host's confidence spread |
 | `search.slaPremiumPerHour` | Current SLA charge rate (API field name) |
 
-Filter active instances with `has_sla=true` in the query.
+To find SLA-covered instances, inspect returned objects for `target_reliability > 0` (or filter in your client). The show-instances API does **not** support a `has_sla` query parameter.
+
+<details>
+<summary>API integrators — field aliases</summary>
+
+| Console / concept | API / raw field |
+| --- | --- |
+| Host SLA claim | `expected_reliability` on offers; `sla_r_claim` on contracts |
+| Host confidence | `sla_sigma_x` |
+| SLA charge rate | `search.slaPremiumPerHour` / `instance.slaPremiumPerHour` |
+| Your target | `target_reliability` |
+
+These fields appear in CLI `--raw` output when SLA is active. Confirm against a live `--raw` response before building parsers.
+</details>
 
 ## When SLA is not available
 
+- **Interruptible (bid) rentals** never include SLA, even on SLA-enabled machines. Use on-demand with a reliability target set.
 - **Prepaid / reserved-only flows** may reject SLA parameters. Use on-demand rentals for SLA coverage.
 - Offers without SLA (`expected_reliability = 0` / `has_sla=false`) are excluded when you filter with `has_sla=true` or set a positive `target_reliability`.
 - If SLA parameters on an offer are invalid for your target, search may flag an SLA pricing error instead of showing a charge.
@@ -176,11 +222,11 @@ No. The target is fixed when the contract is created. End the instance and rent 
 
 ### Does SLA replace verification?
 
-No. Verification is a platform quality signal. SLA is a financial guarantee on a specific contract. A verified machine can still have SLA; an unverified machine may also offer SLA.
+No. Verification is a platform quality signal (see [Machine Tiers](/guides/instances/choosing/find-and-rent#machine-tiers)). SLA is a financial guarantee on a specific contract.
 
 ### Where do I see historical SLA credits?
 
-Check your billing history and instance charges. SLA line items appear alongside compute charges for each settled day.
+Check **Account → Billing** and instance charges. SLA line items appear alongside compute charges for each settled day.
 
 ## Related documentation
 

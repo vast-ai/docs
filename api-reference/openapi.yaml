@@ -6616,8 +6616,31 @@ paths:
                       - RTX_4090
                 reliability:
                   type: object
-                  description: 'Machine reliability score (0-1). Example: {"gte":
-                    0.99}'
+                  description: 'Historical machine reliability score (0-1), not the
+                    host SLA claim. Example: {"gte": 0.99}'
+                target_reliability:
+                  type: object
+                  description: 'Client SLA coverage target (0-1). When set, search
+                    prices include the SLA charge in dph_total
+
+                    and returns search.slaPremiumPerHour. Example: {"eq": 0.95}
+
+                    '
+                has_sla:
+                  type: object
+                  description: 'Restrict to offers with SLA enabled (true) or without
+                    (false). Example: {"eq": true}
+
+                    '
+                  properties:
+                    eq:
+                      type: boolean
+                expected_reliability:
+                  type: object
+                  description: 'Host SLA claim on the offer (0-1). Example: {"gte":
+                    0.99}
+
+                    '
                 num_gpus:
                   type: object
                   description: 'Number of GPUs. Example: {"gte": 4} or {"in": [1,
@@ -6916,7 +6939,13 @@ paths:
                   vram_costperhour: 0.009876
                   webpage: null
                   vms_enabled: false
-                  expected_reliability: 0.5
+                  expected_reliability: 0.99
+                  search:
+                    gpuCostPerHour: 0.123456
+                    diskHour: 0.123456
+                    totalHour: 0.234567
+                    discountTotalHour: 0.01
+                    discountedTotalPerHour: 0.224567
                   is_vm_deverified: false
                   resource_type: gpu
                   cluster_id: null
@@ -6932,12 +6961,6 @@ paths:
                   discount_rate: 0.05
                   discounted_hourly: 0.01
                   discounted_dph_total: 0.224567
-                  search:
-                    gpuCostPerHour: 0.123456
-                    diskHour: 0.123456
-                    totalHour: 0.234567
-                    discountTotalHour: 0.01
-                    discountedTotalPerHour: 0.224567
                   instance:
                     gpuCostPerHour: 0.01
                     diskHour: 0.02
@@ -8040,8 +8063,14 @@ paths:
           `gt`, `gte`, `lt`, `lte`, `in`, `notin`.
 
           Filterable columns: `actual_status`, `gpu_name`, `verification`, `id`, `label`,
-          and other columns stored directly on the contract record. Computed fields
-          (e.g. `dph_total`, `num_gpus`) are not filterable and return 400.
+          and other columns stored directly on the contract record
+
+          (including `sla_r_claim` and `sla_r_target` / `target_reliability` when
+          present). Computed fields (e.g. `dph_total`, `num_gpus`, `has_sla`) are
+          not filterable and return 400.
+
+          To find SLA-covered instances, filter client-side on `target_reliability
+          > 0` or use `select_filters` on `sla_r_target` if supported for your key.
 
           '
         schema:
@@ -8349,7 +8378,36 @@ paths:
                         dph_total:
                           type: number
                           format: float
+                          description: Total $/hour including storage (and SLA charge
+                            when applicable).
                           example: 0.8021
+                        target_reliability:
+                          type: number
+                          format: float
+                          nullable: true
+                          description: Client SLA coverage target locked at rent time.
+                            Null or 0 when the rental has no SLA.
+                          example: 0.95
+                        sla_r_claim:
+                          type: number
+                          format: float
+                          nullable: true
+                          description: Host reliability claim for this SLA contract.
+                          example: 0.99
+                        sla_sigma_x:
+                          type: number
+                          format: float
+                          nullable: true
+                          description: Host confidence spread for this SLA contract.
+                          example: 0.5
+                        search:
+                          type: object
+                          example:
+                            gpuCostPerHour: 0.8
+                            diskHour: 0.0021
+                            totalHour: 0.8021
+                            discountTotalHour: 0
+                            discountedTotalPerHour: 0.8013
                         dlperf:
                           type:
                           - number
@@ -8401,14 +8459,6 @@ paths:
                           - string
                           - 'null'
                           example: null
-                        search:
-                          type: object
-                          example:
-                            gpuCostPerHour: 0.8
-                            diskHour: 0.0021
-                            totalHour: 0.8021
-                            discountTotalHour: 0
-                            discountedTotalPerHour: 0.8013
                         instance:
                           type: object
                           example:
