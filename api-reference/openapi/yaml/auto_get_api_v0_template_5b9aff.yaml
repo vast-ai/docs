@@ -1,0 +1,86 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/template/:
+    get:
+      summary: List Templates
+      tags:
+      - Search
+      description: Search and list templates using optional query and filter parameters; returns public templates and the
+        authenticated user's own private templates.
+      security:
+      - BearerAuth: []
+      x-scope: user_read
+      x-rateLimit:
+        profile: low_volume_burst
+        threshold: 1.9
+      parameters:
+      - name: select_filters
+        in: query
+        required: false
+        schema:
+          type: string
+        description: 'JSON-encoded filter object. Format: `{"field": {"op": value}}`. Example: `{"use_ssh": {"eq": true},
+          "recommended": {"eq": true}}` or `{"count_created": {"gt": 100}}`
+
+          '
+      - name: select_cols
+        in: query
+        required: false
+        schema:
+          type: string
+        description: 'JSON-encoded array of columns to return. Example: `["*"]` for all columns or `["id", "name", "hash_id"]`
+          for specific columns.
+
+          '
+      - name: order_by
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Column to order the results by.
+      responses:
+        '200':
+          description: 'Returns {success, templates_found, templates} on success, or {success: false, msg: "No templates found"}
+            when no results match'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: True if templates were found, false otherwise
+                  msg:
+                    type: string
+                    description: 'Present when no templates are found: "No templates found"'
+                  templates_found:
+                    type: integer
+                    description: Count of returned templates
+                  templates:
+                    type: array
+                    items:
+                      type: object
+                    description: Array of matching template objects
+        '400':
+          description: 'Malformed JSON body or unexpected error; returns {success: false, error, msg}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
