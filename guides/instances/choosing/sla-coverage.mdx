@@ -21,7 +21,7 @@ This page explains SLA from the renter side: how to find SLA offers, how pricing
 | Goal | Start here |
 | --- | --- |
 | Rent with SLA in the console | [Finding SLA offers → In the web console](#in-the-web-console) |
-| I use only the CLI today | Search can **quote** SLA pricing; enable coverage via console or [API automation](#api-automation) (REST) — `vastai create instance` cannot pass `target_reliability` yet |
+| I use only the CLI today | **Cannot enable SLA at rent time** — CLI search only quotes pricing. After rent, verify with `vastai show instances --raw` (`target_reliability` > 0). To enable coverage, use the console or [API automation](#api-automation) (REST) |
 | Understand charges and credits | [How pricing works](#how-pricing-works) → [What happens after you rent](#what-happens-after-you-rent) |
 | Automate search → rent → verify | [API automation](#api-automation) (REST) |
 
@@ -183,7 +183,13 @@ See [Create Instance](/api-reference/instances/create-instance) and [Search Offe
 | Cannot start immediately (`cancel_unavail`) | HTTP 410 `no_such_ask` | Offer cannot start now; pick another offer or retry later — see [Create Instance](/api-reference/instances/create-instance) |
 | Price mismatch after stale quote | HTTP 400 `invalid_price` | Re-search with the same `target_reliability` and storage (`allocated_storage` / `--storage`), then rent again |
 
-Hold storage constant when comparing `dph_total` and when chaining search → rent: console Instance Disk Size defaults to **10 GB**, REST search `allocated_storage` defaults to **8 GB**, and CLI `--storage` defaults to **5 GiB**. REST create-instance requires `disk` ≥ **8 GB**, so a CLI search at the 5 GiB default can quote a price you cannot rent via REST without raising storage — use ≥ 8 GB (or the same explicit value) for CLI search → REST rent flows. CLI `--storage` is in GiB; REST `allocated_storage` / create `disk` are in GB.
+| Channel | Default storage | Field | Units |
+| --- | --- | --- | --- |
+| Console | 10 GB | Instance disk size (UI) | GB |
+| REST search (`POST /api/v0/bundles/`) | 8 GB | `allocated_storage` | GB |
+| CLI (`vastai search offers`) | 5 GiB | `--storage` | GiB |
+
+**Rule:** Set the same explicit storage in search and create-instance. REST create-instance `disk` must be ≥ **8 GB** when you pass it (omit uses platform defaults — do not assume the CLI search default of 5 is rentable via REST). Pass matching numeric values across channels when chaining CLI search → REST rent (CLI help labels GiB; REST fields are labeled GB).
 
 ## What happens after you rent
 
