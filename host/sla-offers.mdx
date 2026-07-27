@@ -209,7 +209,7 @@ In the host console, open **Host Machines** → select your machine → **Set Pr
 New hosts: use the web console steps above first. Use the API when you need scripting, partial updates, or fleet automation.
 
 <Note>
-SLA listing via `vastai list machine` and `VastAI.list_machine()` is **not yet available** in the published CLI/SDK. Use the REST API below until tooling support is released.
+SLA listing via CLI/SDK is not available yet — use the REST API below (or console **Set Pricing → SLA**). See also [List Machine](/api-reference/machines/list-machine) for the same `create_asks` body.
 </Note>
 
 #### Before you start
@@ -241,7 +241,11 @@ Replace `end_date` with a **future** Unix timestamp — past dates expire the of
 
 <Warning>Open-ended offers (no `end_date`) combined with SLA expose you to indefinite asymmetric payout risk. See [Offer End Date](/host/hosting-overview#offer-end-date).</Warning>
 
-Minimal example:
+<Warning>
+Do not use the JSON below alone for a **first** listing. First-time `create_asks` requests must also include `min_chunk` and typical disk/bandwidth pricing — see [Hosting overview](/host/hosting-overview#offers-and-rental-contracts). Use this as an **SLA-fields** reference when base pricing is already configured.
+</Warning>
+
+SLA fields example (existing listing):
 
 ```json
 {
@@ -302,11 +306,13 @@ for id in $(vastai show machines -q); do
   if [ -z "$price" ] || [ -z "$end" ] || [ -z "$chunk" ]; then
     echo "skip $id: missing price_gpu/end_date/min_chunk"; continue
   fi
-  # Preserve per-machine SLA tuning; defaults apply only when unset
+  # Opt-in only: skip machines with no positive SLA claim (do not invent 0.99)
+  if ! echo "$machine" | jq -e '(.sla_r_claim // 0) > 0' >/dev/null; then
+    echo "skip $id: no positive sla_r_claim (enable SLA per machine first)"; continue
+  fi
   body=$(echo "$machine" | jq -c \
     '{machine: (.id|tonumber), price_gpu, end_date, min_chunk,
-      sla_r_claim: (.sla_r_claim // 0.99),
-      sla_sigma_x: (.sla_sigma_x // 0.5)}')
+      sla_r_claim, sla_sigma_x: (.sla_sigma_x // 0.5)}')
   if [ "$DRY_RUN" != "0" ]; then
     echo "dry-run machine_id=$id payload: $body"; continue
   fi
@@ -319,7 +325,7 @@ for id in $(vastai show machines -q); do
 done
 ```
 
-Fetch the fleet once before the loop — do not call `show machines --raw` inside the loop. On fleets of 20+ machines, expect several minutes; back off on HTTP 429. Tune claim/confidence per machine (backtester + earnings) before setting `DRY_RUN=0`.
+Fetch the fleet once before the loop — do not call `show machines --raw` inside the loop. On fleets of 20+ machines, expect several minutes; back off on HTTP 429. Configure claim/confidence per machine (console or single-machine `create_asks`) before running with `DRY_RUN=0` — the loop only updates machines that already have a positive `sla_r_claim`.
 
 **SLA-only update** — include `machine` plus SLA fields; omit unrelated offer fields you intend to keep:
 
@@ -461,7 +467,7 @@ Clients pay more because you admit greater uncertainty. Use this if your reliabi
 
 **Planned SLA maintenance (may earn credit):** Schedule at least 24 hours in advance with [`vastai schedule maint`](/host/cli/schedule-maint) (or the [REST schedule-maintenance API](/api-reference/machines/schedule-maint)). Include `--sdate` and `--duration`. Advance notice (not the category value) is what makes maintenance “planned” for SLA credit review. Valid `--maintenance_category` values: `power`, `internet`, `disk`, `gpu`, `software`, `other`. Credit eligibility is evaluated on a case-by-case basis.
 
-**CLI `--sdate` uses Unix epoch seconds (UTC)**; the REST body uses ISO 8601 UTC. **CLI `--duration` is in hours.**
+**CLI `--sdate` uses Unix epoch seconds (UTC)**; the REST body uses ISO 8601 UTC. **CLI `--duration` is in hours.** Schedule maintenance **sequentially** across a fleet — the API is rate-limited (~2.5 requests/second). On HTTP 429, wait and retry with backoff (for example, `sleep 2` between machines).
 
 ```bash
 # Planned window: 2026-08-01 02:00:00 UTC (≥24 hours ahead when you run this)
