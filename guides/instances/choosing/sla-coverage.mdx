@@ -175,16 +175,16 @@ See [Create Instance](/api-reference/instances/create-instance) and [Search Offe
 | Target on a non-SLA offer | HTTP 400 `invalid_args` | Search with `has_sla=true`; confirm `expected_reliability` |
 | Target out of range / invalid | HTTP 400 `invalid_args` | Use `0 < target_reliability < 1`; stay at or below a realistic host claim |
 | Offer unavailable / stale | HTTP 404 `invalid_args` (check `msg` for `no_such_ask`) | Re-search and rent a current offer ID |
-| Offer no longer exists | HTTP 410 `no_such_ask` | Re-search for a new offer ID |
+| Cannot start immediately (`cancel_unavail`) | HTTP 410 `no_such_ask` | Offer cannot start now; pick another offer or retry later — see [Create Instance](/api-reference/instances/create-instance) |
 | Price mismatch after stale quote | HTTP 400 `invalid_price` | Re-search with the same `target_reliability` and storage (`allocated_storage` / `--storage`), then rent again |
 
-Hold storage constant when comparing `dph_total`: console Instance Disk Size defaults to **10 GB**, REST search `allocated_storage` defaults to **8 GB**, and CLI `--storage` defaults to **5 GiB**. Mismatched defaults make the same offer look differently priced across tools.
+Hold storage constant when comparing `dph_total` and when chaining search → rent: console Instance Disk Size defaults to **10 GB**, REST search `allocated_storage` defaults to **8 GB**, and CLI `--storage` defaults to **5 GiB**. REST create-instance requires `disk` ≥ **8 GB**, so a CLI search at the 5 GiB default can quote a price you cannot rent via REST without raising storage — use ≥ 8 GB (or the same explicit value) for CLI search → REST rent flows. CLI `--storage` is in GiB; REST `allocated_storage` / create `disk` are in GB.
 
 ## What happens after you rent
 
 When you rent an SLA-backed offer **with a target set**:
 
-1. **Contract terms lock in** — your reliability target, the host's claim, and confidence are fixed for that rental.
+1. **Contract terms lock in** — your reliability target, the host's claim, and host confidence (how the host priced SLA around their claim) are fixed for that rental. You only compare the SLA charge or `dph_total` — confidence is a host-side pricing knob, not a setting you control.
 2. **Daily billing** — you pay compute plus the SLA charge each day.
 3. **Daily settlement** — Vast measures reliability across multiple timescales and calculates any SLA credit.
 4. **Credits appear in billing** — settlement credits improve your balance; strong days mean you paid the SLA charge with no credit.
