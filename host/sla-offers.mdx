@@ -271,22 +271,45 @@ Then `PUT /api/v0/machines/create_asks/` with merged fields.
 
 ### Fleet listing workflow (advanced — fleet operators only)
 
-Validate `price_gpu`, `end_date`, and `min_chunk` before each PUT. Prefer reading existing SLA fields from each machine rather than hardcoding claim/confidence. Skip unlisted machines.
+`PUT /api/v0/machines/create_asks/` publishes a live listing (same as **LIST**). Only run this loop on machines you intend to list or update. Validate `price_gpu`, `end_date`, and `min_chunk` before each PUT. Prefer reading existing SLA fields from each machine rather than hardcoding claim/confidence. Skip incomplete machines.
+
+**Before fleet SLA rollout:**
+
+1. Update host daemons fleet-wide per the [host setup guide](https://cloud.vast.ai/host/setup/).
+2. On **Host → Machines**, confirm each machine is healthy (no red error status) and retry **LIST** / `create_asks` after the daemon reconnects.
+3. If listing still returns `sla_daemon_outdated` after an update, contact support with the machine ID — there is no documented `show machines` daemon-version field for a preflight `jq` filter today.
 
 For multiple machines, loop sequentially — do not parallelize without backoff:
 
-1. `PUT /api/v0/machines/create_asks/` with `machine` plus SLA fields and required base pricing.
-2. On `429`, sleep and retry with exponential backoff.
-3. On `invalid_sla_params`, `sla_not_approved`, `sla_daemon_outdated`, or `machine_locked`, log the machine ID and continue or abort per your rollout policy.
+1. Skip machines missing base pricing fields.
+2. `PUT /api/v0/machines/create_asks/` with `machine` plus SLA fields (preserve existing claim/confidence when set).
+3. On `429`, sleep and retry with exponential backoff.
+4. On `invalid_sla_params`, `sla_not_approved`, `sla_daemon_outdated`, or `machine_locked`, log the machine ID and continue or abort per your rollout policy.
 
 See [Fleet workflow](/host/sla-backtester#fleet-workflow) in the backtester for a similar sequential pattern.
 
 ```bash
 export VAST_API_KEY="YOUR_API_KEY"
+# Set DRY_RUN=0 to apply; default prints payloads only
+DRY_RUN="${DRY_RUN:-1}"
 machines=$(vastai show machines --raw)
 for id in $(vastai show machines -q); do
-  body=$(echo "$machines" | jq -c --arg id "$id" \
-    '.machines[] | select((.id|tostring) == $id) | {machine: (.id|tonumber), price_gpu, end_date, min_chunk, sla_r_claim: 0.99, sla_sigma_x: 0.5}')
+  machine=$(echo "$machines" | jq -c --arg id "$id" \
+    '.machines[] | select((.id|tostring) == $id)')
+  price=$(echo "$machine" | jq -r '.price_gpu // empty')
+  end=$(echo "$machine" | jq -r '.end_date // empty')
+  chunk=$(echo "$machine" | jq -r '.min_chunk // empty')
+  if [ -z "$price" ] || [ -z "$end" ] || [ -z "$chunk" ]; then
+    echo "skip $id: missing price_gpu/end_date/min_chunk"; continue
+  fi
+  # Preserve per-machine SLA tuning; defaults apply only when unset
+  body=$(echo "$machine" | jq -c \
+    '{machine: (.id|tonumber), price_gpu, end_date, min_chunk,
+      sla_r_claim: (.sla_r_claim // 0.99),
+      sla_sigma_x: (.sla_sigma_x // 0.5)}')
+  if [ "$DRY_RUN" != "0" ]; then
+    echo "dry-run machine_id=$id payload: $body"; continue
+  fi
   resp=$(curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
     -H "Authorization: Bearer $VAST_API_KEY" \
     -H "Content-Type: application/json" \
@@ -296,7 +319,7 @@ for id in $(vastai show machines -q); do
 done
 ```
 
-Fetch the fleet once before the loop — do not call `show machines --raw` inside the loop. On fleets of 20+ machines, expect several minutes; back off on HTTP 429.
+Fetch the fleet once before the loop — do not call `show machines --raw` inside the loop. On fleets of 20+ machines, expect several minutes; back off on HTTP 429. Tune claim/confidence per machine (backtester + earnings) before setting `DRY_RUN=0`.
 
 **SLA-only update** — include `machine` plus SLA fields; omit unrelated offer fields you intend to keep:
 
@@ -451,6 +474,8 @@ vastai schedule maint MACHINE_ID \
 
 REST equivalent: `PUT /api/v0/machines/{machine_id}/dnotify` with `"sdate": "2026-08-01T02:00:00Z"` (optional `"maintenance_reason": "OS kernel upgrade"`) — see [Schedule Maintenance](/api-reference/machines/schedule-maint).
 
+**Cancel or reschedule:** To cancel a window, use [`vastai cancel maint`](/host/cli/cancel-maint) (requires `machine_write`) or the [REST cancel-maintenance API](/api-reference/machines/cancel-maint). To reschedule, cancel the existing window, then run `schedule maint` with a new `--sdate` (still ≥24 hours ahead for planned SLA maintenance).
+
 **Emergency or unplanned downtime:** Notify clients if possible using `schedule maint`, but expect **full SLA settlement exposure**. Advance-notice credits do not apply to unplanned outages.
 
 See [CLI install](/cli/hello-world) if you have not set up the CLI.
@@ -466,7 +491,8 @@ Use the [SLA Earnings Backtester](/host/sla-backtester) (API-only; requires a `m
 ## When things go wrong
 
 - **Listing rejected (`invalid_sla_params`)** — Re-check claim and `sla_sigma_x` against [validation rules](#validation-rules).
-- **`sla_not_approved` / `sla_daemon_outdated`** — Contact support or update the daemon from the host setup page.
+- **`sla_not_approved`** — Contact support; you can keep a non-SLA listing while approval is pending.
+- **`sla_daemon_outdated`** — Update the host daemon from the [host setup guide](https://cloud.vast.ai/host/setup/), confirm the machine reconnects on **Host → Machines**, then retry LIST / `create_asks`. If the error persists, contact support with the machine ID.
 - **Unexpected credit** — Review reliability; re-run the backtester with a low `reliability` stress value (for example `0.01`).
 - **Severe outage** — Disable SLA on new contracts: open **Host → Machines** → **Set Pricing → SLA**, set claim to `0` (or use API `sla_r_claim=0`); contact [Discord](https://discord.gg/hSuEbSQ4X8) before relisting.
 
