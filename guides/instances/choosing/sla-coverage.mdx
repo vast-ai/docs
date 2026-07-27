@@ -76,6 +76,10 @@ Searching with **target reliability 95%** on an offer where the host **claims 99
 
 ## Finding SLA offers
 
+<Warning>
+**No SLA charge line in the price breakdown = no SLA coverage.** Filtering to SLA listings or searching with a reliability target only quotes pricing. Coverage requires setting **Reliability target** in the console (or passing `target_reliability` on REST create-instance) before you rent.
+</Warning>
+
 **Decision rule:** Search filters **quote** SLA pricing only. Coverage activates only when you rent via the **web console** (Reliability target set) or **REST** create-instance (`target_reliability` on `PUT /api/v0/asks/{id}/`). The CLI cannot enable SLA at rent time today — see [API automation](#api-automation) for the minimum REST rent path.
 
 ### In the web console
@@ -183,13 +187,13 @@ See [Create Instance](/api-reference/instances/create-instance) and [Search Offe
 | Cannot start immediately (`cancel_unavail`) | HTTP 410 `no_such_ask` | Offer cannot start now; pick another offer or retry later — see [Create Instance](/api-reference/instances/create-instance) |
 | Price mismatch after stale quote | HTTP 400 `invalid_price` | Re-search with the same `target_reliability` and storage (`allocated_storage` / `--storage`), then rent again |
 
-| Channel | Default storage | Field | Units |
+| Channel | Default storage | Field | Units (label) |
 | --- | --- | --- | --- |
 | Console | 10 GB | Instance disk size (UI) | GB |
 | REST search (`POST /api/v0/bundles/`) | 8 GB | `allocated_storage` | GB |
 | CLI (`vastai search offers`) | 5 GiB | `--storage` | GiB |
 
-**Rule:** Set the same explicit storage in search and create-instance. REST create-instance `disk` must be ≥ **8 GB** when you pass it (omit uses platform defaults — do not assume the CLI search default of 5 is rentable via REST). Pass matching numeric values across channels when chaining CLI search → REST rent (CLI help labels GiB; REST fields are labeled GB).
+**Match disk size when comparing prices.** Defaults differ by channel. When chaining CLI search → REST rent, use the **same integer** on both sides (for example `--storage 50` then `"disk": 50`) — the platform treats that number identically even though REST fields are labeled GB and CLI help says GiB. REST create-instance `disk` must be ≥ **8** when you pass it; do not assume the CLI default of 5 is rentable via REST.
 
 ## What happens after you rent
 
@@ -302,7 +306,9 @@ No. Verification is a platform quality signal (see [Machine Tiers](/guides/insta
 
 ### Where do I see historical SLA credits?
 
-Check **Account → Billing** and instance charges. SLA line items appear alongside compute charges for each settled day.
+**Console:** After UTC settlement, open **Account → Billing** and look for SLA credit line items alongside compute charges.
+
+**API:** SLA settlement credits are **not** exposed in `GET /api/v0/charges/` today (documented charge `type` values: `gpu`, `disk`, `bwd`, `bwu`). Use the console for reconciliation until a client billing endpoint documents SLA settlement rows. Client webhooks for SLA credits are not available. Host-side settlement visibility uses [machine earnings](/api-reference/machines/show-earnings) (`sla_earn`) — that path is for hosts, not renters.
 
 ## Related documentation
 
