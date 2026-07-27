@@ -73,7 +73,7 @@ Think of an SLA offer as two host ideas plus one client choice:
 
 When a client rents an on-demand instance on your SLA-listed offer with a chosen target:
 
-- They pay **compute** (GPU, storage, bandwidth) plus a **small hourly SLA charge** included in `dph_total`.
+- While a rental runs they pay GPU, storage, bandwidth (usage-based), and a **small hourly SLA charge**. In search results, **`dph_total`** is the quoted hourly rental cost: GPU + storage + SLA charge at the quoted allocation — **not** bandwidth.
 - Each UTC calendar day, Vast measures reliability for the contract and settles the SLA.
 - **Strong reliability relative to the client's target** → you keep the SLA charge for that day.
 - **Shortfalls** → credits flow to the client from your earnings (bounded by that day's covered compute).
@@ -441,9 +441,12 @@ Clients pay more because you admit greater uncertainty. Use this if your reliabi
 **CLI `--sdate` uses Unix epoch seconds (UTC)**; the REST body uses ISO 8601 UTC. **CLI `--duration` is in hours.**
 
 ```bash
-# Example: 2026-08-01 02:00:00 UTC → epoch seconds
-# Linux: date -u -d '2026-08-01 02:00:00' +%s
-vastai schedule maint MACHINE_ID --sdate 1785549600 --duration 2 --maintenance_category software
+# Planned window: 2026-08-01 02:00:00 UTC (≥24 hours ahead when you run this)
+# Prefer computing the epoch so the comment and value stay in sync:
+vastai schedule maint MACHINE_ID \
+  --sdate "$(date -u -d '2026-08-01 02:00:00' +%s)" \
+  --duration 2 \
+  --maintenance_category software
 ```
 
 REST equivalent: `PUT /api/v0/machines/{machine_id}/dnotify` with `"sdate": "2026-08-01T02:00:00Z"` (optional `"maintenance_reason": "OS kernel upgrade"`) — see [Schedule Maintenance](/api-reference/machines/schedule-maint).

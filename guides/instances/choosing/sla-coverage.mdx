@@ -13,7 +13,7 @@ This page explains SLA from the renter side: how to find SLA offers, how pricing
 </Note>
 
 <Warning>
-`target_reliability` is **not yet** available on the published `vastai create instance` CLI or Python SDK `create_instance()`. Searching with `target_reliability` only affects quoted pricing — it does **not** enable SLA on the contract unless you pass the same value at create-instance via **REST** or the **web console**.
+`target_reliability` is **not yet** available on the published `vastai create instance` CLI or Python SDK `create_instance()`. Searching with a target only quotes pricing — use the **web console** or **REST** create-instance to enable coverage (see [Finding SLA offers](#finding-sla-offers)).
 </Warning>
 
 ## Choose your path
@@ -46,11 +46,13 @@ SLA is most useful for **long-running production workloads** where unexpected do
 
 ## How pricing works
 
-Total hourly cost with SLA (`dph_total` = all-in dollars per hour in search):
+Quoted hourly cost with SLA in search (`dph_total`):
 
 ```
-total ≈ GPU + storage + bandwidth + SLA charge
+dph_total ≈ GPU + storage + SLA charge
 ```
+
+Bandwidth is billed separately from usage (`inet_*` rates) and is **not** included in `dph_total`.
 
 | Factor | What it means for you |
 | --- | --- |
@@ -67,14 +69,13 @@ Searching with **target reliability 95%** on an offer where the host **claims 99
 | Cost component | Approx. rate |
 | --- | --- |
 | GPU compute | $3.50/hr |
+| Storage (at search allocation) | ~$0.01/hr |
 | SLA charge | ~$0.008/hr |
-| **Total (`dph_total`)** | ~$3.51/hr |
+| **Total (`dph_total`)** | ~$3.52/hr |
 
 ## Finding SLA offers
 
-<Warning>
-**CLI-only renters:** You can search and price SLA offers from the CLI (`target_reliability` in `vastai search offers`), but SLA coverage is enabled only at create-instance time via the **web console** or **REST API** (`target_reliability` on `PUT /api/v0/asks/{id}/`). `vastai create instance` does not support SLA yet. See [API automation](#api-automation).
-</Warning>
+**Decision rule:** Search filters **quote** SLA pricing only. Coverage activates only when you rent via the **web console** (Reliability target set) or **REST** create-instance (`target_reliability` on `PUT /api/v0/asks/{id}/`). The CLI cannot enable SLA at rent time today — see [API automation](#api-automation) for the minimum REST rent path.
 
 ### In the web console
 
@@ -129,15 +130,11 @@ When you search with an SLA target, reserved-instance discounts may not apply to
 | A | $3.50 | 99% | 95% | ~$0.008 |
 | B | $3.50 | 95% | 95% | much higher |
 
-Always compare **`dph_total`**, not just GPU price, when SLA matters. Search ranking also accounts for SLA cost.
+Always compare **`dph_total`**, not just GPU price, when SLA matters. Sort by `dph_total` to compare total quoted cost.
 
 ### API automation
 
-<Warning>
-SLA coverage is locked at **create-instance** time via `target_reliability` on `PUT /api/v0/asks/{id}/` (REST). Searching with a target only prices offers. The published CLI/SDK create-instance path does **not** accept `target_reliability` yet — use REST or the console to rent with SLA.
-</Warning>
-
-**1. Search** (prices `dph_total` at your target — include storage explicitly; REST defaults to 8 GB, CLI `--storage` defaults to 5 GiB):
+**1. Search** (prices `dph_total` at your target — include storage explicitly so quotes are comparable):
 
 ```bash
 curl -s -X POST "https://console.vast.ai/api/v0/bundles/" \
@@ -171,7 +168,7 @@ See [Create Instance](/api-reference/instances/create-instance) and [Search Offe
 
 **API key permissions:** create a scoped key with `misc` (search/bundles), `instance_write` (create-instance), and preferably `instance_read` (verify show-instances). See [Authentication](/api-reference/authentication) and [Permissions](/api-reference/permissions).
 
-**3. Verify** via `GET /api/v1/instances/` or `vastai show instances --raw`: confirm `target_reliability > 0`. For running instances, check `instance.slaPremiumPerHour`; search-context snapshots use `search.slaPremiumPerHour`. Requires `instance_read`. `GET /api/v1/instances/` returns at most 25 instances per request — paginate with `next_token` until exhausted if you manage many rentals.
+**3. Verify** via `GET /api/v1/instances/` or `vastai show instances --raw`: confirm `target_reliability > 0`. For running instances, check `instance.slaPremiumPerHour`; search-context snapshots use `search.slaPremiumPerHour`. Requires `instance_read`. `GET /api/v1/instances/` returns at most 25 instances per request — paginate by passing each response’s `next_token` as the **`after_token`** query parameter until `next_token` is null.
 
 | Symptom | Typical response | What to do |
 | --- | --- | --- |
@@ -181,7 +178,7 @@ See [Create Instance](/api-reference/instances/create-instance) and [Search Offe
 | Offer no longer exists | HTTP 410 `no_such_ask` | Re-search for a new offer ID |
 | Price mismatch after stale quote | HTTP 400 `invalid_price` | Re-search with the same `target_reliability` and storage (`allocated_storage` / `--storage`), then rent again |
 
-Hold `allocated_storage` / `--storage` constant when comparing `dph_total` across runs or between CLI and REST.
+Hold storage constant when comparing `dph_total`: console Instance Disk Size defaults to **10 GB**, REST search `allocated_storage` defaults to **8 GB**, and CLI `--storage` defaults to **5 GiB**. Mismatched defaults make the same offer look differently priced across tools.
 
 ## What happens after you rent
 
@@ -253,9 +250,7 @@ Production settlement uses the multi-window reliability blend described above, n
 
 ### API integrators
 
-CLI can search with `target_reliability` and can **read** post-rent SLA fields via `vastai show instances --raw`, but cannot **enable** SLA at create-instance time (`vastai create instance` has no `target_reliability`). Use the web console or REST to rent with SLA.
-
-Console users: open **Instances** → select your instance → **price details** to confirm the SLA charge and target. Skip the block below if you do not use the API.
+Console users: open **Instances** → select your instance → **price details** to confirm the SLA charge and target. Skip the block below if you do not use the API. (CLI can **read** these fields via `vastai show instances --raw`; enabling SLA still requires console or REST — see [Finding SLA offers](#finding-sla-offers).)
 
 <details>
 <summary>API integrators: field names and filters</summary>
