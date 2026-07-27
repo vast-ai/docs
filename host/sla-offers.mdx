@@ -106,9 +106,9 @@ When you list or update a machine, set SLA fields via the host console or `PUT /
 
 ### Advanced: `sla_max_beta` (optional)
 
-Hosts do **not** set β (timescale mix). The platform derives β from the client's `target_reliability` at rent time.
+**Support-only — omit unless Vast support directs you.** Hosts do **not** set β (timescale mix). The platform derives β from the client's `target_reliability` at rent time.
 
-`sla_max_beta` is an optional ask **term**: a ceiling on how high a client-derived β this offer will accept (it caps collateral-lock duration for long-running contracts). Leave it unset for an uncapped offer. If you set it, it must be in `(0, 1)` and at least the default β derived at your claim — otherwise listing is rejected. Omit unless Vast support directs you.
+`sla_max_beta` is an optional ask term that caps how aggressively long-running contracts may weight recent uptime versus longer history in settlement. Leave it unset for an uncapped offer. If you set it, it must be in `(0, 1)` and at least the default β derived at your claim — otherwise listing is rejected.
 
 <Warning>
 **`sla_r_target` is not host-settable.** If you send `sla_r_target` or legacy `sla_reliability` on `create_asks/`, they are **ignored**. Clients supply their coverage target at search/rent time (`target_reliability`). Do **not** copy numeric `p` values from the SLA Backtester into `sla_sigma_x` — they use different scales. Use the mapping table on the [backtester page](/host/sla-backtester#confidence-values-p).
@@ -139,11 +139,13 @@ Do not assume the dashboard score equals SLA reliability. Before choosing `sla_r
 
 **This only changes how SLA charges are priced — it does not change how reliability is measured or what credit you owe when a client's target is missed.** Prefer the console controls. Set raw `sla_sigma_x` via the API when automating.
 
-| Guidance | Pricing effect | `sla_sigma_x` | Risk if you miss claim |
+| Console label | API `sla_sigma_x` | Backtester `p` | Pricing effect |
 | --- | --- | --- | --- |
-| Tight | Lowest client SLA charges at a given target | `0.2` | Highest charge sensitivity |
-| Normal (default) | Balanced | `0.5` | Moderate |
-| Wide | Highest client SLA charges at a given target | `1.0` | Lowest charge sensitivity |
+| Tight | `0.2` | ~0.83 | Lowest client SLA charges at a given target |
+| Normal (default) | `0.5` | ~0.6667 | Balanced |
+| Wide | `1.0` | ~0.50 | Highest client SLA charges at a given target |
+
+**Never copy backtester `p` into `sla_sigma_x` — the scales are inverted.** See the full mapping on the [backtester page](/host/sla-backtester#confidence-values-p).
 
 Higher confidence (tighter spread) → lower client SLA charges, but less room for reliability to slip before settlement credits grow.
 
@@ -231,11 +233,11 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
     "price_gpu": 3.50,
     "sla_r_claim": 0.99,
     "sla_sigma_x": 0.5,
-    "end_date": 1735689600
+    "end_date": 1893456000
   }'
 ```
 
-Set `end_date` so the offer does not stay open indefinitely — especially important for SLA commitments. See [Offer End Date](/host/hosting-overview#offer-end-date). Convert a calendar date to Unix seconds: `date -u -d '2025-01-01' +%s` (Linux) or `date -u -j -f '%Y-%m-%d' '2025-01-01' +%s` (macOS). The CLI also accepts `MM/DD/YYYY` via `-e`.
+Replace `end_date` with a **future** Unix timestamp — past dates expire the offer immediately (example `1893456000` = 2030-01-01 00:00 UTC). Set `end_date` so the offer does not stay open indefinitely — especially important for SLA commitments. See [Offer End Date](/host/hosting-overview#offer-end-date). Convert a calendar date to Unix seconds: `date -u -d '2030-01-01' +%s` (Linux) or `date -u -j -f '%Y-%m-%d' '2030-01-01' +%s` (macOS). The CLI also accepts `MM/DD/YYYY` via `-e`.
 
 <Warning>Open-ended offers (no `end_date`) combined with SLA expose you to indefinite asymmetric payout risk. See [Offer End Date](/host/hosting-overview#offer-end-date).</Warning>
 
@@ -245,7 +247,7 @@ Minimal example:
 {
   "machine": 12345,
   "price_gpu": 3.50,
-  "end_date": 1735689600,
+  "end_date": 1893456000,
   "sla_r_claim": 0.99,
   "sla_sigma_x": 0.5
 }
@@ -267,7 +269,9 @@ Machine `id` may be a string in raw JSON. The response is wrapped in a `machines
 Then `PUT /api/v0/machines/create_asks/` with merged fields.
 </Note>
 
-### Fleet listing workflow
+### Fleet listing workflow (advanced — fleet operators only)
+
+Validate `price_gpu`, `end_date`, and `min_chunk` before each PUT. Prefer reading existing SLA fields from each machine rather than hardcoding claim/confidence. Skip unlisted machines.
 
 For multiple machines, loop sequentially — do not parallelize without backoff:
 
