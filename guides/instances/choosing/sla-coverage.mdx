@@ -147,6 +147,7 @@ curl -s -X POST "https://console.vast.ai/api/v0/bundles/" \
     "limit": 20,
     "type": "ondemand",
     "allocated_storage": 50,
+    "order": [["dph_total", "asc"]],
     "target_reliability": {"eq": 0.95},
     "has_sla": {"eq": true},
     "expected_reliability": {"gte": 0.99}
@@ -170,7 +171,7 @@ See [Create Instance](/api-reference/instances/create-instance) and [Search Offe
 
 **API key permissions:** create a scoped key with `misc` (search/bundles), `instance_write` (create-instance), and preferably `instance_read` (verify show-instances). See [Authentication](/api-reference/authentication) and [Permissions](/api-reference/permissions).
 
-**3. Verify** via `GET /api/v1/instances/` (show-instances / `vastai show instances`): confirm `target_reliability > 0`. For running instances, check `instance.slaPremiumPerHour`; search-context snapshots use `search.slaPremiumPerHour`. Requires `instance_read`.
+**3. Verify** via `GET /api/v1/instances/` or `vastai show instances --raw`: confirm `target_reliability > 0`. For running instances, check `instance.slaPremiumPerHour`; search-context snapshots use `search.slaPremiumPerHour`. Requires `instance_read`. `GET /api/v1/instances/` returns at most 25 instances per request — paginate with `next_token` until exhausted if you manage many rentals.
 
 | Symptom | Typical response | What to do |
 | --- | --- | --- |
@@ -252,7 +253,7 @@ Production settlement uses the multi-window reliability blend described above, n
 
 ### API integrators
 
-CLI can search with `target_reliability` but cannot enable or verify SLA on contracts today. Use the web console or REST for rent and post-rent verification.
+CLI can search with `target_reliability` and can **read** post-rent SLA fields via `vastai show instances --raw`, but cannot **enable** SLA at create-instance time (`vastai create instance` has no `target_reliability`). Use the web console or REST to rent with SLA.
 
 Console users: open **Instances** → select your instance → **price details** to confirm the SLA charge and target. Skip the block below if you do not use the API.
 
