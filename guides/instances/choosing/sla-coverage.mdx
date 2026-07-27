@@ -23,7 +23,7 @@ This page explains SLA from the renter side: how to find SLA offers, how pricing
 | Rent with SLA in the console | [Finding SLA offers → In the web console](#in-the-web-console) |
 | I use only the CLI today | **Cannot enable SLA at rent time** — CLI search only quotes pricing. After rent, verify with `vastai show instances --raw` (`target_reliability` > 0). To enable coverage, use the console or [API automation](#api-automation) (REST) |
 | Understand charges and credits | [How pricing works](#how-pricing-works) → [What happens after you rent](#what-happens-after-you-rent) |
-| Automate search → rent → verify | [API automation](#api-automation) (REST) |
+| Automate search → rent → verify | [API automation](#api-automation) (REST). **Billing reconciliation:** SLA settlement credits appear in the console billing UI today — not in `GET /api/v0/charges/` or client webhooks |
 
 <Note>
 SLA applies to **on-demand rentals only** — not interruptible/bid or reserved/prepay contracts. See [Instance Pricing](/guides/instances/pricing).
@@ -61,7 +61,7 @@ Bandwidth is billed separately from usage (`inet_*` rates) and is **not** includ
 | Host SLA claim | Maximum reliability the host advertises on the listing (`expected_reliability`). Higher claim → lower SLA charge at a given target |
 | Host confidence | Host-side pricing setting that affects SLA charge size. **You do not set this** — the host chooses it, and it is **not shown on offer cards**. Compare offers using `dph_total` or the SLA charge line in the price breakdown |
 
-**Rule of thumb:** pick a target **at or below** the host's claim for the best value. Asking for 99% coverage on a host who only claims 95% costs much more than asking for 95% on a host who claims 99%.
+**Rule of thumb:** pick a target **at or below** the host's claim for the best value. Asking for 99% coverage on a host who only claims 95% costs much more than asking for 95% on a host who claims 99%. In search results, the host claim appears as **expected reliability** / SLA claim on the offer (API: `expected_reliability`) — not the Reliability Score on the card.
 
 ### Example: H100 at $3.50/hr GPU
 
@@ -140,6 +140,8 @@ Always compare **`dph_total`**, not just GPU price, when SLA matters. Sort by `d
 ### API automation
 
 Console-only renters can skip this section — use [In the web console](#in-the-web-console) above.
+
+**Billing reconciliation:** SLA settlement credits appear in the console billing UI today. They are not included in `GET /api/v0/charges/` and client webhooks for SLA credits are not available — plan manual console reconciliation after UTC settlement (see [FAQ](#where-do-i-see-historical-sla-credits)).
 
 **1. Search** (prices `dph_total` at your target — include storage explicitly so quotes are comparable):
 
@@ -278,9 +280,9 @@ To find SLA-covered instances, filter **client-side** from the show-instances re
 | --- | --- |
 | Your reliability target | `target_reliability` |
 | SLA charge rate | `search.slaPremiumPerHour` / `instance.slaPremiumPerHour` |
-| Host SLA claim (offers / contracts) | `expected_reliability` / `sla_r_claim` |
+| Host SLA claim (offers / contracts) | `expected_reliability` |
 
-Host confidence is a host-side pricing setting and is **not shown on offer cards** — compare offers using `dph_total` or the SLA charge line. Confirm field names against a live `--raw` response before building parsers.
+Host ask field `sla_r_claim` is host-side only — see [SLA Offers](/host/sla-offers). Host confidence is **not shown on offer cards** — compare offers using `dph_total` or the SLA charge line. Confirm field names against a live `--raw` response before building parsers.
 </details>
 
 ## When SLA is not available
@@ -308,7 +310,7 @@ No. Verification is a platform quality signal (see [Machine Tiers](/guides/insta
 
 **Console:** After UTC settlement, open **Account → Billing** and look for SLA credit line items alongside compute charges.
 
-**API:** SLA settlement credits are **not** exposed in `GET /api/v0/charges/` today (documented charge `type` values: `gpu`, `disk`, `bwd`, `bwu`). Use the console for reconciliation until a client billing endpoint documents SLA settlement rows. Client webhooks for SLA credits are not available. Host-side settlement visibility uses [machine earnings](/api-reference/machines/show-earnings) (`sla_earn`) — that path is for hosts, not renters.
+**API:** SLA settlement credits are **not** exposed in `GET /api/v0/charges/` today (documented charge `type` values: `gpu`, `disk`, `bwd`, `bwu`). Use the console for reconciliation until a client billing endpoint documents SLA settlement rows. Client webhooks for SLA credits are not available. Host-side settlement visibility uses [machine earnings](/api-reference/billing/show-earnings) (`sla_earn`) — that path is for hosts, not renters.
 
 ## Related documentation
 
