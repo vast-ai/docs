@@ -106,7 +106,9 @@ When you list or update a machine, set SLA fields via the host console or `PUT /
 
 ### Advanced: `sla_max_beta` (optional)
 
-Omit unless Vast support directs you. Optional ask term `sla_max_beta` limits how path-dependent a client's timescale mix can be for long-running contracts. Must be in `(0, 1)` and at least the default β derived at your claim. Most hosts should leave it unset.
+Hosts do **not** set β (timescale mix). The platform derives β from the client's `target_reliability` at rent time.
+
+`sla_max_beta` is an optional ask **term**: a ceiling on how high a client-derived β this offer will accept (it caps collateral-lock duration for long-running contracts). Leave it unset for an uncapped offer. If you set it, it must be in `(0, 1)` and at least the default β derived at your claim — otherwise listing is rejected. Omit unless Vast support directs you.
 
 <Warning>
 **`sla_r_target` is not host-settable.** If you send `sla_r_target` or legacy `sla_reliability` on `create_asks/`, they are **ignored**. Clients supply their coverage target at search/rent time (`target_reliability`). Do **not** copy numeric `p` values from the SLA Backtester into `sla_sigma_x` — they use different scales. Use the mapping table on the [backtester page](/host/sla-backtester#confidence-values-p).
@@ -151,7 +153,7 @@ Offers with invalid combinations are rejected at listing time:
 
 - `sla_r_claim` must be `0` (disable) or greater than 0 and at most **0.9999**. Exactly `1.0` is rejected.
 - When claim is positive, `sla_sigma_x` must be positive and at most `3.0` (defaults to `0.5` if omitted).
-- Optional `sla_max_beta` must be in `(0, 1)` and at least the default β derived at your claim.
+- Optional `sla_max_beta` must be in `(0, 1)` and at least the default β derived at your claim. Hosts do not set β; this field only caps the client-derived β the offer accepts. Omit for uncapped.
 
 <Note>
 If listing is rejected with `error: "invalid_sla_params"`, check the `msg` field against the rules above. Other SLA listing errors include `sla_not_approved` and `sla_daemon_outdated`.
