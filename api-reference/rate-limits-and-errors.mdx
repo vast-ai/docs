@@ -23,28 +23,24 @@ Some omit `error` and return only `msg` or `message`.
 
 ### How rate limits are applied
 
-Vast.ai applies rate limits **per endpoint** and **per identity**. This is enforced as a minimum interval between requests for a given endpoint and identity.
+Vast.ai applies rate limits per endpoint and per identity.
 
-The identity is determined by: bearer token + session user + `api_key` query param + client IP.
+Unlike other services, this is enforced as a **minimum interval between requests** for a given endpoint and identity, and enforcement is not a binary wall, but determined probabalistically.
 
-Some endpoints also use **method-specific** limits (GET vs POST) and/or **max-calls-per-period** limits for short bursts.
+The identity is determined by: bearer token + session user + `api_key` query param and falls back to client IP.
 
 
-### Rate limit response behavior
 
-When you hit a rate limit, you will receive **HTTP 429**. The response body is often plain text (in certain cases JSON with `success`/`error`/`msg` like above) with one of the following messages:
+### Rate limit response and recommended retry behavior
 
-```
-API requests too frequent
-```
-
-or
+When you hit a rate limit, you will receive **HTTP 429**. The response body will typically return an acceptable threshold number in seconds:
 
 ```
 API requests too frequent: endpoint threshold=...
 ```
 
-The API does not currently set standard rate-limit headers (for example `Retry-After`), so clients should apply their own backoff strategy.
+We recommend you retry your call after the recommended threshold.
+
 
 ### How to reduce rate limit errors
 
