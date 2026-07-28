@@ -1,0 +1,68 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/instances/balance/{id}/:
+    get:
+      summary: Get Instance Balance
+      tags:
+      - Billing
+      description: Returns the refundable prepay deposit balance and discount information for the specified instance.
+      security:
+      - BearerAuth: []
+      x-scope: instance_read
+      x-rateLimit: 3
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: The ID of the instance.
+      responses:
+        '200':
+          description: 'Returns {success: true, refundable_deposit, total_discount, discount_months}.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: True on success
+                  refundable_deposit:
+                    type: number
+                    description: Amount in USD that would be refunded if the instance is deleted now
+                  total_discount:
+                    type: number
+                    description: Total discount earned so far from the prepayment
+                  discount_months:
+                    type: number
+                    description: Number of months of discount remaining
+              example:
+                success: true
+                refundable_deposit: 12.5
+                total_discount: 2.1
+                discount_months: 1.5
+        '404':
+          description: 'Returns {success: false, error: "no_such_instance", msg: "Instance {id} not found."} when the instance
+            doesn''t exist for the user.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
