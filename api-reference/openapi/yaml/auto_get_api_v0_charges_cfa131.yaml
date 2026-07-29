@@ -1,0 +1,135 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/charges/:
+    get:
+      summary: List Instance Charges
+      tags:
+      - Billing
+      description: Returns paginated instance charge details for the authenticated user within a required day range, optionally
+        formatted as a hierarchical tree.
+      security:
+      - BearerAuth: []
+      x-scope: billing_read
+      x-rateLimit: 1
+      parameters:
+      - name: select_filters
+        in: query
+        required: true
+        description: '**`day`** (required). Date range in unix seconds (UTC). Operators: `gte`, `lte`.
+
+
+          **`type`** (optional). Filter by contract type: `instance`, `volume`, `serverless`. Operator: `in`.
+
+
+          **Examples**:
+
+          ```json
+
+          // All charges in January 2026
+
+          {"day":{"gte":1767225600,"lte":1769903999}}
+
+
+          // Only instance charges
+
+          {"day":{"gte":1767225600,"lte":1769903999},"type":{"in":["instance"]}}
+
+
+          // Volumes and serverless only
+
+          {"day":{"gte":1767225600,"lte":1769903999},"type":{"in":["volume","serverless"]}}
+
+          ```
+
+          '
+        schema:
+          type: string
+      - name: format
+        in: query
+        required: false
+        description: '- `table` (default) flat list of per-contract rows with `type: "instance"` or `"volume"`.
+
+          - `tree` serverless contracts are collapsed under endpoint/workergroup wrappers with `type: "serverless"` and `source:
+          "endpoint-<id>"` / `"workergroup-<id>"`. Regular instances and volumes are unchanged.
+
+          '
+        schema:
+          type: string
+          enum:
+          - table
+          - tree
+          default: table
+          example: table
+      - name: latest_first
+        in: query
+        required: false
+        description: Sort by most recent charges first.
+        schema:
+          type: boolean
+          default: true
+          example: true
+      - name: limit
+        in: query
+        required: false
+        description: Max results per page. Server maximum 500.
+        schema:
+          type: integer
+          minimum: 1
+          default: 100
+          example: 20
+      - name: after_token
+        in: query
+        required: false
+        description: 'Pass the `next_token` value from the previous response to fetch the next page of results. When the response
+          returns `next_token: null`, there are no more pages.'
+        schema:
+          type: string
+          example: eyJ2YWx1ZXMiOiB7ImlkIjogMTIzNDU2Nzh9fQ==
+      responses:
+        '200':
+          description: 'Host users: {"success": false, "msg": "Host users do not have instance charges", "count": 0, ...}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: True on success
+                  count:
+                    type: integer
+                    description: Number of unique instances/volumes in the result
+                  total:
+                    type: integer
+                    description: Total matching instances/volumes across all pages
+                  results:
+                    type: array
+                    items:
+                      type: object
+                    description: Charge entries with start, end, type, source, description, amount, metadata, and items fields
+                  next_token:
+                    type: string
+                    description: Cursor for the next page, or null
+        '400':
+          description: 'Missing day filters: "Must provide both ''day'' gte and lte filters for instance charges"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
