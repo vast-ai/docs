@@ -1,0 +1,88 @@
+---
+title: "First 24 Hours After Install"
+sidebarTitle: "First 24 Hours"
+description: "Expectations after a host first installs and lists a machine."
+"canonical": "/host/first-24-hours"
+personas:
+  - hobbyist
+  - pro-operator
+---
+
+<div className="persona-chips"><span className="persona-chip">Hobbyist</span><span className="persona-chip">Pro Operator</span></div>
+
+Use the first day to confirm the host is stable, listed correctly, and reachable from outside your network.
+
+<a id="healthy-daemon" />
+## Healthy Daemon
+
+A healthy host:
+
+- Shows under the host account.
+- Has active offers when listed.
+- Has no red machine errors.
+- Runs the Vast daemon, metrics service, Docker, and NVIDIA persistence service.
+- Can run a temporary self-test instance that reports progress.
+
+SSH checks:
+
+```bash
+systemctl is-active vastai.service vast_metrics.service docker nvidia-persistenced.service
+systemctl --no-pager --full status vastai.service vast_metrics.service docker nvidia-persistenced.service
+sudo journalctl -u vastai.service -n 80 --no-pager
+sudo journalctl -u vast_metrics.service -n 80 --no-pager
+sudo tail -n 100 /var/lib/vastai_kaalia/kaalia.log
+sudo cat /var/lib/vastai_kaalia/host_port_range
+```
+
+The services should be `active`, without restart loops or repeated fatal errors. The configured port range should match the forwarded range.
+
+<a id="monitor" />
+## Monitor
+
+Watch:
+
+- Machine visibility and active offers.
+- Self-test result.
+- Red machine errors.
+- Daemon, Docker, and NVIDIA runtime health.
+- External port reachability.
+- Thermals, power, storage, and network stability.
+- First-rental startup behavior.
+
+<a id="test-like-a-client" />
+## Test Like A Client
+
+Use a separate client account or the CLI to rent a small test instance on your own machine.
+
+List visible machines/offers:
+
+```text
+vastai show machines
+```
+
+Create a test instance from one available offer:
+
+```text
+vastai create instance <ID> --image pytorch/pytorch:latest --jupyter --direct --env '-e TZ=PDT -p 22:22 -p 8080:8080'
+```
+
+Then test:
+
+- Instance appears in the client account.
+- SSH command works.
+- Jupyter opens.
+- Ports do not hang at "connecting."
+
+Destroy the test instance when done. If SSH or Jupyter is stuck connecting, check [Network & Ports](/host/network-ports#test-ports-outside-lan).
+
+## What Can Take Time
+
+Verification, search visibility, and first rentals are not instant. Passing self-test makes the machine eligible; timing still depends on machine health, supply, demand, and platform policy.
+
+## Related Pages
+
+| Topic | Read next |
+| --- | --- |
+| Self-test | [How to Self-Test](/host/how-to-self-test) |
+| Not in search | [Why Isn't My Machine in Search?](/host/not-in-search) |
+| Reliability | [Reliability & Uptime](/host/reliability-uptime) |
