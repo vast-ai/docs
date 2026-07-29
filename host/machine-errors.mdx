@@ -1,0 +1,338 @@
+---
+title: "Machine Error Reference"
+sidebarTitle: "Machine Errors"
+description: "Host Machines page error strings, meanings, and next checks."
+"canonical": "/host/machine-errors"
+personas:
+  - pro-operator
+  - headless-operator
+---
+
+<div className="persona-chips"><span className="persona-chip">Pro Operator</span><span className="persona-chip">Headless / DC</span></div>
+
+Use this page when the Machines page shows a red machine error or a host-facing runtime message. Start with the exact text shown in the console, fix the likely host-side cause, then allow the platform to refresh the machine state.
+
+<Warning>
+Do not reset machine identity, force-refresh machine specs with internal scripts, or delete renter data as a first response. If the page state looks wrong after the host is healthy, collect logs and escalate to Vast support.
+</Warning>
+
+## What Machine Errors Mean
+
+Machine errors usually mean the host software or platform detected a problem with networking, Docker, NVIDIA runtime, GPU health, storage, VM support, or self-test runtime behavior.
+
+Errors have different impact levels. Some de-verify the whole machine and take it off the market until the error clears. Some only disable VM GPU-passthrough offers while container rentals can remain listed. Some are logged against a single rental attempt and do not change the machine's listing state by themselves.
+
+Resolved errors may take time to clear because the host daemon and platform need to observe healthy state again. Do not assume immediate clearing after a single fix or reboot.
+
+## Listing Impact
+
+| Impact | What happens | Examples | What to do |
+| --- | --- | --- | --- |
+| Machine de-verified | The machine is marked unverified and taken off the market until the error clears. | Port networking issues, Docker/NVIDIA runtime errors, GPU PCIe/ECC faults, Docker daemon unavailable, XFS project quota errors | Fix the host-side cause, verify the host is healthy, then allow the platform to refresh. |
+| VM offers disabled | The machine can stay listed for container rentals, but VM GPU-passthrough rentals are disabled while the VM condition persists. | IOMMU changes, GDM holding a GPU, VM memory preflight failure, machine authentication denied while fetching VM secrets | Fix the VM-specific prerequisite, then wait for the machine to report clean state again. |
+| Logged only | The message is recorded against a specific rental attempt and does not de-verify or unlist the machine by itself. | Container create, build, volume, template-update, or secrets-service messages | Use the message as support context if the rental failed or repeats. |
+
+## Quick Lookup
+
+| Message or symptom | Likely area | Start here |
+| --- | --- | --- |
+| `Port issue`, `port networking issues`, `Port Networking Issues` | Public port reachability | [Port Networking Issues](#port-networking-issues) |
+| `vericode=8` with another visible message | Host-facing machine `error_msg` | Use the exact message in this table |
+| TCP works but UDP fails | Public port protocol mismatch | [TCP works but UDP fails](#tcp-works-but-udp-fails) |
+| `nvidia-container-cli: device error:` | NVIDIA container runtime or GPU device state | [NVIDIA container runtime](#nvidia-container-runtime) |
+| `failed to inject CDI devices: unresolvable CDI devices` | NVIDIA CDI / Docker GPU injection | [CDI device injection](#cdi-device-injection) |
+| `unknown or invalid runtime nvidia` | NVIDIA container runtime not available to Docker | [Docker runtime configuration](#docker-runtime-configuration) |
+| `unknown flag: runtime` | Docker CLI/runtime invocation problem | [Docker runtime configuration](#docker-runtime-configuration) |
+| `Cannot connect to the Docker daemon` | Docker daemon unavailable | [Docker daemon unavailable](#docker-daemon-unavailable) |
+| `GPU PCIE issue`, AER, PCIe, Xid 79, fallen off bus | Hardware path / PCIe / power / riser | [GPU PCIe issue](#gpu-pcie-issue) |
+| `bad bandwidthtest2` | GPU transfer or PCIe bandwidth health | [`bad bandwidthtest2`](#bad-bandwidthtest2) |
+| `Unable to determine the device handle for` | GPU disappeared or cannot be enumerated | [GPU missing or unhealthy](#gpu-missing-or-unhealthy) |
+| `CUDA error: uncorrectable ECC error encountered` | GPU memory / ECC fault | [ECC and GPU memory errors](#ecc-and-gpu-memory-errors) |
+| `CUDA is not available` | Driver/runtime/container CUDA visibility | [CUDA unavailable](#cuda-unavailable) |
+| `nccl_failed`, NCCL initialization, sync, or communicator error | Multi-GPU communication | [NCCL failed](#nccl-failed) |
+| `--storage-opt is supported only for overlay over xfs` | Docker storage filesystem/quota | [XFS project quota error](#xfs-project-quota-error) |
+| Full client storage, `no space left on device` | Docker storage capacity | [Full client storage](#full-client-storage) |
+| Machine not found or not rentable | Offer/listing/rentability state | [Machine not rentable](#machine-not-rentable) |
+| Red machine error / unhealthy / deverified | Machine health or platform state | [Generic red machine error](#generic-red-machine-error) |
+| `<admin-set>` | Manual Vast admin review flag | [Admin-set machine error](#admin-set-machine-error) |
+| IOMMU, GDM, machine does not support VMs, VM memory preflight, or VM secrets HTTP 401 | VM host support | [VM offer errors](#vm-offer-errors) |
+| Container create, build, volume, template update, or secrets-service message | Single rental attempt | [Rental-attempt messages](#rental-attempt-messages) |
+
+<a id="port-networking-issues" />
+## Port Networking Issues
+
+`Port issue`, `port networking issues`, and `Port Networking Issues` usually mean Vast could not reach the machine through the configured direct ports. `vericode=8` by itself only tells you a host-facing machine `error_msg` exists; use the exact visible message to decide whether it is a port issue, CDI issue, PCIe issue, daemon issue, or another machine error.
+
+Check:
+
+- The host port range configured in the installer or `/var/lib/vastai_kaalia/host_port_range`.
+- Router, firewall, or datacenter ACL forwarding for the same range.
+- Public inbound IP availability.
+- Both TCP and UDP forwarding.
+- Outside-LAN reachability. Same-LAN tests can pass because of NAT hairpinning.
+
+If a self-test failure prints a public IP and port, troubleshoot that exact endpoint. See [Network & Ports](/host/network-ports) and [Self-Test Reference: vericode=8](/host/self-test-reference#vericode-8).
+
+<a id="tcp-works-but-udp-fails" />
+## TCP Works But UDP Fails
+
+TCP-only forwarding can make web or progress checks pass while UDP workloads fail. The direct port range must forward both TCP and UDP.
+
+A UDP failure can still happen when the UDP port appears mapped and the container-side responder starts. The public UDP path still has to work end to end. The paid dogfood run on 2026-06-24 reproduced this shape: the TCP progress endpoint was reachable, but the external UDP echo probe timed out. Treat this as a network-path issue first, not a CUDA or NCCL failure.
+
+Check router/firewall rules, datacenter ACLs, host firewall rules, and whether the provider blocks UDP. Test from outside the LAN with `tcpdump` on the host and a UDP packet from an external machine. See [Network & Ports: TCP and UDP](/host/network-ports#tcp-udp).
+
+<a id="nvidia-container-runtime" />
+## NVIDIA Container Runtime
+
+`nvidia-container-cli: device error:` means Docker attempted to start a GPU container, but the NVIDIA runtime could not expose one or more GPU devices.
+
+Possible causes include unhealthy or missing GPUs, driver/NVML issues, CDI/runtime configuration, PCIe errors, or a stale device state after a GPU reset.
+
+Start with:
+
+```bash
+nvidia-smi -L
+sudo docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi -L
+sudo journalctl -k -b --no-pager | grep -Ei 'NVRM|Xid|AER|PCIe|fallen'
+```
+
+If Docker cannot inject GPUs into a normal container, fix driver/runtime/GPU health before listing again. See [Errors & Diagnostics: Failed To Inject CDI Devices](/host/common-errors-diagnostics#failed-cdi).
+
+<a id="cdi-device-injection" />
+## CDI Device Injection
+
+`failed to inject CDI devices: unresolvable CDI devices` points to GPU device injection or container runtime setup. It can also be a symptom of a GPU that disappeared from the host after a reset or PCIe fault.
+
+Confirm host GPU visibility and Docker GPU injection:
+
+```bash
+nvidia-smi -L
+sudo docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi -L
+```
+
+If both fail, investigate driver, NVML, PCIe, Xid, and Docker/NVIDIA runtime health. Do not assume a CDI regeneration command fixes the underlying issue.
+
+<a id="docker-runtime-configuration" />
+## Docker Runtime Configuration
+
+`unknown or invalid runtime nvidia` usually means Docker cannot use the NVIDIA runtime.
+
+`unknown flag: runtime` means the Docker command rejected the `--runtime` option. This can happen if the command is being handled by a nonstandard wrapper or incompatible Docker path.
+
+Check:
+
+```bash
+type docker
+docker --version
+docker create --help | grep -- --runtime
+docker info | grep -i runtime
+```
+
+Then confirm a normal GPU container can run. Repair Docker/NVIDIA runtime configuration before accepting rentals.
+
+<a id="docker-daemon-unavailable" />
+## Docker Daemon Unavailable
+
+`Cannot connect to the Docker daemon` means the host software could not talk to Docker.
+
+Check:
+
+```bash
+systemctl is-active docker
+sudo journalctl -u docker -n 100 --no-pager
+sudo docker ps
+```
+
+Fix Docker startup, storage, or daemon configuration errors before rerunning self-test or listing the machine.
+
+<a id="gpu-pcie-issue" />
+## GPU PCIe Issue
+
+`GPU PCIE issue`, repeated AER messages, Xid 79, or “GPU has fallen off the bus” point to the hardware path between the GPU and the host.
+
+Check risers, slots, cabling, PSU capacity, thermals, BIOS lane settings, motherboard health, GPU seating, and overclock/undervolt settings. Review kernel logs under load:
+
+```bash
+sudo journalctl -k -b --no-pager | grep -Ei 'AER|PCIe|NVRM|Xid|fallen'
+sudo dmesg -T | grep -Ei 'AER|PCIe|NVRM|Xid|fallen'
+```
+
+Corrected AER at boot can be harmless, but repeated messages during load are a stronger signal. See [Errors & Diagnostics: GPU PCIE Issue](/host/common-errors-diagnostics#gpu-pcie-issue).
+
+<a id="bad-bandwidthtest2" />
+## `bad bandwidthtest2`
+
+`bad bandwidthtest2` means a GPU transfer or bandwidth health check failed. Treat it as a machine-health or verification error.
+
+Use the reported GPU index if present, then check PCIe bandwidth, lane configuration, GPU seating, risers, thermals, power, driver/NVML health, Xid errors, Docker GPU runtime behavior, and self-test output.
+
+<a id="gpu-missing-or-unhealthy" />
+## GPU Missing Or Unhealthy
+
+`Unable to determine the device handle for` usually means NVIDIA tooling could not enumerate a GPU that should exist.
+
+Check whether the GPU is visible to the PCIe bus and NVIDIA driver:
+
+```bash
+lspci | grep -i nvidia
+nvidia-smi -L
+sudo journalctl -k -b --no-pager | grep -Ei 'NVRM|Xid|fallen|AER|PCIe'
+```
+
+If a GPU has fallen off the bus, power-cycle the host and fix the hardware path before listing again.
+
+<a id="ecc-and-gpu-memory-errors" />
+## ECC And GPU Memory Errors
+
+`CUDA error: uncorrectable ECC error encountered` means CUDA reported an uncorrectable GPU memory error. This is a hardware-health signal, not a pricing or marketplace issue.
+
+Check ECC and remapping state:
+
+```bash
+nvidia-smi -q -d ECC
+nvidia-smi -q | grep -iE 'Xid|Remapped|Pending'
+sudo journalctl -k -b --no-pager | grep -i xid
+```
+
+If the error repeats, remove the machine from active hosting until the GPU is repaired or replaced.
+
+<a id="cuda-unavailable" />
+## CUDA Unavailable
+
+`CUDA is not available` means the container or self-test image could not use the GPU through CUDA.
+
+Check that `nvidia-smi` works on the host, Docker GPU injection works, the NVIDIA driver supports the CUDA runtime used by the image, and no GPU is missing or unhealthy. Verification requires CUDA-compatible driver/runtime support for CUDA 11.8 or newer.
+
+<a id="nccl-failed" />
+## NCCL Failed
+
+`nccl_failed` or NCCL initialization/synchronization errors mean multi-GPU communication failed after the test started.
+
+First confirm basic GPU visibility and container GPU access. Then check CUDA/NCCL/framework compatibility, PCIe/NVLink/P2P topology, shared memory, overloaded or unhealthy GPUs, and network/IB configuration if present.
+
+On HGX, DGX, or other NVSwitch systems, also check Fabric Manager/NVLSM on the host. The self-test container can show NCCL symptoms, but it cannot prove host service state:
+
+```bash
+systemctl status nvidia-fabricmanager
+journalctl -u nvidia-fabricmanager --since "-24h"
+nvidia-smi -q | grep -i -A 2 Fabric
+nvidia-smi topo -m
+```
+
+See [Self-Test Reference: nccl_failed](/host/self-test-reference#nccl-failed).
+
+<a id="xfs-project-quota-error" />
+## XFS Project Quota Error
+
+`--storage-opt is supported only for overlay over xfs` means Docker storage is not on the expected XFS mount with project quotas.
+
+Vast uses Docker storage quotas for renter containers. Do not bypass the error by removing Docker quota settings. Move or remount `/var/lib/docker` onto the intended XFS filesystem, enable `pquota` or `prjquota` in `/etc/fstab`, verify quota state, then restart Docker and host software.
+
+See [Storage Setup: XFS Project Quotas](/host/storage-setup#xfs-prjquota).
+
+<a id="full-client-storage" />
+## Full Client Storage
+
+Full client storage, `no space left on device`, or missing expected disk space usually means Docker storage is full, mounted on the wrong disk, or still holding images, stopped containers, volumes, or expired rental data.
+
+Check:
+
+```bash
+df -h /var/lib/docker
+sudo docker system df
+findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS
+```
+
+Do not manually delete renter data. For expired or deleted rentals that did not release storage, use [vastai cleanup machine](/host/cli/cleanup-machine).
+
+<a id="machine-not-rentable" />
+## Machine Not Rentable
+
+“Machine not found or not rentable” can mean the machine is offline, unlisted, already rented, missing active offers, below a threshold, showing a red machine error, missing required details, or not visible to the account running the command.
+
+Start in the Machines page for the host account. Confirm the machine is listed, online, not currently rented in a way that hides the expected offer, has active offers, and shows required details such as ports, RAM, upload speed, and download speed. Then confirm the CLI is authenticated to the same host-enabled account.
+
+See [Self-Test Reference: machine not rentable](/host/self-test-reference#machine-not-rentable) and [Not in Search](/host/not-in-search).
+
+<a id="generic-red-machine-error" />
+## Generic Red Machine Error
+
+A red machine error means the host software or platform detected a machine-health, network, storage, driver, container, VM, or policy issue. Fix the specific cause first, then allow the platform to refresh.
+
+If the host looks healthy but the console state remains wrong, collect logs and escalate to Vast support. Do not assume support can manually verify ordinary machines; verification and most eligibility checks are automated.
+
+<a id="admin-set-machine-error" />
+## Admin-Set Machine Error
+
+`<admin-set>` means a Vast administrator manually flagged the machine for investigation. This is not an automatic host self-test result.
+
+Do not try to clear this by resetting machine identity or running internal scripts. Review the visible console message, collect host logs and recent-change details, then follow up with Vast support.
+
+<a id="vm-offer-errors" />
+<a id="vm-and-iommu-errors" />
+## VM Offer Errors
+
+VM-related messages can disable VM GPU-passthrough offers while leaving ordinary container rentals listed. These errors clear after the underlying condition is fixed and the machine reports clean state again, but exact timing can vary.
+
+| Message | Likely cause | Start here |
+| --- | --- | --- |
+| `IOMMU config or Nvidia DRM Modeset has changed to no longer support VMs` | IOMMU or passthrough setup changed, a GPU shares an incompatible IOMMU group, or NVIDIA DRM modeset became enabled. | Check BIOS IOMMU/VT-d/AMD-Vi, GPU isolation, and NVIDIA modeset settings. |
+| `GDM is on; VMs will no longer work.` | GDM is running and holding a GPU, which conflicts with VFIO passthrough. | Disable the display manager for VM-capable headless hosting, then reboot or re-check GPU ownership. |
+| `Error: machine does not support VMs.` | A VM failed because hardware virtualization or IOMMU is not enabled or available. | Enable Intel VT-d or AMD-Vi/IOMMU in BIOS if the hardware supports it. |
+| `Error: Unexpected configuration change; cannot assign GPUs to VMs.` | GPU IOMMU grouping changed since verification. | Review BIOS, kernel, driver, and GPU-slot changes made after listing. |
+| `Error: Machine incompatible with VMs after host change. Please destroy the instance and find a new machine.` | Host configuration changed and the machine no longer meets VM-passthrough prerequisites. | Treat this as VM-specific incompatibility; do not reset machine identity to work around it. |
+| `Error: unable to complete out-of-memory-check` | VM preflight could not confirm enough usable host memory. | Check host RAM pressure, reserved memory, and whether too many workloads are active. |
+| `Secrets fetch failed: machine authentication denied (HTTP 401)` | Machine credentials were rejected while fetching instance secrets. | Collect logs and escalate if it repeats; do not use machine-ID reset workflows. |
+| `Error: GPU error, unable to start instance.` | A GPU error blocked VM startup. Repeated occurrences can disable VM offers. | Check GPU health, driver/NVML state, Xid logs, and VM prerequisites. |
+
+See [VMs & IOMMU](/host/vms).
+
+<a id="rental-attempt-messages" />
+## Rental-Attempt Messages
+
+Some messages are logged against a specific rental attempt and do not change the machine's verification or listing by themselves. They can still explain why a specific rental failed.
+
+| Message | Meaning |
+| --- | --- |
+| `Error: Internal error.` | Unexpected internal error while creating the container. |
+| `Error: container is mounted` | A leftover mount from a previous run blocked the operation. |
+| `Error: Requested volume does not exist: <name>` | The requested storage volume was deleted or never existed. |
+| `docker_build(): <inner error>` | Docker build failed and wrapped the build's own output. |
+| `Waiting for template update` | Transitional state while the image or template updates. This is not a machine fault by itself. |
+| `unknown` | The failed operation did not provide a more specific message. |
+| `Secrets fetch failed: network/subprocess error` | The secrets service could not be reached because of network or local subprocess failure before a response. |
+| `Secrets fetch failed: empty response` | The secrets service returned an empty body. |
+| `Secrets fetch failed: instance not found or access denied (HTTP 404)` | The instance was not found, or access was denied. |
+| `Secrets fetch failed: bad request (HTTP 400)` | The secrets request was malformed. |
+| `Secrets fetch rate limited (HTTP 429)` | The secrets service rate-limited the request. |
+| `Secrets fetch failed: server error (HTTP <code>)` | The secrets service returned a 5xx server error. |
+| `Secrets fetch failed: unexpected HTTP <code>` | The secrets service returned another non-success status. |
+| `Secrets fetch JSON parse error` | The secrets response was not valid JSON. |
+
+If one of these repeats across rentals, collect the exact message, timestamp, instance details, and host logs before asking for help.
+
+<a id="collect-logs" />
+## What To Collect
+
+Before asking for help, collect:
+
+- Exact error string and screenshot.
+- The affected machine record in the console and whether you are using the host account.
+- Timestamp with timezone.
+- Recent changes: reboot, driver, kernel, Docker, BIOS, storage, router, ISP, or GPU swap.
+- `nvidia-smi -L`, Docker GPU container test output, and relevant kernel logs.
+- Host daemon logs and installer logs if this started during install.
+- Self-test support bundle if the error came from self-test.
+
+Review bundles before sharing them. Share sensitive account or machine details only in the appropriate support channel.
+
+## Related Pages
+
+| Topic | Read next |
+| --- | --- |
+| General diagnostics and logs | [Errors & Diagnostics](/host/common-errors-diagnostics) |
+| Self-test failures | [Self-Test Reference](/host/self-test-reference) |
+| Port forwarding | [Network & Ports](/host/network-ports) |
+| Docker storage | [Storage Setup](/host/storage-setup) |
+| Search and visibility | [Not in Search](/host/not-in-search) |

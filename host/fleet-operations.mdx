@@ -1,0 +1,99 @@
+---
+title: "Fleet Operations"
+sidebarTitle: "Fleet Operations"
+description: "Multi-machine host workflows using the CLI and SDK: bulk listing, maintenance, monitoring, and cleanup."
+"canonical": "/host/fleet-operations"
+personas:
+  - headless-operator
+  - business-owner
+---
+
+<div className="persona-chips"><span className="persona-chip">Headless / DC</span><span className="persona-chip">Business</span></div>
+
+Use the CLI or SDK to manage many machines from one workstation.
+
+## Fleet State
+
+Use `--raw` for scripts and `--retry N` for unattended calls:
+
+```bash
+vastai show machines --raw
+```
+
+SDK equivalents live under the [host SDK reference](/host/sdk/show-machines).
+
+## Bulk Listing And Pricing
+
+Apply listing changes to selected machines:
+
+```bash
+vastai list machines <selected-machines> -e 12/31/2026 --retry 6
+```
+
+The same pattern works for on-demand price (`-g`), min bid (`-b`), discount rate (`-r`), min chunk (`-m`), or rolling duration (`--duration "2 weeks"`). See [vastai list machines](/host/cli/list-machines).
+
+<Warning>
+Price changes affect new rental contracts only. Extending the offer end date at the same or lower price can extend existing contracts, increasing your commitment.
+</Warning>
+
+## Maintenance Windows
+
+```bash
+vastai schedule maint <selected-machine> --sdate 1782950400 --duration 2 --maintenance_category power
+vastai show maints --ids <selected-machine>
+vastai cancel maint <selected-machine>
+```
+
+`--sdate` is Unix epoch seconds UTC. Categories are `power`, `internet`, `disk`, `gpu`, `software`, or `other`. See [Maintenance Windows](/host/maintenance-windows).
+
+## Default Jobs
+
+Run your own container when a machine is idle:
+
+```bash
+vastai set defjob <ID> --price_gpu 0.20 --image <your-image> --args <container-args>
+vastai remove defjob <ID>
+```
+
+Make sure background work complies with the [Workload Policy](/host/workload-policy).
+
+## Defragment GPUs
+
+On multi-GPU machines, defragmentation can free larger GPU groups:
+
+```bash
+vastai defrag machines $(vastai show machines -q)
+```
+
+See [vastai defrag machines](/host/cli/defrag-machines).
+
+## Monitor
+
+A simple loop:
+
+1. Pull `vastai show machines --raw`.
+2. Watch for red errors, reliability drops, missing offers, and storage pressure.
+3. Inspect individual machines with [vastai show machine](/host/cli/show-machine).
+4. Rerun self-test on idle machines after fixes.
+5. Collect diagnostics for failures.
+
+For pricing and demand, use [GPU Market Metrics](/host/market-metrics). The `vastai metrics` commands also support `--raw`.
+
+## Cleanup And Decommissioning
+
+Clean stale storage:
+
+```bash
+vastai cleanup machine <selected-machine>
+```
+
+To decommission, unlist first, honor remaining rental end dates, then delete. See [Remove or Recreate](/host/removing-recreating-machines).
+
+## Related Pages
+
+| Topic | Read next |
+| --- | --- |
+| Headless install | [Headless Install](/host/headless-install) |
+| Maintenance | [Maintenance Windows](/host/maintenance-windows) |
+| Pricing | [Pricing Your Listing](/host/pricing-your-listing) |
+| SDK automation | [SDK reference](/host/sdk/show-machines) |
