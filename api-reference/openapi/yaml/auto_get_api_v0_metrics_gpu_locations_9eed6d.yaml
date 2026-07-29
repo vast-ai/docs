@@ -1,0 +1,96 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/metrics/gpu/locations/:
+    get:
+      summary: Get GPU Machine Locations
+      tags:
+      - Machines
+      description: Returns current geographic locations of GPU machines, grouped by coordinates, for use in a geo map dashboard.
+      security:
+      - BearerAuth: []
+      x-scope: machine_read
+      x-rateLimit: 2.0
+      responses:
+        '200':
+          description: 'Success. Returns `{success: true, locations: [{latitude, longitude, city, country_code, gpu_name,
+            rented, verified, datacenter, num_gpus}]}`. Returns `needs_machine: true` with empty locations if host has no
+            active machines.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success
+                  needs_machine:
+                    type: boolean
+                    description: True when caller is a host with no active machines; locations will be empty
+                  locations:
+                    type: array
+                    description: One entry per distinct (lat, lon, gpu_name, rented, verified, datacenter) combination
+                    items:
+                      type: object
+                      properties:
+                        latitude:
+                          type: number
+                          description: Latitude rounded to 4 decimal places
+                        longitude:
+                          type: number
+                          description: Longitude rounded to 4 decimal places
+                        city:
+                          type: string
+                          description: City name, or empty string if unknown
+                        country_code:
+                          type: string
+                          description: ISO country code, or empty string if unknown
+                        gpu_name:
+                          type: string
+                          description: GPU model name, or 'Unknown'
+                        rented:
+                          type: boolean
+                          description: Whether this cluster of GPUs is currently rented
+                        verified:
+                          type: boolean
+                          description: Whether these GPUs are verified
+                        datacenter:
+                          type: boolean
+                          description: True if hosting_type indicates a secure cloud / datacenter host
+                        num_gpus:
+                          type: integer
+                          description: Number of GPUs at this location matching the other attributes
+              example:
+                success: true
+                locations:
+                - latitude: 37.7749
+                  longitude: -122.4194
+                  city: San Francisco
+                  country_code: US
+                  gpu_name: RTX 4090
+                  rented: false
+                  verified: true
+                  datacenter: true
+                  num_gpus: 8
+        '403':
+          description: 'Caller is not a host or admin: "Host or admin access required"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
