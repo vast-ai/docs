@@ -1,0 +1,71 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/team/members/{id}/:
+    delete:
+      summary: Remove Team Member
+      tags:
+      - Team
+      description: Removes a member from the current team and revokes all their team-scoped API keys.
+      security:
+      - BearerAuth: []
+      x-scope: team_write
+      x-rateLimit: 2
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: User ID of the team member to remove; cannot be the team owner or the caller themselves.
+      responses:
+        '200':
+          description: '{"status": "success", "message": "User removed from the team."}'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: '"success" on successful removal'
+                  message:
+                    type: string
+                    description: Human-readable confirmation message
+              example:
+                status: success
+                message: User removed from the team.
+        '400':
+          description: '"Missing team member''s user id"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Not in team context; cannot remove team owner; cannot remove yourself
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: '"User is not a member of this team" or "User was not found on the team"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
