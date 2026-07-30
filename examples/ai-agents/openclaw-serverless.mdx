@@ -1,0 +1,297 @@
+---
+title: OpenClaw AI Assistant with Vast Serverless
+slug: openclaw-ai-assistant-vast-serverless
+createdAt: Mon Apr 07 2026 00:00:00 GMT+0000 (Coordinated Universal Time)
+updatedAt: Mon Apr 07 2026 00:00:00 GMT+0000 (Coordinated Universal Time)
+---
+
+<script type="application/ld+json" dangerouslySetInnerHTML={{
+  __html: JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "Connect OpenClaw to Vast.ai Serverless",
+    "description": "Connect OpenClaw, an open-source AI assistant, to a Vast.ai Serverless endpoint using the OpenAI-compatible API for auto-scaling, self-hosted AI conversations.",
+    "step": [
+      {
+        "@type": "HowToStep",
+        "name": "Install prerequisites",
+        "text": "Install the Vast.ai CLI, Node.js 22+, and OpenClaw locally."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Create a Serverless endpoint",
+        "text": "Create a Serverless endpoint and workergroup on Vast.ai serving Qwen3-8B."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Configure OpenClaw",
+        "text": "Run openclaw onboard to connect to the Vast Serverless OpenAI-compatible API."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Test the connection",
+        "text": "Send a message through OpenClaw and verify a response from Qwen3-8B on Vast Serverless."
+      }
+    ],
+    "author": {
+      "@type": "Organization",
+      "name": "Vast.ai Team"
+    },
+    "datePublished": "2026-04-07",
+    "dateModified": "2026-04-07"
+  })
+}} />
+
+Connect [OpenClaw](https://github.com/openclaw/openclaw) to a [Vast.ai Serverless](https://vast.ai) endpoint for auto-scaling AI conversations powered by [Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B). No instance management required — Vast handles GPU provisioning, scaling, and load balancing automatically.
+
+## Overview
+
+[OpenClaw](https://docs.openclaw.ai/) is an open-source AI assistant that supports multiple model providers through OpenAI-compatible APIs. [Vast Serverless](/documentation/serverless/getting-started-with-serverless) provides an auto-scaling inference layer with an [OpenAI-compatible proxy](/documentation/serverless/openai-compatible-api), so any tool that speaks the OpenAI API can connect directly.
+
+In this guide, you will:
+
+1. Create a Vast Serverless endpoint serving Qwen3-8B
+2. Run OpenClaw's onboarding wizard to connect to the endpoint
+3. Send messages through OpenClaw to the Serverless backend
+
+Compared to the [instance-based approach](/examples/ai-agents/openclaw) where you manage a single GPU, Serverless endpoints scale workers up and down based on demand and require no SSH, port discovery, or manual instance lifecycle management.
+
+## Requirements
+
+- **Vast.ai account** with credits loaded ([quickstart guide](/documentation/get-started/quickstart))
+- **Vast.ai API key** from your [account page](https://cloud.vast.ai/account/)
+- **Node.js 22.12.0 or later** ([nodejs.org](https://nodejs.org/))
+- **HuggingFace account** with a [read-access token](https://huggingface.co/docs/hub/en/security-tokens) (for gated models)
+
+<Warning>
+  Serverless workers bill per-second. Active and loading workers are billed for GPU compute, storage, and bandwidth. Inactive (cold) workers are billed for storage and bandwidth only. To stop all billing, destroy the endpoint — see [Cleanup](#cleanup) and [Serverless pricing](/documentation/serverless/pricing).
+</Warning>
+
+## Step 1: Install the Vast CLI
+
+```bash Bash
+pip install --upgrade vastai
+vastai set api-key <YOUR_API_KEY>
+```
+
+Verify the CLI is working:
+
+```bash Bash
+vastai show user
+```
+
+You should see your account details and credit balance.
+
+## Step 2: Configure HuggingFace Token
+
+Navigate to your [Vast account settings](https://cloud.vast.ai/account/) and add your HuggingFace token as a user environment variable:
+
+- **Key:** `HF_TOKEN`
+- **Value:** Your HuggingFace read-access token
+
+This token is passed to Serverless workers so they can download gated models from HuggingFace.
+
+## Step 3: Create a Serverless Endpoint
+
+Create an endpoint that will receive requests and route them to GPU workers:
+
+```bash Bash
+vastai create endpoint \
+    --endpoint_name "openclaw-qwen3-8b" \
+    --cold_mult 2.0 \
+    --min_load 100 \
+    --target_util 0.9 \
+    --max_workers 5 \
+    --cold_workers 1
+```
+
+```text Text
+create endpoint {'success': True, 'result': 19201}
+```
+
+The `cold_workers` value of 1 keeps one worker ready for fast response times. Increase `max_workers` if you expect concurrent usage.
+
+## Step 4: Create a Workergroup
+
+Attach GPU workers to the endpoint using the [vLLM Serverless template](https://cloud.vast.ai/?ref_id=62897&creator_id=62897&name=vLLM%20(Serverless)):
+
+```bash Bash
+vastai create workergroup \
+    --template_hash 490c0ed717a7da3bc5e2677a80f9c4c2 \
+    --endpoint_name "openclaw-qwen3-8b" \
+    --gpu_ram 24 \
+    --test_workers 1 \
+    --cold_workers 1
+```
+
+<Note>
+  The default vLLM Serverless template serves Qwen/Qwen3-8B. To use a different model, edit the template on the [Templates page](https://cloud.vast.ai/templates/), change the `MODEL_NAME` environment variable, save it, and copy the new template hash for the `--template_hash` flag.
+</Note>
+
+```text Text
+workergroup create {'success': True, 'id': 25087}
+```
+
+The Serverless engine will automatically find available GPUs and provision workers. Monitor progress:
+
+```bash Bash
+vastai show instances
+```
+
+Workers go through `loading` → `running` as they download the model and complete benchmarking. A worker in `running` status may take an additional 1-3 minutes to pass health checks before the endpoint routes traffic to it.
+
+## Step 5: Verify the Endpoint
+
+Once at least one worker reaches `running` status, wait 1-2 minutes for health checks to complete, then verify the endpoint is responding with curl. If you receive a 504 timeout, wait another minute and retry.
+
+```bash Bash
+curl https://openai.vast.ai/<ENDPOINT_NAME>/chat/completions \
+    -H "Authorization: Bearer <YOUR_VAST_API_KEY>" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "model": "Qwen/Qwen3-8B",
+        "messages": [{"role": "user", "content": "Who are you? One sentence."}],
+        "max_tokens": 512,
+        "temperature": 0.7,
+        "chat_template_kwargs": {"enable_thinking": false}
+    }'
+```
+
+Replace `<ENDPOINT_NAME>` with `openclaw-qwen3-8b` (or your chosen endpoint name) and `<YOUR_VAST_API_KEY>` with your API key from the [account page](https://cloud.vast.ai/account/).
+
+You should see a JSON response with Qwen3-8B's reply in the `content` field.
+
+<Note>
+  Qwen3-8B defaults to "thinking mode," which uses tokens for internal reasoning before producing a final answer. The `enable_thinking: false` flag disables this for a straightforward response. Without it, short `max_tokens` values may result in `content: null` because all tokens are consumed by reasoning. See [Troubleshooting](#responses-contain-only-reasoning-no-final-answer) for details.
+</Note>
+
+## Step 6: Install and Configure OpenClaw
+
+If you don't have OpenClaw installed yet, install it and run the onboarding wizard. If you already have OpenClaw running, skip to the [existing installation](#existing-installation) tab.
+
+<Tabs>
+  <Tab title="New installation">
+Install OpenClaw:
+
+```bash Bash
+npm install -g openclaw
+```
+
+<Note>
+  OpenClaw requires Node.js 22.12.0 or later. If you see a version error, update Node.js or use [nvm](https://github.com/nvm-sh/nvm) to install a compatible version.
+</Note>
+
+Set your Vast API key and run the onboarding wizard:
+
+```bash Bash
+export CUSTOM_API_KEY="<YOUR_VAST_API_KEY>"
+
+openclaw onboard --non-interactive \
+    --accept-risk \
+    --mode local \
+    --install-daemon \
+    --auth-choice custom-api-key \
+    --custom-base-url "https://openai.vast.ai/<ENDPOINT_NAME>" \
+    --custom-model-id "Qwen/Qwen3-8B" \
+    --custom-provider-id "vast"
+```
+
+Replace `<ENDPOINT_NAME>` with your endpoint name (e.g., `openclaw-qwen3-8b`).
+
+This configures the Vast Serverless provider, installs the gateway daemon, and sets Qwen3-8B as the default model.
+  </Tab>
+  <Tab title="Existing installation">
+Add the Vast Serverless provider to your existing config. The provider must be set as a single block:
+
+```bash Bash
+openclaw config set 'models.providers.vast' '{"baseUrl":"https://openai.vast.ai/<ENDPOINT_NAME>","apiKey":"<YOUR_VAST_API_KEY>","api":"openai-completions","models":[{"id":"Qwen/Qwen3-8B","name":"Qwen3 8B on Vast Serverless","reasoning":false,"input":["text"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0},"contextWindow":32000,"maxTokens":4096}]}'
+openclaw config set 'agents.defaults.model.primary' 'vast/Qwen/Qwen3-8B'
+```
+
+Replace `<ENDPOINT_NAME>` with your endpoint name and `<YOUR_VAST_API_KEY>` with your API key.
+  </Tab>
+</Tabs>
+
+After setup, increase the context window if you used the onboarding wizard (it defaults to 16,000 tokens, but Qwen3-8B supports 32,000):
+
+```bash Bash
+openclaw config set 'models.providers.vast.models[0].contextWindow' 32000
+```
+
+Verify OpenClaw can see the model:
+
+```bash Bash
+openclaw models list
+```
+
+```text Text
+Model                                      Input      Ctx      Local Auth  Tags
+vast/Qwen/Qwen3-8B                         text       31k      no    yes   default,configured
+```
+
+## Step 7: Test OpenClaw
+
+Send a message through OpenClaw to the Serverless backend:
+
+```bash Bash
+openclaw agent --session-id test \
+    --message "Write a haiku about cloud computing." \
+    --thinking off
+```
+
+```text Text
+Silicon fire burns,
+Cores blaze, data streams surge—
+Lightning in the machine.
+```
+
+The `--thinking off` flag disables Qwen3's reasoning mode, which otherwise prepends reasoning tokens to every response.
+
+You can also open the OpenClaw dashboard to chat through the web UI:
+
+```bash Bash
+openclaw dashboard
+```
+
+This opens [http://127.0.0.1:18789](http://127.0.0.1:18789) in your browser.
+
+You now have an auto-scaling AI assistant. Vast Serverless handles GPU provisioning and scaling, while OpenClaw routes through the OpenAI-compatible proxy with no infrastructure to manage.
+
+## Troubleshooting
+
+### Responses contain only reasoning, no final answer
+
+If responses include `reasoning_content` but `content` is `null`, increase `max_tokens`. Qwen3-8B's thinking mode consumes tokens for its chain of thought before producing the final answer. Set `maxTokens` to at least 4096, or disable thinking with `--thinking off`.
+
+## Cleanup
+
+Find your endpoint ID:
+
+```bash Bash
+vastai show endpoints
+```
+
+**Scale down** to stop GPU compute charges but keep workers available for quick restart (storage and bandwidth still billed):
+
+```bash Bash
+vastai update endpoint <ENDPOINT_ID> --min_load 0
+```
+
+**Delete the endpoint** to destroy all workers and stop all billing:
+
+```bash Bash
+vastai delete endpoint <ENDPOINT_ID>
+```
+
+See [Serverless pricing](/documentation/serverless/pricing) and [Managing Scale](/documentation/serverless/managing-scale) for more options, including scaling to zero total workers.
+
+## Resources
+
+- [OpenClaw Documentation](https://docs.openclaw.ai/)
+- [OpenClaw Getting Started](https://docs.openclaw.ai/start/getting-started)
+- [OpenClaw vLLM Provider Guide](https://docs.openclaw.ai/providers/vllm)
+- [Qwen3-8B Model Card](https://huggingface.co/Qwen/Qwen3-8B)
+- [Vast Serverless Getting Started](/documentation/serverless/getting-started-with-serverless)
+- [Vast OpenAI-Compatible API](/documentation/serverless/openai-compatible-api)
+- [Vast vLLM Serverless Template](/documentation/serverless/vllm)
+- [OpenClaw Instance-Based Guide](/examples/ai-agents/openclaw) (alternative: single GPU with manual instance management)
