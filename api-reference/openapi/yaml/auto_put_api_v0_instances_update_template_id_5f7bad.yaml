@@ -1,0 +1,99 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/instances/update_template/{id}/:
+    put:
+      summary: Update Instance Template
+      tags:
+      - Instances
+      description: Updates the image, environment, or template associated with an existing instance, optionally recycling
+        it immediately.
+      security:
+      - BearerAuth: []
+      x-scope: instance_write
+      x-rateLimit: 2
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Instance contract ID whose template to update.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                template_id:
+                  type: integer
+                  description: Numeric ID of an existing template to apply to the instance.
+                  example: 99
+                template_hash_id:
+                  type: string
+                  description: Hash ID of an existing template to apply; takes precedence over template_id.
+                  example: abc123def456
+                image:
+                  type: string
+                  description: Docker image reference to set on the instance.
+                  example: pytorch/pytorch:2.0.0-cuda11.7-cudnn8-runtime
+                onstart:
+                  type: string
+                  description: Shell script to run when the instance starts.
+                  example: pip install mypackage
+                image_login:
+                  type: string
+                  description: Docker registry login credentials used to pull a private image, in the format '-u <username>
+                    -p <password> <registry>'.
+                  example: -u myuser -p mypass docker.io
+                disk:
+                  type: number
+                  description: Disk allocation in GB; minimum 8 GB.
+                  example: 20
+                recycle:
+                  type: boolean
+                  description: If true, immediately recycle the instance after applying the template update.
+                  example: true
+      responses:
+        '200':
+          description: 'Returns {success: true} on successful update, or the recycle response {success: true/false} if recycle
+            was requested.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: True when update succeeded
+              example:
+                success: true
+        '400':
+          description: 'Returns {success: false, error: "missing_id", msg: "Instance ID is required"} when id is absent.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 'Returns {success: false, error: "not_found", msg: "Instance not found or you don''t have permission
+            to modify it"} when the instance doesn''t exist for the user.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
