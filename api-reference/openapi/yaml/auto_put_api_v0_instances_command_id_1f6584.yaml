@@ -1,0 +1,84 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/instances/command/{id}/:
+    put:
+      summary: Execute Instance Command
+      tags:
+      - Instances
+      description: Runs a whitelisted command on a stopped instance's container and returns a URL where the output can be
+        retrieved.
+      security:
+      - BearerAuth: []
+      x-scope: instance_write
+      x-rateLimit: 1.5
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ID of the instance to execute command on
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                command:
+                  type: string
+                  description: Command to execute on the instance
+                  example: ls -l
+      responses:
+        '200':
+          description: 'Returns {success: true, writeable_path, result_url, msg: "Command is executing, wait a few seconds
+            and then view the result_url"}.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: True when command was queued
+                  writeable_path:
+                    type: string
+                    description: Filesystem path writable by the container
+                  result_url:
+                    type: string
+                    description: URL to poll for command output
+                  msg:
+                    type: string
+                    description: Human-readable status message
+        '400':
+          description: 'Returns {error: "invalid_args"} with messages such as "Missing instance ID", "Invalid instance_id.",
+            "Missing command.", "Invalid command.", "Invalid command given.", "Container not ready", "Execute command only
+            avail on stopped instances. Use ssh to run commands on running instances.", or "VM instances do not support this
+            operation."'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 'Returns {error: "not_found", msg: "Instance not found."} when the instance doesn''t exist for the
+            user.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
