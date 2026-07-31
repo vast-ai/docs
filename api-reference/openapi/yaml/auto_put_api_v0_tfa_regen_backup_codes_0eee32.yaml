@@ -1,0 +1,107 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/tfa/regen-backup-codes/:
+    put:
+      summary: Regenerate 2FA Backup Codes
+      tags:
+      - Accounts
+      description: Regenerates 10 new 2FA backup codes after verifying a 2FA code or backup code, returning the new codes
+        once.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 1.1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tfa_method_id:
+                  type: integer
+                  description: ID of the specific 2FA method to authenticate with; preferred when multiple methods of the
+                    same type exist
+                  example: 3
+                code:
+                  type: string
+                  description: Verification code from the chosen 2FA method
+                  example: '123456'
+                secret:
+                  type: string
+                  description: tfa_secret from the prior send step (required for SMS and email methods)
+                  example: abc123secret
+                tfa_method:
+                  type: string
+                  description: The 2FA method used to authorize regeneration
+                  example: totp
+                  enum:
+                  - sms
+                  - totp
+                  - email
+                backup_code:
+                  type: string
+                  description: Existing backup code that can be used instead of a normal 2FA code to authorize regeneration
+                  example: ABCD-EFGH-1234
+      responses:
+        '200':
+          description: 'Returns {msg: "success", backup_codes: [...]} with the 10 new plaintext backup codes.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  msg:
+                    type: string
+                    description: '"success"'
+                  backup_codes:
+                    type: array
+                    description: List of 10 new plaintext backup codes in XXXX-XXXX-XXXX format
+                    items:
+                      type: string
+              example:
+                msg: success
+                backup_codes:
+                - ABCD-EFGH-IJKL
+                - MNPQ-RSTU-VWXY
+        '400':
+          description: Missing code or backup_code ("missing_auth_value"), invalid tfa_method ("invalid_tfa_method"), or invalid
+            2FA code ("2fa_verification_failed").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Not authenticated or invalid backup code ("invalid_backup_code").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Team user in team context ("team_user_forbidden").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many failed 2FA attempts, method locked ("tfa_locked") or Twilio rate limited ("twilio_rate_limited").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
