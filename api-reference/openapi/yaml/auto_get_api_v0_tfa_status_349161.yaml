@@ -1,0 +1,77 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/tfa/status/:
+    get:
+      summary: Get 2FA Status
+      tags:
+      - Accounts
+      description: Get the current 2FA status for the user, including whether 2FA is enabled, what methods are configured,
+        and how many backup codes they have remaining.
+      security:
+      - BearerAuth: []
+      x-scope: user_read
+      x-rateLimit: 1
+      responses:
+        '200':
+          description: 'Returns {success: true, tfa_enabled, methods: [...], backup_codes_remaining, new_method_authorized}.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success
+                  tfa_enabled:
+                    type: boolean
+                    description: Whether 2FA is currently enabled for the user
+                  methods:
+                    type: array
+                    description: Active 2FA methods; phone numbers are masked to the last 4 digits and secrets are omitted
+                    items:
+                      type: object
+                  backup_codes_remaining:
+                    type: integer
+                    description: Number of unused backup codes remaining
+                  new_method_authorized:
+                    type: boolean
+                    description: Whether the user has completed pre-authorization for adding a new 2FA method
+              example:
+                success: true
+                tfa_enabled: true
+                methods:
+                - id: 3
+                  method: sms
+                  is_primary: true
+                  phone_number: '******5678'
+                backup_codes_remaining: 8
+                new_method_authorized: false
+        '401':
+          description: User is not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Team user attempting 2FA action in team context ("team_user_forbidden").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
