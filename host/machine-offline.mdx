@@ -1,0 +1,119 @@
+---
+title: "Offline Machine - Troubleshooting Steps"
+description: "Steps to identify and resolve connectivity, service, and GPU-related issues when a Vast.ai host machine shows as Offline."
+---
+
+If your host machine appears **Offline**, follow the steps below in order to identify and resolve common connectivity, service, and GPU-related issues.
+
+> **Important:** Do not reboot the machine, stop customer containers, force-stop VMs, or delete instance data while there are active rentals, unless instructed by Vast.ai Support. These actions may interrupt customer workloads.
+
+## 1. Verify Internet Connectivity
+
+Before checking any Vast.ai-specific services, confirm the host machine has a stable, working internet connection with outbound access.
+
+Run the following checks:
+
+```bash
+ip a
+ip route
+ping -c 4 <gateway_ip>   # replace with your default gateway
+ping -c 4 1.1.1.1
+getent hosts vast.ai
+curl -v https://vast.ai
+sudo iptables -L -n
+```
+
+Also review any proxy or VPN client configuration on the host.
+
+If any check fails, times out, or shows DNS, routing, firewall, proxy, ISP, or datacenter network issues, resolve the underlying network problem first (for example, correct DNS configuration, allow outbound HTTPS traffic on port 443, disable a blocking firewall rule, or contact your ISP/datacenter network team).
+
+Only proceed to Step 2 once you have confirmed the host machine has stable internet connectivity.
+
+## 2. Confirm the Vastai Service Is Running
+
+Check the current status:
+
+```bash
+systemctl status vastai
+```
+
+Example output when the service is running normally:
+
+```
+● vastai.service - Vast.ai Host Daemon
+     Loaded: loaded (/etc/systemd/system/vastai.service; enabled; preset: enabl>
+     Active: active (running) since Tue 2026-08-04 07:47:51 +07; 6h ago
+   Main PID: 2966 (launch_kaalia.s)
+      Tasks: 2 (limit: 143635)
+     Memory: 3.5G (peak: 6.5G)
+        CPU: 5min 41.404s
+     CGroup: /system.slice/vastai.service
+             ├─2966 /bin/bash /var/lib/vastai_kaalia/latest/launch_kaalia.sh
+             └─2975 /var/lib/vastai_kaalia/latest/kaalia backend=DKR installpat>
+```
+
+Important: Also verify that all expected GPUs are detected by the operating system:
+
+```bash
+nvidia-smi
+```
+
+If `nvidia-smi` fails, returns no devices, or does not list all expected GPUs, the GPUs are not properly detected by the operating system, and the Vastai service will fail to start as a result.
+
+If the service is not running, or GPUs are not detected correctly, investigate the root cause:
+
+```bash
+sudo systemctl start vastai
+systemctl status vastai
+sudo journalctl -u vastai.service -n 100 --no-pager
+nvidia-smi -q
+dmesg -T | grep -iE 'nvrm|nvidia|xid|pcie|aer'
+journalctl -k -b | grep -iE 'nvrm|nvidia|xid|pcie|aer'
+```
+
+Common root causes include NVIDIA driver errors, GPU power/PCIe issues, BIOS configuration changes, or a recent kernel/OS update.
+
+> **Note:** Do not restart or modify NVIDIA drivers while active customer instances are running unless instructed by Support.
+
+Continue debugging until the service is active and all GPUs are detected. Once Vastai is confirmed running with GPUs correctly detected but the machine is still Offline in the Console, proceed to Step 3.
+
+## 3. Reset the Controller Connection and Restart Vastai
+
+If the Vastai service is running and GPUs are detected correctly, but the machine remains Offline, reset the controller connection state and resend machine information.
+
+```bash
+sudo systemctl stop vastai.service && \
+sudo rm -rf /var/lib/vastai_kaalia/data/last_try_get_controller && \
+sudo rm -rf /var/lib/vastai_kaalia/data/get_controller_delay && \
+sudo rm -rf /var/lib/vastai_kaalia/controller_connection && \
+sudo systemctl restart vastai.service && \
+sudo python3 /var/lib/vastai_kaalia/send_mach_info.py
+```
+
+Wait a few minutes, then check whether the machine returns Online in the Vast.ai Console.
+
+Confirm the service remains active:
+
+```bash
+systemctl status vastai
+```
+
+## 4. Contact Vast.ai Support
+
+If the machine remains Offline after completing the steps above, contact Vast.ai Support and provide the following information:
+
+- The machine ID.
+- The approximate time the machine went Offline, including timezone.
+- Whether the host has active Docker or VM rentals.
+- Whether the issue began after a driver, kernel, network, hardware, or configuration change.
+- The output of the following commands:
+
+```bash
+systemctl status vastai
+nvidia-smi
+sudo journalctl -u vastai.service -n 200 --no-pager
+```
+
+- The full Vastai daemon log file: `/var/lib/vastai_kaalia/kaalia.log`
+
+Please redact any passwords, private keys, API keys, tokens, customer information, or other sensitive data before sharing logs.
