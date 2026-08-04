@@ -1,0 +1,102 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/tfa/update/:
+    put:
+      summary: Update 2FA Method
+      tags:
+      - Accounts
+      description: Updates a 2FA method's label or primary status for the authenticated user.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 1.1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tfa_method_id:
+                  type: integer
+                  description: ID of the 2FA method to update; preferred over tfa_method when multiple methods of the same
+                    type exist
+                  example: 3
+                tfa_method:
+                  type: string
+                  description: Method type to update; used when tfa_method_id is not provided
+                  example: sms
+                  enum:
+                  - sms
+                  - totp
+                label:
+                  type: string
+                  description: User-friendly name for this method (max 30 characters), e.g. 'Work Phone'
+                  example: Work Phone
+                is_primary:
+                  type: boolean
+                  description: Set to true to make this the preferred default method; set to false to unset it
+                  example: true
+      responses:
+        '200':
+          description: 'Returns {success: true, msg: "2FA method updated", method: {...}} with updated method info (phone
+            masked, TOTP secret redacted).'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success
+                  msg:
+                    type: string
+                    description: '"2FA method updated"'
+                  method:
+                    type: object
+                    description: Updated 2FA method record with phone number masked and TOTP secret redacted
+              example:
+                success: true
+                msg: 2FA method updated
+                method:
+                  id: 3
+                  method: sms
+                  label: Work Phone
+                  is_primary: true
+                  phone_number: '******5678'
+                  totp_secret: null
+        '400':
+          description: No update parameters provided ("invalid_params"), email 2FA cannot be updated, label too long (max
+            30 chars), is_primary must be boolean, no changes made, or at least one method must remain primary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: User is not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Team user attempting 2FA action in team context ("team_user_forbidden").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
