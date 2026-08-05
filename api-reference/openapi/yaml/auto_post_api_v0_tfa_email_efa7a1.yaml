@@ -1,0 +1,75 @@
+openapi: 3.1.0
+info:
+  title: Vast.ai API (auto-generated endpoint)
+  description: Auto-generated from vast backend code introspection. Do not hand-edit — change web/ code or scripts/openapi_overrides.json
+    and regenerate.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/tfa/email/:
+    post:
+      summary: Send 2FA Email Code
+      tags:
+      - Accounts
+      description: Sends a 6-digit 2FA verification code to the user's verified email address.
+      security:
+      - BearerAuth: []
+      x-scope: user_write
+      x-rateLimit: 2.0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                secret:
+                  type: string
+                  description: Existing tfa_secret to reuse when refreshing a code during an active login challenge; omit
+                    to generate a new secret
+                  example: abc123secret
+      responses:
+        '200':
+          description: 'Returns {success: true, msg: "2FA code sent to your email address.", secret} where secret is used
+            to verify the code.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Always true on success
+                  msg:
+                    type: string
+                    description: Confirmation message
+                  secret:
+                    type: string
+                    description: TFA secret token to include in the subsequent verification request
+              example:
+                success: true
+                msg: 2FA code sent to your email address.
+                secret: abc123randomtoken
+        '400':
+          description: No email associated with account ("missing_email"), email not verified ("email_not_verified"), or a
+            recent code was already sent ("tfa_challenge_exists").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing 2FA secret or bearer token ("missing_auth_value").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        msg:
+          type: string
