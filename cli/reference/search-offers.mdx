@@ -44,11 +44,11 @@ vastai search offers [--help] [--api-key API_KEY] [--raw] <query>
 </ParamField>
 
 <ParamField path="--new" type="boolean">
-  New search exp
+  Experimental search path — not recommended for production use. Prefer the default search for SLA filtering.
 </ParamField>
 
 <ParamField path="--limit" type="integer">
-  
+  Maximum number of offers to return. Prefer an explicit limit when comparing SLA-inclusive `dph_total` results; combine with `--order` / `-o` as needed.
 </ParamField>
 
 <ParamField path="--storage" type="number" default="5.0">
@@ -77,9 +77,17 @@ bool       = True | False
 
 ## Examples
 
+<Warning>
+**Search quotes SLA pricing only.** `vastai create instance` cannot pass `target_reliability` today — use the web console or REST to enable coverage; see [SLA Coverage](/guides/instances/choosing/sla-coverage#finding-sla-offers).
+</Warning>
+
 ```bash
 # reliable single RTX 3090, no conflicts with stopped instances
 vastai search offers 'reliability > 0.98 num_gpus=1 gpu_name=RTX_3090 rented=False'
+
+# SLA search quote (enable coverage at rent via console/REST — see SLA Coverage)
+# Always set --storage explicitly when comparing dph_total (CLI default 5 GiB ≠ REST 8 GB).
+vastai search offers 'has_sla=true expected_reliability>=0.99 target_reliability=0.95' --storage 50 --order dph_total
 
 # datacenter GPUs with minimum compute capability and TFLOPs
 vastai search offers 'compute_cap > 610 total_flops > 5 datacenter=True'
@@ -88,7 +96,7 @@ vastai search offers 'compute_cap > 610 total_flops > 5 datacenter=True'
 vastai search offers 'reliability>0.99 num_gpus=4 geolocation in [TW,SE]'
 
 # reliable RTX 3090 or 4090 NOT in China or Vietnam
-vastai search offers 'reliability>0.99 gpu_name in ["RTX 4090", "RTX 3090"] geolocation notin [CN,VN]'
+vastai search offers 'reliability>0.99 gpu_name in [RTX_4090, RTX_3090] geolocation notin [CN,VN]'
 
 # nvidia driver 535.86.05 or greater with various constraints
 vastai search offers 'disk_space>146 duration>24 gpu_ram>10 cuda_vers>=12.1 direct_port_count>=2 driver_version >= 535.86.05'
@@ -134,7 +142,7 @@ vastai search offers 'cpu_arch=arm64'
 | `gpu_frac` | float | ratio of GPUs in the offer to GPUs in the system |
 | `gpu_display_active` | bool | True if the GPU has a display attached |
 | `has_avx` | bool | CPU supports AVX instruction set |
-| `id` | int | instance unique ID |
+| `id` | int | Offer/ask ID. Use this value when renting via create-instance (`PUT /api/v0/asks/{id}/`) |
 | `inet_down` | float | internet download speed in Mb/s |
 | `inet_down_cost` | float | internet download bandwidth cost in $/GB |
 | `inet_up` | float | internet upload speed in Mb/s |
@@ -144,7 +152,16 @@ vastai search offers 'cpu_arch=arm64'
 | `num_gpus` | int | number of GPUs |
 | `pci_gen` | float | PCIE generation |
 | `pcie_bw` | float | PCIE bandwidth (CPU to GPU) |
+| `dph_total` | float | total $/hr in search results (compute + storage + SLA charge when applicable) |
 | `reliability` | float | machine reliability score (see FAQ for explanation) |
+| `expected_reliability` | float | host’s advertised SLA reliability claim on the offer |
+| `has_sla` | bool | restrict to offers with SLA enabled (`true`) or without (`false`) |
+| `target_reliability` | float | desired SLA coverage (0–1 exclusive); prices `dph_total` in search only — see [SLA Coverage](/guides/instances/choosing/sla-coverage#finding-sla-offers) to enable at rent |
+
+<Note>
+SLA query keys (`has_sla`, `expected_reliability`, `target_reliability`) are accepted by search. Older CLI builds may print a stderr warning that a field is unrecognized while still applying the filter — prefer a current CLI, or ignore the warning when results look correct.
+</Note>
+
 | `rentable` | bool | is the instance currently rentable |
 | `rented` | bool | allow/disallow duplicates and potential conflicts with existing stopped instances |
 | `storage_cost` | float | storage cost in $/GB/month |

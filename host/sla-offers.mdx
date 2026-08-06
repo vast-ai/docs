@@ -1,0 +1,623 @@
+---
+title: "SLA Offers"
+description: "Offer reliability guarantees on your machines, set claim and confidence, and understand how SLA charges and payouts work."
+"canonical": "/host/sla-offers"
+---
+
+Vast.ai lets hosts attach a **Service Level Agreement (SLA)** to a machine listing. An SLA is a reliability guarantee: clients who choose coverage pay a small hourly **SLA charge** included in **`dph_total`** (dollars per hour total in search — base compute plus SLA charge), and if measured reliability falls short of their chosen target, they receive a settlement credit funded from your earnings.
+
+This page explains how SLA offers work from the host side — what you set, how clients choose coverage, and what happens when uptime is good or bad.
+
+<Note title="For hosts">
+SLA settlement is **asymmetric by design**: when reliability is strong relative to the client's target, you keep the SLA charge; when it falls short, client credits can exceed the charge you collected that day. Charges and credits settle on a daily cadence. Preview economics with the [SLA backtester](/host/sla-backtester) (API, requires rental history) or the web console SLA preview (**Set Pricing → SLA**).
+</Note>
+
+<Note title="This page is for hosts">
+**Clients:** see [SLA Coverage](/guides/instances/choosing/sla-coverage) for how SLA appears in search and billing.
+</Note>
+
+## Choose your path
+
+| Goal | Start here |
+| --- | --- |
+| Preview economics and enable SLA in the console | [How it works](#how-it-works-plain-english) → [Listing an SLA offer](#listing-an-sla-offer). Planned downtime during active rentals still needs [CLI/REST schedule maint](#scheduled-maintenance) — no in-console scheduler. |
+| Enable or update SLA via API | [Before you enable SLA](#before-you-enable-sla) → [API (for automation)](#api-for-automation) |
+| I list with CLI only (no SLA flags yet) | **Set Pricing → SLA** + **LIST** in the console, or REST `PUT /api/v0/machines/create_asks/` — SLA flags are **not** in `vastai list machine` yet |
+| Monitor settlement after listing | [Monitoring SLA after listing](#monitoring-sla-after-listing) |
+
+## SLA host checklist
+
+1. Complete [host setup](https://cloud.vast.ai/host/setup/) and list your machine.
+2. Test on a [separate client account](/host/hosting-overview#testing-your-own-machine) (billed like any rental).
+3. Install the [CLI](/cli/hello-world) (required for SLA maintenance scheduling).
+4. Confirm SLA account access (**Set Pricing → SLA** panel visible; if missing, contact support).
+5. Preview economics (console SLA panel or [backtester](/host/sla-backtester)), then set claim/confidence.
+6. Enable SLA listing and verify in search (`machine_id=` filter).
+7. Read [Scheduled maintenance](#scheduled-maintenance) before your first SLA rental.
+
+## Before you enable SLA
+
+<Warning>
+If you expect downtime during active rentals, install the [Vast CLI](/cli/hello-world) (or plan to use the [REST schedule-maintenance API](/api-reference/machines/schedule-maint)) **before** enabling SLA. Planned SLA maintenance must be scheduled at least 24 hours ahead via CLI or REST — there is no in-console maintenance scheduler today.
+</Warning>
+
+**Pre-flight checklist (before tuning claim/confidence):**
+
+- Hosting requires a separate host account and hosting agreement — see [Account setup](/host/hosting-overview#account-setup-and-hosting-agreement) if you have not completed host onboarding.
+- Confirm SLA is enabled for your account. In the console, open **Set Pricing → SLA** on a machine — if the panel is missing or listing returns `sla_not_approved`, contact [Discord](https://discord.gg/hSuEbSQ4X8) or [contact@vast.ai](mailto:contact@vast.ai) to request access before configuring a fleet. Approval timing varies; complete host setup and a base listing first.
+- Ensure your host daemon is current per the [host setup guide](https://cloud.vast.ai/host/setup/).
+- If listing fails with `sla_not_approved` or `sla_daemon_outdated`, resolve eligibility before changing SLA parameters.
+- **Planned maintenance tooling:** Use [`vastai schedule maint`](/host/cli/schedule-maint) or REST — see [Scheduled maintenance](#scheduled-maintenance).
+
+Complete [host setup](https://cloud.vast.ai/host/setup/) first. A healthy machine appears on **Host → Machines** with no red error status.
+
+Before enabling SLA, finish normal listing setup: test your machine, set GPU price and offer end date, choose on-demand vs interruptible, and understand [Testing your own machine](/host/hosting-overview#testing-your-own-machine) and offer terms in [Hosting overview](/host/hosting-overview).
+
+<Warning>
+On outage days you may still bill clients for **intended** compute **and** owe SLA settlement credits. Tail-risk exposure can approach a full day’s compute per affected contract — not just the daily SLA charge shown in previews. Read [Billing vs settlement](#billing-vs-settlement-important) before enabling SLA.
+</Warning>
+
+<Warning>
+**Rental types:** SLA applies to **on-demand rentals only**. It does not apply to interruptible/bid instances or reserved/prepay rentals. Interruptible instances on an SLA-enabled machine are not SLA-covered; on-demand contracts on the same machine are. Reserved or prepay attempts on an SLA-enabled offer are not supported — use on-demand to rent with SLA.
+</Warning>
+
+- Optional: run the [backtester](/host/sla-backtester) after you have weeks of history; otherwise use the web console SLA preview and the economics walkthrough on this page.
+- **New or low-history machines:** If the backtester returns `has_data: false`, rely on the web console SLA preview. Wait for rental history before trusting `worst_day_loss`. Consider wider confidence or a more conservative claim until you have a few weeks of data.
+
+## How it works (plain English)
+
+<Note title="Console hosts — read this first">
+In **Host → Machines → Set Pricing → SLA** you set host knobs only:
+
+- **Claim** — the reliability level you believe your machine will deliver (shown to clients as `expected_reliability`).
+- **Confidence** — how tightly you price around that claim (`sla_sigma_x`; lower = tighter / cheaper for clients at a given target).
+
+Clients choose their own **reliability target** at search and rent time. You do **not** set the client target on the listing.
+</Note>
+
+Think of an SLA offer as two host ideas plus one client choice:
+
+1. **Your reliability claim** — what you believe your machine will deliver (`sla_r_claim`). Setting this above `0` enables SLA on the offer.
+2. **Your confidence** — how wide your belief is around that claim (`sla_sigma_x`). Tighter confidence → lower SLA charges for clients at a given target; wider confidence → higher charges.
+3. **Client reliability target** — chosen by the renter via search (`target_reliability`). Settlement and SLA charge sizing use this target. Clients typically pick a target **at or below** your claim.
+
+When a client rents an on-demand instance on your SLA-listed offer with a chosen target:
+
+- While a rental **contract** is active, clients pay GPU, storage, bandwidth (usage-based), and a **small hourly SLA charge** — including during downtime. Settlement credits for missed targets are calculated separately at UTC day boundaries. In search results, **`dph_total`** is the quoted hourly rental cost: GPU + storage + SLA charge at the quoted allocation — **not** bandwidth.
+- Each UTC calendar day, Vast measures reliability for the contract and settles the SLA.
+- **Strong reliability relative to the client's target** → you keep the SLA charge for that day.
+- **Shortfalls** → credits flow to the client from your earnings (bounded by that day's covered compute).
+
+Over many strong days, SLA charges can offset occasional credits, but a single bad day can exceed months of collected charges — see [Risk scenarios](#risk-scenarios) and `worst_day_loss` before you commit.
+
+### How reliability is measured
+
+SLA reliability is measured at the **rental contract (instance) level** using platform health signals for active on-demand contracts — not your personal SSH session or Jupyter tab.
+
+- **Instance fails to start** when a client rents → counts against SLA reliability for that contract.
+- **Machine-level outage** while contracts are active → affects settlement for those contracts.
+- **Brief host reboots** during active rentals may count as downtime. Vast does not publish a fixed second-level threshold in host docs — treat unplanned reboots as SLA risk. For planned work, use [Scheduled maintenance](#scheduled-maintenance) with at least 24 hours' notice when possible.
+- **Scheduled maintenance** may receive credit case by case — see [Scheduled maintenance](#scheduled-maintenance).
+
+On sliced machines, SLA settles **per rental contract**. If one GPU slice fails but others remain healthy, only contracts on the affected slice are measured for downtime.
+
+### Billing vs settlement (important)
+
+For SLA-covered on-demand contracts, compute billing uses the **intended daily compute** for the rental. Offline time is tracked as an outage in reliability observations. Client compensation for poor reliability flows through **SLA settlement credits**, not by silently zeroing the day's compute bill.
+
+## SLA parameters
+
+When you list or update a machine, set SLA fields via the host console or `PUT /api/v0/machines/create_asks/` (see [Listing an SLA offer](#listing-an-sla-offer) below).
+
+| Parameter | API field | Backtester alias | What it means |
+| --- | --- | --- | --- |
+| Reliability claim | `sla_r_claim` | `r` (backtester sets claim = target = `r`) | Your advertised belief about machine reliability. Set above `0` to enable SLA. Values are greater than 0 and at most **0.9999** (for example, `0.99` = 99%). Exactly `1.0` is rejected. Set to `0` to disable SLA on new rentals. |
+| Confidence spread | `sla_sigma_x` | `p` (different scale — see [backtester](/host/sla-backtester#confidence-values-p)) | How wide your belief is around the claim. Lower = more confident (lower SLA charges for clients at a given target). Defaults to `0.5` if omitted. |
+
+### Advanced: `sla_max_beta` (optional)
+
+**Support-only — omit unless Vast support directs you.** Hosts do **not** set β (timescale mix). The platform derives β from the client's `target_reliability` at rent time.
+
+`sla_max_beta` is an optional ask term that caps how aggressively long-running contracts may weigh recent uptime versus longer history in settlement. Leave it unset for an uncapped offer. If you set it, it must be in `(0, 1)` and at least the default β derived at your claim — otherwise listing is rejected.
+
+<Warning>
+**`sla_r_target` is not host-settable.** If you send `sla_r_target` or legacy `sla_reliability` on `create_asks/`, they are **ignored**. Clients supply their coverage target at search/rent time (`target_reliability`). Do **not** copy numeric `p` values from the SLA Backtester into `sla_sigma_x` — they use different scales. Use the mapping table on the [backtester page](/host/sla-backtester#confidence-values-p).
+</Warning>
+
+<Note title="Terminology">
+| Concept | Console | Listing API | Backtester | Client sees / sets |
+| --- | --- | --- | --- | --- |
+| Reliability claim | Claim | `sla_r_claim` | `r` (claim = target in sim) | `expected_reliability` |
+| Confidence | Confidence / spread | `sla_sigma_x` | `p` (different scale) | — |
+| Reliability target | — (client-chosen) | — (not on asks) | `r` (same as claim in sim) | `target_reliability` in search |
+| All-in hourly price | — | — | — | `dph_total` (compute plus SLA charge when enabled) |
+
+**Confidence is not an uptime target.** It controls how aggressively SLA charges are priced around your claim.
+</Note>
+
+### Machine reliability score vs SLA reliability
+
+The **reliability score** on the Host Machines page reflects connection and instance-start behavior over recent activity. **SLA settlement** measures whether covered instances met the client's published uptime target for billing purposes.
+
+Do not assume the dashboard score equals SLA reliability. Before choosing `sla_r_claim`:
+
+1. Open **Host → Machines** → **Set Pricing → SLA** and review the console SLA charge preview at candidate claims.
+2. If you have rental history, run the [backtester](/host/sla-backtester) and check top-level `reliability` in the response.
+3. Set **claim** at a level you can sustain; clients who pick targets below your claim see lower SLA charges.
+
+### Confidence values
+
+**This only changes how SLA charges are priced — it does not change how reliability is measured or what credit you owe when a client's target is missed.** Prefer the console controls. Set raw `sla_sigma_x` via the API when automating.
+
+| Console label | API `sla_sigma_x` | Backtester `p` | Pricing effect |
+| --- | --- | --- | --- |
+| Tight | `0.2` | ~0.83 | Lowest client SLA charges at a given target |
+| Normal (default) | `0.5` | ~0.6667 | Balanced |
+| Wide | `1.0` | ~0.50 | Highest client SLA charges at a given target |
+
+**Never copy backtester `p` into `sla_sigma_x` — the scales are inverted.** See the full mapping on the [backtester page](/host/sla-backtester#confidence-values-p).
+
+**Tighter confidence** (tighter spread; console label **Tight**) → lower client SLA charges (more competitive `dph_total`). **Wider confidence** (console label **Wide**) → higher client SLA charges. Confidence does **not** change the credit formula when a target is missed — use `worst_day_loss` and stress-test with the backtester `reliability=` override for tail-risk planning.
+
+### Validation rules
+
+Offers with invalid combinations are rejected at listing time:
+
+- `sla_r_claim` must be `0` (disable) or greater than 0 and at most **0.9999**. Exactly `1.0` is rejected.
+- When claim is positive, `sla_sigma_x` must be positive and at most `3.0` (defaults to `0.5` if omitted).
+- Optional `sla_max_beta` must be in `(0, 1)` and at least the default β derived at your claim. Hosts do not set β; this field only caps the client-derived β the offer accepts. Omit for uncapped.
+
+<Note>
+If listing is rejected with `error: "invalid_sla_params"`, check the `msg` field against the rules above. Other SLA listing errors include `sla_not_approved` and `sla_daemon_outdated`.
+</Note>
+
+### SLA and GPU slicing
+
+SLA settlement applies per rental contract. If your machine has multiple GPU slices rented by different clients (GPU slicing — see **Min GPU** in [Hosting Overview](/host/hosting-overview)), each contract's SLA is settled independently based on the reliability experienced by that instance.
+
+The backtester replays **machine-level** daily earnings (total compute across all active rentals on that machine). `worst_day_loss` in `summary` reflects the worst simulated day for the whole machine in the replay window — not a single GPU slice in isolation.
+
+On sliced machines, a full-machine outage can affect every concurrent SLA rental at once. Use `worst_day_loss` as your primary tail-risk metric for the machine, and sanity-check exposure against how many SLA-covered instances you typically run in parallel. Do **not** multiply `worst_day_loss` by contract count — the backtester already models machine-level compute for the replay window.
+
+### SLA on extended contracts
+
+When a rental contract is extended (by moving the offer end date forward at the same or lower price), the original SLA parameters remain in effect for the extended period. Changing SLA parameters on the offer does not alter SLA terms on existing contracts — only new rental contracts pick up updated SLA settings.
+
+Disabling SLA on the offer (setting `sla_r_claim` to `0`) prevents new SLA-covered contracts but does not terminate SLA on existing active contracts — they continue under their original SLA terms until their rental end date.
+
+## Listing an SLA offer
+
+### Web console
+
+1. Open your machine on the [Host Machines page](https://cloud.vast.ai/host/machines) → **Set Pricing**.
+2. Set base listing fields first (GPU price, offer end date, rental types) if this is a new listing.
+3. Expand **SLA**.
+4. Set **Claim** and **Confidence**. For your first listing, choose **Normal** (`sla_sigma_x ≈ 0.5`) unless your uptime history is volatile — see [Confidence values](#confidence-values) for risk tradeoffs.
+5. Save and confirm the SLA charge preview before listing.
+6. After saving pricing, click **LIST** on the Host Machines page (or confirm the machine status changes to **listed**). Saving pricing alone stores your offer settings; listing publishes the offer to search.
+
+#### Updating SLA on an already-listed machine
+
+If the machine is already **listed**:
+
+1. Open **Host → Machines → Set Pricing → SLA**, set Claim and Confidence, then click **Save**.
+2. **Save** applies SLA to the live offer — you do not need to click **LIST** again unless this is a brand-new listing that was never published.
+3. Verify after listing:
+   - **Console:** confirm the machine status is **Listed**, reopen **Set Pricing → SLA** to review the preview, or check offer details under **Host → Machines**.
+   - **Search:** `dph_total` includes the SLA charge at a client's `target_reliability`, and `expected_reliability` matches your claim (see [Search / client-visible fields](#search--client-visible-fields)).
+
+<Note title="Console vs API">
+In the web console, **Set Pricing → Save** stores SLA settings; clicking **LIST** publishes the offer to search. `PUT /api/v0/machines/create_asks/` performs both steps in one request — it creates or updates the **live listing** (same as pressing **LIST** or running `vastai list machine`), not a save-only draft.
+</Note>
+
+#### Web console SLA preview
+
+In the host console, open **Host Machines** → select your machine → **Set Pricing** → **SLA**. The preview shows estimated SLA charge and payout exposure for the parameters you enter. It is a forward-looking quote, not a historical replay — use the [SLA Backtester](/host/sla-backtester) for history-based simulation.
+
+### API (for automation)
+
+New hosts: use the web console steps above first. Use the API when you need scripting, partial updates, or fleet automation.
+
+<Note>
+SLA listing via CLI/SDK is not available yet — use the REST API below (or console **Set Pricing → SLA**). See also [List Machine](/api-reference/machines/list-machine) for the same `create_asks` body.
+</Note>
+
+#### Before you start
+
+1. Open **Account → API Keys** and create a key. See [Create API Key](/api-reference/accounts/create-api-key).
+2. For listing SLA offers, enable **`machine_write`**. For backtesting first, add **`machine_read`**. For post-listing earnings, add **`billing_read`**.
+3. Use the key as `Authorization: Bearer YOUR_API_KEY` in the `curl` examples below. See [Authentication](/api-reference/authentication).
+4. To enable SLA today, use `PUT /api/v0/machines/create_asks/` or **Set Pricing → SLA** in the console. The listing body field is `machine` (same ID as backtester `machine_id` and earnings `machid`).
+5. For the full request/response schema, see [List Machine](/api-reference/machines/list-machine).
+
+<Note>
+The example below **adds SLA to an offer that already has base pricing configured**. For a first-time listing, include all required base fields (`price_gpu`, `end_date`, `min_chunk`, storage/bandwidth prices as needed) — see [Hosting overview](/host/hosting-overview#offers-and-rental-contracts).
+</Note>
+
+```bash
+curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "machine": 12345,
+    "price_gpu": 3.50,
+    "sla_r_claim": 0.99,
+    "sla_sigma_x": 0.5,
+    "end_date": 1893456000
+  }'
+```
+
+Replace `end_date` with a **future** Unix timestamp — past dates expire the offer immediately (example `1893456000` = 2030-01-01 00:00 UTC). Set `end_date` so the offer does not stay open indefinitely — especially important for SLA commitments. See [Offer End Date](/host/hosting-overview#offer-end-date). Convert a calendar date to Unix seconds: `date -u -d '2030-01-01' +%s` (Linux) or `date -u -j -f '%Y-%m-%d' '2030-01-01' +%s` (macOS). The CLI also accepts `MM/DD/YYYY` via `-e`.
+
+<Warning>Open-ended offers (no `end_date`) combined with SLA expose you to indefinite asymmetric payout risk. See [Offer End Date](/host/hosting-overview#offer-end-date).</Warning>
+
+<Warning>
+Do not use the JSON below alone for a **first** listing. First-time `create_asks` requests must also include `min_chunk` and typical disk/bandwidth pricing — see [Hosting overview](/host/hosting-overview#offers-and-rental-contracts). Use this as an **SLA-fields** reference when base pricing is already configured.
+</Warning>
+
+SLA fields example (existing listing):
+
+```json
+{
+  "machine": 12345,
+  "price_gpu": 3.50,
+  "end_date": 1893456000,
+  "sla_r_claim": 0.99,
+  "sla_sigma_x": 0.5
+}
+```
+
+This creates an offer with claim `0.99` and confidence spread `0.5`. Clients who search with `target_reliability` below your claim see lower SLA charges than clients who ask for coverage near your claim.
+
+<Note>
+Partial updates are supported when editing an existing listing. If you change only one SLA field, the platform re-validates the merged parameters. Set `sla_r_claim` to `0` to disable SLA on an existing listing.
+
+Omitted non-SLA fields retain their current listing values; only fields present in the request body are updated. Read current listing fields from `vastai show machines --raw`:
+
+```bash
+vastai show machines --raw | jq '.machines[] | select(.id == 12345 or .id == "12345") | {id, sla_r_claim, sla_sigma_x, price_gpu, end_date}'
+```
+
+Machine `id` may be a string in raw JSON. The response is wrapped in a `machines` array.
+
+Then `PUT /api/v0/machines/create_asks/` with merged fields.
+</Note>
+
+### Fleet listing workflow (advanced — fleet operators only)
+
+`PUT /api/v0/machines/create_asks/` publishes a live listing (same as **LIST**). Only run this loop on machines you intend to list or update. Validate `price_gpu`, `end_date`, and `min_chunk` before each PUT. Prefer reading existing SLA fields from each machine rather than hardcoding claim/confidence. Skip incomplete machines.
+
+**Before fleet SLA rollout:**
+
+1. Update host daemons fleet-wide per the [host setup guide](https://cloud.vast.ai/host/setup/).
+2. On **Host → Machines**, confirm each machine is healthy (no red error status) and retry **LIST** / `create_asks` after the daemon reconnects.
+3. If listing still returns `sla_daemon_outdated` after an update, contact support with the machine ID — there is no documented `show machines` daemon-version field for a preflight `jq` filter today.
+
+For multiple machines, loop sequentially — do not parallelize without backoff:
+
+1. Skip machines missing base pricing fields.
+2. `PUT /api/v0/machines/create_asks/` with `machine` plus SLA fields (preserve existing claim/confidence when set).
+3. On `429`, sleep and retry with exponential backoff.
+4. On `invalid_sla_params`, `sla_not_approved`, `sla_daemon_outdated`, or `machine_locked`, log the machine ID and continue or abort per your rollout policy.
+
+See [Fleet workflow](/host/sla-backtester#fleet-workflow) in the backtester for a similar sequential pattern.
+
+```bash
+export VAST_API_KEY="YOUR_API_KEY"
+# Set DRY_RUN=0 to apply; default prints payloads only
+DRY_RUN="${DRY_RUN:-1}"
+machines=$(vastai show machines --raw)
+for id in $(vastai show machines -q); do
+  machine=$(echo "$machines" | jq -c --arg id "$id" \
+    '.machines[] | select((.id|tostring) == $id)')
+  price=$(echo "$machine" | jq -r '.price_gpu // empty')
+  end=$(echo "$machine" | jq -r '.end_date // empty')
+  chunk=$(echo "$machine" | jq -r '.min_chunk // empty')
+  if [ -z "$price" ] || [ -z "$end" ] || [ -z "$chunk" ]; then
+    echo "skip $id: missing price_gpu/end_date/min_chunk"; continue
+  fi
+  # Opt-in only: skip machines with no positive SLA claim (do not invent 0.99)
+  if ! echo "$machine" | jq -e '(.sla_r_claim // 0) > 0' >/dev/null; then
+    echo "skip $id: no positive sla_r_claim (enable SLA per machine first)"; continue
+  fi
+  body=$(echo "$machine" | jq -c \
+    '{machine: (.id|tonumber), price_gpu, end_date, min_chunk,
+      sla_r_claim, sla_sigma_x: (.sla_sigma_x // 0.5)}')
+  if [ "$DRY_RUN" != "0" ]; then
+    echo "dry-run machine_id=$id payload: $body"; continue
+  fi
+  resp=$(curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
+    -H "Authorization: Bearer $VAST_API_KEY" \
+    -H "Content-Type: application/json" \
+    -d "$body")
+  echo "machine_id=$id response: $resp"
+  sleep 2
+done
+```
+
+Fetch the fleet once before the loop — do not call `show machines --raw` inside the loop. On fleets of 20+ machines, expect several minutes; back off on HTTP 429. Configure claim/confidence per machine (console or single-machine `create_asks`) before running with `DRY_RUN=0` — the loop only updates machines that already have a positive `sla_r_claim`.
+
+**SLA-only update** — include `machine` plus SLA fields; omit unrelated offer fields you intend to keep:
+
+```bash
+curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"machine": 12345, "sla_r_claim": 0.995, "sla_sigma_x": 0.2}'
+```
+
+**Disable SLA on new rentals** — set `sla_r_claim` to `0` (active contracts keep their terms).
+
+#### Common errors
+
+| Status | Code / shape | When it happens |
+| --- | --- | --- |
+| 401 | `success: false` + `msg` (+ optional `error`) | Missing `machine_write` or other required permission |
+| 403 | `machine_locked` | Machine is decommissioned or migration-locked |
+| 400 | `invalid_args` | Machine ID not found for your account (includes other hosts' machines) |
+| 400 | `invalid_sla_params` | SLA parameters failed validation |
+| 400 | `sla_not_approved` | Host account is not approved to create SLA asks |
+| 400 | `sla_daemon_outdated` | Machine daemon build is too old for SLA listing |
+| 400 | `invalid_args` | Malformed or incompatible request body |
+
+**`machine_locked`:** Returned when a machine is decommissioned or migration-locked. If you are migrating hardware, finish or cancel active rentals first, remove or update the listing as needed, and contact support if the machine remains locked. Existing SLA terms on active contracts remain in force until those contracts end.
+
+**Success response (200):**
+
+```json
+{
+  "success": true,
+  "you_sent": { "...": "echo of your request body" },
+  "results": [
+    {
+      "machine_id": 12345,
+      "user_id": 67890,
+      "extended": 1,
+      "new_contracts": [],
+      "upd_contracts": [1]
+    }
+  ]
+}
+```
+
+- `extended` — integer count of rental contracts extended (read from `results[0]`, not the top level)
+- `new_contracts` / `upd_contracts` — arrays of contract IDs
+
+## Economics walkthrough
+
+**Setup:** You list an H100 at **$3.50/hr** GPU price with claim **99%** and normal confidence (`sla_sigma_x = 0.5`). A client searches with **target 95%**.
+
+| Item | Amount |
+| --- | --- |
+| Daily compute (`C`) | ~$84/day ($3.50 × 24 hr GPU only — simplified) |
+| SLA charge (client pays) | ~**$0.008/hr** (~$0.20/day at 24 hr) |
+
+SLA credits are capped relative to that UTC day's covered compute — GPU, storage, and bandwidth combined — not GPU compute alone. The simplified example below uses GPU-only math for readability; treat `worst_day_loss` from the [SLA backtester](/host/sla-backtester) as the authoritative tail-risk figure before you list.
+
+SLA charge sizing uses internal SLA math. Use the [SLA backtester](/host/sla-backtester) to preview worst single-day credit exposure (`worst_day_loss`), not exact client SLA charges. For authoritative client-visible charges, use **Set Pricing → SLA** in the console or **`dph_total`** in search offers at a chosen `target_reliability` — not backtester `total_sla` when clients will rent below your claim.
+
+<Note>
+The backtester sets claim equal to target (`r`), which is a **conservative** what-if (as if every client targeted your claim). Live clients who choose targets **below** your claim usually see lower SLA charges than the backtester's simulated charges. Use `worst_day_loss` from the backtester as your worst single-day credit reference, then verify visible charges in **Set Pricing → SLA** (or `dph_total` in search) before listing.
+</Note>
+
+### Search / client-visible fields
+
+When SLA is enabled on an offer, clients see:
+
+- **`dph_total`** — total $/hour including the SLA charge at their `target_reliability` (authoritative for client-visible all-in pricing).
+- **`expected_reliability`** — your advertised claim (maps to `sla_r_claim`).
+- **`reliability` / `reliability2`** — historical machine reliability scores, **not** your SLA claim.
+
+**Filter vs response field:** In search queries, the `reliability` filter uses the machine's historical reliability score — not the SLA claim. The published SLA claim appears in responses as `expected_reliability`. To select SLA-listed offers programmatically, use `has_sla=true` or filter on `expected_reliability > 0`; do not use the `reliability` filter as an SLA selector.
+
+Verify after listing — filter the offer you care about; sliced machines often return multiple rows (different `num_gpus`, bid vs on-demand):
+
+```bash
+vastai search offers 'machine_id=12345 verified=any has_sla=true target_reliability=0.95' --raw \
+  | jq '[.offers[] | select(.is_bid == false) | {id, num_gpus, dph_total, expected_reliability, reliability}]'
+```
+
+### If reliability is strong relative to the client's target
+
+In the **You net** column, values follow host earnings sign conventions: positive means SLA charge you kept; negative means credit you owed the client.
+
+| Measured reliability (simplified) | You net (per day) |
+| --- | --- |
+| ~100% (excellent day) | +$0.20 (keep SLA charge) |
+| ~99% (good day) | +$0.17 (keep most of the SLA charge) |
+
+You keep most or all of the SLA charge.
+
+### What if measured reliability is between the client's target and my claim?
+
+Example: you publish **claim 99%**, the client chose **target 95%**, and measured reliability is **~97%**.
+
+- **Credits** are evaluated against the client's **target** (95%), not your claim.
+- Because 97% is above 95%, you typically **owe no SLA credit** for that day.
+- **SLA charges** are priced from your **claim**, confidence, and the client's target — a higher claim relative to the target generally means lower client charges.
+
+**Claim** is your belief/pricing knob; the client's **target** is what drives payout eligibility.
+
+### If the client's target is missed
+
+<Warning>
+Credits scale relative to the day's compute, not only the SLA charge collected. A single bad day near the client's target boundary can cost as much as 200+ days of collected SLA charges. Review the economics below and run the [backtester](/host/sla-backtester) before enabling SLA.
+</Warning>
+
+These scenarios show settlement when reliability **drops to or below** a 95% client target — they are boundary illustrations, not typical strong days:
+
+| Measured reliability (simplified) | You net (per day) |
+| --- | --- |
+| At target (~95%) | −$42 (credit you owe) |
+| Well below target (~90% or less) | −$84 (large credit owed) |
+
+To put the asymmetry in perspective: at ~$0.20/day in SLA charges, it takes roughly 210 strong days to accumulate the $42 you could lose on a single day at the target boundary. The SLA charge is a small fraction of daily compute, while credits scale against total daily compute.
+
+Your maximum SLA loss on any single settlement day is bounded by that day's covered compute (GPU, storage, and bandwidth).
+
+## Risk scenarios
+
+### You claim 99% and deliver 99.5%
+
+You outperform your claim. Clients who chose targets at or below 99% pay small SLA charges; credits are rare. You net positive on SLA over time.
+
+### You claim 99% but have an offline day
+
+Clients receive credits tied to how far measured reliability falls below **their** target. Extended outages can approach a full-day compute credit. Your reliability score and verification status may also be affected separately from SLA settlement.
+
+### Clients target near your claim
+
+SLA charges are **much higher** when the client's target sits near your claim (little headroom). Prefer a claim you can sustain above the targets clients actually choose.
+
+### You widen confidence (`sla_sigma_x` → 1.0)
+
+Clients pay more because you admit greater uncertainty. Use this if your reliability history is volatile or the machine is new.
+
+### Scheduled maintenance
+
+**Planned SLA maintenance (may earn credit):** Schedule at least 24 hours in advance with [`vastai schedule maint`](/host/cli/schedule-maint) (or the [REST schedule-maintenance API](/api-reference/machines/schedule-maint)). Include `--sdate` and `--duration`. Advance notice (not the category value) is what makes maintenance “planned” for SLA credit review. Valid `--maintenance_category` values: `power`, `internet`, `disk`, `gpu`, `software`, `other`. Credit eligibility is evaluated on a case-by-case basis.
+
+**CLI `--sdate` uses Unix epoch seconds (UTC)**; the REST body uses ISO 8601 UTC. **CLI `--duration` is in hours.** Schedule maintenance **sequentially** across a fleet. On HTTP 429, wait and retry with backoff (for example, `sleep 2` between machines). See [Rate Limits and Errors](/api-reference/rate-limits-and-errors).
+
+```bash
+# Planned window: 2026-08-01 02:00:00 UTC (≥24 hours ahead when you run this)
+# Prefer computing the epoch so the comment and value stay in sync:
+vastai schedule maint MACHINE_ID \
+  --sdate "$(date -u -d '2026-08-01 02:00:00' +%s)" \
+  --duration 2 \
+  --maintenance_category software
+```
+
+REST equivalent: `PUT /api/v0/machines/{machine_id}/dnotify` with `"sdate": "2026-08-01T02:00:00Z"` (optional `"maintenance_reason": "OS kernel upgrade"`) — see [Schedule Maintenance](/api-reference/machines/schedule-maint).
+
+**Cancel or reschedule:** To cancel a window, use [`vastai cancel maint`](/host/cli/cancel-maint) (requires `machine_write`) or the [REST cancel-maintenance API](/api-reference/machines/cancel-maint). To reschedule, cancel the existing window, then run `schedule maint` with a new `--sdate` (still ≥24 hours ahead for planned SLA maintenance).
+
+**Emergency or unplanned downtime:** Notify clients if possible using `schedule maint`, but expect **full SLA settlement exposure**. Advance-notice credits do not apply to unplanned outages.
+
+See [CLI install](/cli/hello-world) if you have not set up the CLI.
+
+<Warning>
+Planned maintenance credit is not guaranteed. The platform evaluates advance notice (generally at least 24 hours recommended) and maintenance duration when determining credit eligibility. **Treat any scheduled downtime as a potential SLA credit event when modeling risk.** Contact support via [Discord](https://discord.gg/hSuEbSQ4X8) or email [contact@vast.ai](mailto:contact@vast.ai) before extended maintenance on an SLA-listed machine to confirm credit eligibility.
+</Warning>
+
+## Preview earnings before listing
+
+Use the [SLA Earnings Backtester](/host/sla-backtester) (API-only; requires a `machine_read` API key) to replay historical earnings through SLA math. Console-only hosts can use the web console SLA preview and the economics walkthrough on this page instead.
+
+## When things go wrong
+
+- **Listing rejected (`invalid_sla_params`)** — Re-check claim and `sla_sigma_x` against [validation rules](#validation-rules).
+- **`sla_not_approved`** — Contact support; you can keep a non-SLA listing while approval is pending.
+- **`sla_daemon_outdated`** — Update the host daemon from the [host setup guide](https://cloud.vast.ai/host/setup/), confirm the machine reconnects on **Host → Machines**, then retry LIST / `create_asks`. If the error persists, contact support with the machine ID.
+- **Unexpected credit** — Review reliability; re-run the backtester with a low `reliability` stress value (for example `0.01`).
+- **Severe outage** — Disable SLA on new contracts: open **Host → Machines** → **Set Pricing → SLA**, set claim to `0` (or use API `sla_r_claim=0`); contact [Discord](https://discord.gg/hSuEbSQ4X8) before relisting.
+
+## Monitoring SLA after listing
+
+After you enable SLA, charges and credits settle on UTC (Coordinated Universal Time) day boundaries. SLA earnings rows typically appear in **Host → Billing** within a few hours after UTC midnight (exact timing can vary).
+
+### Console (recommended for day-to-day checks)
+
+1. Go to **Host → Billing** (or **Earnings** / **Reports**).
+2. Set the date range to include the UTC day you want to review.
+3. Filter by machine ID if available.
+4. Look for **SLA** entries in the earnings breakdown — positive amounts are SLA charges you kept; negative amounts are credits you owed the client.
+5. After downtime, compare the affected UTC day(s) to your `worst_day_loss` backtest estimate.
+
+**If you don't see SLA rows:** widen the date range (settlement uses UTC day boundaries), confirm the machine had an active on-demand rental that day, and confirm SLA was enabled and the offer was **listed** (not just saved).
+
+<Note>
+SLA daily settlement (SLA charge kept / credit owed) does not currently emit host webhooks. Monitor via console billing or poll `machine-earnings`; settlements align to UTC calendar days.
+</Note>
+
+### CLI
+
+**Linux (GNU date):**
+
+```bash
+vastai show earnings --machine_id <id> --start_date $(date -u -d '7 days ago' +%F) --end_date $(date -u +%F)
+```
+
+**macOS:**
+
+```bash
+vastai show earnings --machine_id <id> --start_date $(date -u -v-7d +%F) --end_date $(date -u +%F)
+```
+
+On Windows, use WSL or the API example below. See [`show earnings`](/cli/reference/show-earnings) for all options.
+
+**Linux (GNU date) — one UTC day (compare to `worst_day_loss`):**
+
+```bash
+vastai show earnings --machine_id <id> --start_date $(date -u -d 'yesterday' +%F) --end_date $(date -u -d 'yesterday' +%F) --raw \
+  | jq '.per_machine[] | select(.machine_id == <id> or .machine_id == "<id>") | {machine_id, sla_earn}'
+```
+
+Positive `sla_earn` = net SLA charge you kept that period; negative = net credit you owe. Weekly aggregates are window totals, not daily series — use a one-day range above for day-level checks.
+
+### API (automation)
+
+<Note>
+**Console users:** Skip this section if you check payouts in **Host → Billing**. No API key is required.
+</Note>
+
+**API keys for SLA**
+
+| Task | Permission |
+| --- | --- |
+| SLA backtester | `machine_read` |
+| List or update SLA on an offer | `machine_write` |
+| Post-listing SLA earnings | `billing_read` |
+
+`GET /api/v0/users/{user_id}/machine-earnings/` returns SLA fields alongside compute earnings. Requires a **`billing_read`** API key. See [`show earnings`](/api-reference/billing/show-earnings).
+
+This endpoint is rate-limited — see [Rate Limits and Errors](/api-reference/rate-limits-and-errors). Poll at most about once every two seconds per IP; back off on HTTP 429.
+
+<Warning>
+When you pass `machid`, use `per_machine[].sla_earn` for that machine's SLA settlement in the window. Do **not** read `per_day[].sla_earn` for single-machine checks — `per_day[]` is always fleet-wide, even with `?machid=`.
+
+**Quick rules:**
+- **One machine, one UTC day:** use `last_days=1` with `machid` set, or `sday`/`eday` as UTC day indices (`day = floor(unix_epoch_seconds / 86400)`). Example: for `2026-07-24` UTC, `sday=eday=20658`. Prefer `last_days` when you do not need an absolute window.
+- **Fleet snapshot:** one request without `machid` returns all machines in `per_machine[]` for the window:
+
+```bash
+curl -s -H "Authorization: Bearer $VAST_API_KEY" \
+  "https://console.vast.ai/api/v0/users/{user_id}/machine-earnings/?last_days=1" \
+  | jq '.per_machine[] | {machine_id, sla_earn}'
+```
+</Warning>
+
+**Machine-scoped one-day total:**
+
+```bash
+curl -s -H "Authorization: Bearer $VAST_API_KEY" \
+  "https://console.vast.ai/api/v0/users/{user_id}/machine-earnings/?machid=12345&last_days=1" \
+  | jq '.per_machine[] | select(.machine_id == 12345 or .machine_id == "12345") | {machine_id, sla_earn}'
+```
+
+Do **not** compare `last_days=7` totals to single-day `worst_day_loss` from the backtester.
+
+**Sign convention** (same as backtester `sla` / `historical_sla`):
+
+| Field | Strong day (meet client target) | Weak day (miss client target) |
+| --- | --- | --- |
+| `per_machine[].sla_earn` | Positive (SLA charge kept) | Negative (credit you owe) |
+| Fleet `per_day[].sla_earn` | Positive (SLA charge kept) | Negative (credit you owe) |
+
+- `{user_id}` — Your account ID (from **Account → Profile** in the console, or `vastai show user`).
+- Settlement is evaluated on UTC day boundaries. Rows typically update within a few hours after UTC midnight.
+
+## Tips for competitive SLA offers
+
+- **Claim a level you can sustain.** Clients who choose targets below your claim see lower SLA charges and still get meaningful coverage.
+- **Tighten confidence only when earned.** Use a tighter spread (`sla_sigma_x ≈ 0.2`) after you have a strong reliability track record on that machine.
+- **Keep the machine online during active contracts.** SLA credits and verification are separate systems, but both respond to downtime.
+- **SLA applies to on-demand rentals only.** It does not apply to interruptible/bid instances or reserved/prepay rentals. When a client starts an on-demand rental on an SLA-enabled offer, SLA terms lock for that rental contract and do not change if you later edit the offer.
+- **Use the [SLA backtester](/host/sla-backtester) (API-only)** to preview how different claims and confidence levels would have affected past earnings.
+
+## Related documentation
+
+- [SLA Coverage (clients)](/guides/instances/choosing/sla-coverage) — how renters find and evaluate SLA offers
+- [SLA Earnings Backtester](/host/sla-backtester) — preview SLA economics on historical earnings
+- [Hosting Overview](/host/hosting-overview) — offers, rental contracts, and listing basics
+- [Understanding Verification](/host/understanding-verification) — platform verification (separate from SLA, but related to trust)
