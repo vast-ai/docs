@@ -1,0 +1,266 @@
+---
+title: "Host Teams"
+sidebarTitle: "Host Teams"
+description: "How team context affects host machines, permissions, earnings, and payouts."
+"canonical": "/host/host-teams"
+personas:
+  - business-owner
+  - headless-operator
+  - pro-operator
+---
+
+<div className="persona-chips"><span className="persona-chip">Business</span><span className="persona-chip">Headless / DC</span><span className="persona-chip">Pro Operator</span></div>
+
+Use this page when multiple people manage a hosting operation from a shared Vast team account.
+
+In the console, this team-management area is labeled **Account > Members**. There is no separate **Host Teams** console page; this guide uses "host teams" to describe using **Account > Members** for hosting operations.
+
+This page covers the host-specific parts: machine ownership, install context, machine permissions, earnings, payouts, invoice information, escalation contacts, and wrong-account recovery. If the team does not exist yet, create it first, then return here before installing or registering host machines under that team.
+
+## Team Context
+
+A team is its own Vast account. When you switch into a team with the Context Switcher, actions are performed as the team account instead of your personal account.
+
+Before doing any host operation, confirm the active context in the console:
+
+- Copying the host install command.
+- Creating an API key for a host daemon, CLI, SDK, or automation.
+- Registering, listing, unlisting, repricing, or deleting machines.
+- Reviewing earnings, invoices, or payout history.
+- Configuring the payout account.
+- Editing invoice information.
+- Setting the escalation contact for urgent hosted-machine issues.
+
+If you are in the wrong context, machines, API keys, earnings, and payout settings can end up attached to the wrong account.
+
+## Invite Host Operators
+
+To invite someone to help manage team-owned host machines:
+
+1. Open **Account > Members** in the console, or go directly to the [Members page](https://cloud.vast.ai/manage-members/).
+2. If the page says **No team found**, click **Create Team** and complete team creation first. For the full team-creation flow, see [Teams Quickstart](/guides/teams/teams-quickstart).
+3. Switch to the intended team in the Context Switcher.
+4. If the pre-populated roles are not right for this operator, open the **Roles** tab and create or edit a role first.
+5. Click **Invite**.
+6. Enter the operator's email address.
+7. Assign one of the available roles, such as a pre-populated `manager` or `member` role, or a custom role created for host operations.
+8. Send the invite and confirm the operator appears on the Members page after accepting.
+
+<Frame caption="Create a team before inviting members">
+  ![No team found state with Create Team button](/images/host-teams-no-team-found.webp)
+</Frame>
+
+<Frame caption="Create Team dialog">
+  ![Create Team dialog with team name field and Learn more link](/images/host-teams-create-team.webp)
+</Frame>
+
+<Frame caption="Invite a team member and assign a role">
+  ![Invite Member dialog with role selection](/images/host-teams-invite-member.webp)
+</Frame>
+
+## Machines And Teams
+
+Machines registered while you are operating in a team context belong to the team account. Their offers, listings, pricing, maintenance windows, and rental history are managed through that team context.
+
+Machines registered while you are operating in a personal account context belong to that personal account unless they are migrated or re-registered through a supported flow.
+
+<Warning>
+Do not assume that switching context moves existing machines, active rentals, earnings, or payout history. If you need to move an existing host operation from an individual account to a team, contact Vast support before changing install keys, deleting machines, or reinstalling the daemon.
+</Warning>
+
+## Install In The Right Context
+
+When installing a team-owned host:
+
+1. Switch to the intended team in the Context Switcher.
+2. Confirm the team is host-enabled and the hosting agreement flow is complete.
+3. Open the [host setup page](https://cloud.vast.ai/host/setup/) in that team context.
+4. Copy a fresh install command from that page.
+5. Run the command on the host.
+6. Confirm the new machine appears under the team's Machines page.
+
+Do not reuse a setup command copied from a personal account, another team, an old note, shell history, or a screenshot. Setup commands can include account-specific machine installation keys. See [Installing Host Software](/host/installing-host-software#install-command).
+
+If the generated command contains `undefined`, uses the wrong account, or the installed machine appears as unauthenticated, stop and regenerate the command from the intended team context. If the problem persists after switching context, refreshing the setup page, and re-accepting any required agreement flow, contact support with the team name, account email, and screenshots of the setup-page state.
+
+## Machine Roles
+
+Host teams should grant machine access intentionally. New teams include pre-populated roles such as `member` and `manager`, and team admins can create additional roles from the **Roles** tab on the Members page.
+
+<Frame caption="Pre-populated roles and New Role action">
+  ![Roles tab showing member, manager, and New Role](/images/host-teams-roles-tab.webp)
+</Frame>
+
+Role names are less important than the permissions on the role. For host operations, check the role editor before inviting or promoting an operator:
+
+| Permission or role | Host use |
+| --- | --- |
+| Machines Read | Allows the operator to view team machines and machine state. |
+| Machines Write | Required for registering and managing host machines, including listing, unlisting, price changes, min-bid changes, default jobs, cleanup, and maintenance. |
+| Billing/Earning Read | Allows earnings, invoices, and payout-history visibility. Grant only when the operator needs business or accounting visibility. |
+| Billing/Earning Write | Allows billing-related changes where supported. Reserve for admins or finance owners. |
+| Team Write | Allows team administration actions such as changing members or roles. Grant only to admins. |
+| Require 2FA | The role editor can require 2FA for the whole role, or for selected permissions. Use this for roles that can change machines, billing, payouts, or team membership. |
+| Pre-populated `manager` | Broad role for trusted operators or admins. Confirm the role settings before using it as the standard host-operator role. |
+| Pre-populated `member` | Lower-access role for team members who do not need to change host-machine state. Confirm whether Machines Read is enabled if they need visibility. |
+| Custom host role | Preferred when you want least-privilege access for operators: usually Machines Read + Machines Write, plus only the billing or team permissions they actually need. |
+| Owner | Can manage machines and administer or delete the team account. Reserve for the business principal or accountable administrator. |
+
+<Frame caption="Create a custom role with permissions and 2FA options">
+  ![Create Role dialog with permission and 2FA controls](/images/host-teams-create-role.webp)
+</Frame>
+
+Before assigning a role that requires 2FA, make sure the operator has 2FA configured on their personal account. See [Two-factor authentication](/guides/reference/two-factor-authentication).
+
+The role editor maps to API permission scopes such as `machine_read`, `machine_write`, `billing_read`, `billing_write`, and `team_write`. For the full permission reference, see [API Permissions](/api-reference/permissions) and [Teams role syntax](/guides/teams/teams-roles#role-syntax). The exact flow for granting machine registration rights to a team API key still needs engineering confirmation before this draft is published.
+
+## API Keys For Host Teams
+
+Create host automation keys while switched into the team context. A key created in your personal account is not a team key, even if you are a member of the team.
+
+Use a team key or role with:
+
+- `machine_read` for read-only machine dashboards.
+- `machine_read` and `machine_write` for host registration, listing, repricing, maintenance, cleanup, and daemon workflows.
+- `billing_read` only for operators who need earnings, invoice, or payout-history visibility.
+- `billing_write` only for people or automation allowed to change billing or transfer credit.
+
+If a host command returns `403`, `machine_api_key does not have machine registration rights`, or another permission error, check that the key was created in the team context and that the role grants the needed machine permission. See [Manage API keys](/guides/reference/api-keys) and [API Permissions](/api-reference/permissions).
+
+## Vast CLI For Host Teams
+
+Install and configure the CLI first. See the [Vast CLI guide](/cli/hello-world).
+
+The CLI does not have a separate Host Teams mode. It acts through whichever API key you configure with [`vastai set api-key`](/cli/reference/set-api-key), pass with `--api-key`, or expose as `VAST_API_KEY`. For host-team automation, use a key that belongs to the intended team account and has the required team, machine, or billing permissions. Keep personal-account keys separate from team host-operation keys.
+
+Use these team-related commands for host operations:
+
+| Workflow | Commands | Host-team use |
+| --- | --- | --- |
+| Create the team | [`vastai create team`](/cli/reference/create-team) | Create a team account from the CLI before inviting operators or registering team-owned machines. |
+| Delete the team | [`vastai destroy team`](/cli/reference/destroy-team) | Permanently remove the team. Do not use this while the team owns active host machines, unresolved rentals, payout history, or billing records that need to be preserved. |
+| Manage members | [`vastai show members`](/cli/reference/show-members), [`vastai invite member`](/cli/reference/invite-member), [`vastai remove member`](/cli/reference/remove-member) | List operators, invite an operator with a role, or remove access. Requires the team key or user role to allow team administration. |
+| Manage roles | [`vastai create team-role`](/cli/reference/create-team-role), [`vastai show team-roles`](/cli/reference/show-team-roles), [`vastai show team-role`](/cli/reference/show-team-role), [`vastai update team-role`](/cli/reference/update-team-role), [`vastai remove team-role`](/cli/reference/remove-team-role) | Create or inspect custom roles for operators. Host operators usually need machine read/write permissions; team administration should stay limited. |
+| Manage API keys | [`vastai create api-key`](/cli/reference/create-api-key), [`vastai show api-keys`](/cli/reference/show-api-keys), [`vastai delete api-key`](/cli/reference/delete-api-key) | Create, audit, and revoke keys for automation. Use scoped keys where possible and rotate them like production secrets. |
+| Monitor machines | [`vastai show machines`](/host/cli/show-machines), [`vastai show machine`](/host/cli/show-machine), [`vastai reports`](/cli/reference/reports) | View team-owned machine state and diagnostics when the key has machine read access. |
+| Operate machines | [`vastai list machines`](/host/cli/list-machines), [`vastai unlist machine`](/host/cli/unlist-machine), [`vastai set min-bid`](/host/cli/set-min-bid), [`vastai schedule maint`](/host/cli/schedule-maint), [`vastai cancel maint`](/host/cli/cancel-maint) | List, unlist, price, and schedule maintenance for team-owned machines. Requires machine write access. |
+| Repair and cleanup | [`vastai self-test machine`](/host/cli/self-test-machine), [`vastai cleanup machine`](/host/cli/cleanup-machine), [`vastai defrag machines`](/host/cli/defrag-machines), [`vastai set defjob`](/host/cli/set-defjob), [`vastai remove defjob`](/host/cli/remove-defjob) | Run host maintenance workflows for team machines. Use `--raw` and `--retry` for scripts. |
+| Review earnings and market context | [`vastai show earnings`](/cli/reference/show-earnings), [`vastai metrics gpu`](/host/cli/metrics-gpu), [`vastai metrics gpu-trends`](/host/cli/metrics-gpu-trends), [`vastai metrics gpu-locations`](/host/cli/metrics-gpu-locations) | Review team machine earnings and compare GPU pricing or demand. Earnings visibility requires billing read access. |
+| Review account activity | [`vastai show audit-logs`](/cli/reference/show-audit-logs) | Audit important account actions when investigating role, key, or machine changes. |
+
+For command examples that operate across many machines, see [Fleet Operations](/host/fleet-operations).
+
+## Earnings And Payouts
+
+Rental earnings from team-owned machines accrue to the team account, not to the individual operator who installed or managed the machine.
+
+Earnings and payout visibility is role-gated:
+
+| Access | What it allows |
+| --- | --- |
+| `billing_read` | View team earnings, invoices, and payout history. |
+| `billing_write` | Change billing-related settings or transfer credit where supported. |
+| Owner or billing administrator | Configure the team payout account. |
+
+The payout account is configured on the team account. Individual members do not receive separate payouts for team-owned machine rentals.
+
+For payout timing, invoices, and provider setup, see [Host Payouts](/host/payment). Treat credit transfer into or out of a team as a billing/account action, not as a host-machine setting.
+
+## Invoice Information
+
+Invoice information is edited from **Account > Settings**, or directly from [Settings](https://cloud.vast.ai/settings/). For host teams, set this while operating in the team context so generated invoices use the team or business name, address, country, zipcode, and tax information instead of a personal account's default details.
+
+Keep this separate from payout setup. Invoice information controls what appears on generated invoices; payout-provider and payment details are managed from the earnings or payout flow.
+
+<Frame caption="Invoice Information settings">
+  ![Invoice Information section in Settings with business name, address, country, zipcode, and tax information fields](/images/host-teams-invoice-information.webp)
+</Frame>
+
+## Escalation Contact
+
+Set an escalation contact for hosted-machine incidents from **Account > Settings**, or open [Settings](https://cloud.vast.ai/settings/). The console asks for an escalation email and phone number.
+
+Use a monitored address and phone number for the person or on-call group that can respond to urgent hosted-machine issues. This helps Vast reach the right responder when a machine problem needs fast coordination, such as active-rental impact, repeated instability, security or abuse reports, datacenter events, power or network incidents, or account actions that affect hosted machines.
+
+For teams, set this while operating in the intended team context and avoid using a personal inbox that will not be watched during outages. Update the contact when on-call ownership, provider handoffs, or business ownership changes.
+
+<Frame caption="Escalation Contact settings">
+  ![Escalation Contact section in Settings with email and phone fields](/images/host-teams-escalation-contact.webp)
+</Frame>
+
+## Team Owner Actions
+
+Team owners can manage account-level team settings from the three-dot menu in **Account > Members**, or by opening the [Members page](https://cloud.vast.ai/manage-members/).
+
+<Frame caption="Team owner actions menu">
+  ![Members page owner menu with Edit Team Name, Transfer Team Ownership, and Delete Team](/images/host-teams-owner-menu.webp)
+</Frame>
+
+| Action | Host-team guidance |
+| --- | --- |
+| Edit Team Name | Changes the team display name. It does not move machines, API keys, earnings, or payout setup. |
+| Transfer Team Ownership | Reassigns ownership to an existing team member. The current owner cannot undo the transfer by themselves after confirmation. Decide whether billing and payment information should be cleared before transferring ownership. |
+| Delete Team | Permanently removes the team and its members, and returns remaining credits to the owner's personal account. Do not use this to move machines, payout history, or earnings between accounts. |
+
+<Frame caption="Edit the team name">
+  ![Edit Team Name dialog](/images/host-teams-edit-name.webp)
+</Frame>
+
+<Frame caption="Transfer team ownership">
+  ![Transfer Team Ownership dialog](/images/host-teams-transfer-ownership.webp)
+</Frame>
+
+<Warning>
+Before deleting a host team, unlist or remove team-owned machines as appropriate, honor active rentals and storage obligations, and confirm whether earnings, payout history, or billing records must be preserved. If the team owns active host machines or unresolved payout history, contact Vast support before deleting the team.
+</Warning>
+
+<Frame caption="Delete team confirmation">
+  ![Delete Team confirmation dialog](/images/host-teams-delete-team.webp)
+</Frame>
+
+## Recommended Business Setup
+
+For a hosting business or multi-operator fleet:
+
+- Run hosting under a dedicated host team account.
+- Keep personal client rentals separate from host operations.
+- Give day-to-day operators a role with Machines Read and Machines Write.
+- Require 2FA for roles that can change machine state, billing, payouts, or team membership.
+- Limit earnings, invoice, and payout visibility to people who actually need it.
+- Reserve Owner access for the business principal or accountable administrator.
+- Treat ownership transfer and team deletion as business-critical account actions.
+- Create team API keys for automation in team context, then rotate and revoke them like production secrets.
+- Set invoice information in team context so generated invoices use the business or team details.
+- Set a monitored escalation email and phone number in Settings for urgent hosted-machine issues.
+
+For machine automation after setup, see [Fleet Operations](/host/fleet-operations).
+
+## Wrong Context Troubleshooting
+
+| Symptom | Likely cause | What to do |
+| --- | --- | --- |
+| Install command contains `undefined` or uses an unexpected host/account ID | Setup page generated a command from the wrong or incomplete context. | Switch to the intended team, refresh the setup page, complete any agreement flow, and copy a fresh command. Contact support if it still generates incorrectly. |
+| Machine appears under the individual account instead of the team | The install command or API key came from the personal account context. | Do not keep listing from the wrong account. If there are no active rentals, prepare to re-register under the team context or ask support about the supported migration path. |
+| Existing rigs and payout history need to move from individual to team | Existing machines, earnings, and payout history may require account-level migration support. | Contact support before deleting, reinstalling, or changing payout setup. Include machine IDs, account email, intended team, and whether active rentals exist. |
+| `403` or `machine_api_key does not have machine registration rights` | The key or role lacks `machine_write`, or the key was created in personal context. | Create or select a team-context key with `machine_read` and `machine_write`, then rerun from the intended context. |
+| Team API key keeps being created under the personal account | The Keys page or CLI is still operating in personal context. | Switch to the team in the Context Switcher before creating the key. Verify the key is associated with the team before using it for host automation. |
+| Unauthenticated machine or wrong-account errors | Daemon, CLI, or setup flow is using a key from the wrong context. | Switch context, regenerate the setup command or API key, update the CLI/daemon configuration, then confirm the machine appears under the intended team. |
+
+## Related
+
+| Topic | Read next |
+| --- | --- |
+| Create a team | [Teams Quickstart](/guides/teams/teams-quickstart) |
+| Invite host operators | [Account > Members](https://cloud.vast.ai/manage-members/) |
+| Role syntax | [Teams role syntax](/guides/teams/teams-roles#role-syntax) |
+| 2FA setup | [Two-factor authentication](/guides/reference/two-factor-authentication) |
+| Team owner actions | [Account > Members](https://cloud.vast.ai/manage-members/) |
+| CLI install | [Vast CLI guide](/cli/hello-world) |
+| CLI permissions | [CLI permissions](/cli/permissions) |
+| API key setup | [Manage API keys](/guides/reference/api-keys) |
+| Permission categories | [API Permissions](/api-reference/permissions) |
+| Invoice information | [Settings](https://cloud.vast.ai/settings/) |
+| Escalation contact | [Settings](https://cloud.vast.ai/settings/) |
+| Install command | [Installing Host Software](/host/installing-host-software#install-command) |
+| Payouts | [Host Payouts](/host/payment) |
+| Fleet workflows | [Fleet Operations](/host/fleet-operations) |
