@@ -1,0 +1,123 @@
+---
+title: "Network & Ports"
+sidebarTitle: "Network & Ports"
+description: "Port forwarding, CGNAT, public IP, IPv6, and host connectivity guidance."
+"canonical": "/host/network-ports"
+personas:
+  - pro-operator
+  - headless-operator
+---
+
+<div className="persona-chips"><span className="persona-chip">Pro Operator</span><span className="persona-chip">Headless / DC</span></div>
+
+Configure public inbound networking before verification. Vast hosts need direct ports reachable from outside the host LAN.
+
+<a id="ports-per-gpu" />
+## Ports Per GPU
+
+Self-test requires at least 3 direct ports per listed GPU. For production hosting, plan for about 100 direct ports per listed GPU. One instance can map up to 64 ports, and a larger range gives headroom while old mappings are being released and new instances are starting.
+
+| Listed GPUs | Minimum | Practical example |
+| --- | ---: | --- |
+| 1 | 3 | `40000-40099` |
+| 4 | 12 | `40000-40399` |
+| 8 | 24 | `40000-40799` |
+
+The forwarded router/firewall range must match the range configured in the host software. The 100-port guidance is practical headroom, not a self-test minimum.
+
+<a id="tcp-udp" />
+## TCP And UDP
+
+Forward both TCP and UDP for the configured direct port range. TCP-only forwarding can pass some checks while still failing renter workloads that need UDP.
+
+## Set The Host Port Range
+
+In the Host Installer Wizard, enter the same range you forwarded.
+
+For the raw installer:
+
+```bash
+sudo python3 ./install "$VAST_HOST_KEY" --ports 40000 40799
+```
+
+For an installed host:
+
+```bash
+echo -n "40000-40799" | sudo tee /var/lib/vastai_kaalia/host_port_range
+sudo systemctl restart vastai.service
+sudo tail -n 50 /var/lib/vastai_kaalia/kaalia.log | grep host_port_range
+```
+
+The log should show `host_port_range: 40000 40799`.
+
+<a id="cgnat-starlink-ipv6" />
+## CGNAT, Starlink, IPv6-Only, Or No Public IP
+
+Vast instances need public inbound TCP and UDP reachability. CGNAT, double NAT without a real public forwarding path, many residential Starlink setups, incompatible IPv6-only service, blocked inbound ports, or no public inbound IP are not supported for hosting because renters and self-test must be able to reach the machine directly.
+
+Compare your router WAN IP with your public IP and test from outside the LAN. If the router does not have a public inbound address or cannot forward the configured ports to the host, use a network connection that provides public inbound connectivity before listing the machine.
+
+<a id="test-ports-outside-lan" />
+## Test Ports From Outside The LAN
+
+Same-LAN tests can be misleading because of NAT hairpinning. Test from a different network, such as mobile data, a cloud VM, or another external machine.
+
+On the host, start a temporary TCP listener and confirm it is listening:
+
+```bash
+sudo python3 -m http.server 40000 --bind 0.0.0.0
+sudo ss -ltnp | grep ':40000'
+```
+
+From macOS or Linux outside the LAN:
+
+```bash
+curl -v http://PUBLIC_IP:40000/
+nc -vz PUBLIC_IP 40000
+```
+
+From Windows PowerShell outside the LAN:
+
+```powershell
+Test-NetConnection PUBLIC_IP -Port 40000
+curl.exe http://PUBLIC_IP:40000/
+```
+
+You can also use a public TCP checker such as [portchecker.co](https://portchecker.co/) for a quick outside-LAN TCP check.
+
+For UDP, watch for packets on the host:
+
+```bash
+sudo tcpdump -ni any udp port 40000
+```
+
+Then send a UDP packet from macOS or Linux outside the LAN:
+
+```bash
+printf 'vast-port-test\n' | nc -u -w2 PUBLIC_IP 40000
+```
+
+From Windows PowerShell outside the LAN:
+
+```powershell
+$udp = New-Object System.Net.Sockets.UdpClient
+$bytes = [Text.Encoding]::ASCII.GetBytes("vast-port-test")
+$udp.Send($bytes, $bytes.Length, "PUBLIC_IP", 40000)
+$udp.Close()
+```
+
+Stop temporary listeners before running the installer.
+
+During self-test, troubleshoot the exact public IP and port reported by the CLI, such as `https://PUBLIC_IP:PORT/progress`.
+
+## Connectivity Failures
+
+Self-test timeouts and `Port Networking Issues` usually mean a network-path problem. [`vericode=8`](/host/glossary#vericode) means a host-facing machine error is present; use the exact visible message to confirm whether it is the port-networking case. See [Self-Test Reference: vericode=8](/host/self-test-reference#vericode-8) and [no response for 120s](/host/self-test-reference#no-response-120s).
+
+## Related Pages
+
+| Topic | Read next |
+| --- | --- |
+| Hardware/network fit | [Supported Hardware](/host/supported-hardware) |
+| Self-test | [How to Self-Test](/host/how-to-self-test) |
+| Failure reference | [Self-Test Reference](/host/self-test-reference) |
