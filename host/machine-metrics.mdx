@@ -1,0 +1,162 @@
+---
+title: "Machine Metrics"
+sidebarTitle: "Machine Metrics"
+description: "Monitor the health and performance of your machines with historical CPU, memory, GPU, disk, and network data"
+---
+
+Machine Metrics is a monitoring dashboard for the machines you host on Vast. It records how each machine has behaved over time and lets you replay any window of that history, from the last few seconds to the last several days.
+
+## Why use it
+
+- Confirm a machine is online, reporting, and healthy before or after a rental
+- Catch hardware problems early, such as a GPU running hot or clocking down
+- Investigate a client complaint about a slow, unresponsive, or underperforming machine
+- See whether containers on the machine are running cleanly or crash looping
+- Track down a runaway process or an unexpected drop in throughput
+
+## Opening the dashboard
+
+Open [Machine Metrics](https://cloud.vast.ai/host/machine-metrics/) in the Host section of the console, then pick a machine from the **Machine ID** dropdown. It lists every machine on your account; one that has not reported yet says so instead of drawing a chart.
+
+You can also jump straight to a specific machine from **Host → Machines**: open the machine's options menu (the "..." button on the machine card) and choose **View metrics**.
+
+<Frame caption="The Machine Metrics page: metrics chart on top, detail tabs below">
+  <img src="/images/machine-metrics-overview-light.webp" className="block dark:hidden" alt="Machine Metrics page showing a time-series chart above a container timeline" />
+  <img src="/images/machine-metrics-overview-dark.webp" className="hidden dark:block" alt="Machine Metrics page showing a time-series chart above a container timeline" />
+</Frame>
+
+<Note>
+There is nothing to install or enable. The Vast daemon collects and uploads this data automatically, so a machine that is listed and up to date will appear on its own. Metrics are visible to you and to Vast staff, not to the clients renting your machine.
+</Note>
+
+## What gets collected
+
+| Data | How often it is sampled |
+| --- | --- |
+| CPU, memory, GPU, disk, and network counters | Every second |
+| Process table | Every 5 seconds |
+| Container state | Every 15 seconds |
+| Vast daemon log lines | As they are written |
+
+Samples are batched on the machine and uploaded about once a minute. If the machine goes offline, data is spooled to disk and uploaded when it reconnects, so an outage appears as a gap that fills in later. A very long outage eventually drops its oldest batches.
+
+<Note>
+The page is a snapshot, not a live feed: it loads the window ending at the moment you opened it and does not advance while the tab stays open. Reload to catch up, and expect the newest few minutes to be missing.
+</Note>
+
+## Metrics chart
+
+The top half of the page is a time-series chart covering the last 7 days by default. Every metric has a button above the chart. Click one to add that series to the chart, click it again to remove it.
+
+### CPU and memory
+
+The first row covers the machine as a whole:
+
+| Group | Metrics |
+| --- | --- |
+| CPU | User CPU, System CPU, CPU I/O Wait, Idle CPU, CPU Steal, Load (1m) |
+| Memory | Available Memory, Free Memory, Total Memory, Buffers, Cached, Free Swap, Total Swap |
+| Processes | Total process count |
+
+### GPU, disk, and network
+
+Below that is a row of **GPU**, **Disk**, and **Network** tabs. One is selected at a time, and the selected tab shows its whole-machine summary metrics beside the tab row:
+
+| Tab | Summary metrics |
+| --- | --- |
+| GPU | Avg Util (averaged across the machine's GPUs), Max Temp (the hottest GPU), Total Power |
+| Disk | Avg Util |
+| Network | Total RX, Total TX |
+
+Use the chevron on the right of the tab row to expand the per-device grid, where every GPU, disk, or interface gets its own row and can be charted individually. This is what shows whether one card in an eight-GPU box runs hotter or slower than its neighbors.
+
+| Tab | Per-device metrics |
+| --- | --- |
+| GPU | Utilization, Memory Utilization, Used Memory, Total Memory, Temperature, Power, SM Clock, Memory Clock |
+| Disk | Utilization, Read and Write IOPS, Read and Write Speed |
+| Network | RX and TX throughput, RX and TX Packets, RX and TX Errors, RX and TX Drops |
+
+<Frame caption="The GPU tab with its per-device grid expanded">
+  <img src="/images/machine-metrics-gpu-grid-light.webp" className="block dark:hidden" alt="Machine Metrics GPU tab showing eight GPUs, each with utilization, memory, temperature, power, and clock metrics" />
+  <img src="/images/machine-metrics-gpu-grid-dark.webp" className="hidden dark:block" alt="Machine Metrics GPU tab showing eight GPUs, each with utilization, memory, temperature, power, and clock metrics" />
+</Frame>
+
+### Reading the chart
+
+Each series is drawn between the **hi** and **lo** marks on its own scale, so metrics with different units share one chart. The solid line is the average and the shaded band is the min to max range, which is why a variable series looks like a band when zoomed out.
+
+Hover anywhere to read values at that moment. All timestamps on this page are UTC.
+
+To move around the timeline:
+
+- **Drag** to pan through time, or **scroll** to zoom in and out around the cursor
+- Use the **zoom in** and **zoom out** buttons in the toolbar for fixed steps
+- **Reset** returns to the default 7-day window and the default set of metrics
+- **All off** clears the chart. **All on** turns on the CPU, memory, and summary metrics, but leaves per-device series off so the chart does not fill with one line per GPU
+
+Zooming in loads finer-grained data, down to per-second samples over short windows.
+
+## Detail tabs
+
+The bottom half of the page has three tabs, each showing detail for the time range currently in the chart.
+
+### Containers
+
+A timeline with one row per container that was on the machine during the window, so you can see the rental history at a glance:
+
+| Legend | What it shows |
+| --- | --- |
+| exists (stopped) | A thin gray line spanning the container's life. It existed on the machine but was not running |
+| running | A solid blue bar over the periods the container was actually running |
+| running (vm) | The same, in purple, for a container running as a VM |
+| intermittent (zoom in) | A striped bar covering several runs and the gaps between them, too close together to draw separately at this zoom |
+
+<Frame caption="Container timeline, with running bars and two containers that existed without running">
+  <img src="/images/machine-metrics-containers-light.webp" className="block dark:hidden" alt="Container timeline showing blue running bars and thin lines for stopped containers" />
+  <img src="/images/machine-metrics-containers-dark.webp" className="hidden dark:block" alt="Container timeline showing blue running bars and thin lines for stopped containers" />
+</Frame>
+
+Hover a row for the container's status, last reported state, first and last seen times, how long it existed, and its run count and total running time. Click a run to zoom the chart to it and line the rental up with the GPU, memory, and network activity behind it.
+
+<Note>
+A striped bar is a zoom artifact, not a problem. Zoom in to see the real pattern: restarts every few seconds are a crash loop, while a few runs spread over days is normal rental activity.
+</Note>
+
+### Processes
+
+A table of the 50 heaviest processes in the window, ranked by accumulated CPU time: PID, command, CPU time, peak CPU percentage, peak resident memory, and first and last seen timestamps. Search and sorting work over those 50 rows, so narrow the time window to change which processes are in play.
+
+This includes processes running inside your clients' containers.
+
+### Logs
+
+The Vast daemon's log for that machine, with Info, Warning, Error, and Critical counts across the top. The counts cover the whole window; the lines below them are a capped sample of it. Click one or more severities to filter, or search to narrow by keyword. Repeated identical lines are grouped with a `×N` count rather than flooding the view.
+
+<Frame caption="Log viewer with severity counts and grouped repeat lines">
+  <img src="/images/machine-metrics-logs-light.webp" className="block dark:hidden" alt="Machine Metrics log viewer showing Info, Warning, and Error counts and repeated lines grouped with a multiplier badge" />
+  <img src="/images/machine-metrics-logs-dark.webp" className="hidden dark:block" alt="Machine Metrics log viewer showing Info, Warning, and Error counts and repeated lines grouped with a multiplier badge" />
+</Frame>
+
+Click a log line to pin a marker on the chart above and see what the machine was doing when the message was written. **Deselect All** clears the filters and any pinned markers. The refresh button re-runs the query for the current window; it does not move the window forward.
+
+<Note>
+These are Vast daemon logs, not the logs from inside your clients' containers. Container output stays with the client's instance.
+</Note>
+
+## Troubleshooting
+
+| Symptom | Where to look |
+| --- | --- |
+| A GPU running hot or throttling | Expand the GPU grid and compare Temperature, Power, and SM Clock per card. One card hotter and clocking lower than the rest points at cooling or seating rather than at the workload |
+| Clients keep leaving the machine | Find the rental in the Containers tab and zoom into it. Short runs repeating back to back are a crash loop. Check the Logs tab around those times |
+| Unexplained slowness | High CPU I/O Wait alongside disk utilization points at storage. High CPU Steal points at contention on the host |
+| Bandwidth complaints | Chart Total RX and Total TX over the rental window, then expand the Network grid to check errors and drops on the interface |
+| The machine looks idle | GPU utilization near zero through a rental usually means the client's workload is not using the GPUs |
+| No data at all for a machine | It has most likely not reported yet. Check that it is online and running a current Vast daemon, and contact support if it stays empty |
+| The chart stops short of right now | Expected. The page does not follow the clock. Reload it |
+
+## Limitations
+
+- **VM machines** report everything except GPU metrics for now. The page shows a notice when you are looking at one.
+- **History starts when the machine first reported in its current recording format.** A recently set up machine has a shorter history than the default 7-day window, and a daemon update that changes the recording format restarts it.
+- **There is no data deletion policy yet.** We will let hosts know if one is introduced.
