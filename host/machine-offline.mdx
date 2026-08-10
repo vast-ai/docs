@@ -1,5 +1,6 @@
 ---
 title: "Offline Machine - Troubleshooting Steps"
+sidebarTitle: "Offline Machine"
 description: "Steps to identify and resolve connectivity, service, and GPU-related issues when a Vast.ai host machine shows as Offline."
 ---
 
@@ -9,25 +10,70 @@ If your host machine appears **Offline**, follow the steps below in order to ide
 
 ## 1. Verify Internet Connectivity
 
-Before checking any Vast.ai-specific services, confirm the host machine has a stable, working internet connection with outbound access.
+Before checking any Vast.ai-specific services, confirm the host machine has a stable, working internet connection with outbound access. Run each check below and compare your output with the expected result.
 
-Run the following checks:
+### Check basic connectivity
+
+This command sends 4 test packets directly to Cloudflare's public IP address (`1.1.1.1`). It verifies that the machine can reach the internet at the IP level, bypassing DNS entirely — so if this works but the next check fails, the problem is DNS, not the connection itself.
 
 ```bash
-ip a
-ip route
-ping -c 4 <gateway_ip>   # replace with your default gateway
 ping -c 4 1.1.1.1
-getent hosts vast.ai
-curl -v https://vast.ai
-sudo iptables -L -n
 ```
 
-Also review any proxy or VPN client configuration on the host.
+Expected result:
 
-If any check fails, times out, or shows DNS, routing, firewall, proxy, ISP, or datacenter network issues, resolve the underlying network problem first (for example, correct DNS configuration, allow outbound HTTPS traffic on port 443, disable a blocking firewall rule, or contact your ISP/datacenter network team).
+```
+PING 1.1.1.1 (1.1.1.1) 56(84) bytes of data.
+64 bytes from 1.1.1.1: icmp_seq=1 ttl=56 time=35.7 ms
+64 bytes from 1.1.1.1: icmp_seq=2 ttl=56 time=36.0 ms
+64 bytes from 1.1.1.1: icmp_seq=3 ttl=56 time=35.7 ms
+64 bytes from 1.1.1.1: icmp_seq=4 ttl=56 time=35.9 ms
 
-Only proceed to Step 2 once you have confirmed the host machine has stable internet connectivity.
+--- 1.1.1.1 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 3005ms
+rtt min/avg/max/mdev = 35.681/35.806/35.962/0.109 ms
+```
+
+What to look for: **`4 packets transmitted, 4 received, 0% packet loss`** means the internet connection is working. If you see `100% packet loss`, `Network is unreachable`, or the command hangs, the machine has no outbound internet access — check cables, the router/gateway, firewall rules, or contact your ISP/datacenter network team.
+
+### Check DNS resolution
+
+This command asks your DNS server to translate the domain name `vast.ai` into an IP address. The host daemon connects to Vast.ai servers by domain name, so even with a working internet connection, the machine cannot reach Vast.ai if DNS resolution is broken.
+
+```bash
+nslookup vast.ai
+```
+
+Expected result:
+
+```
+Server:		127.0.0.53
+Address:	127.0.0.53
+
+Non-authoritative answer:
+Name:	vast.ai
+Address: 76.76.21.21
+```
+
+What to look for: a `Name:` line followed by an `Address:` line containing an IP address means DNS is working (the exact IP returned may differ). If you see `;; connection timed out; no servers could be reached` or `server can't find vast.ai: NXDOMAIN`, DNS is broken — fix the DNS configuration (for example, set a public resolver such as `1.1.1.1` or `8.8.8.8` in your network settings).
+
+### Check your public IPv4 address
+
+This command contacts an external service (`ifconfig.me`) over the internet and returns the public IPv4 address your machine appears as from the outside. It confirms two things at once: that outbound HTTP/HTTPS traffic actually works (not just ping), and which public IP your machine is using — useful for checking that port forwarding / NAT rules point to the correct address.
+
+```bash
+curl -4 ifconfig.me
+```
+
+Expected sample result:
+
+```
+203.0.113.45
+```
+
+What to look for: a single public IPv4 address (your own address will differ from the example). If the command times out or returns an error such as `Could not resolve host`, outbound web traffic is blocked even though ping may work — check firewall rules and any proxy or VPN configuration on the host. If the returned IP is not the one you configured for port forwarding, update your NAT/port-forwarding rules to match.
+
+Also review any proxy or VPN client configuration on the host. Only proceed to Step 2 once all three checks above return the expected results.
 
 ## 2. Confirm the Vastai Service Is Running
 
@@ -52,22 +98,87 @@ Example output when the service is running normally:
              └─2975 /var/lib/vastai_kaalia/latest/kaalia backend=DKR installpat>
 ```
 
-Important: Also verify that all expected GPUs are detected by the operating system:
+How to read the `Active:` line:
+
+- **`active (running)`** is the healthy state — the service started successfully and is currently running. Any other state (`inactive (dead)`, `failed`, `activating (auto-restart)`) means the service is not running normally.
+- **`since Tue 2026-08-04 07:47:51 +07; 6h ago`** shows when the service last started and how long it has been running continuously — here, 6 hours without interruption, which is a good sign of stability.
+- **A very recent start time is a warning sign.** If you run `systemctl status vastai` repeatedly and the "ago" value keeps resetting to a few seconds or minutes (and the `Main PID` keeps changing), the service is crashing and being restarted over and over — a **restart loop**. The state `activating (auto-restart)` with a message like `Restart=on-failure` or `Scheduled restart job` also indicates a restart loop. In that case, inspect the logs (see the debugging commands below) to find the crash reason.
+
+### Verify GPUs are detected
+
+This command shows the NVIDIA driver status and every GPU the operating system currently sees, including temperature, power, and memory usage. The Vastai service requires all GPUs to be visible at this level — if the driver cannot see them, the service will fail to start.
 
 ```bash
 nvidia-smi
 ```
 
-If `nvidia-smi` fails, returns no devices, or does not list all expected GPUs, the GPUs are not properly detected by the operating system, and the Vastai service will fail to start as a result.
+Expected result (your GPU model, driver version, and values will differ):
 
-If the service is not running, or GPUs are not detected correctly, investigate the root cause:
+```
+Mon Aug 10 15:18:38 2026
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 595.84                 Driver Version: 595.84         CUDA Version: 13.2     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA GeForce RTX 3060        On  |   00000000:82:00.0  On |                  N/A |
+|  0%   52C    P2             44W /  170W |    1847MiB /  12288MiB |      3%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+```
+
+What to look for: a table listing **every GPU installed in the machine**, each with a valid name, temperature, and memory reading. Signs that something is wrong:
+
+- **`NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver`** — the driver is not loaded or is broken, often after a kernel/OS update. The GPUs are invisible to the system.
+- **Fewer GPUs listed than physically installed** — a GPU has dropped off the PCIe bus (power, riser, or slot issue) or has a hardware fault.
+- **`ERR!` or `Unknown Error` in any column** — the GPU is in a faulty state and may need further diagnosis.
+- **The command hangs for a long time** — usually indicates a GPU stuck on the bus or a driver-level problem.
+
+If the service is not running, or GPUs are not detected correctly, investigate the root cause with the commands below.
+
+### Debugging commands
+
+Start the service manually. If it was simply stopped, this brings it back up; if it fails immediately, the error message points you to the cause:
 
 ```bash
 sudo systemctl start vastai
+```
+
+Re-check the service state after starting it, and confirm the `Active:` line reaches `active (running)` and stays there (see the explanation above about restart loops):
+
+```bash
 systemctl status vastai
+```
+
+Show the last 100 log lines from the Vastai service. This is usually where the actual error is written — look for messages logged right before the service exited or crashed:
+
+```bash
 sudo journalctl -u vastai.service -n 100 --no-pager
+```
+
+Show a detailed per-GPU report from the driver (much more detail than plain `nvidia-smi`), including ECC error counters, throttle reasons, and PCIe link status — useful for spotting a GPU that is detected but unhealthy:
+
+```bash
 nvidia-smi -q
+```
+
+Search the kernel ring buffer for NVIDIA driver errors (`NVRM`, `Xid`) and PCIe/AER bus errors with human-readable timestamps. `Xid` messages are NVIDIA's hardware/driver error codes and often reveal why a GPU fell off the bus:
+
+```bash
 dmesg -T | grep -iE 'nvrm|nvidia|xid|pcie|aer'
+```
+
+Search the kernel logs for the current boot for the same NVIDIA/PCIe error patterns. Unlike `dmesg`, this survives ring-buffer overflow, so it catches errors that happened hours ago:
+
+```bash
 journalctl -k -b | grep -iE 'nvrm|nvidia|xid|pcie|aer'
 ```
 
@@ -108,9 +219,21 @@ If the machine remains Offline after completing the steps above, contact Vast.ai
 - Whether the issue began after a driver, kernel, network, hardware, or configuration change.
 - The output of the following commands:
 
+Current state of the Vastai service — tells Support whether the daemon is running, stopped, or crash-looping, and for how long:
+
 ```bash
 systemctl status vastai
+```
+
+Current GPU and driver status — tells Support whether all GPUs are visible and healthy at the driver level:
+
+```bash
 nvidia-smi
+```
+
+The last 200 log lines from the Vastai service — usually contains the exact error messages Support needs to diagnose the problem:
+
+```bash
 sudo journalctl -u vastai.service -n 200 --no-pager
 ```
 
