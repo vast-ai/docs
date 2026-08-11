@@ -21,10 +21,10 @@ paths:
         - name: limit
           in: query
           required: false
-          description: Instances per page. Default 25, max 25. Values ≤ 0 are treated as 5.
+          description: Instances per page. Maximum 25. Omit or set ≤ 0 to use the server default (currently 5). Prefer an explicit `limit` (for example 25).
           schema:
             type: integer
-            default: 25
+            default: 5
             maximum: 25
           example: 25
         - name: after_token
@@ -54,7 +54,9 @@ paths:
           required: false
           description: |
             JSON object of column filters. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `in`, `notin`.
-            Filterable columns: `actual_status`, `gpu_name`, `verification`, `id`, `label`, and other columns stored directly on the contract record. Computed fields (e.g. `dph_total`, `num_gpus`) are not filterable and return 400.
+            Filterable columns: `actual_status`, `gpu_name`, `verification`, `id`, `label`, and other columns stored directly on the contract record
+            (including `sla_r_claim` and `sla_r_target` / `target_reliability` when present). Computed fields (e.g. `dph_total`, `num_gpus`, `has_sla`) are not filterable and return 400.
+            Prefer client-side filtering on `target_reliability > 0` for SLA-covered instances. Optional `select_filters` on stored SLA fields may work for some keys; do not rely on it as the only detection path.
           schema:
             type: string
             default: '{}'
@@ -332,7 +334,26 @@ paths:
                         dph_total:
                           type: number
                           format: float
+                          description: Total $/hour including storage (and SLA charge when applicable).
                           example: 0.8021
+                        target_reliability:
+                          type: number
+                          format: float
+                          nullable: true
+                          description: Client SLA coverage target locked at rent time. Null or 0 when the rental has no SLA.
+                          example: 0.95
+                        sla_r_claim:
+                          type: number
+                          format: float
+                          nullable: true
+                          description: Host reliability claim for this SLA contract.
+                          example: 0.99
+                        sla_sigma_x:
+                          type: number
+                          format: float
+                          nullable: true
+                          description: Host confidence spread for this SLA contract.
+                          example: 0.5
                         dlperf:
                           type: number
                           nullable: true
@@ -381,17 +402,35 @@ paths:
                           example: null
                         search:
                           type: object
+                          description: Price breakdown for search-context costs (may include slaPremiumPerHour).
+                          additionalProperties: true
+                          properties:
+                            slaPremiumPerHour:
+                              type: number
+                              format: float
+                              description: SLA charge rate in $/hour (API field name).
+                              example: 0.008
                           example:
                             gpuCostPerHour: 0.8
                             diskHour: 0.0021
+                            slaPremiumPerHour: 0.008
                             totalHour: 0.8021
                             discountTotalHour: 0
                             discountedTotalPerHour: 0.8013
                         instance:
                           type: object
+                          description: Price breakdown for instance-context costs (may include slaPremiumPerHour while running).
+                          additionalProperties: true
+                          properties:
+                            slaPremiumPerHour:
+                              type: number
+                              format: float
+                              description: SLA charge rate in $/hour while the instance is running (API field name).
+                              example: 0.008
                           example:
                             gpuCostPerHour: 0.8
                             diskHour: 0.0013
+                            slaPremiumPerHour: 0.008
                             totalHour: 0.8021
                             discountTotalHour: 0
                             discountedTotalPerHour: 0.5034

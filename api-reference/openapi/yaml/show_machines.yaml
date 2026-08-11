@@ -9,6 +9,8 @@ paths:
       description: |
         Fetches data for multiple machines associated with the authenticated user.
 
+        The `--raw` CLI output includes listing and SLA fields (`price_gpu`, `end_date`, `sla_r_claim`, `sla_sigma_x`, etc.) used for read-modify-write before partial SLA updates. See [SLA Offers — Partial updates](/host/sla-offers#api-for-automation).
+
         CLI Usage: `vastai show machines [--user_id <user_id>]`
       operationId: getMachines
       parameters:
@@ -37,6 +39,35 @@ paths:
                         name:
                           type: string
                           description: The name of the machine.
+                        price_gpu:
+                          type: number
+                          description: GPU rental price in $/hour (when present in raw listing output).
+                        end_date:
+                          type: number
+                          description: Offer expiration as Unix timestamp (when present in raw listing output).
+                        min_chunk:
+                          type: integer
+                          description: Minimum GPUs rented together (GPU slicing).
+                        sla_r_claim:
+                          type: number
+                          description: Host reliability claim. Values above 0 mean SLA is enabled on the ask.
+                        sla_sigma_x:
+                          type: number
+                          description: SLA confidence spread around the claim.
+                        sla_max_beta:
+                          type: number
+                          description: |
+                            Optional cap on client-derived β for this ask (support-directed). Hosts do not
+                            set β; leave unset for uncapped.
+              example:
+                machines:
+                  - id: "12345"
+                    name: my-h100
+                    price_gpu: 3.5
+                    end_date: 1735689600
+                    min_chunk: 1
+                    sla_r_claim: 0.99
+                    sla_sigma_x: 0.5
         '401':
           description: Unauthorized - User authentication failed
         '429':
