@@ -1,0 +1,528 @@
+---
+title: Sessions
+description: Pin a series of requests to a single Serverless worker, run long asynchronous tasks on it, and release it automatically when the work is done.
+"canonical": "/guides/serverless/sessions"
+---
+
+
+By default, every Serverless request is routed independently. The SDK asks the serverless engine for a worker, sends the request to whichever worker it is given, and forgets about it. The next request may land on a completely different worker.
+
+A **session** changes that. When you open a session you claim one specific worker, and every request made through that session goes directly to it, bypassing the router entirely, until you close the session or it expires.
+
+Sessions solve three problems:
+
+- **Worker affinity.** Related requests that share state on the worker, such as an LLM conversation that shares a KV cache prefix, a loaded LoRA, or a warmed pipeline, stay on the machine that already holds that state.
+- **Worker reservation.** An open session reports load to the serverless engine for as long as it is open, so the worker stays hot and is not scaled away while you are still using it.
+- **Asynchronous work.** You can kick off a long-running job, return immediately, and poll it later on the same worker. The session carries the credentials needed to end it, so the worker itself, or a third-party webhook, can close the session the moment the job finishes.
+
+<Note>
+  Sessions are a feature of the [Serverless SDK](./sdk-overview) and the PyWorker web server. Both sides are built in: any PyWorker built with `Worker`/`WorkerConfig` already serves the session routes described below, and no worker code is required to support basic session usage.
+</Note>
+
+***
+
+## How a session works
+
+<Steps>
+  <Step title="The client opens the session">
+    `endpoint.session()` sends a normal routed request to the special `/session/create` route. Because this is a normal request, the serverless engine picks the worker using its usual load-balancing rules. The worker that answers is the worker you are pinned to.
+  </Step>
+
+  <Step title="The worker registers the session">
+    The PyWorker stores a `Session` object holding a generated `session_id`, the `auth_data` that was used to reach it, an expiration timestamp, and the optional close hook. It responds with the `session_id` and the expiration, and it starts reporting the session's `cost` as in-flight load.
+  </Step>
+
+  <Step title="The client pins to the worker">
+    The SDK keeps the worker's URL and `auth_data` on the returned `Session` object. Every subsequent `session.request(...)` posts straight to that URL with the `session_id` attached. The `/route/` call is skipped entirely, so there is no routing latency and no chance of landing elsewhere.
+  </Step>
+
+  <Step title="Each request extends the deadline">
+    Every request that carries the `session_id` pushes the session's expiration out by another `lifetime` seconds. A session garbage collector on the worker runs every five seconds and closes any session whose deadline has passed.
+  </Step>
+
+  <Step title="The session closes">
+    A session ends when the client calls `session.close()`, when a webhook or the model server posts to `/session/end` with the session's credentials, or when it expires. On close, the worker cancels any in-flight requests belonging to the session, fires the optional close hook, and stops reporting the session's load.
+  </Step>
+</Steps>
+
+***
+
+## The worker web server
+
+Every PyWorker runs two HTTP servers. Understanding the split matters when you want the model itself, rather than your client, to close a session.
+
+| Server | Port | TLS | Routes |
+|---|---|---|---|
+| Main worker server | `WORKER_PORT` (default `3000`) | `USE_SSL=true` uses the instance certificate at `/etc/instance.crt` | Your `HandlerConfig` routes, plus `/session/create`, `/session/end`, `/session/get`, `/session/health`, `/pyworker/update` |
+| Internal webhook server | `WORKER_HTTP_PORT` (defaults to `WORKER_PORT + 1`) | Never | `/session/end` only |
+
+The main server is what the outside world talks to. The second, plain-HTTP server exists so that processes running **on the same instance**, typically your model server firing a completion webhook, can end a session without having to negotiate TLS against the instance certificate. It exposes nothing except `/session/end`.
+
+### The request envelope
+
+Every request the SDK sends to a worker route uses the same JSON envelope:
+
+```json
+{
+  "auth_data": { "url": "...", "endpoint": "...", "cost": 100, "reqnum": 42, "request_idx": 7, "signature": "..." },
+  "session_id": "aB3xY7kLm9Qz1",
+  "payload": { "your": "model payload" }
+}
+```
+
+- `auth_data` is the signed routing grant issued by the serverless engine. Your handler routes verify its signature against the engine's public key before doing any work.
+- `session_id` is `null` for ordinary requests and set for session requests.
+- `payload` is what reaches your `request_parser` and `workload_calculator`, and ultimately your model server.
+
+### The session routes
+
+The session lifecycle routes do not use the routing signature. They authenticate by comparing the `session_auth` in the body against the `auth_data` stored on the worker when the session was created. This is what makes it possible to hand a session's credentials to something else, such as a webhook, and let that thing end the session.
+
+| Route | Body | Success | Failures |
+|---|---|---|---|
+| `POST /session/create` | `{auth_data, payload: {lifetime, on_close_route, on_close_payload}}` | `201` with `{session_id, expiration}` | `429` if `max_sessions` is reached, `422` on malformed JSON |
+| `POST /session/end` | `{session_id, session_auth}` | `200` with `{ended: true, removed_session}` | `400` unknown session, `401` bad `session_auth`, `410` already closed |
+| `POST /session/get` | `{session_id, session_auth}` | `200` with `{session_id, auth_data, lifetime, expiration, created_at, on_close_route, on_close_payload}` | `400` unknown session, `401` bad `session_auth` |
+| `POST /session/health` | `{session_id, session_auth}` | `200` with `{ok: true}` | `200` with `{ok: false}` if unknown, `401` bad `session_auth` |
+
+A request sent to one of *your* handler routes with a `session_id` that the worker no longer knows about returns **`410 Gone`**. The SDK treats that as a closed session: it flips `session.open` to `False` and raises.
+
+<Warning>
+  `session.auth_data` is a credential. Anyone holding a session's `session_id` and `auth_data` can send requests on that session and end it. Only pass it to services you control, such as a webhook handler on the worker itself.
+</Warning>
+
+***
+
+## Opening and using a session
+
+```python
+import asyncio
+from vastai import Serverless
+
+
+async def main():
+    async with Serverless() as client:
+        endpoint = await client.get_endpoint(name="my-endpoint")
+
+        session = await endpoint.session(cost=100, lifetime=60)
+        try:
+            result = await session.request("/generate/sync", {"input": {"prompt": "hello"}})
+            print(result["response"])
+        finally:
+            await session.close()
+
+
+asyncio.run(main())
+```
+
+`Session` is also an async context manager, so the `try`/`finally` can be collapsed:
+
+```python
+async with await endpoint.session(cost=100, lifetime=60) as session:
+    result = await session.request("/generate/sync", {"input": {"prompt": "hello"}})
+```
+
+### endpoint.session()
+
+```python
+await endpoint.session(
+    cost: int = 100,
+    lifetime: float = 60,
+    on_close_route: str = None,
+    on_close_payload: dict = None,
+    timeout: float = None,
+)
+```
+
+- `cost: int` (default `100`)
+  The workload the session holds on the worker for as long as it stays open. This is what keeps the worker occupied and prevents the engine from scaling it away. Set it to roughly the workload of one representative request so that autoscaling accounts for the reserved capacity.
+
+- `lifetime: float` (default `60`)
+  Seconds of idle time the session is allowed before the worker's garbage collector reclaims it. Each request through the session adds another `lifetime` seconds to the deadline.
+
+- `on_close_route: str | None`
+  A route the worker POSTs to when the session closes, for any reason. A relative path such as `/cancel_task` is resolved against your model server (`model_server_url:model_server_port`); an absolute URL is called as-is.
+
+- `on_close_payload: dict | None`
+  The JSON body sent to `on_close_route`. The worker adds `session_id` to it if you have not set that key yourself.
+
+- `timeout: float | None`
+  Total seconds to wait for a worker to become available while the session is being created. `None` waits indefinitely.
+
+### session.request()
+
+```python
+await session.request(
+    route: str,
+    payload: dict,
+    serverless_request = None,
+    cost: int = 100,
+    retry: bool = True,
+    stream: bool = False,
+)
+```
+
+Identical to `endpoint.request()`, except that the request is delivered directly to the session's worker instead of being routed.
+
+<Note>
+  The `cost` argument is ignored for session requests. Routing is what consumes `cost`, and session requests skip routing. The workload the worker records for the request comes from that handler's `workload_calculator`, exactly as it does for an unrouted request.
+</Note>
+
+### Inspecting and closing
+
+```python
+await session.is_open()   # POST /session/get against the worker
+await session.close()     # POST /session/end against the worker
+session.session_id        # str
+session.auth_data         # dict, the session credential
+session.url               # the pinned worker's URL
+session.expiration        # epoch seconds
+```
+
+`is_open()` returns `True` while the worker still holds the session. If the session has already been removed, or the worker is unreachable, it raises instead of returning `False`, so guard it when you use it as a loop condition:
+
+```python
+async def still_running(session) -> bool:
+    try:
+        return await session.is_open()
+    except Exception:
+        return False
+```
+
+`close()` is idempotent and never raises. It marks the session closed locally even if the call to the worker fails.
+
+***
+
+## Pinning related requests to one worker
+
+This is the most common reason to reach for a session. Consider a multi-turn conversation against a vLLM endpoint. Each turn resends the whole message history, and vLLM's prefix cache means that a worker which has already seen turns 1 through 3 can reuse the KV cache for that prefix and only prefill the new tokens.
+
+Without a session, every turn is routed independently. Turn 4 may land on a worker that has never seen the conversation, forcing a full prefill of the entire history: the prefix cache buys you nothing and latency grows with the conversation instead of staying flat.
+
+With a session, all turns hit the same worker and the cache is hit on every turn after the first.
+
+```python
+import asyncio
+from vastai import Serverless
+
+MODEL = "Qwen/Qwen3-8B"
+MAX_TOKENS = 512
+
+TURNS = [
+    "Summarize the attached contract clause in plain English.",
+    "Now list every obligation it places on the buyer.",
+    "Which of those obligations have hard deadlines?",
+]
+
+
+async def main():
+    async with Serverless() as client:
+        endpoint = await client.get_endpoint(name="my-vllm-endpoint")
+
+        messages = [{"role": "system", "content": "You are a contract analyst."}]
+
+        # cost mirrors a single turn's workload so the engine sizes capacity correctly
+        session = await endpoint.session(cost=MAX_TOKENS, lifetime=300)
+        try:
+            for turn in TURNS:
+                messages.append({"role": "user", "content": turn})
+
+                result = await session.request(
+                    "/v1/chat/completions",
+                    {
+                        "model": MODEL,
+                        "messages": messages,
+                        "max_tokens": MAX_TOKENS,
+                        "temperature": 0.7,
+                    },
+                )
+                if not result["ok"]:
+                    raise RuntimeError(f"turn failed: {result['status']} {result['text']}")
+
+                reply = result["response"]["choices"][0]["message"]["content"]
+                messages.append({"role": "assistant", "content": reply})
+                print(reply)
+        finally:
+            await session.close()
+
+
+asyncio.run(main())
+```
+
+The same pattern applies to any worker-local state: a ComfyUI worker that has already loaded a checkpoint, a diffusion worker holding a LoRA, or a worker that has downloaded a large input file for you to operate on repeatedly.
+
+<Tip>
+  Give a conversation session a `lifetime` comfortably longer than the gap you expect between turns. Because every request pushes the deadline out by another `lifetime` seconds, an actively used session never expires on its own.
+</Tip>
+
+### Fanning out across workers
+
+Sessions do not force everything onto one worker. Each `endpoint.session()` call routes independently, so opening N sessions spreads them across the pool exactly as N ordinary requests would, and each one then stays put:
+
+```python
+async def run_one(endpoint, prompt):
+    session = await endpoint.session(cost=100, lifetime=30)
+    try:
+        return await session.request("/generate/sync", {"input": {"prompt": prompt}})
+    finally:
+        await session.close()
+
+
+results = await asyncio.gather(*(run_one(endpoint, p) for p in prompts))
+```
+
+***
+
+## Running asynchronous tasks
+
+A session request is still an HTTP request, and the SDK gives it a 600 second worker timeout. Anything longer than that, a training run, a long video render, a batch job, should not be held open on a single connection. Instead, use the session as a **handle** to a job running on the worker:
+
+1. One short request starts the job and returns immediately.
+2. The session keeps the worker pinned and alive while the job runs.
+3. Short status requests poll progress on the same worker.
+4. Closing the session cancels the job through `on_close_route`.
+
+### The worker side
+
+Expose three routes: one to start the task, one to report status, and one to cancel it. The model server starts the work in the background and returns straight away.
+
+```python
+from vastai import Worker, WorkerConfig, HandlerConfig, LogActionConfig, BenchmarkConfig
+
+worker_config = WorkerConfig(
+    model_server_url="http://127.0.0.1",
+    model_server_port=8080,
+    model_log_file="/var/log/model.log",
+    model_healthcheck_url="/health",
+    max_sessions=4,
+    handlers=[
+        HandlerConfig(
+            route="/start_task",
+            benchmark_config=BenchmarkConfig(
+                dataset=[{"max_train_batches_per_epoch": 10}], runs=1
+            ),
+        ),
+        HandlerConfig(route="/status"),
+        HandlerConfig(route="/cancel_task"),
+    ],
+    log_action_config=LogActionConfig(
+        on_load=["Model Server Running"],
+        on_error=["Traceback (most recent call last):"],
+    ),
+)
+
+Worker(worker_config).run()
+```
+
+### The client side
+
+```python
+import asyncio
+from vastai import Serverless
+
+
+async def run_task(endpoint, epochs: int):
+    # on_close_route fires on close, expiry, or crash -> the job is always cancelled
+    session = await endpoint.session(cost=100, lifetime=120, on_close_route="/cancel_task")
+    try:
+        started = await session.request(
+            "/start_task",
+            {"epochs": epochs, "session_id": session.session_id},
+        )
+        status = started["response"]["status"]
+        print(f"[{session.session_id}] started, state={status['state']}")
+
+        while status["state"] not in ("completed", "failed", "canceled"):
+            await asyncio.sleep(1.0)
+            try:
+                polled = await session.request("/status", {}, retry=False)
+            except Exception:
+                # a closed session means the worker finished and ended it for us
+                break
+            status = polled["response"]["status"]
+            print(f"[{session.session_id}] {status['state']} "
+                  f"epoch={status.get('epoch')} step={status.get('step')}")
+
+        return status
+    finally:
+        await session.close()
+
+
+async def main():
+    async with Serverless() as client:
+        endpoint = await client.get_endpoint(name="my-training-endpoint")
+        results = await asyncio.gather(*(run_task(endpoint, 5) for _ in range(3)))
+        for r in results:
+            print(r)
+
+
+asyncio.run(main())
+```
+
+Three things are worth calling out:
+
+- **`on_close_route="/cancel_task"`** is the safety net. It is invoked whenever the session ends, including on expiry after your client crashes, so a dropped client never leaves a GPU grinding on abandoned work.
+- **Polling extends the lease.** Each `/status` call pushes the expiration out by another `lifetime`, so an actively monitored job cannot be reclaimed mid-run.
+- **`retry=False` on polls.** A failed status check should surface immediately rather than being retried with backoff; the next poll will pick it up anyway.
+
+### Resuming a session from another process
+
+Because a session is fully described by its `session_id` and `auth_data`, you can hand those to a different process, a web request handler, a cron job, and reattach:
+
+```python
+session = await endpoint.get_session(
+    session_id=stored_session_id,
+    session_auth=stored_auth_data,
+)
+status = await session.request("/status", {})
+```
+
+`get_session()` raises if the worker no longer has the session, which is itself a useful signal that the job has finished and released its worker.
+
+***
+
+## Ending a session from the worker
+
+The most efficient shape for asynchronous work is one where nothing has to poll at all: the worker ends its own session as soon as the job finishes, releasing the GPU on the exact tick the work completes.
+
+This works because `/session/end` authenticates on `session_auth` rather than on a routing signature. Pass the session's credentials into whatever webhook your model server supports, point the webhook at the worker's own internal HTTP port, and the model closes the session for you.
+
+```python
+import asyncio
+from vastai import Serverless
+
+
+async def main():
+    async with Serverless() as client:
+        endpoint = await client.get_endpoint(name="my-comfy-endpoint")
+        session = await endpoint.session(cost=100, lifetime=30)
+
+        payload = {
+            "input": {
+                "modifier": "Text2Image",
+                "modifications": {
+                    "prompt": "a page from a peanuts comic strip",
+                    "width": 512,
+                    "height": 512,
+                    "steps": 20,
+                },
+                # ComfyUI POSTs here when the job finishes. The worker's
+                # plain-HTTP session server listens on WORKER_HTTP_PORT
+                # (WORKER_PORT + 1, so 3001 by default).
+                "webhook": {
+                    "url": "http://localhost:3001/session/end",
+                    "extra_params": {
+                        "session_id": session.session_id,
+                        "session_auth": session.auth_data,
+                    },
+                },
+            }
+        }
+
+        result = await session.request("/generate", payload)
+        print("queued:", result["ok"])
+
+        # The session is now self-terminating. Any later request raises
+        # once the render finishes and the webhook closes it.
+        await asyncio.sleep(30)
+        try:
+            await session.request("/generate", payload)
+        except ValueError:
+            print("session was closed by the completion webhook")
+
+
+asyncio.run(main())
+```
+
+The `extra_params` mechanism above is ComfyUI-specific: it merges those keys into the webhook body, producing exactly the `{"session_id": ..., "session_auth": ...}` shape `/session/end` expects. Any model server that can POST a JSON body of your choosing on completion can do the same thing.
+
+If your model server cannot be configured with a webhook, call the endpoint from your own code inside the worker instead:
+
+```python
+import json
+import os
+import urllib.request
+
+def end_session(session_id: str, session_auth: dict) -> None:
+    port = int(os.environ.get("WORKER_HTTP_PORT", int(os.environ.get("WORKER_PORT", "3000")) + 1))
+    body = json.dumps({"session_id": session_id, "session_auth": session_auth}).encode()
+    req = urllib.request.Request(
+        url=f"http://127.0.0.1:{port}/session/end",
+        data=body,
+        method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=2.0) as resp:
+            resp.read()
+    except Exception:
+        pass  # best effort: never fail the job because cleanup failed
+```
+
+Pass the `session_auth` through your job payload when you start the task, the same way `session_id` is passed in the training example above.
+
+<Note>
+  `on_close_route` and a completion webhook are complements, not alternatives. The webhook closes the session on the happy path; `on_close_route` cleans up on every other path, including expiry.
+</Note>
+
+***
+
+## Sessions and autoscaling
+
+An open session is visible to the serverless engine as work in progress.
+
+- **The session's `cost` counts toward the worker's current load** for its whole lifetime. The engine therefore treats the worker as busy: it prefers other workers when routing new traffic, and it will not scale the worker down while the session is open.
+- **The session's cost is excluded from queue-time calculations.** A worker holding idle sessions does not start rejecting fresh requests with `429` on the basis of reserved-but-unused capacity, because `max_queue_time` is evaluated against real in-flight requests only.
+- **Requests made through a session still report their own workload** via the handler's `workload_calculator`, so throughput accounting stays accurate.
+
+Pick `cost` deliberately. Too low and the engine may pack more concurrent work onto a worker you intended to reserve; too high and you inflate perceived load and recruit workers you do not need.
+
+### Limiting sessions per worker
+
+`WorkerConfig.max_sessions` caps how many concurrent sessions one worker will hold. It defaults to **10**; setting it to `0` or `None` removes the cap.
+
+```python
+worker_config = WorkerConfig(
+    ...,
+    max_sessions=4,   # at most 4 concurrent sessions on this worker
+)
+```
+
+When a worker is at its cap it answers `/session/create` with `429`. The SDK treats `429` as retryable and will back off and try to route again, so at the client level a saturated pool shows up as a slower `endpoint.session()` call rather than an error.
+
+Set `max_sessions` to match what a single GPU can genuinely hold at once. For a worker that keeps per-session state in VRAM, that number is usually small.
+
+***
+
+## Failure modes
+
+| Situation | What the SDK does |
+|---|---|
+| The session's worker becomes unreachable mid-request | The session cannot be re-routed, so the SDK marks it closed and raises `ConnectionError`. Ordinary, non-session requests would silently re-route to another worker. |
+| A request returns `410` because the session expired or was closed | `session.open` becomes `False` and a `ValueError` is raised. Later calls to `session.request()` raise immediately without touching the network. |
+| `session.close()` cannot reach the worker | The error is logged and swallowed; the session is marked closed locally. The worker reclaims it on expiry. |
+| The client process dies with a session open | The worker's garbage collector closes the session `lifetime` seconds after the last request and fires `on_close_route`. |
+| A worker route returns `429` because queue time is exceeded | Retried with backoff, on the same worker, since the session cannot re-route. |
+
+<Warning>
+  Always close sessions you open. An abandoned session holds its worker's load and blocks a `max_sessions` slot until it expires. `try`/`finally` around the session body, or `async with`, is the pattern to reach for.
+</Warning>
+
+***
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="The SDK" icon="python" href="/guides/serverless/sdk-overview">
+    An overview of what the Serverless SDK handles for you.
+  </Card>
+  <Card title="Creating Custom PyWorkers" icon="server" href="/guides/serverless/creating-new-pyworkers">
+    Define the handler routes your sessions will call.
+  </Card>
+  <Card title="Session API reference" icon="book" href="/sdk/python/serverless/session">
+    Full signatures for the `Session` class.
+  </Card>
+  <Card title="Scaling parameters" icon="sliders" href="/guides/serverless/serverless-parameters">
+    How load and queue time drive worker recruitment.
+  </Card>
+</CardGroup>
