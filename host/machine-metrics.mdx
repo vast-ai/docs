@@ -8,11 +8,14 @@ Machine Metrics is a monitoring dashboard for the machines you host on Vast. It 
 
 ## Why use it
 
+**Machine health:**
 - Confirm a machine is online, reporting, and healthy before or after a rental
 - Catch hardware problems early, such as a GPU running hot or clocking down
+
+**Troubleshooting:**
 - Investigate a client complaint about a slow, unresponsive, or underperforming machine
 - See whether containers on the machine are running cleanly or crash looping
-- Track down a runaway process or an unexpected drop in throughput
+- Track down performance issues or unexpected drops in throughput
 
 ## Opening the dashboard
 
@@ -31,12 +34,12 @@ There is nothing to install or enable. The Vast daemon collects and uploads this
 
 ## What gets collected
 
+The Vast daemon collects the following data from your machines:
+
 | Data | How often it is sampled |
 | --- | --- |
 | CPU, memory, GPU, disk, and network counters | Every second |
-| Process table | Every 5 seconds |
 | Container state | Every 15 seconds |
-| Vast daemon log lines | As they are written |
 
 Samples are batched on the machine and uploaded periodically, at a rate that depends on how much data the machine is producing. If the machine goes offline, its data is saved locally and uploaded when it reconnects, so an outage appears as a gap that fills in later. A very long outage eventually loses its oldest data.
 
@@ -52,9 +55,9 @@ The chart covers the last 7 days by default. Every metric has a button above it:
 
 | Metric | What it means |
 | --- | --- |
-| User CPU | Time spent running programs, including your clients' workloads. On a busy rented machine this should be the largest share |
-| System CPU | Time spent in the kernel on the programs' behalf: syscalls, drivers, filesystem and network work. Persistently high system time with low user time often means heavy I/O rather than useful compute |
-| CPU I/O Wait | Time the CPU sat idle waiting for a disk or network read to finish. High I/O wait points at storage as the bottleneck, not the processor |
+| User CPU | Time spent running programs, including your clients' workloads |
+| System CPU | Time spent in the kernel on the programs' behalf: syscalls, drivers, filesystem and network work |
+| CPU I/O Wait | Time the CPU sat idle with a disk read or write still outstanding. High I/O wait points at storage as the bottleneck, not the processor |
 | Idle CPU | Time the CPU had nothing to do |
 | CPU Steal | Time the CPU was ready to run but the hypervisor gave the cycles to someone else. Only meaningful if the machine is itself a virtual guest; it stays at zero on bare metal |
 | Load (1m) | Average number of processes running or waiting to run over the last minute. Compare it against the machine's core count: a load well above the core count means work is queuing |
@@ -85,9 +88,9 @@ Expand the tab with the arrow on its right to chart each device separately. This
 
 | Tab | Per-device metrics | Notes |
 | --- | --- | --- |
-| GPU | Utilization, Memory Utilization, Used Memory, Total Memory, Temperature, Power, SM Clock, Memory Clock | Utilization is the share of time the GPU was busy, not how much of its compute was used. SM Clock dropping while Temperature and Power stay high is thermal throttling |
+| GPU | Utilization, Memory Utilization, Used Memory, Total Memory, Temperature, Power, SM Clock, Memory Clock | Utilization is the share of time the GPU was busy, not how much of its compute was used. SM Clock dropping while Temperature sits at its ceiling is thermal throttling; SM Clock dropping while Power is pinned at its limit is the power cap |
 | Disk | Utilization, Read and Write IOPS, Read and Write Speed | Utilization is the share of time the disk had a request in flight. IOPS counts operations per second, speed counts bytes |
-| Network | RX and TX throughput, RX and TX Packets, RX and TX Errors, RX and TX Drops | RX is traffic in, TX is traffic out. Errors and drops should sit at or near zero; a climbing count points at a cable, NIC, or upstream problem |
+| Network | RX and TX throughput, RX and TX Packets, RX and TX Errors, RX and TX Drops | RX is traffic in, TX is traffic out. Errors and drops are counted per sample rather than accumulated, so a healthy interface reads a flat zero; anything sitting above it points at a cable, NIC, or upstream problem |
 
 <Frame caption="The GPU tab with its per-device grid expanded">
   <img src="/images/machine-metrics-gpu-grid-light.webp" className="block dark:hidden" alt="Machine Metrics GPU tab showing eight GPUs, each with utilization, memory, temperature, power, and clock metrics" />
@@ -109,13 +112,9 @@ To move around the timeline:
 
 Zooming in loads finer-grained data, down to per-second samples over short windows.
 
-## Containers, processes, and logs
+## Containers
 
-Below the chart, three tabs show detail for the time range you are viewing.
-
-### Containers
-
-A timeline with one row per container that was on the machine during the window, so you can see the rental history at a glance:
+Below the chart, a timeline shows container activity for the time range you are viewing. One row per container appears on the machine during the window, so you can see the rental history at a glance:
 
 | Legend | What it shows |
 | --- | --- |
@@ -135,28 +134,12 @@ Hover a row for the container's status, last reported state, first and last seen
 A striped bar is a zoom artifact, not a problem. Zoom in to see the real pattern: restarts every few seconds are a crash loop, while a few runs spread over days is normal rental activity.
 </Note>
 
-### Processes
-
-A table of the 50 heaviest processes in the window, ranked by accumulated CPU time: PID, command, CPU time, peak CPU percentage, peak resident memory, and first and last seen timestamps. Search and sorting work over those 50 rows, so narrow the time window to change which processes are in play.
-
-This includes processes running inside your clients' containers.
-
-### Logs
-
-The Vast daemon's log for that machine, with Info, Warning, Error, and Critical counts across the top. The counts cover the whole window; the lines below them are a capped sample of it. Click one or more severities to filter, or search to narrow by keyword. Repeated identical lines are grouped with a `×N` count rather than flooding the view.
-
-Click a log line to pin a marker on the chart above and see what the machine was doing when the message was written. **Deselect All** clears the filters and any pinned markers. The refresh button re-runs the query for the current window; it does not move the window forward.
-
-<Note>
-These are Vast daemon logs, not the logs from inside your clients' containers. Container output stays with the client's instance.
-</Note>
-
 ## Troubleshooting
 
 | Symptom | Where to look |
 | --- | --- |
 | A GPU running hot or throttling | Expand the GPU grid and compare Temperature, Power, and SM Clock per card. One card hotter and clocking lower than the rest points at cooling or seating rather than at the workload |
-| Clients keep leaving the machine | Find the rental in the Containers tab and zoom into it. Short runs repeating back to back are a crash loop. Check the Logs tab around those times |
+| Clients keep leaving the machine | Find the rental in the Containers timeline and zoom into it. Short runs repeating back to back are a crash loop |
 | Unexplained slowness | High CPU I/O Wait alongside disk utilization points at storage. High CPU Steal means the machine is itself a virtual guest and its hypervisor is oversubscribed, so it stays at zero on bare metal |
 | Bandwidth complaints | Chart Total RX and Total TX over the rental window, then expand the Network grid to check errors and drops on the interface |
 | The machine looks idle | GPU utilization near zero through a rental usually means the client's workload is not using the GPUs |
