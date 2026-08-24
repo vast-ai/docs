@@ -15,10 +15,6 @@ Sessions solve three problems:
 - **Worker reservation.** An open session reports load to the serverless engine for as long as it is open, so the worker stays hot and is not scaled away while you are still using it.
 - **Asynchronous work.** You can kick off a long-running job, return immediately, and poll it later on the same worker. The session carries the credentials needed to end it, so the worker itself, or a third-party webhook, can close the session the moment the job finishes.
 
-<Note>
-  Sessions are a feature of the [Serverless SDK](./sdk-overview) and the PyWorker web server. Both sides are built in: any PyWorker built with `Worker`/`WorkerConfig` already serves the session routes described below, and no worker code is required to support basic session usage.
-</Note>
-
 ***
 
 ## How a session works
@@ -472,7 +468,8 @@ Pass the `session_auth` through your job payload when you start the task, the sa
 An open session is visible to the serverless engine as work in progress.
 
 - **The session's `cost` counts toward the worker's current load** for its whole lifetime. The engine therefore treats the worker as busy: it prefers other workers when routing new traffic, and it will not scale the worker down while the session is open.
-- **The session's cost is excluded from queue-time calculations.** A worker holding idle sessions does not start rejecting fresh requests with `429` on the basis of reserved-but-unused capacity, because `max_queue_time` is evaluated against real in-flight requests only.
+- **The worker's own queue-time check ignores the session.** `HandlerConfig.max_queue_time` is the PyWorker's local admission control, and it is evaluated against real in-flight requests only. A worker holding idle sessions therefore does not start rejecting fresh requests with `429` on the basis of reserved-but-unused capacity.
+- **The serverless engine's queue-time accounting does not ignore it.** The load a worker reports upstream (`cur_load`, `new_load`, and its working-request count) includes every open session for the session's whole lifetime. The endpoint-level [`max_queue_time` and `target_queue_time`](./serverless-parameters) are derived from those numbers, so sessions make a worker look full to the router and can push the endpoint into scaling up.
 - **Requests made through a session still report their own workload** via the handler's `workload_calculator`, so throughput accounting stays accurate.
 
 Pick `cost` deliberately. Too low and the engine may pack more concurrent work onto a worker you intended to reserve; too high and you inflate perceived load and recruit workers you do not need.
