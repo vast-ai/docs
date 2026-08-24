@@ -1,0 +1,293 @@
+---
+title: Parallel Batch Rendering
+description: Run a batch of GPU jobs from one asyncio.gather, and understand what actually governs whether the batch spreads across workers.
+"canonical": "/examples/deployments/fan-out"
+---
+
+This example renders a deep zoom into the Mandelbrot set — one frame per remote call — and stitches the frames into an animation. There are no model weights to download, so every second you observe is either worker startup or real GPU compute, which makes it a clean lens on how batching actually behaves.
+
+The pattern generalises to any embarrassingly parallel batch: rendering frames, encoding video segments, embedding a corpus, scoring a dataset, running a parameter sweep.
+
+It also does something most examples skip — it reports **which worker** ran each call. That is the difference between assuming a batch ran in parallel and knowing whether it did. As you will see below, the honest answer on a cold deployment is usually "it didn't", and the rest of this page explains why and what to do about it.
+
+<Frame caption="One frame of the zoom, rendered on a remote GPU">
+  <img src="/images/deployments/mandelbrot-frame.png" alt="Mandelbrot set rendered on a GPU" />
+</Frame>
+
+## Prerequisites
+
+```bash
+pip install vastai pillow
+export VAST_API_KEY=<your key>
+```
+
+## deploy.py
+
+The remote function returns a dict rather than raw bytes so the client can see **which worker** handled each frame. That is the whole trick behind making fan-out legible: without attribution you cannot tell a fast serial run from a real parallel one.
+
+```python deploy.py
+"""Render a Mandelbrot zoom on remote GPUs, one frame per call."""
+
+from vastai import Deployment
+from vastai.data.query import gpu_name, RTX_4090, RTX_5090
+
+app = Deployment(name="mandelbrot", ttl=1800)
+
+WIDTH = HEIGHT = 2048
+BASE_ITER = 3000
+ITER_PER_FRAME = 1500   # deeper zooms need more iterations to resolve detail
+
+
+def _render(frame: int):
+    """Pure, synchronous GPU work. Runs in a thread - see render_frame below."""
+    import io
+    import torch
+    from PIL import Image
+
+    device = torch.device("cuda")
+    max_iter = BASE_ITER + ITER_PER_FRAME * frame
+
+    # Zoom toward a point on the boundary of the set
+    cx, cy = -0.743643887037151, 0.131825904205330
+    span = 3.0 * (0.92 ** frame)
+
+    xs = torch.linspace(cx - span, cx + span, WIDTH, device=device)
+    ys = torch.linspace(cy - span, cy + span, HEIGHT, device=device)
+    X, Y = torch.meshgrid(xs, ys, indexing="xy")
+    c = torch.complex(X, Y)
+
+    z = torch.zeros_like(c)
+    escape = torch.zeros(c.shape, dtype=torch.int32, device=device)
+    for _ in range(max_iter):
+        alive = z.abs() <= 2.0
+        z = torch.where(alive, z * z + c, z)
+        escape += alive.to(torch.int32)
+
+    # Smooth cosine palette; points that never escaped stay black
+    inside = escape >= max_iter
+    t = (escape.float() / max_iter).clamp(0, 1) ** 0.3
+    phase = 3.0 + 14.0 * t
+    channels = [(0.5 + 0.5 * torch.cos(phase + off)) for off in (0.0, 0.7, 1.4)]
+    rgb = torch.stack([(ch * 255).to(torch.uint8) for ch in channels], dim=-1)
+    rgb[inside] = 0
+
+    buf = io.BytesIO()
+    Image.fromarray(rgb.cpu().numpy(), mode="RGB").save(buf, format="PNG")
+    return buf.getvalue(), max_iter
+
+
+@app.remote(benchmark_dataset=[{"frame": 0, "total_frames": 1}])
+async def render_frame(frame: int, total_frames: int) -> dict:
+    """Render one frame of a Mandelbrot zoom.
+
+    The GPU work is handed to asyncio.to_thread so it never blocks the worker's
+    event loop, which has to stay free to report health and load upstream.
+    """
+    import asyncio, os, socket, time
+
+    started = time.time()
+    png, iterations = await asyncio.to_thread(_render, frame)
+
+    return {
+        "png": png,
+        "worker": os.environ.get("CONTAINER_ID") or socket.gethostname(),
+        "seconds": round(time.time() - started, 2),
+        "iterations": iterations,
+    }
+
+
+image = app.image("vastai/pytorch:@vastai-automatic-tag", 24)
+image.venv("/venv/main")
+image.pip_install("pillow")
+image.require(gpu_name.in_([RTX_4090, RTX_5090]))
+app.configure_autoscaling(
+    min_load=1,        # any pending work is enough to justify a worker
+    cold_mult=1,       # don't over-provision stopped workers
+    max_workers=4,     # cap the blast radius (and the bill)
+    target_util=0.9,
+)
+app.ensure_ready()
+```
+
+## client.py
+
+`asyncio.gather` is the entire fan-out mechanism. Each `render_frame(...)` call is an independent HTTP request that the serverless router places on whichever worker is free.
+
+```python client.py
+import asyncio, io, sys, time, collections
+from pathlib import Path
+from PIL import Image
+from deploy import render_frame
+
+N_FRAMES = int(sys.argv[1]) if len(sys.argv) > 1 else 32
+
+
+async def main():
+    t0 = time.time()
+    done = 0
+
+    async def one(i):
+        nonlocal done
+        r = await render_frame(i, N_FRAMES)
+        done += 1
+        print(f"  frame {i:3d}  worker={r['worker'][:12]:12s} iters={r['iterations']:6d} "
+              f"gpu={r['seconds']:5.2f}s ({done}/{N_FRAMES}) t={time.time()-t0:6.1f}s", flush=True)
+        return i, r
+
+    results = await asyncio.gather(*(one(i) for i in range(N_FRAMES)))
+    elapsed = time.time() - t0
+
+    frames = [Image.open(io.BytesIO(r["png"])) for _, r in sorted(results, key=lambda x: x[0])]
+    frames[0].save("zoom.gif", save_all=True, append_images=frames[1:], duration=80, loop=0)
+
+    per_worker = collections.Counter(r["worker"] for _, r in results)
+    gpu_total = sum(r["seconds"] for _, r in results)
+
+    print(f"\n{N_FRAMES} frames in {elapsed:.1f}s wall")
+    print(f"total GPU time {gpu_total:.1f}s  ->  speedup {gpu_total/elapsed:.1f}x")
+    print(f"spread across {len(per_worker)} workers:")
+    for w, n in per_worker.most_common():
+        print(f"  {w[:16]:16s} {n:3d} frames")
+    print(f"wrote zoom.gif ({Path('zoom.gif').stat().st_size/1e6:.1f} MB)")
+
+asyncio.run(main())
+```
+
+## Run it
+
+```bash
+python client.py 32
+```
+
+```
+INFO - Deployment tarball built: hash=349ba9b0..., size=1937 bytes
+INFO - Uploading deployment tarball
+INFO - Deployment 'mandelbrot' is ready (id=2348)
+  frame   8  worker=48601969     iters= 15000 gpu= 2.43s (1/32) t=  75.0s
+  frame  15  worker=48601969     iters= 25500 gpu= 4.07s (2/32) t=  79.2s
+  ...
+  frame   0  worker=48601969     iters=  3000 gpu= 0.53s (31/32) t= 203.0s
+  frame  12  worker=48601969     iters= 21000 gpu= 3.38s (32/32) t= 206.7s
+
+32 frames in 206.7s wall
+total GPU time 134.0s  ->  speedup 0.6x
+spread across 1 workers:
+  48601969          32 frames
+wrote zoom.gif (10.7 MB)
+```
+
+Run it a second time while the deployment is still up and the difference is the cold start, not the compute:
+
+```
+INFO - Deployment tarball already up to date, skipping upload
+INFO - Deployment 'mandelbrot' is ready (id=2348)
+  frame  30  worker=48601969     iters= 48000 gpu= 7.60s (1/32) t=   9.9s
+  ...
+32 frames in 136.3s wall
+total GPU time 134.3s  ->  speedup 1.0x
+spread across 1 workers:
+  48601969          32 frames
+```
+
+The second run reconnects in about two seconds and delivers its first frame at **9.9s** instead of 75s. Nothing was rebuilt or re-uploaded because the content hash was unchanged.
+
+Note what the warm run is and is not. 136.3s of wall clock against 134.3s of GPU time means the overhead of routing, serialization, and transferring 32 PNGs is about **2 seconds in total** — the machinery is nearly free. It also means the batch ran strictly one frame at a time. The warm run is faster than the cold run purely because it skipped the cold start, not because anything ran in parallel.
+
+## Why one worker served the whole batch
+
+Look at that output again: 32 frames, `max_workers=4`, and **one** worker did all of them. The endpoint really did rent four instances — they just never received any work. This is the most important thing to understand about batching on Vast, so it is worth being precise about the mechanism.
+
+**Routing is decided when the call is dispatched.** `asyncio.gather` fires all 32 requests at once. Each one asks the serverless engine for a worker and then posts directly to the address it is given. At t=0 exactly one worker was ready, so all 32 requests bound to that worker and queued there. Workers that finish booting later have nothing to do — there is no work-stealing, and a request that has already been routed will not migrate.
+
+**Worker recruitment is slow relative to a small batch.** Renting an instance, pulling the image, installing `pillow`, and running the startup benchmark took roughly 75 seconds for the fastest worker in this run and several minutes for the others. A batch representing about two minutes of GPU work is simply over before a pool can assemble.
+
+The practical consequences:
+
+- A burst dispatched against a **cold** deployment lands on whichever worker is ready first, no matter what `max_workers` says.
+- Fan-out across workers happens when the pool is **already warm** at dispatch time, or when the batch is long enough that later requests are dispatched after more workers exist.
+- To get a warm pool, set `cold_workers` so the engine keeps stopped instances ready to start, or dispatch in waves with a bounded semaphore rather than one big `gather`.
+
+<Warning>
+  Do not read `max_workers=4` as "this batch will be four times faster." It is a ceiling on what the engine may rent, not a promise about how one burst is distributed. Measure with per-worker attribution, as this example does, before assuming a batch is parallel.
+</Warning>
+
+## Two things that make scaling possible
+
+Even with a warm pool, two settings decide whether the engine ever sees a reason to spread load.
+
+### Benchmark something representative
+
+Every worker benchmarks itself at startup and reports the resulting throughput. That number is the denominator in every queue-time estimate the system makes.
+
+```python
+# Frame 0 is the cheapest frame in the whole zoom (3000 iterations, ~0.5s).
+# Benchmarking it made workers advertise ~7x the throughput they really had,
+# so a full queue looked like a short wait and nothing scaled.
+benchmark_dataset=[{"frame": 16, "total_frames": 32}],
+```
+
+An unrepresentative benchmark is worse than no benchmark, because it produces confident, wrong capacity numbers.
+
+<Note>
+  `benchmark_dataset` currently uses only the **last** entry in the list as of `vastai` 1.5.5, so supplying several inputs to get an average does not work. Put your single most representative input in the list, or use `benchmark_generator`.
+</Note>
+
+### Report real per-request cost
+
+By default every request counts as one flat unit of load. In this zoom, frame 31 does sixteen times the work of frame 0, so a flat count tells the autoscaler almost nothing.
+
+```python
+def frame_cost(frame: int, total_frames: int = 1) -> float:
+    return float(BASE_ITER + ITER_PER_FRAME * frame)
+
+@app.remote(..., workload_calculator=frame_cost)
+```
+
+The calculator takes the same arguments as the function and returns a float. Only the ratio between cheap and expensive calls matters.
+
+## Do not block the event loop
+
+This is the pitfall that cost the most to find, and it is invisible until you look at worker logs.
+
+The GPU work in this example is a tight synchronous PyTorch loop. Calling it directly from the `async def` body — rather than through `asyncio.to_thread` — holds the worker's event loop for the entire render. The worker keeps serving requests, so nothing looks wrong from the client side, but it can no longer send its periodic status upstream:
+
+```
+2026-08-24 21:47:29[DEBUG] Request to /worker_status/ timed out
+2026-08-24 21:48:17[DEBUG] delete_requests timed out
+2026-08-24 21:48:36[DEBUG] Retrying /worker_status/ request, attempt: 2
+```
+
+In a blocking run of this same example, workers dropped out of the batch as it progressed:
+
+| Elapsed | Workers still completing frames |
+|---|---|
+| 60–120s | 1 |
+| 120–180s | 3 |
+| 180–240s | 2 |
+| 240–480s | 1 |
+
+The batch finished, but four rented GPUs had collapsed to one. Wrapping the compute in `asyncio.to_thread` keeps the loop free and the health reports flowing:
+
+```python
+png, iterations = await asyncio.to_thread(_render, frame)
+```
+
+Any remote function whose body runs for more than a second or two of uninterrupted synchronous work — PyTorch, NumPy, PIL, `subprocess.run` — should do the same.
+
+## Make it yours
+
+- **Swap the workload.** Replace the body of `render_frame` with anything that takes one unit of work and returns a result. The `deploy.py`/`client.py` split does not change.
+- **Return less data.** Every return value is serialized over HTTP; a 2048×2048 PNG is a few megabytes. For large batches, write results to object storage from inside the function and return the key instead.
+- **Raise the ceiling.** `max_workers=4` exists to keep this example cheap. A real batch job can set it far higher — the engine will only rent what the queue justifies.
+- **Warm the pool first.** Set `cold_workers` so stopped instances are kept ready, or send a few throwaway calls before the real batch, so that routing has more than one worker to choose from.
+- **Throttle the burst.** Dispatching through an `asyncio.Semaphore` in waves, rather than one `gather` of everything, gives late-arriving workers a chance to pick up work.
+- **Bound the cost.** `ttl=1800` tears the deployment down after 30 minutes with no client heartbeat, so an interrupted run cannot leave GPUs rented.
+
+<CardGroup cols={2}>
+  <Card title="Scaling parameters" icon="sliders" href="/guides/serverless/serverless-parameters">
+    What `min_load`, `cold_mult`, and `target_util` actually control.
+  </Card>
+  <Card title="Whisper transcription" icon="microphone" href="/examples/deployments/whisper">
+    The same pattern with a model held open in a `@context`.
+  </Card>
+</CardGroup>

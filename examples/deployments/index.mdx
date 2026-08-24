@@ -1,0 +1,113 @@
+---
+title: Deployment Examples
+description: Runnable example projects built with Vast Deployments, from a parallel batch job to a hosted LLM.
+"canonical": "/examples/deployments"
+---
+
+Every example on this page is a **complete, copy-pasteable project**: one `deploy.py` that describes the code and the hardware it runs on, and one `client.py` that calls it. There is no cluster to configure, no Dockerfile to write, and no endpoint to wire up by hand.
+
+<Note>
+  Deployments are currently in **beta**. If you are new to them, read the [Deployments overview](/guides/serverless/deployments) first — it covers `@remote`, `@context`, and the `Image` builder that these examples assume.
+</Note>
+
+## The shape of every example
+
+All four projects below have the same two-file structure, and that is the point: the thing that changes between a toy and a production service is configuration, not architecture.
+
+<CodeGroup>
+```python deploy.py
+from vastai import Deployment
+from vastai.data.query import gpu_name, RTX_4090
+
+app = Deployment(name="my-app")
+
+@app.context()                       # loaded once per worker
+class Model:
+    async def __aenter__(self):
+        self.model = load_model()
+        return self
+    async def __aexit__(self, *exc):
+        pass
+
+@app.remote(benchmark_dataset=[...]) # runs on the GPU
+async def predict(x):
+    return app.get_context(Model).run(x)
+
+image = app.image("vastai/pytorch:@vastai-automatic-tag", 24)
+image.require(gpu_name == RTX_4090)
+app.configure_autoscaling(max_workers=4)
+app.ensure_ready()
+```
+
+```python client.py
+import asyncio
+from deploy import predict
+
+async def main():
+    print(await predict("hello"))   # a real GPU, one await away
+
+asyncio.run(main())
+```
+</CodeGroup>
+
+## Examples
+
+<CardGroup cols={2}>
+  <Card title="Parallel batch rendering" icon="grip" href="/examples/deployments/fan-out">
+    Render a Mandelbrot zoom by dispatching 32 frames with `asyncio.gather`, then stitch them into an animation. Includes per-worker attribution and an honest look at what governs whether a batch really spreads.
+  </Card>
+  <Card title="Stable Diffusion XL" icon="image" href="/examples/deployments/sdxl">
+    Expose SDXL as two chainable remote functions — `txt2img` and `img2img` — that share one copy of the weights on the GPU.
+  </Card>
+  <Card title="Whisper transcription" icon="microphone" href="/examples/deployments/whisper">
+    Send audio bytes, get back a transcript with timestamped segments. Shows binary payloads and a model held open in a `@context`.
+  </Card>
+  <Card title="LLM chat with vLLM" icon="comments" href="/examples/deployments/vllm">
+    Serve a chat model on vLLM's async engine, with a token-aware workload calculator so the autoscaler scales on tokens rather than request count.
+  </Card>
+</CardGroup>
+
+### Also in the guides
+
+<CardGroup cols={3}>
+  <Card title="Square" icon="calculator" href="/guides/serverless/deployments/examples/square">
+    The smallest possible deployment.
+  </Card>
+  <Card title="MNIST" icon="brain" href="/guides/serverless/deployments/examples/train-mnist">
+    Train at startup, then serve inference.
+  </Card>
+  <Card title="vLLM (minimal)" icon="feather" href="/guides/serverless/deployments/examples/vllm">
+    The bare vLLM engine wiring.
+  </Card>
+</CardGroup>
+
+## From example to production
+
+The examples are deliberately small, but nothing about them is a toy — they run on the same infrastructure a production endpoint uses. Turning one into a real service is a matter of changing configuration:
+
+| You want | Change |
+|---|---|
+| More throughput under load | Raise `max_workers` in `configure_autoscaling()` |
+| To absorb bursts without a cold start | Set `cold_workers` so stopped workers are kept ready to start |
+| To stop paying when nobody is calling | Set `ttl=` on `Deployment(...)` so it tears itself down after inactivity |
+| Scaling driven by real cost, not request count | Pass a `workload_calculator` to `@app.remote` |
+| To ship a breaking change safely | Change `tag=` to deploy alongside the old version on a separate endpoint |
+| Specific hardware | Tighten `image.require(...)` with the [query builder](/guides/serverless/deployments/configuration#gpu-and-hardware-requirements) |
+
+See [Configuring Deployments](/guides/serverless/deployments/configuration) for every available knob and [Serverless Parameters](/guides/serverless/serverless-parameters) for how the autoscaler interprets them.
+
+## What to expect the first time
+
+Deployments provision real GPU instances, so the first call is not instant. Numbers below are measured from the examples on this page, on RTX 4090 workers:
+
+| Phase | Typical | What is happening |
+|---|---|---|
+| `ensure_ready()` returns | ~2s | Tarball built, hashed, and uploaded; endpoint registered |
+| First call on a cold deployment | 75s – 6min | A worker is rented, the image is pulled, packages install, `@context` loads, benchmark runs |
+| Subsequent calls | milliseconds – seconds | Routed straight to a ready worker |
+
+The wide range on the first call is almost entirely **model weights and image size**. Measured on this page: Mandelbrot 75s, Whisper 75s, SDXL 253s, vLLM 323s. The first two install a package or download a small model; the last two pull several gigabytes of weights before their first pixel or token.
+
+<Tip>
+  Keep a deployment alive between runs while you iterate. Re-running `deploy.py` with unchanged code is a no-op that reconnects to the existing endpoint in seconds.
+</Tip>

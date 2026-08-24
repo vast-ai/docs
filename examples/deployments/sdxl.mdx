@@ -1,0 +1,227 @@
+---
+title: Stable Diffusion XL
+description: Expose SDXL as two chainable remote functions that share a single copy of the weights on the GPU.
+"canonical": "/examples/deployments/sdxl"
+---
+
+This example serves Stable Diffusion XL as two composable remote functions — `txt2img` and `img2img` — that you chain together from your own machine like nodes in a graph:
+
+```python
+base    = await txt2img("a corgi astronaut", steps=30)
+refined = await img2img(base, "a corgi astronaut, ultra detailed", strength=0.35)
+```
+
+Both functions run on the same worker and share **one** copy of the SDXL weights in VRAM. The interesting technique here is not the diffusion — it is how a `@context` lets several remote functions cooperate over expensive shared state.
+
+<CardGroup cols={2}>
+  <Frame caption="txt2img, 30 steps">
+    <img src="/images/deployments/sdxl-base.png" alt="SDXL txt2img output" />
+  </Frame>
+  <Frame caption="img2img over the same image, strength 0.35">
+    <img src="/images/deployments/sdxl-refined.png" alt="SDXL img2img refinement" />
+  </Frame>
+</CardGroup>
+
+## Prerequisites
+
+```bash
+pip install vastai
+export VAST_API_KEY=<your key>
+```
+
+## deploy.py
+
+`StableDiffusionXLImg2ImgPipeline` is constructed from the **already-loaded components** of the txt2img pipeline rather than with a second `from_pretrained`. Diffusers pipelines are thin wrappers around their modules, so this gives a fully functional second pipeline for essentially zero extra VRAM.
+
+```python deploy.py
+"""Stable Diffusion XL as composable remote functions.
+
+Two nodes you can chain client-side:
+    base    = await txt2img("a corgi astronaut", steps=30)
+    refined = await img2img(base, "a corgi astronaut, highly detailed", strength=0.4)
+"""
+
+from vastai import Deployment
+from vastai.data.query import gpu_name, RTX_4090, RTX_5090
+
+app = Deployment(name="sdxl", ttl=2400)
+
+MODEL_ID = "stabilityai/stable-diffusion-xl-base-1.0"
+
+
+@app.context()
+class SDXL:
+    async def __aenter__(self):
+        import torch
+        from diffusers import StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline
+
+        print(f"[sdxl] loading {MODEL_ID} ...", flush=True)
+        self.txt2img = StableDiffusionXLPipeline.from_pretrained(
+            MODEL_ID, torch_dtype=torch.float16, variant="fp16", use_safetensors=True
+        ).to("cuda")
+        self.txt2img.set_progress_bar_config(disable=True)
+
+        # img2img reuses the *same* weights already on the GPU - no extra VRAM
+        self.img2img = StableDiffusionXLImg2ImgPipeline(
+            vae=self.txt2img.vae,
+            text_encoder=self.txt2img.text_encoder,
+            text_encoder_2=self.txt2img.text_encoder_2,
+            tokenizer=self.txt2img.tokenizer,
+            tokenizer_2=self.txt2img.tokenizer_2,
+            unet=self.txt2img.unet,
+            scheduler=self.txt2img.scheduler,
+        )
+        self.img2img.set_progress_bar_config(disable=True)
+
+        print("[sdxl] warming up ...", flush=True)
+        self.txt2img("warmup", num_inference_steps=1, output_type="latent")
+        print("[sdxl] ready", flush=True)
+        return self
+
+    async def __aexit__(self, *exc):
+        pass
+
+
+def _png(image) -> bytes:
+    import io
+    buf = io.BytesIO()
+    image.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+@app.remote(benchmark_dataset=[{"prompt": "a photograph of an astronaut riding a horse", "steps": 8}])
+async def txt2img(
+    prompt: str,
+    negative_prompt: str = "",
+    width: int = 1024,
+    height: int = 1024,
+    steps: int = 30,
+    guidance_scale: float = 7.5,
+    seed: int = -1,
+) -> bytes:
+    """Text prompt -> PNG bytes."""
+    import random, torch
+
+    ctx = app.get_context(SDXL)
+    g = torch.Generator(device="cuda")
+    g.manual_seed(seed if seed >= 0 else random.randint(0, 2**32 - 1))
+
+    out = ctx.txt2img(
+        prompt=prompt,
+        negative_prompt=negative_prompt or None,
+        width=width, height=height,
+        num_inference_steps=steps,
+        guidance_scale=guidance_scale,
+        generator=g,
+    )
+    return _png(out.images[0])
+
+
+@app.remote()
+async def img2img(
+    image_bytes: bytes,
+    prompt: str,
+    negative_prompt: str = "",
+    strength: float = 0.4,
+    steps: int = 30,
+    guidance_scale: float = 7.5,
+    seed: int = -1,
+) -> bytes:
+    """Existing PNG + prompt -> refined PNG bytes."""
+    import io, random, torch
+    from PIL import Image
+
+    ctx = app.get_context(SDXL)
+    g = torch.Generator(device="cuda")
+    g.manual_seed(seed if seed >= 0 else random.randint(0, 2**32 - 1))
+
+    out = ctx.img2img(
+        prompt=prompt,
+        negative_prompt=negative_prompt or None,
+        image=Image.open(io.BytesIO(image_bytes)).convert("RGB"),
+        strength=strength,
+        num_inference_steps=steps,
+        guidance_scale=guidance_scale,
+        generator=g,
+    )
+    return _png(out.images[0])
+
+
+image = app.image("vastai/pytorch:@vastai-automatic-tag", 50)
+image.venv("/venv/main")
+image.pip_install("diffusers>=0.30.0", "transformers>=4.40.0", "accelerate", "safetensors")
+image.require(gpu_name.in_([RTX_4090, RTX_5090]))
+app.configure_autoscaling(min_load=1, max_workers=2, cold_mult=1)
+app.ensure_ready()
+```
+
+## client.py
+
+```python client.py
+import asyncio, time
+from pathlib import Path
+from deploy import txt2img, img2img
+
+PROMPT = "a corgi astronaut floating above the earth, cinematic lighting, 35mm"
+NEG = "blurry, low quality, watermark, text"
+
+
+async def main():
+    t0 = time.time()
+    base = await txt2img(PROMPT, negative_prompt=NEG, steps=30, seed=42)
+    Path("01_base.png").write_bytes(base)
+    print(f"01_base.png      {len(base)/1e6:.2f} MB   t={time.time()-t0:.1f}s")
+
+    t1 = time.time()
+    refined = await img2img(base, f"{PROMPT}, ultra detailed, sharp focus",
+                            negative_prompt=NEG, strength=0.35, steps=30, seed=7)
+    Path("02_refined.png").write_bytes(refined)
+    print(f"02_refined.png   {len(refined)/1e6:.2f} MB   t={time.time()-t1:.1f}s")
+    print(f"total {time.time()-t0:.1f}s")
+
+asyncio.run(main())
+```
+
+## Run it
+
+```bash
+python client.py
+```
+
+```
+01_base.png      1.68 MB   t=253.2s
+02_refined.png   1.65 MB   t=3.8s
+total 257.0s
+```
+
+The first call absorbs the whole cold start — renting an instance, pulling the PyTorch image, installing diffusers, downloading roughly 7 GB of SDXL weights, and running the warmup pass. The second call is a **3.8s** round trip, because by then the pipeline is resident on a warm worker.
+
+## How it works
+
+**One context, many functions.** `app.get_context(SDXL)` returns the same instance to every remote function on that worker. That is what makes `txt2img` and `img2img` two views onto one model rather than two models.
+
+**Warm up inside `__aenter__`.** The single-step `output_type="latent"` pass forces CUDA kernel compilation and allocator warmup before the worker reports ready. Without it, the first real request pays several extra seconds and — more importantly — the startup benchmark measures a cold pipeline and under-reports the worker's throughput to the autoscaler.
+
+**Chaining happens on the client.** `img2img` takes the PNG bytes that `txt2img` returned. Because each call is independently routed, a long chain may hop between workers; that is fine here because all state lives in the model, not in the request. If you need a chain pinned to one worker — to avoid re-uploading a large intermediate, say — use a [session](/guides/serverless/sessions).
+
+**Storage is explicit.** `app.image(..., 50)` requests 50 GB. SDXL weights plus the image plus the pip environment do not fit in the default allocation, and a worker that runs out of disk mid-download fails its startup and gets recycled.
+
+<Warning>
+  Returning a 1024×1024 PNG means about 1.7 MB per call, and the SDK base64-encodes bytes in transit, so budget roughly a third more on the wire. For high-volume generation, write to object storage from inside the function and return the key.
+</Warning>
+
+## Make it yours
+
+- **Add a refiner stage.** Load `stable-diffusion-xl-refiner-1.0` as a second context and add a third remote function; expect roughly 6 GB more VRAM.
+- **LoRA.** Call `pipe.load_lora_weights(...)` in `__aenter__` and expose the scale as a function argument.
+- **Batch prompts.** `asyncio.gather` over many `txt2img` calls and raise `max_workers` — see [Parallel batch rendering](/examples/deployments/fan-out).
+- **Cheaper hardware.** SDXL fits comfortably in 24 GB; widen `image.require(...)` to include more GPU types and the engine will pick whatever is cheapest and available.
+
+<CardGroup cols={2}>
+  <Card title="@context classes" icon="layer-group" href="/guides/serverless/deployments/context">
+    How worker-scoped resources are loaded and shared.
+  </Card>
+  <Card title="Sessions" icon="link" href="/guides/serverless/sessions">
+    Pin a multi-step chain to one worker.
+  </Card>
+</CardGroup>

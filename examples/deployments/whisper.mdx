@@ -1,0 +1,177 @@
+---
+title: Whisper Transcription
+description: Send audio bytes to a remote GPU and get back a transcript with timestamped segments, using a model held open in a @context.
+"canonical": "/examples/deployments/whisper"
+---
+
+This example turns OpenAI's Whisper into a remote function: you pass raw audio bytes, and you get back the transcript plus timestamped segments. It is the cleanest illustration of two things deployments do well — **binary payloads** and **`@context`**, which loads the model once per worker instead of once per request.
+
+## Prerequisites
+
+```bash
+pip install vastai
+export VAST_API_KEY=<your key>
+```
+
+Any audio file will do. The run below uses the 11-second JFK clip from Whisper's own test fixtures:
+
+```bash
+curl -LO https://github.com/openai/whisper/raw/main/tests/jfk.flac
+```
+
+## deploy.py
+
+The model lives in a `@context`. Its `__aenter__` runs once, while the worker is still starting up, and the worker does not report itself ready until it finishes — so no request ever pays the model-load cost.
+
+```python deploy.py
+"""Speech-to-text on remote GPUs with OpenAI Whisper."""
+
+from vastai import Deployment
+from vastai.data.query import gpu_name, RTX_4090, RTX_5090
+
+app = Deployment(name="whisper", ttl=1800)
+
+MODEL_SIZE = "small"
+
+
+def _silent_wav(seconds: float = 1.0, rate: int = 16000) -> bytes:
+    """A tiny in-memory WAV used as benchmark input, so no assets are needed."""
+    import io, struct, wave
+
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        w.writeframes(struct.pack("<h", 0) * int(rate * seconds))
+    return buf.getvalue()
+
+
+@app.context()
+class Whisper:
+    async def __aenter__(self):
+        import whisper
+
+        print(f"[whisper] loading {MODEL_SIZE} ...", flush=True)
+        self.model = whisper.load_model(MODEL_SIZE, device="cuda")
+        print("[whisper] ready", flush=True)
+        return self
+
+    async def __aexit__(self, *exc):
+        pass
+
+
+@app.remote(benchmark_dataset=[{"audio": _silent_wav()}])
+async def transcribe(audio: bytes, language: str | None = None) -> dict:
+    """Transcribe audio bytes (any ffmpeg-readable format). Returns text + segments."""
+    import os, tempfile
+
+    ctx = app.get_context(Whisper)
+
+    with tempfile.NamedTemporaryFile(suffix=".audio", delete=False) as f:
+        f.write(audio)
+        path = f.name
+    try:
+        result = ctx.model.transcribe(path, language=language, fp16=True)
+    finally:
+        os.unlink(path)
+
+    return {
+        "text": result["text"].strip(),
+        "language": result.get("language"),
+        "segments": [
+            {"start": round(s["start"], 2), "end": round(s["end"], 2), "text": s["text"].strip()}
+            for s in result.get("segments", [])
+        ],
+    }
+
+
+image = app.image("vastai/pytorch:@vastai-automatic-tag", 24)
+image.venv("/venv/main")
+image.apt_get("ffmpeg")
+image.pip_install("openai-whisper")
+image.require(gpu_name.in_([RTX_4090, RTX_5090]))
+app.configure_autoscaling(min_load=1, max_workers=2, cold_mult=1)
+app.ensure_ready()
+```
+
+## client.py
+
+```python client.py
+import asyncio, sys, time
+from pathlib import Path
+from deploy import transcribe
+
+path = Path(sys.argv[1] if len(sys.argv) > 1 else "jfk.flac")
+
+
+async def main():
+    audio = path.read_bytes()
+    print(f"sending {path} ({len(audio)/1e6:.2f} MB)")
+    t0 = time.time()
+    result = await transcribe(audio)
+    print(f"took {time.time()-t0:.1f}s   language={result['language']}\n")
+    print(result["text"])
+    print("\nsegments:")
+    for s in result["segments"]:
+        print(f"  [{s['start']:6.2f} -> {s['end']:6.2f}]  {s['text']}")
+
+asyncio.run(main())
+```
+
+## Run it
+
+```bash
+python client.py jfk.flac
+```
+
+On the first call the deployment has no workers yet, so you are waiting for an instance to be rented, the image pulled, `ffmpeg` and `openai-whisper` installed, and the model downloaded:
+
+```
+sending jfk.flac (1.15 MB)
+took 74.9s   language=en
+
+And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country.
+
+segments:
+  [  0.00 ->  11.00]  And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country.
+```
+
+Run it again while the worker is still up and the model is already resident:
+
+```
+sending jfk.flac (1.15 MB)
+took 2.1s   language=en
+
+And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country.
+```
+
+**74.9s cold, 2.1s warm.** That gap is the entire argument for `@context`: without it, every request would reload the model and you would pay a version of the cold number every single time.
+
+## How it works
+
+**Bytes cross the wire natively.** `audio: bytes` and the returned `dict` are serialized by the SDK — bytes are base64-encoded, so you do not need to think about encoding. Be aware this makes the payload roughly a third larger in transit; for very large media, upload to object storage and pass a URL instead.
+
+**The benchmark needs no fixtures.** Every deployment benchmarks itself at startup to tell the autoscaler how much throughput a worker has, and the benchmark input has to exist at deploy time. Rather than shipping an audio file, `_silent_wav()` synthesizes one second of silence in memory. The function is defined at module scope, so it is available both locally when the tarball is built and on the worker when the benchmark runs.
+
+**System packages come from the image builder.** `image.apt_get("ffmpeg")` installs ffmpeg on the worker at startup, which is what lets Whisper accept FLAC, MP3, M4A and the rest rather than only WAV.
+
+<Note>
+  `benchmark_dataset` currently uses only the **last** entry in the list. Supplying several inputs to get a representative mix does not work as of `vastai` 1.5.5 — put your single most representative input in the list, or use `benchmark_generator` if you need variety.
+</Note>
+
+## Make it yours
+
+- **Bigger model.** `MODEL_SIZE = "large-v3"` is a one-word change; add storage (`app.image(..., 48)`) and require more VRAM with `image.require(gpu_ram >= 24)`.
+- **Batch a directory.** Wrap the call in `asyncio.gather` over many files and raise `max_workers` — see [Parallel batch rendering](/examples/deployments/fan-out) for that pattern in full.
+- **Translate instead of transcribe.** Pass `task="translate"` through to `model.transcribe` to get English output from any source language.
+- **Word-level timestamps.** `model.transcribe(..., word_timestamps=True)` and forward the `words` array in the response.
+
+<CardGroup cols={2}>
+  <Card title="@context classes" icon="layer-group" href="/guides/serverless/deployments/context">
+    The full lifecycle of worker-scoped resources.
+  </Card>
+  <Card title="Parallel batch rendering" icon="grip" href="/examples/deployments/fan-out">
+    Fan a whole directory of audio across a pool of GPUs.
+  </Card>
+</CardGroup>

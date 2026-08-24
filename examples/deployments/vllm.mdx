@@ -1,0 +1,225 @@
+---
+title: LLM Chat Service (vLLM)
+description: Serve a chat model on vLLM's async engine, with a token-aware workload calculator so the autoscaler scales on tokens rather than request count.
+"canonical": "/examples/deployments/vllm"
+---
+
+This example puts a chat model behind a `@remote` function using vLLM's `AsyncLLMEngine`. It is the closest of these examples to a conventional production service, and it introduces one thing the others do not need: a **`workload_calculator`**, so that a 2000-token generation counts for more than a 20-token one when the autoscaler decides how many workers to rent.
+
+## Prerequisites
+
+```bash
+pip install vastai
+export VAST_API_KEY=<your key>
+```
+
+## deploy.py
+
+Two remote functions share one engine: `chat` applies the model's chat template, `complete` takes a raw prompt. Both funnel into a private helper — remote functions can call ordinary Python functions in the same module freely.
+
+```python deploy.py
+"""Serve a chat LLM with vLLM's async engine behind a @remote function."""
+
+from vastai import Deployment
+from vastai.data.query import gpu_name, RTX_4090, RTX_5090
+
+app = Deployment(name="vllm-chat", ttl=2400)
+
+MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
+MAX_MODEL_LEN = 4096
+
+
+@app.context()
+class Engine:
+    async def __aenter__(self):
+        from vllm import AsyncLLMEngine, AsyncEngineArgs, SamplingParams
+        from transformers import AutoTokenizer
+
+        print(f"[vllm] starting engine for {MODEL} ...", flush=True)
+        self.engine = AsyncLLMEngine.from_engine_args(
+            AsyncEngineArgs(model=MODEL, max_model_len=MAX_MODEL_LEN, gpu_memory_utilization=0.85)
+        )
+        self.tokenizer = AutoTokenizer.from_pretrained(MODEL)
+
+        # Force weights + KV cache to be fully allocated before we report ready
+        async for _ in self.engine.generate("warmup", SamplingParams(max_tokens=1), request_id="warmup"):
+            pass
+        print("[vllm] ready", flush=True)
+        return self
+
+    async def __aexit__(self, *exc):
+        self.engine.shutdown_background_loop()
+
+
+async def _generate(prompt: str, max_tokens: int, temperature: float) -> dict:
+    import uuid
+    from vllm import SamplingParams
+
+    ctx = app.get_context(Engine)
+    params = SamplingParams(max_tokens=max_tokens, temperature=temperature)
+
+    final = None
+    async for out in ctx.engine.generate(prompt, params, request_id=str(uuid.uuid4())):
+        final = out
+
+    completion = final.outputs[0]
+    return {
+        "text": completion.text,
+        "finish_reason": completion.finish_reason,
+        "prompt_tokens": len(final.prompt_token_ids),
+        "completion_tokens": len(completion.token_ids),
+    }
+
+
+@app.remote(
+    benchmark_dataset=[{"messages": [{"role": "user", "content": "Hello"}], "max_tokens": 32}],
+    workload_calculator=lambda messages, max_tokens=256, temperature=0.7: float(max_tokens),
+)
+async def chat(messages: list, max_tokens: int = 256, temperature: float = 0.7) -> dict:
+    """OpenAI-style messages in, completion out."""
+    ctx = app.get_context(Engine)
+    prompt = ctx.tokenizer.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=True
+    )
+    return await _generate(prompt, max_tokens, temperature)
+
+
+@app.remote()
+async def complete(prompt: str, max_tokens: int = 128, temperature: float = 0.7) -> dict:
+    """Raw prompt in, completion out (no chat template)."""
+    return await _generate(prompt, max_tokens, temperature)
+
+
+image = app.image("vastai/vllm:v0.11.0-cuda-12.8-mvc-cuda-12.0", 40)
+image.use_system_python()
+image.require(gpu_name.in_([RTX_4090, RTX_5090]))
+app.configure_autoscaling(min_load=1, max_workers=2, cold_mult=1)
+app.ensure_ready()
+```
+
+## client.py
+
+```python client.py
+import asyncio, time
+from deploy import chat
+
+QUESTIONS = [
+    "In one sentence: what is a GPU?",
+    "In one sentence: what is a container image?",
+    "In one sentence: what is autoscaling?",
+    "In one sentence: what is a KV cache?",
+]
+
+
+async def main():
+    t0 = time.time()
+    r = await chat(
+        [
+            {"role": "system", "content": "You are terse and precise."},
+            {"role": "user", "content": "Explain what a GPU serverless endpoint is, in two sentences."},
+        ],
+        max_tokens=120,
+    )
+    print(f"single chat: {time.time()-t0:.1f}s  "
+          f"{r['prompt_tokens']} prompt -> {r['completion_tokens']} completion tokens ({r['finish_reason']})")
+    print(f"  {r['text'].strip()}\n")
+
+    # Multi-turn: the client owns the history, each turn is an independent request
+    history = [{"role": "user", "content": "Name one fast sorting algorithm."}]
+    r1 = await chat(history, max_tokens=40)
+    history += [{"role": "assistant", "content": r1["text"]},
+                {"role": "user", "content": "What is its worst-case complexity?"}]
+    r2 = await chat(history, max_tokens=60)
+    print(f"turn 1: {r1['text'].strip()}")
+    print(f"turn 2: {r2['text'].strip()}\n")
+
+    # Fan out four independent questions
+    t1 = time.time()
+    answers = await asyncio.gather(*(
+        chat([{"role": "user", "content": q}], max_tokens=60) for q in QUESTIONS
+    ))
+    print(f"4 questions answered in {time.time()-t1:.1f}s:")
+    for q, a in zip(QUESTIONS, answers):
+        print(f"  Q: {q}\n  A: {a['text'].strip()}")
+
+asyncio.run(main())
+```
+
+## Run it
+
+```bash
+python client.py
+```
+
+The very first call waits out the whole cold start — renting a GPU, pulling the vLLM image, downloading the model, and building the CUDA graphs and KV cache during warmup. Measured on an RTX 5090, that first call took **323s**. Every call afterwards hits a warm engine:
+
+```
+single chat: 1.2s  33 prompt -> 40 completion tokens (stop)
+  A GPU serverless endpoint is a cloud service that provides access to GPUs without the need
+  for manual provisioning or management of servers, enabling efficient use of GPU resources
+  for tasks that require high-performance computing.
+
+turn 1: One fast sorting algorithm is the Quick Sort algorithm.
+turn 2: The worst-case complexity of the Quick Sort algorithm is O(n^2), where n is the number
+        of elements in the array. This happens when the pivot selected is the smallest or the
+        largest element, leading to unbalanced partitions.
+
+4 questions answered in 1.1s:
+  Q: In one sentence: what is a GPU?
+  A: A GPU, or Graphics Processing Unit, is a specialized chip designed to accelerate data
+     processing and rendering tasks in fields such as gaming, video editing, and scientific computing.
+  Q: In one sentence: what is a container image?
+  A: A container image is a lightweight, standalone, executable package that includes everything
+     needed to run a piece of software, complete with code, runtime, system tools, system libraries, and settings.
+  Q: In one sentence: what is autoscaling?
+  A: Autoscaling is a feature in cloud computing that automatically adjusts the number of resources
+     (such as servers or storage) based on the current workload.
+  Q: In one sentence: what is a KV cache?
+  A: A key-value cache stores data as key-value pairs, and allows quick access to frequently used data elements.
+```
+
+## Scaling on tokens, not requests
+
+By default every request counts as one fixed unit of load, which is a poor model for an LLM: a 16-token reply and a 2000-token reply are wildly different amounts of GPU time. `workload_calculator` fixes that.
+
+```python
+@app.remote(
+    benchmark_dataset=[...],
+    workload_calculator=lambda messages, max_tokens=256, temperature=0.7: float(max_tokens),
+)
+async def chat(messages: list, max_tokens: int = 256, temperature: float = 0.7) -> dict:
+    ...
+```
+
+The calculator receives **the same arguments the function does** and returns a float. Here `max_tokens` is used as the cost proxy, so a queue of long generations reports proportionally more pending load and pulls in workers sooner than a queue of short ones.
+
+Its signature must accept the function's arguments — including defaults — or the call fails at load-scoring time, before your function ever runs.
+
+<Note>
+  For a more accurate estimate, count prompt tokens too: `len(str(messages)) / 4 + max_tokens` is a crude but effective improvement. The absolute scale does not matter; only the ratio between cheap and expensive requests does.
+</Note>
+
+## Streaming
+
+`@remote` functions return a single serialized value, so **token-by-token streaming is not available through a deployment**. The function runs to completion on the worker and the full result comes back in one response.
+
+If you need streaming, use one of:
+
+- The [OpenAI-compatible endpoint](/guides/serverless/openai-compatible-api), which supports `"stream": true` against a Serverless vLLM endpoint.
+- A [custom PyWorker](/guides/serverless/creating-new-pyworkers), where a handler can return a `StreamResponse` and the SDK can consume it with `stream=True`.
+
+## Make it yours
+
+- **Bigger model.** Change `MODEL`, raise the storage argument to `app.image(...)`, and require more VRAM with `image.require(gpu_ram >= 48)`. Multi-GPU needs `tensor_parallel_size` in `AsyncEngineArgs` and `num_gpus >= 2` in the requirements.
+- **Guided output.** vLLM's `GuidedDecodingParams` work unchanged inside `_generate` for JSON-schema-constrained responses.
+- **Keep a worker hot.** Set `cold_workers=1` so a stopped worker is always ready to start, trading a small standing cost for a much shorter worst case than 323s.
+- **Pin a conversation to one worker.** Each call here is routed independently, so a long conversation may hop workers and lose vLLM's prefix cache. [Sessions](/guides/serverless/sessions) pin related requests to a single worker and keep that cache warm.
+
+<CardGroup cols={2}>
+  <Card title="Sessions" icon="link" href="/guides/serverless/sessions">
+    Keep an LLM conversation on one worker for KV cache reuse.
+  </Card>
+  <Card title="OpenAI-compatible API" icon="plug" href="/guides/serverless/openai-compatible-api">
+    Point an existing OpenAI client at Vast, with streaming.
+  </Card>
+</CardGroup>
