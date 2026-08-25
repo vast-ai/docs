@@ -1,0 +1,153 @@
+---
+title: "Machine Metrics"
+sidebarTitle: "Machine Metrics"
+description: "Monitor the health and performance of your machines with historical CPU, memory, GPU, disk, and network data"
+---
+
+Machine Metrics is a monitoring dashboard for the machines you host on Vast. It records how each machine has behaved over time and lets you replay any window of that history, from a few seconds to the machine's full recorded history.
+
+## Why use it
+
+**Machine health:**
+- Confirm a machine is online, reporting, and healthy before or after a rental
+- Catch hardware problems early, such as a GPU running hot or clocking down
+
+**Troubleshooting:**
+- Investigate a client complaint about a slow, unresponsive, or underperforming machine
+- See whether containers on the machine are running cleanly or crash looping
+- Track down performance issues or unexpected drops in throughput
+
+## Opening the dashboard
+
+Open [Machine Metrics](https://cloud.vast.ai/host/machine-metrics/) in the Host section of the console, then pick a machine from the **Machine ID** dropdown.
+
+You can also open a specific machine from **Host → Machines** with the **View metrics** option on the machine card.
+
+<Frame caption="The metrics chart, with memory and GPU series selected">
+  <img src="/images/machine-metrics-overview-light.webp" className="block dark:hidden" alt="Machine Metrics time-series chart with metric toggles above it" />
+  <img src="/images/machine-metrics-overview-dark.webp" className="hidden dark:block" alt="Machine Metrics time-series chart with metric toggles above it" />
+</Frame>
+
+<Note>
+There is nothing to install or enable. The Vast daemon collects and uploads this data automatically, so a machine that is listed and up to date will appear on its own.
+</Note>
+
+## What gets collected
+
+The Vast daemon collects the following data from your machines:
+
+| Data | How often it is sampled |
+| --- | --- |
+| CPU, memory, GPU, disk, and network counters | Every second |
+| Container state | Every 15 seconds |
+
+Samples are batched on the machine and uploaded periodically, at a rate that depends on how much data the machine is producing. If the machine goes offline, its data is saved locally and uploaded when it reconnects, so an outage appears as a gap that fills in later. A very long outage eventually loses its oldest data.
+
+<Note>
+This is not a real-time tool. The page loads the window ending at the moment you opened it and does not advance while the tab stays open, and the most recent data can be hours behind. Reload the page to pull in whatever has arrived since.
+</Note>
+
+## Metrics chart
+
+The chart covers the last 7 days by default. Every metric has a button above it: click to add that series, click again to remove it.
+
+### CPU
+
+| Metric | What it means |
+| --- | --- |
+| User CPU | Time spent running programs, including your clients' workloads |
+| System CPU | Time spent in the kernel on the programs' behalf: syscalls, drivers, filesystem and network work |
+| CPU I/O Wait | Time the CPU sat idle with a disk read or write still outstanding. High I/O wait points at storage as the bottleneck, not the processor |
+| Idle CPU | Time the CPU had nothing to do |
+| CPU Steal | Time the CPU was ready to run but the hypervisor gave the cycles to someone else. Only meaningful if the machine is itself a virtual guest; it stays at zero on bare metal |
+| Load (1m) | Average number of processes running or waiting to run over the last minute. Compare it against the machine's core count: a load well above the core count means work is queuing |
+
+### Memory
+
+| Metric | What it means |
+| --- | --- |
+| Total Memory | RAM installed and visible to the operating system |
+| Free Memory | RAM not in use for anything at all. This normally sits low on a healthy machine and is not a problem on its own |
+| Available Memory | RAM that new work can actually claim, including cache the kernel can reclaim. **This is the number to watch**, not Free Memory |
+| Cached | File contents the kernel is keeping in RAM to avoid re-reading them from disk. Reclaimed automatically when something needs the memory |
+| Buffers | Kernel bookkeeping for block devices, usually small |
+| Free Swap / Total Swap | Swap space on disk. Steady swap use means the machine is short on RAM and paging to disk, which is slow |
+| Processes | Total number of processes on the machine |
+
+### GPU, disk, and network
+
+Select the **GPU**, **Disk**, or **Network** tab to chart whole-machine summaries for that hardware:
+
+| Tab | Summary metrics |
+| --- | --- |
+| GPU | Avg Util (averaged across the machine's GPUs), Max Temp (the hottest GPU), Total Power |
+| Disk | Avg Util |
+| Network | Total RX, Total TX |
+
+Expand the tab with the arrow on its right to chart each device separately. This is how you spot one card in an eight-GPU box running hotter or slower than the rest.
+
+| Tab | Per-device metrics | Notes |
+| --- | --- | --- |
+| GPU | Utilization, Memory Utilization, Used Memory, Total Memory, Temperature, Power, SM Clock, Memory Clock | Utilization is the share of time the GPU was busy, not how much of its compute was used. SM Clock dropping while Temperature sits at its ceiling is thermal throttling; SM Clock dropping while Power is pinned at its limit is the power cap |
+| Disk | Utilization, Read and Write IOPS, Read and Write Speed | Utilization is the share of time the disk had a request in flight. IOPS counts operations per second, speed counts bytes |
+| Network | RX and TX throughput, RX and TX Packets, RX and TX Errors, RX and TX Drops | RX is traffic in, TX is traffic out. Errors and drops are counted per sample rather than accumulated, so a healthy interface reads a flat zero; anything sitting above it points at a cable, NIC, or upstream problem |
+
+<Frame caption="The GPU tab with its per-device grid expanded">
+  <img src="/images/machine-metrics-gpu-grid-light.webp" className="block dark:hidden" alt="Machine Metrics GPU tab showing eight GPUs, each with utilization, memory, temperature, power, and clock metrics" />
+  <img src="/images/machine-metrics-gpu-grid-dark.webp" className="hidden dark:block" alt="Machine Metrics GPU tab showing eight GPUs, each with utilization, memory, temperature, power, and clock metrics" />
+</Frame>
+
+### Reading the chart
+
+Each series is drawn between the **hi** and **lo** marks on its own scale, so metrics with different units share one chart. The solid line is the average and the shaded band is the min to max range, which is why a variable series looks like a band when zoomed out.
+
+Hover anywhere to read values at that moment. All timestamps on this page are UTC.
+
+To move around the timeline:
+
+- **Drag** to pan through time, or **scroll** to zoom in and out around the cursor
+- Use the **zoom in** and **zoom out** buttons in the toolbar for fixed steps
+- **Reset** returns to the default 7-day window and the default set of metrics
+- **All off** clears the chart. **All on** turns on the CPU, memory, and summary metrics, but leaves per-device series off so the chart does not fill with one line per GPU
+
+Zooming in loads finer-grained data, down to per-second samples over short windows.
+
+## Containers
+
+Below the chart, a timeline shows container activity for the time range you are viewing. One row per container appears on the machine during the window, so you can see the rental history at a glance:
+
+| Legend | What it shows |
+| --- | --- |
+| exists (stopped) | A thin gray line spanning the container's life. It existed on the machine but was not running |
+| running | A solid blue bar over the periods the container was actually running |
+| running (vm) | The same, in purple, for a container running as a VM |
+| intermittent (zoom in) | A striped bar covering several runs and the gaps between them, too close together to draw separately at this zoom |
+
+<Frame caption="Separate rentals at different times. C.47325989 ran, then stopped while still present on the machine, so its bar gives way to a thin line">
+  <img src="/images/machine-metrics-containers-light.webp" className="block dark:hidden" alt="Container timeline showing several short runs at different times and one container whose run ends before its life line does" />
+  <img src="/images/machine-metrics-containers-dark.webp" className="hidden dark:block" alt="Container timeline showing several short runs at different times and one container whose run ends before its life line does" />
+</Frame>
+
+Hover a row for the container's status, last reported state, first and last seen times, how long it existed, and its run count and total running time. Click a run to zoom the chart to it and line the rental up with the GPU, memory, and network activity behind it.
+
+<Note>
+A striped bar is a zoom artifact, not a problem. Zoom in to see the real pattern: restarts every few seconds are a crash loop, while a few runs spread over days is normal rental activity.
+</Note>
+
+## Troubleshooting
+
+| Symptom | Where to look |
+| --- | --- |
+| A GPU running hot or throttling | Expand the GPU grid and compare Temperature, Power, and SM Clock per card. One card hotter and clocking lower than the rest points at cooling or seating rather than at the workload |
+| Clients keep leaving the machine | Find the rental in the Containers timeline and zoom into it. Short runs repeating back to back are a crash loop |
+| Unexplained slowness | High CPU I/O Wait alongside disk utilization points at storage. High CPU Steal means the machine is itself a virtual guest and its hypervisor is oversubscribed, so it stays at zero on bare metal |
+| Bandwidth complaints | Chart Total RX and Total TX over the rental window, then expand the Network grid to check errors and drops on the interface |
+| The machine looks idle | GPU utilization near zero through a rental usually means the client's workload is not using the GPUs |
+| No data at all for a machine | It has most likely not reported yet. Check that it is online and running a current Vast daemon, and contact support if it stays empty |
+| The chart stops short of right now | Expected. The page does not follow the clock. Reload it |
+
+## Limitations
+
+- **VM machines** report everything except GPU metrics for now. The page shows a notice when you are looking at one.
+- **History starts when the machine first reported in its current recording format.** A recently set up machine has a shorter history than the default 7-day window, and a daemon update that changes the recording format restarts it.
+- **There is no set retention period.** Nothing is deleted on a schedule today, so a machine's history keeps growing for as long as it reports.
