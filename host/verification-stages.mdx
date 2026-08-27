@@ -20,6 +20,13 @@ Verification is **entirely automated by proprietary algorithms** that assess eac
 
 Only machines that meet the platform’s reliability and [performance thresholds](https://docs.vast.ai/host/how-to-self-test) are eligible for verification. There is **no manual intervention**, ensuring consistency, scalability, and objectivity.
 
+<Note>
+Top-tier AI GPUs are prioritized for verification because demand for them is
+highest. This includes datacenter GPUs such as B300, B200, H200, and H100,
+and dense premium builds such as RTX PRO 6000 (Server/WS/Max-Q),
+8x RTX 5090, and 8x RTX 4090.
+</Note>
+
 ---
 
 ## Host Responsibilities (Always)
@@ -49,41 +56,107 @@ Only machines that meet the platform’s reliability and [performance thresholds
 
 ---
 
-### Minimum Guidelines for Listing on Vast.ai
+### Minimum Requirements for Verification
 
-In order to be listed on Vast.ai, the machine must follow these minimum guidelines:
+Your machine must meet all of the following.
 
-```text Text
-- Ubuntu 18.04 or newer (required)
-- Dedicated machines only - the machine shouldn't be doing other stuff while rented
-- Fast, reliable internet: at least 10Mbps per machine.
-- 10-series Nvidia GPU or MI25 or newer Radeon Instinct series GPU or Radeon VII or Radeon Pro VII or Radeon RX 7900 (GRE/XT/XTX); or Radeon Pro W7900/W7800. Other 6000 series or newer Radeon RX/Pro W series GPUs may be supported; but may not be searchable using standard filters for AMD ROCm.
-- At least 1 physical CPU core (2 hyperthreads) per GPU.
-- Your CPU must support AVX instruction set (not all lower end CPUs support this).
-- At least 4 GB of system RAM per GPU.
-- Fast SSD storage with at least 128GB per GPU.
-- At least 1X PCIe for every 2.5 TFLOPS of GPU performance.
-- All GPUs on the machine must be of the same type.
-- An open port range mapped to each machine.
-```
----
+#### GPU
 
-### Additional Requirements for Verification
+| Requirement | Minimum |
+| --- | --- |
+| GPU | NVIDIA, Maxwell or newer |
+| VRAM per GPU | More than 7 GB |
+| CUDA version | 11.8 or newer |
+| GPU models | All identical, do not mix models in one machine |
+| PCIe bandwidth | More than 2.85 GiB/s per GPU |
 
-In order for your unverified machine to be verified, it must also meet the following minimum requirements:
+#### CPU
 
-```text Text
-- CUDA version greater than or equal to 12.0
-- Reliability of 90%
-- At least 3 open ports per GPU (100 recommended)
-- Internet Download speed must scale with total machine VRAM at ~2.6 Mbps per GiB, with a 100 Mbps floor and 500 Mbps ceiling
-- Internet Upload speed must scale with total machine VRAM at ~2.6 Mbps per GiB, with a 100 Mbps floor and 500 Mbps ceiling
-- GPU RAM of 7 GB
-- Passing the Self-Test
-```
-> **Note:** High-end GPUs are more likely to be verified. Machines with datacenter GPUs such as B200, H200, H100, A100, etc., and those with premium GPUs such as RTX PRO 6000 WS, 8xRTX 5090, 8xRTX 4090, etc., receive prioritized verification processing due to their high demand and performance capabilities.
+| Requirement | Minimum |
+| --- | --- |
+| CPU architecture | x86_64 or ARM64 |
+| Instruction set | AVX |
+| Physical CPU cores | 2 per GPU |
+
+<Note>
+**On ARM64 (aarch64), CUDA 12.6 or newer is required.** The CUDA 11.8
+Self-Test image is built for x86_64 only, so Maxwell and Pascal GPUs cannot
+be verified on ARM64.
+</Note>
+
+#### Memory
+
+| Requirement | Minimum |
+| --- | --- |
+| System RAM | At least 95% of total GPU VRAM |
+
+<Note>
+**Formula:** system RAM >= 0.95 x VRAM per GPU x number of GPUs
+
+**Example:** 8 x RTX PRO 6000 (96 GB) means the min system RAM >= 0.95 x
+96 GB x 8 = 730 GB
+</Note>
+
+#### Network
+
+| Requirement | Minimum |
+| --- | --- |
+| Download speed | 500 Mbps |
+| Upload speed | 500 Mbps |
+| Connection type | Wired Ethernet, fiber recommended |
+| Public IP | Public IPv4 address |
+| Forwarded ports | 5 ports per GPU, 100 ports per GPU recommended |
+
+<Warning>
+Renters connect directly to the machine over the WAN, so it needs a public
+IPv4 address with the port range forwarded to it. Machines behind CGNAT or a
+shared ISP IP cannot be used for hosting.
+</Warning>
+
+#### Operating system
+
+| Requirement | Minimum |
+| --- | --- |
+| Operating system | Ubuntu Server 22.04 LTS, 24.04 LTS recommended |
+| Secure Boot | Disabled |
+
+<Note>
+Use a server edition. Desktop editions are not supported, and Ubuntu
+releases above 24.04 are not supported yet.
+</Note>
+
+#### Storage
+
+| Requirement | Minimum |
+| --- | --- |
+| Storage type | SSD |
+| Dedicated drive for Docker container storage | 200 GB |
+| Root partition free space | 20 GB |
+
+#### Reliability
+
+| Requirement | Minimum |
+| --- | --- |
+| Reliability score | Over 90% |
+
+<Note>
+Reliability starts low on a new machine and grows the longer the machine
+stays online. A stable machine typically reaches 90% within a few days.
+</Note>
+
+#### Self-Test
+
+You can check whether your machine is ready for verification by running a
+Self-Test. See [How to Self-Test](/host/how-to-self-test).
+
+<Warning>
+**Dedicated machines only.** Any personal workload, such as mining, gaming,
+running your own jobs, or using the machine as a desktop, will automatically
+fail verification.
+</Warning>
+
 <Tip>
-**Tip:** Meeting these minimum requirements makes your machine eligible for verification, but does not automatically guarantee verification. [Read More about Verification](https://docs.vast.ai/host/understanding-verification)
+Meeting these minimum requirements makes your machine eligible for verification, but does not automatically guarantee verification. [Read More about Verification](https://docs.vast.ai/host/understanding-verification)
 </Tip>
 ---
 
