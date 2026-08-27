@@ -1,6 +1,6 @@
 # Host Docs QA summary
 
-Date checked: 2026-08-26
+Date checked: 2026-08-27
 Docs revision: `5088d76b89856185f3ab15a628e4152ff140ab26`
 Review target: [vast-ai/docs PR #185](https://github.com/vast-ai/docs/pull/185)
 
@@ -9,6 +9,8 @@ Review target: [vast-ai/docs PR #185](https://github.com/vast-ai/docs/pull/185)
 The repeatable audit covers all 72 Host pages plus all 33 imported Host CLI/SDK snippets. It found three concrete publication problems; all three are corrected in this checkout. One low-risk generated-metadata drift and several areas that require named source-owner confirmation remain.
 
 No paid rental, destructive command, privileged host change, production mutation, or credential-bearing operation was executed.
+
+Fresh evidence now follows the [Oxiom V&V Evidence procedure](./verification/README.md). The current retained result is eight passing local-safe items, one failing accessibility item, and two blocked validation classes. This is strong evidence for the stated local/static claims, not a claim that paid-host runtime or private product behavior is fully validated. See the [current V&V summary](./verification/summary.md) and the preserved [failure/retest ledger](./verification/issues.md).
 
 ## Corrections made
 
@@ -88,6 +90,8 @@ Passing local tests does not settle these claims:
 
 ## Detailed artifacts
 
+- [V&V reviewer summary](./verification/summary.md)
+- [V&V inventory, raw attempts, and reviewer workflow](./verification/README.md)
 - [Full verification inventory](./HOST-DOCS-VERIFICATION.md)
 - [CLI command registry check](./HOST-DOCS-CLI-COMMAND-CHECK.md)
 - [Machine-readable inventory](./host-docs-verification-inventory.json)
