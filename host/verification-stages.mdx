@@ -20,6 +20,13 @@ Verification is **entirely automated by proprietary algorithms** that assess eac
 
 Only machines that meet the platform’s reliability and [performance thresholds](https://docs.vast.ai/host/how-to-self-test) are eligible for verification. There is **no manual intervention**, ensuring consistency, scalability, and objectivity.
 
+<Note>
+Top-tier AI GPUs are prioritized for verification because demand for them is
+highest. This includes datacenter GPUs such as B300, B200, H200, and H100,
+and dense premium builds such as RTX PRO 6000 (Server/WS/Max-Q),
+8x RTX 5090, and 8x RTX 4090.
+</Note>
+
 ---
 
 ## Host Responsibilities (Always)
@@ -51,48 +58,103 @@ Only machines that meet the platform’s reliability and [performance thresholds
 
 ### Minimum Requirements for Verification
 
-In order for your machine to be listed and verified on Vast.ai, it must meet the following minimum requirements:
+Your machine must meet all of the following.
 
-```text Text
-- Ubuntu 22.04 LTS or 24.04 LTS (required). Ubuntu 20.04 is accepted with a
-  warning - upgrading to 22.04+ is recommended. Other distros, and Ubuntu
-  releases newer than 24.04, are not supported.
-- x86_64 CPU architecture.
-- Python 3.7 or newer available as python3 (3.6 is accepted with a warning).
-- Dedicated machines only - the machine shouldn't be doing other stuff while
-  rented. (The Self-Test fails if more than 2% of any GPU's VRAM is in use
-  when it runs.)
-- Fast, reliable internet: minimum 500 Mbps download AND 500 Mbps upload,
-  over wired Ethernet only (WiFi and cellular are not suitable), with
-  latency under 50 ms, jitter under 20 ms, and zero packet loss. A static
-  IP is recommended.
-- NVIDIA driver version 580 or newer, and CUDA version 12.0 or newer.
-- At least 2 physical CPU cores per GPU, plus 1 additional core.
-- Your CPU must support AVX instruction set (the PyTorch-based Self-Test
-  cannot run without it; not all lower end CPUs support this).
-- System RAM of at least 95% of the machine's total GPU VRAM, capped at 2 TB
-  (e.g., 8 x 24 GB GPUs require ~182 GB of RAM).
-- Fast SSD storage: a dedicated data drive of at least 200 GB, with 900 GB or
-  more strongly recommended - smaller hosts attract fewer long-term rentals.
-  The root partition additionally needs at least 20 GB free (30 GB
-  recommended).
-- PCIe Gen 4 or higher per GPU recommended; Gen 3 is accepted with a warning.
-- All GPUs on the machine should be of the same model.
-- An open TCP/UDP port range forwarded to each machine: a continuous range
-  within ports 1024-65535, not used by other services, containing at least
-  3 ports per GPU plus 2 extra (100 ports per GPU recommended), reachable
-  from the internet, and not overlapping with any other machine on the same
-  network.
-- Secure Boot disabled in BIOS/UEFI (it can block the NVIDIA driver from
-  loading, now or after a future kernel update).
-- Passing the Self-Test, which verifies: system requirements (at least 98% of
-  each GPU's VRAM free, system RAM of at least 95% of total VRAM, at least 2
-  physical CPU cores per GPU), a ResNet training run on all GPUs, a 95% VRAM
-  allocation test on each GPU, an NCCL all-GPU communication test, and 60
-  seconds of simultaneous CPU stress (stress-ng) and GPU burn-in (gpu-burn)
-  load.
-```
-> **Note:** High-end GPUs are more likely to be verified. Machines with datacenter GPUs such as B200, H200, H100, A100, etc., and those with premium GPUs such as RTX PRO 6000 WS, 8xRTX 5090, 8xRTX 4090, etc., receive prioritized verification processing due to their high demand and performance capabilities.
+#### GPU
+
+| Requirement | Minimum |
+| --- | --- |
+| GPU | NVIDIA, Maxwell or newer |
+| VRAM per GPU | More than 7 GB |
+| CUDA version | 11.8 or newer |
+| GPU models | All identical, do not mix models in one machine |
+| PCIe bandwidth | More than 2.85 GiB/s per GPU |
+
+#### CPU
+
+| Requirement | Minimum |
+| --- | --- |
+| CPU architecture | x86_64 or ARM64 |
+| Instruction set | AVX |
+| Physical CPU cores | 2 per GPU |
+
+<Note>
+**On ARM64 (aarch64), CUDA 12.6 or newer is required.** The CUDA 11.8
+Self-Test image is built for x86_64 only, so Maxwell and Pascal GPUs cannot
+be verified on ARM64.
+</Note>
+
+#### Memory
+
+| Requirement | Minimum |
+| --- | --- |
+| System RAM | At least 95% of total GPU VRAM |
+
+<Note>
+**Formula:** system RAM >= 0.95 x VRAM per GPU x number of GPUs
+
+**Example:** 8 x RTX PRO 6000 (96 GB) means the min system RAM >= 0.95 x
+96 GB x 8 = 730 GB
+</Note>
+
+#### Network
+
+| Requirement | Minimum |
+| --- | --- |
+| Download speed | 500 Mbps |
+| Upload speed | 500 Mbps |
+| Connection type | Wired Ethernet, fiber recommended |
+| Public IP | Public IPv4 address |
+| Forwarded port range | (3 x GPUs) + 2 contiguous ports, dedicated to rentals |
+| Recommended range size | 100 ports per GPU |
+
+<Warning>
+Renters connect directly to the machine over the WAN, so it needs a public
+IPv4 address with the port range forwarded to it. Machines behind CGNAT or a
+shared ISP IP cannot be used for hosting.
+</Warning>
+
+#### Operating system
+
+| Requirement | Minimum |
+| --- | --- |
+| Operating system | Ubuntu Server 22.04 LTS, 24.04 LTS recommended |
+| Secure Boot | Disabled |
+
+<Note>
+Use a server edition. Desktop editions are not supported, and Ubuntu
+releases above 24.04 are not supported yet.
+</Note>
+
+#### Storage
+
+| Requirement | Minimum |
+| --- | --- |
+| Storage type | SSD |
+| Dedicated drive for Docker container storage | 200 GB |
+| Root partition free space | 20 GB |
+
+#### Reliability
+
+| Requirement | Minimum |
+| --- | --- |
+| Reliability score | Over 90% |
+
+<Note>
+Reliability starts low on a new machine and grows the longer the machine
+stays online. A stable machine typically reaches 90% within a few days.
+</Note>
+
+#### Self-Test
+
+You can check whether your machine is ready for verification by running a
+Self-Test. See [How to Self-Test](/host/how-to-self-test).
+
+<Warning>
+**Dedicated machines only.** Any personal workload on the machine will cause
+the Self-Test to fail, and the machine will not be verified.
+</Warning>
+
 <Tip>
 **Tip:** Meeting these minimum requirements makes your machine eligible for verification, but does not automatically guarantee verification. [Read More about Verification](https://docs.vast.ai/host/understanding-verification)
 </Tip>
