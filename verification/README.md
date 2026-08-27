@@ -27,7 +27,6 @@ npm ci
   /path/to/clean/official/vast-cli
 ```
 
-The run ID creates a new append-only directory under `verification/evidence/`; the script refuses to overwrite an existing attempt. Review [`inventory.md`](./inventory.md), the current [`summary.md`](./summary.md), and the linked raw attempt outputs.
+The run ID creates a new append-only directory under `verification/evidence/`; the script refuses to overwrite an existing attempt. Review [`inventory.md`](./inventory.md), the current [`summary.md`](./summary.md), the [`issue and retest ledger`](./issues.md), and the linked raw attempt outputs.
 
 This package supports technical review; it does not constitute acceptance or certification. An authorized reviewer makes that decision.
-

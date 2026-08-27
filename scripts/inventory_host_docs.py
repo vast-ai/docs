@@ -505,13 +505,33 @@ def check_local_references(paths: list[Path], route_paths: list[Path]) -> list[d
     return issues
 
 
-def git_revision() -> str:
+def git_content_revision() -> str:
+    """Return the newest commit that changed the inventoried content roots.
+
+    Using repository HEAD makes generated evidence self-invalidating: committing
+    the evidence changes HEAD even when no Host content changed.
+    """
     try:
         return subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, stderr=subprocess.DEVNULL
+            ["git", "log", "-1", "--format=%H", "--", "host", "snippets/host"],
+            cwd=ROOT,
+            text=True,
+            stderr=subprocess.DEVNULL,
         ).strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
         return "unknown"
+
+
+def content_fingerprint(content_paths: list[Path]) -> str:
+    """Hash the exact inventoried paths and bytes, including uncommitted edits."""
+    digest = hashlib.sha256()
+    for path in content_paths:
+        relative = path.relative_to(ROOT).as_posix().encode()
+        digest.update(relative)
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return f"sha256:{digest.hexdigest()}"
 
 
 def build_inventory() -> dict[str, Any]:
@@ -539,8 +559,9 @@ def build_inventory() -> dict[str, Any]:
     content_source_counts = Counter(source_type(path) for path in content_paths)
     occurrence_count = sum(len(item["locations"]) for item in items)
     return {
-        "schema_version": 1,
-        "source_revision": git_revision(),
+        "schema_version": 2,
+        "source_revision": git_content_revision(),
+        "content_fingerprint": content_fingerprint(content_paths),
         "scope": {
             "root": "host",
             "pages": len(page_paths),
@@ -644,6 +665,7 @@ def render_markdown(inventory: dict[str, Any]) -> str:
         "## Coverage and current result",
         "",
         f"- Source revision: `{inventory['source_revision']}`",
+        f"- Content fingerprint: `{inventory['content_fingerprint']}`",
         f"- Pages scanned: **{scope['pages']}** ({', '.join(f'{count} {name}' for name, count in scope['source_pages'].items())})",
         f"- Imported Host snippet dependencies scanned: **{scope['rendered_dependency_files']}**",
         f"- Unique verification targets: **{scope['unique_items']}** across **{scope['occurrences']}** occurrences",

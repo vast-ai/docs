@@ -7,6 +7,7 @@ This inventory answers two separate questions: whether documented examples are s
 ## Coverage and current result
 
 - Source revision: `5088d76b89856185f3ab15a628e4152ff140ab26`
+- Content fingerprint: `sha256:bc59a848d0cb8698097787b911bb9e5b6875570c7c58815baa6d1f48b2504b4d`
 - Pages scanned: **72** (38 authored, 33 generated-cli-sdk, 1 generated-self-test)
 - Imported Host snippet dependencies scanned: **33**
 - Unique verification targets: **474** across **529** occurrences

@@ -54,15 +54,22 @@ mkdir -p "$evidence_dir"
 results_file="$evidence_dir/results.tsv"
 printf 'id\texpected_exit\tactual_exit\tstarted_utc\tfinished_utc\tstdout\tstderr\n' > "$results_file"
 unexpected=0
+clean_snapshot="$(mktemp -d "${TMPDIR:-/tmp}/host-docs-vv.XXXXXX")"
+cleanup() {
+  rm -rf -- "$clean_snapshot"
+}
+trap cleanup EXIT
+git -C "$repo_root" archive HEAD | tar -x -C "$clean_snapshot"
 
 run_check() {
   local id="$1"
   local expected_exit="$2"
-  shift 2
+  local workdir="$3"
+  shift 3
   local started finished actual_exit
   started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   (
-    cd "$repo_root"
+    cd "$workdir"
     PATH="$node24_dir:$PATH" "$@"
   ) > "$evidence_dir/$id.stdout.txt" 2> "$evidence_dir/$id.stderr.txt"
   actual_exit=$?
@@ -105,15 +112,15 @@ run_check() {
     "$repo_root/host-docs-cli-command-check.json"
 } > "$evidence_dir/environment.txt" 2> "$evidence_dir/environment.stderr.txt"
 
-run_check VV-HOST-001 0 python3 -B scripts/inventory_host_docs.py --check
-run_check VV-HOST-002 0 python3 -B scripts/verify_host_cli_commands.py --vast-cli "$vast_cli" --check
-run_check VV-HOST-003 0 npm run check-persona-chips
-run_check VV-HOST-004 0 npm run test-review-context
-run_check VV-HOST-005 0 node --check review-server.mjs
-run_check VV-HOST-006 0 npm run check-openapi
-run_check VV-HOST-007 1 "$repo_root/node_modules/.bin/mint" broken-links
-run_check VV-HOST-008 1 "$repo_root/node_modules/.bin/mint" a11y
-run_check VV-HOST-009 0 git diff --check
+run_check VV-HOST-001 0 "$repo_root" python3 -B scripts/inventory_host_docs.py --check
+run_check VV-HOST-002 0 "$repo_root" python3 -B scripts/verify_host_cli_commands.py --vast-cli "$vast_cli" --check
+run_check VV-HOST-003 0 "$repo_root" npm run check-persona-chips
+run_check VV-HOST-004 0 "$repo_root" npm run test-review-context
+run_check VV-HOST-005 0 "$repo_root" node --check review-server.mjs
+run_check VV-HOST-006 0 "$repo_root" npm run check-openapi
+run_check VV-HOST-007 1 "$clean_snapshot" "$repo_root/node_modules/.bin/mint" broken-links
+run_check VV-HOST-008 1 "$clean_snapshot" "$repo_root/node_modules/.bin/mint" a11y
+run_check VV-HOST-009 0 "$repo_root" git diff --check
 
 if [[ "$unexpected" -ne 0 ]]; then
   echo "One or more checks returned an unexpected exit code. Preserve this attempt and review results.tsv." >&2
