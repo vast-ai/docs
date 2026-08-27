@@ -1,6 +1,6 @@
 # Host Docs verification and validation summary
 
-Attempt 02 is the current result for baseline `VV-HOST-DOCS-2026-08-27-A`. Eight local items pass, accessibility remains failed, and two validation classes still require external access or owner evidence. Attempt 01 and every original failure remain retained.
+Attempt 03 is the current replay for baseline `VV-HOST-DOCS-2026-08-27-A`. Eight local items pass, accessibility remains failed, and two validation classes still require external access or owner evidence. Attempt 01 and every original failure remain retained.
 
 | Status | Count |
 |---|---:|
@@ -37,7 +37,8 @@ Attempt 02 is the current result for baseline `VV-HOST-DOCS-2026-08-27-A`. Eight
 - [Inventory and current status](./inventory.md)
 - [Issue, correction, and retest ledger](./issues.md)
 - [Attempt 01 — preserved failures](./evidence/2026-08-27-macos-arm64-attempt-01/attempt-01.md)
-- [Attempt 02 — current local-safe result](./evidence/2026-08-27-macos-arm64-attempt-02/attempt-02.md)
+- [Attempt 02 — corrective retest](./evidence/2026-08-27-macos-arm64-attempt-02/attempt-02.md)
+- [Attempt 03 — final clean-tree replay](./evidence/2026-08-27-macos-arm64-attempt-03/attempt-03.md)
 
 ## Acceptance
 
