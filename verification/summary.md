@@ -1,6 +1,6 @@
 # Host Docs verification and validation summary
 
-Attempt 03 is the current replay for baseline `VV-HOST-DOCS-2026-08-27-A`. Eight local items pass, accessibility remains failed, and two validation classes still require external access or owner evidence. Attempt 01 and every original failure remain retained.
+Attempt 04 is the current replay for baseline `VV-HOST-DOCS-2026-08-27-A`. Eight local items pass, accessibility remains failed, and two validation classes still require external access or owner evidence. Attempt 01 and every original failure remain retained.
 
 | Status | Count |
 |---|---:|
@@ -20,6 +20,7 @@ Attempt 03 is the current replay for baseline `VV-HOST-DOCS-2026-08-27-A`. Eight
 ## What the evidence supports
 
 - All 72 Host pages and 33 imported Host snippets are inventoried as 474 unique targets with no local structural/reference issue.
+- All 176 command targets reconcile into five execution-access groups: 0 paid+root, 6 paid-only, 52 Host-root/privileged, 14 Host-context without root, and 104 requiring neither. Additional account, credential, mutation, environment, and external-client gates remain visible per command.
 - All 181 documented Vast CLI occurrences conform to clean current CLI `master@ecf32efa...`; 179 pass directly and two are intentional command-family references.
 - Persona synchronization, review-context behavior (9/9), review-server syntax, OpenAPI validity, Host-scope links, and whitespace pass at the recorded target and environment.
 - The corrected Host Payment image has zero missing-alt findings.
@@ -39,6 +40,7 @@ Attempt 03 is the current replay for baseline `VV-HOST-DOCS-2026-08-27-A`. Eight
 - [Attempt 01 — preserved failures](./evidence/2026-08-27-macos-arm64-attempt-01/attempt-01.md)
 - [Attempt 02 — corrective retest](./evidence/2026-08-27-macos-arm64-attempt-02/attempt-02.md)
 - [Attempt 03 — final clean-tree replay](./evidence/2026-08-27-macos-arm64-attempt-03/attempt-03.md)
+- [Attempt 04 — command-access reconciliation replay](./evidence/2026-08-27-macos-arm64-attempt-04/attempt-04.md)
 
 ## Acceptance
 
