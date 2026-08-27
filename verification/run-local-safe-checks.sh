@@ -107,8 +107,10 @@ run_check() {
   shasum -a 256 \
     "$repo_root/HOST-DOCS-QA-SUMMARY.md" \
     "$repo_root/HOST-DOCS-VERIFICATION.md" \
+    "$repo_root/HOST-DOCS-COMMAND-ACCESS.md" \
     "$repo_root/HOST-DOCS-CLI-COMMAND-CHECK.md" \
     "$repo_root/host-docs-verification-inventory.json" \
+    "$repo_root/host-docs-command-access.json" \
     "$repo_root/host-docs-cli-command-check.json"
 } > "$evidence_dir/environment.txt" 2> "$evidence_dir/environment.stderr.txt"
 

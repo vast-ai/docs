@@ -27,6 +27,8 @@ HOST_ROOT = ROOT / "host"
 DEFAULT_JSON = ROOT / "host-docs-verification-inventory.json"
 DEFAULT_CSV = ROOT / "host-docs-verification-inventory.csv"
 DEFAULT_MARKDOWN = ROOT / "HOST-DOCS-VERIFICATION.md"
+DEFAULT_COMMAND_ACCESS_JSON = ROOT / "host-docs-command-access.json"
+DEFAULT_COMMAND_ACCESS_MARKDOWN = ROOT / "HOST-DOCS-COMMAND-ACCESS.md"
 
 FENCE_RE = re.compile(r"^```([A-Za-z0-9_+-]*)\s*$")
 INLINE_CODE_RE = re.compile(r"(?<!`)`([^`\n]+)`(?!`)")
@@ -92,6 +94,11 @@ MUTATING_RE = re.compile(
     r"remove[- ]defjob|cleanup[- ]machine|delete[- ]machine|unlist[- ]machine|defrag[- ]machines)",
     re.I,
 )
+ACCOUNT_MUTATION_RE = re.compile(
+    r"vastai\s+(?:create|destroy|delete|invite|remove|update|set|schedule|cancel|"
+    r"cleanup|defrag|unlist|list\s+machines?\b)",
+    re.I,
+)
 PRIVILEGED_RE = re.compile(
     r"(?:\bsudo\b|/etc/|/var/lib/|apt(?:-get)?\s+(?:install|remove|update|upgrade)|"
     r"dnf\s+install|yum\s+install|curl[^\n|]*\|\s*(?:sudo\s+)?(?:ba)?sh)",
@@ -108,6 +115,53 @@ ACCOUNT_READ_RE = re.compile(
     re.I,
 )
 SECRET_RE = re.compile(r"(?:api[_ -]?key|setup[_ -]?key|token|password|secret)", re.I)
+ROOT_ACTION_RE = re.compile(
+    r"(?:\bsudo\b|\bsu\s+-|/etc/|/var/lib/|\b(?:mount|umount|mkfs(?:\.[\w-]+)?|"
+    r"wipefs|cfdisk|update-grub|reboot|shutdown|nvidia-xconfig)\b|"
+    r"\bsystemctl\s+(?:stop|restart|disable|mask|enable)\b)",
+    re.I,
+)
+HOST_MACHINE_RE = re.compile(
+    r"(?:\bssh\b|vast_host_install\.log|vastai_install_logs|\bubuntu-drivers\b|"
+    r"\btmux\b|\bapt(?:-get)?\b|nvidia-smi|nvidia-ctk|\bdocker\b|\bsystemctl\b|"
+    r"\bjournalctl\b|\bdmesg\b|\blspci\b|\blsblk\b|\blscpu\b|\bfindmnt\b|"
+    r"\bxfs_[\w-]+\b|\btcpdump\b|\biptables\b|\bfirewall-cmd\b|\bufw\b|"
+    r"\blsb_release\b|\buname\s+-a\b|\bdf\s+-h\b|\bip\s+-brief\b|/proc/|/sys/)",
+    re.I,
+)
+EXTERNAL_CLIENT_RE = re.compile(
+    r"(?:PUBLIC_IP|Test-NetConnection|curl\.exe|New-Object\s+System\.Net\.Sockets|"
+    r"\bnc\s+(?:-u\s+)?-?v?z?\s*PUBLIC_IP)",
+    re.I,
+)
+
+COMMAND_ACCESS_GROUPS = (
+    (
+        "paid-and-host-root",
+        "Paid and Host root",
+        "Needs both approved spend and root on a disposable Host machine.",
+    ),
+    (
+        "paid-only",
+        "Paid resource, no Host root",
+        "Creates or uses a billable resource; the documented command itself does not require Host root.",
+    ),
+    (
+        "host-root",
+        "Host root/privileged access, no paid resource",
+        "Conservatively requires root or privileged Host access and does not itself create a paid resource.",
+    ),
+    (
+        "host-machine-no-root",
+        "Host machine, no root in command",
+        "Needs a representative Host or Host artifact, but the documented command does not itself use root.",
+    ),
+    (
+        "no-paid-or-host-root",
+        "No paid resource or Host root",
+        "Can be checked without paid spend or Host root; account, credential, mutation, environment, or external-client gates may still apply.",
+    ),
+)
 
 
 def clean_markdown(value: str) -> str:
@@ -179,6 +233,66 @@ def command_tier(command: str) -> tuple[str, str]:
         "local-safe",
         "Verify command availability/help and static syntax locally; use placeholders and do not supply production credentials.",
     )
+
+
+def command_execution_access(command: str) -> dict[str, Any]:
+    """Classify independent resources needed for a representative execution.
+
+    This deliberately does not reuse ``command_tier`` because that value is
+    precedence-based and can hide intersections such as a credential-bearing
+    installer that also uses sudo.
+    """
+    paid_resource = bool(PAID_LIVE_RE.search(command))
+    root_required = bool(ROOT_ACTION_RE.search(command))
+    host_machine = root_required or bool(HOST_MACHINE_RE.search(command))
+    external_client = bool(EXTERNAL_CLIENT_RE.search(command))
+    account_authentication = bool(re.search(r"\bvastai\s", command, re.I)) or bool(
+        re.search(r"console\.vast\.ai/api/", command, re.I)
+    )
+    destructive_or_mutating = bool(
+        DESTRUCTIVE_RE.search(command)
+        or MUTATING_RE.search(command)
+        or ACCOUNT_MUTATION_RE.search(command)
+    )
+    credential = bool(SECRET_RE.search(command))
+    matching_environment = bool(ENVIRONMENT_RE.search(command))
+
+    if paid_resource and root_required:
+        group = "paid-and-host-root"
+        reason = "Requires an approved paid resource and root or privileged access on a disposable Host machine."
+    elif paid_resource:
+        group = "paid-only"
+        reason = "Requires an approved test account/machine and budget; the documented command itself does not require Host root."
+    elif root_required:
+        group = "host-root"
+        reason = "Conservatively requires a disposable supported Host with root or privileged access; no paid resource is created by the documented command."
+    elif host_machine:
+        group = "host-machine-no-root"
+        reason = "Requires a representative Host machine or Host artifact, but the documented command does not itself require root."
+    else:
+        group = "no-paid-or-host-root"
+        reason = "Does not require a paid resource or Host root for the documented command; other gates still apply where listed."
+
+    additional_gates: list[str] = []
+    for gate, required in (
+        ("account-authentication", account_authentication),
+        ("credential", credential),
+        ("destructive-or-mutating", destructive_or_mutating),
+        ("matching-environment", matching_environment),
+        ("external-client", external_client),
+    ):
+        if required:
+            additional_gates.append(gate)
+
+    return {
+        "group": group,
+        "paid_resource": paid_resource,
+        "host_machine": host_machine,
+        "root_required": root_required,
+        "external_client": external_client,
+        "additional_gates": additional_gates,
+        "reason": reason,
+    }
 
 
 def bash_syntax(command: str) -> tuple[str, str]:
@@ -271,6 +385,8 @@ def add_item(
         }
         if language:
             items[key]["language"] = language
+        if kind == "command":
+            items[key]["execution_access"] = command_execution_access(value)
         if kind == "command" and language in {"bash", "sh", "shell"}:
             syntax_status, syntax_detail = bash_syntax(value)
             items[key]["static_syntax"] = {
@@ -555,11 +671,27 @@ def build_inventory() -> dict[str, Any]:
     kind_counts = Counter(item["kind"] for item in items)
     tier_counts = Counter(item["verification_tier"] for item in items)
     status_counts = Counter(item["status"] for item in items)
+    command_items = [item for item in items if item["kind"] == "command"]
+    command_access_group_counts = {
+        group: sum(item["execution_access"]["group"] == group for item in command_items)
+        for group, _, _ in COMMAND_ACCESS_GROUPS
+    }
+    if sum(command_access_group_counts.values()) != len(command_items):
+        raise RuntimeError("Command execution access groups do not reconcile with the command inventory.")
+    command_access_dimension_counts = {
+        dimension: sum(bool(item["execution_access"][dimension]) for item in command_items)
+        for dimension in (
+            "paid_resource",
+            "host_machine",
+            "root_required",
+            "external_client",
+        )
+    }
     source_counts = Counter(source_type(path) for path in page_paths)
     content_source_counts = Counter(source_type(path) for path in content_paths)
     occurrence_count = sum(len(item["locations"]) for item in items)
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "source_revision": git_content_revision(),
         "content_fingerprint": content_fingerprint(content_paths),
         "scope": {
@@ -575,6 +707,9 @@ def build_inventory() -> dict[str, Any]:
             "items_by_kind": dict(sorted(kind_counts.items())),
             "items_by_verification_tier": dict(sorted(tier_counts.items())),
             "items_by_status": dict(sorted(status_counts.items())),
+            "command_count": len(command_items),
+            "command_access_groups": command_access_group_counts,
+            "command_access_dimensions": command_access_dimension_counts,
             "structural_or_reference_issues": len(structural_issues) + len(reference_issues),
         },
         "safety": {
@@ -714,6 +849,24 @@ def render_markdown(inventory: dict[str, Any]) -> str:
     for tier, count in summary["items_by_verification_tier"].items():
         lines.append(f"| {tier} | {count} | {tier_meanings.get(tier, '')} |")
 
+    lines.extend(
+        [
+            "",
+            "## Command execution access groups",
+            "",
+            "The 176 command targets are also grouped by the resources needed for representative execution. These access groups are independent of the safety tier and do **not** authorize paid, root, credential-bearing, destructive, or production actions.",
+            "",
+            "See [Host Docs command access groups](./HOST-DOCS-COMMAND-ACCESS.md) for every command ID, source line, access group, and additional gate.",
+            "",
+            "| Access group | Commands | Meaning |",
+            "|---|---:|---|",
+        ]
+    )
+    for group, title, meaning in COMMAND_ACCESS_GROUPS:
+        lines.append(
+            f"| {title} | {summary['command_access_groups'].get(group, 0)} | {meaning} |"
+        )
+
     lines.extend(["", "## Issues found by the generator", ""])
     if inventory["issues"]:
         lines.extend(["| Type | Location | Detail |", "|---|---|---|"])
@@ -786,6 +939,122 @@ def render_markdown(inventory: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def command_access_payload(inventory: dict[str, Any]) -> dict[str, Any]:
+    commands = []
+    for item in inventory["items"]:
+        if item["kind"] != "command":
+            continue
+        commands.append(
+            {
+                "id": item["id"],
+                "text": item["text"],
+                "verification_tier": item["verification_tier"],
+                "status": item["status"],
+                "execution_access": item["execution_access"],
+                "locations": item["locations"],
+            }
+        )
+    return {
+        "schema_version": 1,
+        "source_revision": inventory["source_revision"],
+        "content_fingerprint": inventory["content_fingerprint"],
+        "command_count": len(commands),
+        "group_counts": inventory["summary"]["command_access_groups"],
+        "dimension_counts": inventory["summary"]["command_access_dimensions"],
+        "commands": commands,
+    }
+
+
+def render_command_access_markdown(inventory: dict[str, Any]) -> str:
+    summary = inventory["summary"]
+    command_items = [item for item in inventory["items"] if item["kind"] == "command"]
+    lines = [
+        "# Host Docs command execution access groups",
+        "",
+        "> Generated by `python3 scripts/inventory_host_docs.py`. Do not hand-edit the grouped tables.",
+        "",
+        "This view groups every documented command by the resources needed for a representative execution. It is an execution-planning aid, not authorization to run the commands. Existing safety tiers, stable IDs, source lines, and non-execution status remain authoritative.",
+        "",
+        f"- Source revision: `{inventory['source_revision']}`",
+        f"- Content fingerprint: `{inventory['content_fingerprint']}`",
+        f"- Unique command targets: **{len(command_items)}**",
+        "- Documented commands executed while generating this report: **0**",
+        "",
+        "## Access matrix",
+        "",
+        "| Access group | Commands | Meaning |",
+        "|---|---:|---|",
+    ]
+    for group, title, meaning in COMMAND_ACCESS_GROUPS:
+        lines.append(f"| {title} | {summary['command_access_groups'].get(group, 0)} | {meaning} |")
+
+    dimensions = summary["command_access_dimensions"]
+    lines.extend(
+        [
+            "",
+            "## Non-exclusive resource totals",
+            "",
+            "A command may appear in more than one resource total.",
+            "",
+            "| Resource | Commands |",
+            "|---|---:|",
+            f"| Approved paid resource/budget | {dimensions['paid_resource']} |",
+            f"| Representative Host machine or Host artifact | {dimensions['host_machine']} |",
+            f"| Host root/privileged access required or conservatively assumed | {dimensions['root_required']} |",
+            f"| Separate external client/network vantage point | {dimensions['external_client']} |",
+            "",
+            "## How to use the groups",
+            "",
+            "- **Paid resource** means the command can create or exercise a billable resource. Record budget approval, account, machine/instance, CLI revision, image digest where applicable, cost, and cleanup.",
+            "- **Host root/privileged access** is conservatively assumed when the documented command uses `sudo`, a protected Host path, or a root-only system action. Use a disposable supported Host and record before/after state; downgrade a command only with evidence.",
+            "- **Host machine, no root in command** still requires a representative Linux/GPU/Docker/Host context or Host artifact, but the command text itself does not require elevation.",
+            "- **No paid resource or Host root** does not mean automatically safe: use the additional gates for authentication, credentials, mutations, matching environments, and external clients.",
+        ]
+    )
+
+    for group, title, _ in COMMAND_ACCESS_GROUPS:
+        grouped_items = [
+            item for item in command_items if item["execution_access"]["group"] == group
+        ]
+        lines.extend(["", f"## {title}", ""])
+        if not grouped_items:
+            lines.append("No command targets are currently classified in this group.")
+            continue
+        lines.extend(
+            [
+                "| ID | Source | Command | Existing tier | Additional gates |",
+                "|---|---|---|---|---|",
+            ]
+        )
+        for item in grouped_items:
+            locations = ", ".join(location_link(location) for location in item["locations"][:3])
+            if len(item["locations"]) > 3:
+                locations += f" (+{len(item['locations']) - 3} more in JSON/CSV)"
+            gates = ", ".join(item["execution_access"]["additional_gates"]) or "none"
+            lines.append(
+                "| {id} | {locations} | {text} | {tier} | {gates} |".format(
+                    id=item["id"],
+                    locations=locations,
+                    text=markdown_escape(compact_text(item["text"])),
+                    tier=item["verification_tier"],
+                    gates=gates,
+                )
+            )
+
+    lines.extend(
+        [
+            "",
+            "## Reconciliation",
+            "",
+            f"The five mutually exclusive groups contain **{sum(summary['command_access_groups'].values())}** commands, matching the **{len(command_items)}** unique command targets in the full inventory.",
+            "",
+            "Use [`host-docs-command-access.json`](./host-docs-command-access.json) for the same classification in machine-readable form.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def render_csv(inventory: dict[str, Any]) -> str:
     output = io.StringIO(newline="")
     writer = csv.writer(output, lineterminator="\n")
@@ -798,6 +1067,12 @@ def render_csv(inventory: dict[str, Any]) -> str:
             "verification_method",
             "status",
             "static_syntax",
+            "execution_group",
+            "paid_resource",
+            "host_machine",
+            "root_required",
+            "external_client",
+            "additional_gates",
             "file",
             "line_start",
             "line_end",
@@ -807,6 +1082,7 @@ def render_csv(inventory: dict[str, Any]) -> str:
     )
     for item in inventory["items"]:
         syntax = item.get("static_syntax", {})
+        access = item.get("execution_access", {})
         syntax_value = ""
         if syntax:
             syntax_value = f"{syntax.get('status', '')}: {syntax.get('detail', '')}"
@@ -820,6 +1096,12 @@ def render_csv(inventory: dict[str, Any]) -> str:
                     item["verification_method"],
                     item["status"],
                     syntax_value,
+                    access.get("group", ""),
+                    access.get("paid_resource", ""),
+                    access.get("host_machine", ""),
+                    access.get("root_required", ""),
+                    access.get("external_client", ""),
+                    ",".join(access.get("additional_gates", [])),
                     location["file"],
                     location["line_start"],
                     location["line_end"],
@@ -831,10 +1113,13 @@ def render_csv(inventory: dict[str, Any]) -> str:
 
 
 def expected_outputs(inventory: dict[str, Any]) -> dict[Path, str]:
+    access_payload = command_access_payload(inventory)
     return {
         DEFAULT_JSON: json.dumps(inventory, indent=2, sort_keys=False) + "\n",
         DEFAULT_CSV: render_csv(inventory),
         DEFAULT_MARKDOWN: render_markdown(inventory),
+        DEFAULT_COMMAND_ACCESS_JSON: json.dumps(access_payload, indent=2, sort_keys=False) + "\n",
+        DEFAULT_COMMAND_ACCESS_MARKDOWN: render_command_access_markdown(inventory),
     }
 
 
@@ -857,7 +1142,9 @@ def main() -> int:
             return 1
         print(
             f"Host Docs inventory is current: {inventory['scope']['pages']} pages, "
-            f"{inventory['scope']['unique_items']} unique targets."
+            f"{inventory['scope']['unique_items']} unique targets; "
+            f"{inventory['summary']['command_count']} commands reconcile across "
+            f"{len(COMMAND_ACCESS_GROUPS)} execution-access groups."
         )
         return 0
 

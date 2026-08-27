@@ -2,12 +2,12 @@
 
 This package applies the [Oxiom Systems V&V Evidence procedure](https://github.com/Oxiom-Systems/vv-evidence) at commit `a0b49e328777b85c635016c7f5920ce270ade759` to the Host Docs review in [PR #185](https://github.com/vast-ai/docs/pull/185).
 
-It is the reviewer entry point for fresh, retained evidence. The detailed population remains in [`HOST-DOCS-VERIFICATION.md`](../HOST-DOCS-VERIFICATION.md); the CLI population remains in [`HOST-DOCS-CLI-COMMAND-CHECK.md`](../HOST-DOCS-CLI-COMMAND-CHECK.md). This package does not duplicate those 474 targets.
+It is the reviewer entry point for fresh, retained evidence. The detailed population remains in [`HOST-DOCS-VERIFICATION.md`](../HOST-DOCS-VERIFICATION.md); its 176 commands are grouped by required execution access in [`HOST-DOCS-COMMAND-ACCESS.md`](../HOST-DOCS-COMMAND-ACCESS.md); the CLI population remains in [`HOST-DOCS-CLI-COMMAND-CHECK.md`](../HOST-DOCS-CLI-COMMAND-CHECK.md). This package does not duplicate those 474 targets.
 
 ## Validation plan
 
 - **Scope and target:** corrected Host Docs content at commit `5088d76b89856185f3ab15a628e4152ff140ab26`, the QA artifacts added at review-branch commit `1566df66299d58aa0f8e5316dca2f5740456d031`, and a new clean evidence baseline committed before execution.
-- **Population and coverage:** all 72 Host pages, all 33 imported Host snippets, all 474 unique inventory targets, and all 181 documented Vast CLI occurrences. The existing generated inventories establish the item-level population; the inventory freshness check establishes that they still describe the target.
+- **Population and coverage:** all 72 Host pages, all 33 imported Host snippets, all 474 unique inventory targets, all 176 commands classified into five execution-access groups, and all 181 documented Vast CLI occurrences. The existing generated inventories establish the item-level population; the inventory freshness check establishes that they still describe the target.
 - **Local-safe verification:** inventory freshness and structural parsing, CLI registry conformance, persona synchronization, review-context tests, review-server syntax, OpenAPI validation, link analysis, accessibility analysis, and whitespace checks.
 - **Validation requiring another environment:** paid self-test, GPU, Docker, network, storage, privileged host, credential-bearing, account-mutating, and private control-plane behavior. These are not authorized by this plan and remain `BLOCKED` or `UNVALIDATED`.
 - **Environment and prerequisites:** macOS arm64; Python 3; Bash; Git; repository dependencies from `npm ci`; supported Node 24 for Mint; and a clean official Vast CLI checkout whose full revision is retained.

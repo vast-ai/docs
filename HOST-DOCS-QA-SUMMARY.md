@@ -29,6 +29,7 @@ Repository-level accessibility also fails because the shared `#315FFF` light col
 |---|---|
 | Rendered scope | 72 Host pages + 33 imported Host snippets |
 | Full inventory | 474 unique targets / 529 occurrences: 176 command snippets, 77 error strings/categories, 18 thresholds, 203 behavior-claim candidates |
+| Command execution access | All 176 commands reconcile into 5 mutually exclusive groups: 6 paid-only, 52 Host-root, 14 Host-context without root, 104 needing neither, and 0 needing both paid spend and Host root |
 | Bash structure | 123/123 fenced Bash snippets parse with `bash -n` after inert placeholder substitution; nothing executed |
 | CLI registry | 179 occurrences pass against clean current `vast-cli master@ecf32efa...`; 2 are command-family references; 0 actionable defects |
 | Local Host images/routes/fences | No missing local images, missing `/host` routes, empty fences, or unclosed fences |
@@ -70,6 +71,8 @@ Installed Mint `4.2.234` does not have a `mint validate` command. Use `broken-li
 
 ## Commands that must not be treated as routine local tests
 
+Use the generated [command execution access groups](./HOST-DOCS-COMMAND-ACCESS.md) to select an approved environment for every command. The grouped report preserves each stable inventory ID and source line; it is a planning aid, not authorization.
+
 - `vastai self-test machine ...` creates a paid temporary instance. Run only with approved machine/account/budget and record CLI SHA, image digest, machine, instance, cost, and result.
 - Listing, unlisting, maintenance, cleanup, defrag, delete, and default-job commands mutate account or machine state. Use a disposable/non-production target and record before/after state.
 - Installer, storage, Docker, firewall, kernel, reboot, and GPU commands require a disposable supported host and may need root access.
@@ -93,8 +96,10 @@ Passing local tests does not settle these claims:
 - [V&V reviewer summary](./verification/summary.md)
 - [V&V inventory, raw attempts, and reviewer workflow](./verification/README.md)
 - [Full verification inventory](./HOST-DOCS-VERIFICATION.md)
+- [Command execution access groups](./HOST-DOCS-COMMAND-ACCESS.md)
 - [CLI command registry check](./HOST-DOCS-CLI-COMMAND-CHECK.md)
 - [Machine-readable inventory](./host-docs-verification-inventory.json)
+- [Machine-readable command access groups](./host-docs-command-access.json)
 - [Spreadsheet-friendly inventory](./host-docs-verification-inventory.csv)
 - [Machine-readable CLI check](./host-docs-cli-command-check.json)
 

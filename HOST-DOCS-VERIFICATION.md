@@ -48,6 +48,20 @@ The first command regenerates this Markdown report plus JSON and CSV. `--check` 
 | source-or-fixture | 48 | Needs a code source and/or captured redacted runtime fixture. |
 | source-owner | 188 | Needs the owning code, policy, or stakeholder confirmation. |
 
+## Command execution access groups
+
+The 176 command targets are also grouped by the resources needed for representative execution. These access groups are independent of the safety tier and do **not** authorize paid, root, credential-bearing, destructive, or production actions.
+
+See [Host Docs command access groups](./HOST-DOCS-COMMAND-ACCESS.md) for every command ID, source line, access group, and additional gate.
+
+| Access group | Commands | Meaning |
+|---|---:|---|
+| Paid and Host root | 0 | Needs both approved spend and root on a disposable Host machine. |
+| Paid resource, no Host root | 6 | Creates or uses a billable resource; the documented command itself does not require Host root. |
+| Host root/privileged access, no paid resource | 52 | Conservatively requires root or privileged Host access and does not itself create a paid resource. |
+| Host machine, no root in command | 14 | Needs a representative Host or Host artifact, but the documented command does not itself use root. |
+| No paid resource or Host root | 104 | Can be checked without paid spend or Host root; account, credential, mutation, environment, or external-client gates may still apply. |
+
 ## Issues found by the generator
 
 No unclosed/empty fences, missing Host routes, or missing local image targets were found.
