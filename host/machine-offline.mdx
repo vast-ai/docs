@@ -80,7 +80,7 @@ Also review any proxy or VPN client configuration on the host. Only proceed to S
 Check the current status:
 
 ```bash
-systemctl status vastai
+sudo systemctl status vastai
 ```
 
 Example output when the service is running normally:
@@ -155,13 +155,13 @@ sudo systemctl start vastai
 Re-check the service state after starting it, and confirm the `Active:` line reaches `active (running)` and stays there (see the explanation above about restart loops):
 
 ```bash
-systemctl status vastai
+sudo systemctl status vastai
 ```
 
-Show the last 100 log lines from the Vastai service. This is usually where the actual error is written — look for messages logged right before the service exited or crashed:
+Show the last 100 lines of the Vastai daemon log. This is where the actual error text is written — look for messages logged right before the service exited or crashed:
 
 ```bash
-sudo journalctl -u vastai.service -n 100 --no-pager
+sudo tail -n 100 /var/lib/vastai_kaalia/kaalia.log
 ```
 
 Show a detailed per-GPU report from the driver (much more detail than plain `nvidia-smi`), including ECC error counters, throttle reasons, and PCIe link status — useful for spotting a GPU that is detected but unhealthy:
@@ -173,13 +173,13 @@ nvidia-smi -q
 Search the kernel ring buffer for NVIDIA driver errors (`NVRM`, `Xid`) and PCIe/AER bus errors with human-readable timestamps. `Xid` messages are NVIDIA's hardware/driver error codes and often reveal why a GPU fell off the bus:
 
 ```bash
-dmesg -T | grep -iE 'nvrm|nvidia|xid|pcie|aer'
+sudo dmesg -T | grep -iE 'nvrm|nvidia|xid|pcie|aer'
 ```
 
 Search the kernel logs for the current boot for the same NVIDIA/PCIe error patterns. Unlike `dmesg`, this survives ring-buffer overflow, so it catches errors that happened hours ago:
 
 ```bash
-journalctl -k -b | grep -iE 'nvrm|nvidia|xid|pcie|aer'
+sudo journalctl -k -b | grep -iE 'nvrm|nvidia|xid|pcie|aer'
 ```
 
 Common root causes include NVIDIA driver errors, GPU power/PCIe issues, BIOS configuration changes, or a recent kernel/OS update.
@@ -206,7 +206,7 @@ Wait a few minutes, then check whether the machine returns Online in the Vast.ai
 Confirm the service remains active:
 
 ```bash
-systemctl status vastai
+sudo systemctl status vastai
 ```
 
 ## 4. Contact Vast.ai Support
@@ -222,7 +222,7 @@ If the machine remains Offline after completing the steps above, contact Vast.ai
 Current state of the Vastai service — tells Support whether the daemon is running, stopped, or crash-looping, and for how long:
 
 ```bash
-systemctl status vastai
+sudo systemctl status vastai
 ```
 
 Current GPU and driver status — tells Support whether all GPUs are visible and healthy at the driver level:
@@ -231,12 +231,6 @@ Current GPU and driver status — tells Support whether all GPUs are visible and
 nvidia-smi
 ```
 
-The last 200 log lines from the Vastai service — usually contains the exact error messages Support needs to diagnose the problem:
-
-```bash
-sudo journalctl -u vastai.service -n 200 --no-pager
-```
-
-- The full Vastai daemon log file: `/var/lib/vastai_kaalia/kaalia.log`
+- The full Vastai daemon log file: `/var/lib/vastai_kaalia/kaalia.logX`
 
 Please redact any passwords, private keys, API keys, tokens, customer information, or other sensitive data before sharing logs.
