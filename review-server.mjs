@@ -17,6 +17,7 @@
  *   Browse:      http://localhost:4000/host/hosting-overview
  *
  * Options:
+ *   --host 127.0.0.1           loopback address for this review server
  *   --port 4000                port for this review server
  *   --target http://localhost:3000   where the Mintlify preview runs
  *   --dir ./review-feedback    where feedback JSON files are written
@@ -36,6 +37,12 @@ function argValue(name, dflt) {
   const i = argv.indexOf(name);
   return i !== -1 && argv[i + 1] ? argv[i + 1] : dflt;
 }
+const BIND_HOST = argValue('--host', '127.0.0.1');
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', '::1', 'localhost']);
+if (!LOOPBACK_HOSTS.has(BIND_HOST)) {
+  throw new Error(`--host must be loopback-only (${[...LOOPBACK_HOSTS].join(', ')})`);
+}
+const DISPLAY_HOST = BIND_HOST === '::1' ? '[::1]' : BIND_HOST;
 const PORT = parseInt(argValue('--port', '4000'), 10);
 const TARGET = new URL(argValue('--target', 'http://localhost:3000'));
 const FEEDBACK_DIR = path.resolve(argValue('--dir', './review-feedback'));
@@ -191,6 +198,99 @@ function normalizeReviewPath(rawPath) {
   return pathname;
 }
 
+const VV_FILES = [
+  './verification/host-docs-test-sets.json',
+  './verification/host-docs-test-results.json',
+  './verification/host-docs-command-scores.json',
+];
+function vvArray(value) {
+  if (!Array.isArray(value)) throw new Error('invalid V&V data');
+  return value;
+}
+function vvText(value) {
+  if (typeof value !== 'string') throw new Error('invalid V&V text');
+  return value
+    .replace(/\b[A-Za-z_][A-Za-z0-9._-]*@(?!(?:<|\[))[A-Za-z0-9][A-Za-z0-9.-]*\b/g, '[account-or-host]')
+    .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, '[network-address]')
+    .replace(/(?:[A-Za-z]:\\Users\\[^\\\s"'\x60]+|\/(?:Users|home)\/[^\s"'\x60]+|\/(?:private\/tmp|tmp)\/[^\s"'\x60]+)/g, '[local-path]')
+    .replace(/\b(?:verification|review-feedback)\/[^\s"'\x60]+/g, '[artifact-ref]')
+    .replace(/\b((?:machine|instance|offer|account|user|host)(?:[-_ ]?id)?)\s*[:=]\s*[A-Za-z0-9._-]{4,}\b/gi, '$1=[identifier]')
+    .replace(/\b\d{7,}\b/g, '[identifier]')
+    .replace(/\b((?:api[-_ ]?key|access[-_ ]?token|secret|password))\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi, '$1=[redacted]');
+}
+function vvTotals(testSets) {
+  const branches = testSets.flatMap((set) => set.branches);
+  const steps = branches.flatMap((branch) => branch.steps);
+  const commands = steps.flatMap((step) => step.commands);
+  return {
+    testSets: testSets.length, branches: branches.length, steps: steps.length, commands: commands.length,
+    observations: new Set(commands.flatMap((command) => command.evidence.map((row) => row.ref))).size,
+    scored: commands.filter((command) => command.score).length,
+  };
+}
+function loadVerificationEvidence() {
+  try {
+    const bytes = VV_FILES.map((file) => fs.readFileSync(new URL(file, import.meta.url)));
+    const [sets, results, scores] = bytes.map((value) => JSON.parse(value.toString('utf8')));
+    const snapshot = crypto.createHash('sha256').update(bytes[0]).digest('hex');
+    if (results.test_set_snapshot_sha256 !== snapshot || scores.test_set_snapshot_sha256 !== snapshot) {
+      throw new Error('V&V snapshot mismatch');
+    }
+    const pages = vvArray(sets.pages);
+    const evidence = new Map();
+    for (const result of vvArray(results.command_results)) {
+      const row = { ref: vvText(result.evidence_id), observation: vvText(result.observation),
+        executionStatus: vvText(result.vv_status) };
+      for (const id of vvArray(result.command_ids)) {
+        if (typeof id !== 'string') throw new Error('invalid command ID');
+        evidence.set(id, [...(evidence.get(id) || []), row]);
+      }
+    }
+    const scoreByCommand = new Map(vvArray(scores.records).map((score) => {
+      if (typeof score.command_id !== 'string' || !Number.isInteger(score.score)) throw new Error('invalid score');
+      return [score.command_id, { value: score.score, rationale: vvText(score.rationale),
+        executionStatus: vvText(score.execution_status) }];
+    }));
+    const totals = {
+      pages: sets.counts?.pages, testSets: sets.counts?.test_sets, branches: sets.counts?.branches,
+      steps: sets.counts?.steps, commands: sets.counts?.command_carriers,
+      observations: results.counts?.command_runs, scored: scores.counts?.scored,
+    };
+    if (Object.values(totals).some((value) => !Number.isInteger(value) || value < 0)) throw new Error('invalid totals');
+    return { available: true, pages, evidence, scoreByCommand, totals };
+  } catch {
+    return { available: false, pages: [], evidence: new Map(), scoreByCommand: new Map(), totals: null };
+  }
+}
+const VERIFICATION_EVIDENCE = loadVerificationEvidence();
+function verificationForPath(pathname) {
+  if (!VERIFICATION_EVIDENCE.available) return { available: false };
+  try {
+    const page = VERIFICATION_EVIDENCE.pages.find((row) => row.route === pathname);
+    if (!page) return { available: false };
+    const testSets = vvArray(page.test_sets).map((set) => ({
+      id: vvText(set.test_set_id), title: vvText(set.title), executionStatus: vvText(set.execution_status),
+      branches: vvArray(set.branches).map((branch) => ({
+        id: vvText(branch.branch_id), condition: vvText(branch.condition),
+        executionStatus: vvText(branch.execution_status),
+        steps: vvArray(branch.steps).map((step) => ({
+          id: vvText(step.step_id), instruction: vvText(step.instruction),
+          executionStatus: vvText(step.execution_status),
+          commands: vvArray(step.commands).map((command) => ({
+            id: vvText(command.command_id), text: vvText(command.text),
+            executionStatus: vvText(command.execution_status),
+            evidence: VERIFICATION_EVIDENCE.evidence.get(command.command_id) || [],
+            score: VERIFICATION_EVIDENCE.scoreByCommand.get(command.command_id) || null,
+          })),
+        })),
+      })),
+    }));
+    return { available: true, testSets, totals: vvTotals(testSets) };
+  } catch {
+    return { available: false };
+  }
+}
+
 function issueDetails(key) {
   const issue = JIRA_ISSUES[key] || { title: key, status: '' };
   return { key, title: issue.title, status: issue.status, url: JIRA_BASE_URL + encodeURIComponent(key) };
@@ -228,6 +328,7 @@ function reviewContextForPath(rawPath) {
     epics: epicKeys.map(issueDetails),
     issues: issueKeys.map(issueDetails),
     blockers,
+    verification: verificationForPath(pathname),
   };
 }
 
@@ -461,6 +562,10 @@ function esc(s) {
 function statusPage() {
   const { items, reviewers } = readAllItems();
   const open = items.filter((i) => i.status !== 'resolved').length;
+  const vv = VERIFICATION_EVIDENCE;
+  const vvSummary = vv.available
+    ? `<p><b>V&amp;V evidence:</b> ${vv.totals.pages} pages · ${vv.totals.testSets} test sets · ${vv.totals.branches} branches · ${vv.totals.steps} steps · ${vv.totals.commands} commands · ${vv.totals.observations} observations · ${vv.totals.scored} scores.</p>`
+    : '<p><b>V&amp;V evidence:</b> unavailable because required review data is missing or invalid.</p>';
   const byReviewer = {};
   for (const it of items) byReviewer[it.reviewer || '?'] = (byReviewer[it.reviewer || '?'] || 0) + 1;
   const rows = Object.entries(byReviewer)
@@ -472,7 +577,8 @@ h1{font-size:22px} table{border-collapse:collapse;margin:12px 0}td,th{border:1px
 .btn.primary{background:#4a5cf0;color:#fff}.muted{color:#687086}#importResult{min-height:24px;font-weight:600}
 code{background:#f0f0f6;padding:2px 5px;border-radius:4px}</style></head><body>
 <h1>Vast.ai docs review — PR 185 feedback</h1>
-<p><b>${items.length}</b> item(s), <b>${open}</b> open. Feedback files live in <code>${esc(FEEDBACK_DIR)}</code>.</p>
+<p><b>${items.length}</b> item(s), <b>${open}</b> open. Feedback is stored in this local review workspace (default <code>review-feedback/</code>).</p>
+${vvSummary}
 <table><tr><th>Reviewer</th><th>Items</th></tr>${rows}</table>
 <p>
 <a class="btn primary" href="/__review__/export/feedback.json" download>Save JSON</a>
@@ -990,6 +1096,12 @@ const OVERLAY_JS = String.raw`
     '.jira-blockers a{color:#4a5cf0;text-decoration:none;font-weight:800;white-space:nowrap}' +
     '.jira-owner{display:block;color:#8a6f2f;font-size:10px;margin-top:2px}' +
     '.jira-clear{font-size:11px;color:#687188}' +
+    '.vv-context{margin-top:7px;border:1px solid #c9d0e2;border-radius:8px;background:#fff;padding:7px 9px}' +
+    '.vv-context summary{cursor:pointer;font-size:11px;font-weight:800;color:#34405a}' +
+    '.vv-set{margin:7px 0;border-top:1px solid #e7eaf1;padding-top:6px}.vv-set summary{font-weight:700}' +
+    '.vv-branch{margin:7px 0}.vv-branch ol{margin:4px 0;padding-left:20px}.vv-step{margin-bottom:7px}' +
+    '.vv-command{margin:5px 0;padding:6px;background:#f7f8fc;border-radius:6px}.vv-command code{white-space:pre-wrap}' +
+    '.vv-meta,.vv-evidence,.vv-score{margin-top:3px;font-size:10px;color:#687188}.vv-evidence{padding-left:16px}' +
     '#selectionTools{padding:10px 14px;border-bottom:1px solid #e7eaf1;background:#f7f8ff}' +
     '#selectionTools .selection-empty{color:#5c677d;line-height:1.45}' +
     '#selectionTools .selection-ready-body{display:none;gap:8px;flex-direction:column}' +
@@ -1153,15 +1265,42 @@ const OVERLAY_JS = String.raw`
       ' title="' + esc(issue.title || issue.key) + '">' + esc(issue.key) +
       (issue.status ? ' <span class="jira-status">' + esc(issue.status) + '</span>' : '') + '</a>';
   }
+  function verificationHtml(vv) {
+    var html = '<details class="vv-context"><summary>V&amp;V evidence for this page';
+    if (!vv || !vv.available) return html + '</summary><div class="vv-meta">Evidence unavailable.</div></details>';
+    html += ' <span class="vv-meta">' + vv.totals.testSets + ' sets · ' + vv.totals.commands + ' commands</span></summary>';
+    vv.testSets.forEach(function (set) {
+      html += '<details class="vv-set"><summary>' + esc(set.title) + ' · ' + esc(set.executionStatus) + '</summary>';
+      set.branches.forEach(function (branch) {
+        html += '<div class="vv-branch"><b>' + esc(branch.id) + '</b> · ' + esc(branch.executionStatus) + '<br>' + esc(branch.condition) + '<ol>';
+        branch.steps.forEach(function (step) {
+          html += '<li class="vv-step"><b>' + esc(step.id) + '</b> · ' + esc(step.executionStatus) + '<br>' + esc(step.instruction);
+          step.commands.forEach(function (command) {
+            html += '<div class="vv-command"><code>' + esc(command.text) + '</code><div class="vv-meta">' + esc(command.id) + ' · ' + esc(command.executionStatus) + '</div>';
+            if (command.evidence.length) html += '<ul class="vv-evidence">' + command.evidence.map(function (row) {
+              return '<li>' + esc(row.executionStatus) + ' · ' + esc(row.observation) + ' · <code>' + esc(row.ref) + '</code></li>';
+            }).join('') + '</ul>';
+            if (command.score) html += '<div class="vv-score">Score ' + command.score.value + '/3 · ' + esc(command.score.rationale) + '</div>';
+            html += '</div>';
+          });
+          html += '</li>';
+        });
+        html += '</ol></div>';
+      });
+      html += '</details>';
+    });
+    return html + '</details>';
+  }
   function renderPageContext() {
     var box = $('jiraContext');
     var epics = pageContext && Array.isArray(pageContext.epics) ? pageContext.epics : [];
     var issues = pageContext && Array.isArray(pageContext.issues) ? pageContext.issues : [];
     var blockers = pageContext && Array.isArray(pageContext.blockers) ? pageContext.blockers : [];
+    var verification = pageContext && pageContext.verification ? pageContext.verification : { available: false };
     var count = $('jiraCount');
     count.hidden = blockers.length === 0;
     count.textContent = blockers.length ? '\u26A0 ' + blockers.length : '';
-    if (!epics.length && !issues.length && !blockers.length) {
+    if (!epics.length && !issues.length && !blockers.length && !verification.available) {
       box.hidden = true;
       box.innerHTML = '';
       return;
@@ -1187,6 +1326,7 @@ const OVERLAY_JS = String.raw`
     } else {
       html += '<div class="jira-clear">No page-specific blocker is recorded; use the linked Jira source for scope.</div>';
     }
+    html += verificationHtml(verification);
     box.innerHTML = html;
     box.hidden = false;
   }
@@ -1615,13 +1755,13 @@ server.on('upgrade', (req, socket, head) => {
   socket.on('error', () => upstream.destroy());
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, BIND_HOST, () => {
   console.log('');
   console.log('  Vast.ai docs review server (PR #185)');
   console.log('  ------------------------------------');
-  console.log(`  Review the docs at:   http://localhost:${PORT}/host/hosting-overview`);
+  console.log(`  Review the docs at:   http://${DISPLAY_HOST}:${PORT}/host/hosting-overview`);
   console.log(`  Proxying preview at:  ${TARGET.origin}  (start it with: npm run dev -- --no-open)`);
   console.log(`  Feedback saved to:    ${FEEDBACK_DIR}`);
-  console.log(`  Status & exports:     http://localhost:${PORT}/__review__/`);
+  console.log(`  Status & exports:     http://${DISPLAY_HOST}:${PORT}/__review__/`);
   console.log('');
 });

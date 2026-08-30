@@ -70,6 +70,56 @@ async function reviewerState(reviewer) {
   return response.json();
 }
 
+async function runReviewServer(args) {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, ['review-server.mjs', ...args], {
+      cwd: ROOT,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let output = '';
+    child.stdout.on('data', (chunk) => { output += chunk; });
+    child.stderr.on('data', (chunk) => { output += chunk; });
+    child.once('exit', (code, signal) => resolve({ code, signal, output }));
+  });
+}
+
+async function isolatedVerificationContext(mode) {
+  const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'vast-review-vv-'));
+  const script = path.join(fixtureRoot, 'review-server.mjs');
+  await fs.copyFile(path.join(ROOT, 'review-server.mjs'), script);
+  if (mode === 'malformed') {
+    await fs.mkdir(path.join(fixtureRoot, 'verification'));
+    await fs.writeFile(path.join(fixtureRoot, 'verification', 'host-docs-test-sets.json'), '{');
+  } else if (mode === 'snapshot-mismatch') {
+    const verificationDir = path.join(fixtureRoot, 'verification');
+    await fs.mkdir(verificationDir);
+    for (const name of ['host-docs-test-sets.json', 'host-docs-test-results.json', 'host-docs-command-scores.json']) {
+      await fs.copyFile(path.join(ROOT, 'verification', name), path.join(verificationDir, name));
+    }
+    const resultsFile = path.join(verificationDir, 'host-docs-test-results.json');
+    const results = JSON.parse(await fs.readFile(resultsFile, 'utf8'));
+    results.test_set_snapshot_sha256 = '0'.repeat(64);
+    await fs.writeFile(resultsFile, JSON.stringify(results));
+  }
+  const port = await freePort();
+  const child = spawn(process.execPath, [script, '--port', String(port), '--target', targetOrigin,
+    '--dir', path.join(fixtureRoot, 'feedback')], { cwd: fixtureRoot, stdio: 'ignore' });
+  try {
+    for (let i = 0; i < 80; i += 1) {
+      try {
+        const response = await fetch(`http://127.0.0.1:${port}/__review__/api/context?path=%2Fhost%2Fnetwork-ports`);
+        if (response.ok) return response.json();
+      } catch { /* wait for startup */ }
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    throw new Error('isolated review server did not start');
+  } finally {
+    if (child.exitCode == null) child.kill('SIGTERM');
+    await new Promise((resolve) => child.exitCode == null ? child.once('exit', resolve) : resolve());
+    await fs.rm(fixtureRoot, { recursive: true, force: true });
+  }
+}
+
 before(async () => {
   targetServer = http.createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
@@ -95,6 +145,13 @@ after(async () => {
   }
   if (targetServer) await new Promise((resolve) => targetServer.close(resolve));
   if (feedbackDir) await fs.rm(feedbackDir, { recursive: true, force: true });
+});
+
+test('Review server rejects non-loopback bind addresses', async () => {
+  const result = await runReviewServer(['--host', '0.0.0.0', '--port', '0']);
+  assert.notEqual(result.code, 0);
+  assert.equal(result.signal, null);
+  assert.match(result.output, /--host must be loopback-only/);
 });
 
 test('Host Teams shows its Jira sources and only its page blockers', async () => {
@@ -131,6 +188,33 @@ test('Network page receives network blockers without unrelated Teams blockers', 
   assert.ok(context.blockers.every((item) => item.issue.key === 'CON-1514'));
 });
 
+test('Page context joins only sanitized page-scoped V&V evidence', async () => {
+  const context = await contextFor('/host/market-metrics');
+  assert.equal(context.verification.available, true);
+  assert.deepEqual(context.verification.totals,
+    { testSets: 3, branches: 7, steps: 10, commands: 6, observations: 3, scored: 3 });
+  const commands = context.verification.testSets.flatMap((set) =>
+    set.branches.flatMap((branch) => branch.steps.flatMap((step) => step.commands)));
+  assert.equal(commands.flatMap((command) => command.evidence).length, 3);
+  assert.ok(commands.flatMap((command) => command.evidence).every((row) => /^EV-[A-Z0-9-]+$/.test(row.ref)));
+  assert.equal(commands.filter((command) => command.score).length, 3);
+  const serialized = JSON.stringify(context.verification);
+  assert.doesNotMatch(serialized, /evidence_ref|source_file|source_context|test_set_snapshot_sha256|\/private\/tmp|\/Users\//);
+
+  const network = await contextFor('/host/network-ports');
+  const networkCommands = network.verification.testSets.flatMap((set) =>
+    set.branches.flatMap((branch) => branch.steps.flatMap((step) => step.commands)));
+  const redacted = networkCommands.find((command) => command.id === 'CLM-f93e44da84eeeef6');
+  assert.match(redacted.text, /\[network-address\]/);
+  assert.doesNotMatch(redacted.text, /(?:\d{1,3}\.){3}\d{1,3}/);
+});
+
+test('Missing or malformed verification input fails closed', async () => {
+  assert.deepEqual((await isolatedVerificationContext()).verification, { available: false });
+  assert.deepEqual((await isolatedVerificationContext('malformed')).verification, { available: false });
+  assert.deepEqual((await isolatedVerificationContext('snapshot-mismatch')).verification, { available: false });
+});
+
 test('Unmapped Host pages retain epic provenance without invented blockers', async () => {
   const context = await contextFor('/host/workload-policy');
   assert.equal(context.matched, false);
@@ -144,6 +228,7 @@ test('Non-Host pages do not inherit Host Jira context', async () => {
   assert.deepEqual(context.epics, []);
   assert.deepEqual(context.issues, []);
   assert.deepEqual(context.blockers, []);
+  assert.deepEqual(context.verification, { available: false });
 });
 
 test('Only the review proxy injects the overlay', async () => {
@@ -153,6 +238,7 @@ test('Only the review proxy injects the overlay', async () => {
   assert.match(reviewHtml, /__review__\/overlay\.js/);
   const overlay = await (await fetch(`${reviewOrigin}/__review__/overlay.js`)).text();
   assert.match(overlay, /Jira context for this page/);
+  assert.match(overlay, /V&amp;V evidence for this page/);
   assert.match(overlay, /REVIEW-TRACEABILITY\.md/);
   assert.match(overlay, /\/context\?path=/);
   assert.match(overlay, /Save JSON/);
@@ -210,6 +296,9 @@ test('JSON import restores multiple reviewers and keeps newer server items', asy
   assert.match(statusHtml, /Save JSON/);
   assert.match(statusHtml, /Import JSON/);
   assert.match(statusHtml, /restorable backup for every page and reviewer/);
+  assert.match(statusHtml, /V&amp;V evidence:<\/b> 39 pages · 97 test sets · 203 branches · 468 steps · 165 commands · 12 observations · 13 scores/);
+  assert.match(statusHtml, /default <code>review-feedback\/<\/code>/);
+  assert.doesNotMatch(statusHtml, new RegExp(feedbackDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 });
 
 test('JSON import rejects an invalid backup before writing any reviewer state', async () => {

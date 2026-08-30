@@ -1,5 +1,41 @@
 # Host Docs QA summary
 
+## Current procedure-based V&V status — 2026-08-30
+
+The earlier atomic inventory below is preserved as discovery history, but it is
+not the current acceptance denominator. The current review follows each authored
+Host page as a logical, ordered procedure: **39 pages → 97 test sets → 165
+command carriers**. Related commands remain together and sequential instructions
+are not split into artificial standalone tests.
+
+Current retained results:
+
+- 12 behavioral command observations: 5 `PASS`, 7 `BLOCKED`, 0 `FAIL`.
+- 42/42 installed CLI leaf-signature help checks pass; syntax evidence is not
+  counted as behavioral proof.
+- 13 command carriers have page-context scores: two score `3`, eleven score `2`,
+  and none score `1`. The other 152 remain deliberately unscored until behavior
+  is observed.
+- The port-4000 review tool now shows the sanitized evidence and score beside
+  each affected page command. Its focused suite passes 12/12 tests, and rendered
+  browser QA confirms the evidence panel, dashboard totals, and the previously
+  missing pricing image.
+- The authorized Host network has a private tunnel route, but the Host currently
+  answers neither SSH nor bounded ICMP; no remote command has executed. The
+  local configured CLI credential is a client/non-Host account, so seven
+  Host-account reads are correctly recorded as credential/ownership blockers.
+
+Next live actions are limited and concrete: inject the Host key from a protected
+file (without replacing the saved client key), repeat the seven read-only CLI
+contexts, then run the frozen read-only Host snapshot once the Host or its SSH
+ACL/jump route is available. See
+[command coverage](./verification/HOST-DOCS-COMMAND-COVERAGE.md),
+[test sets](./verification/host-docs-test-sets.json),
+[results](./verification/host-docs-test-results.json), and
+[scores](./verification/host-docs-command-scores.json).
+
+---
+
 Date checked: 2026-08-27
 Docs revision: `5088d76b89856185f3ab15a628e4152ff140ab26`
 Review target: [vast-ai/docs PR #185](https://github.com/vast-ai/docs/pull/185)
