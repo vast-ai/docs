@@ -10,25 +10,40 @@ are not split into artificial standalone tests.
 
 Current retained results:
 
-- 12 behavioral command observations: 5 `PASS`, 7 `BLOCKED`, 0 `FAIL`.
+- The append-only ledger contains 31 logical behavior observations: 13 `PASS`,
+  16 `BLOCKED`, one `FAIL`, and one `NOT_APPLICABLE`. Historical credential and
+  SSH blockers remain preserved rather than overwritten.
+- At the latest-evidence carrier level, 31 of 165 carriers have behavior:
+  15 `PASS`, 14 `BLOCKED`, one `FAIL`, and one `NOT_APPLICABLE`.
 - 42/42 installed CLI leaf-signature help checks pass; syntax evidence is not
   counted as behavioral proof.
-- 13 command carriers have page-context scores: two score `3`, eleven score `2`,
-  and none score `1`. The other 152 remain deliberately unscored until behavior
-  is observed.
+- 31 command carriers have page-context scores: twelve score `3`, eighteen score
+  `2`, and one score `1`. The other 134 remain deliberately unscored until
+  behavior is observed.
 - The port-4000 review tool now shows the sanitized evidence and score beside
   each affected page command. Its focused suite passes 12/12 tests, and rendered
   browser QA confirms the evidence panel, dashboard totals, and the previously
   missing pricing image.
-- The authorized Host network has a private tunnel route, but the Host currently
-  answers neither SSH nor bounded ICMP; no remote command has executed. The
-  local configured CLI credential is a client/non-Host account, so seven
-  Host-account reads are correctly recorded as credential/ownership blockers.
+- A role-correct Host key completed 11/11 read-only CLI/API calls with exit `0`
+  and empty stderr. It resolved all seven earlier account/ownership blockers,
+  returned live market data, and reproduced the documented search-filter
+  sequence: default lookup empty, then the target visible under `-n` and
+  explicit offer-state filters.
+- Corrected SSH access completed all 41 frozen read-only Host checks plus 14
+  bounded deltas. Hardware/GPU inventory and VM-status behavior passed. Exact
+  privileged forms, Docker-socket reads, Docker GPU injection, paid self-test,
+  WAN reachability, and real fault/maintenance/report branches remain bounded
+  rather than overstated.
+- One concrete defect is now evidence-backed: the non-root
+  `docker info | grep -i runtime` instruction fails on Docker-socket permission
+  while adjacent privileged Docker checks use `sudo`. Fix and retest are queued
+  behind an interactive privileged run.
 
-Next live actions are limited and concrete: inject the Host key from a protected
-file (without replacing the saved client key), repeat the seven read-only CLI
-contexts, then run the frozen read-only Host snapshot once the Host or its SSH
-ACL/jump route is available. See
+Raw outputs are retained mode `0600` in a restricted local archive outside Git;
+only hashes and sanitized observations are committed. The ephemeral Host-key
+file was zeroed after the API run. Next actions are the short manual privileged
+queue, then separately authorized paid/container/WAN branches if the review
+requires them. See
 [command coverage](./verification/HOST-DOCS-COMMAND-COVERAGE.md),
 [test sets](./verification/host-docs-test-sets.json),
 [results](./verification/host-docs-test-results.json), and

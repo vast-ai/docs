@@ -5,35 +5,44 @@ Coverage is counted over the 165 command carriers frozen in
 help check proves only that a CLI signature is registered, not that its runtime
 behavior supports the page.
 
-| Evidence available | Command carriers | Context units |
-| --- | ---: | ---: |
-| Behavior PASS | 5 | 5 |
-| Behavior attempted but BLOCKED | 8 | 7 |
-| CLI signature only | 55 | 55 |
-| No signature or behavior evidence | 97 | 91 |
-| **Total** | **165** | **158** |
+| Latest evidence available | Command carriers |
+| --- | ---: |
+| Behavior `PASS` | 15 |
+| Behavior attempted but `BLOCKED` | 14 |
+| Behavior `FAIL` | 1 |
+| Behavior `NOT_APPLICABLE` | 1 |
+| CLI signature only | 55 |
+| No signature or behavior evidence | 79 |
+| **Total** | **165** |
 
 The installed CLI passed all 42 leaf-signature help checks. Thirty-eight of
 those signatures occur in the Host-page command population and map to 68
-carriers; 13 of those carriers also have behavioral attempts. Of the 55
-signature-only carriers, 33 are display-only, 15 are executable but not yet
-run, and 7 are already source-defect blocked.
+carriers. Host-account retesting resolved the seven earlier credential or
+ownership blockers and reproduced the `/host/not-in-search` sequence under the
+correct account. A live read-only SSH snapshot added behavior for 18 Host-shell
+carriers across hardware, services, Docker, storage, GPU/kernel, Fabric Manager,
+and VM status.
 
-Thirteen carriers currently have page-context scores: two score `3` and eleven
-score `2`. No carrier has score `1`. The remaining 152 carriers stay unscored;
-static syntax evidence must not be promoted to behavioral support.
+Thirty-one carriers now have page-context scores: twelve score `3`, eighteen
+score `2`, and one scores `1`. The score-1 carrier is the non-root
+`docker info | grep -i runtime` instruction on `/host/machine-errors`; it failed
+on Docker-socket permission while adjacent privileged Docker checks use
+`sudo`. The remaining 134 carriers stay unscored; static syntax evidence must
+not be promoted to behavioral support.
 
 ## Highest-value next runs
 
-1. Repeat the seven blocked read-only CLI contexts with a Host-capable
-   `machine_read` key and an owned machine target. This addresses eight carriers
-   across fleet operations, maintenance, market metrics, and workload policy.
-2. Run the frozen read-only Host snapshot from a network context that can reach
-   the authorized machine. Its nine procedure contexts cover 22 carriers in 21
-   context units across hardware, services, Docker, storage, GPU, kernel/ECC,
-   fabric, and VM status.
-3. Keep Host Teams' 32-carrier catalog static: the page presents it as reference
-   material, not as a workflow to execute for coverage.
+1. Complete the short interactive-privilege queue: exact `sudo` log checks,
+   `sudo docker ps`, `sudo docker system df`, and a privileged retest of
+   `docker info | grep -i runtime` before correcting the score-1 instruction.
+2. Separately authorize and bound Docker GPU-injection, paid self-test, and
+   external TCP/UDP reachability if those live branches are required for this
+   review. Record instance, cost, image digest, cleanup, and WAN evidence.
+3. Exercise maintenance/report/fault branches only when a representative safe
+   state exists. Empty current results validate access, not known-record fields
+   or report-to-log correlation.
+4. Keep Host Teams' catalog static: the page presents it as reference material,
+   not as a workflow to execute for coverage.
 
 Mutating, destructive, paid, installer, reboot, listener, packet-capture,
 container-load, and source-defect-blocked branches remain excluded until their

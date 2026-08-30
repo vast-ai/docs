@@ -1077,7 +1077,8 @@ const OVERLAY_JS = String.raw`
     '.filters label{display:flex;align-items:center;gap:6px;cursor:pointer;color:#5c677d}' +
     '.filters .primary{background:#4a5cf0;border-color:#4a5cf0;color:#fff;font-weight:600}' +
     '.context-count{background:#fff1b8;color:#6b4f00;border-radius:999px;padding:1px 7px;font-size:11px;font-weight:800}' +
-    '#jiraContext{padding:10px 14px;border-bottom:1px solid #e7eaf1;background:#f8f9fc;color:#384056}' +
+    '#jiraContext{padding:10px 14px;border-bottom:1px solid #e7eaf1;background:#f8f9fc;color:#384056;' +
+      'max-height:60vh;min-height:0;overflow-y:auto;flex:0 1 auto}' +
     '#jiraContext[hidden]{display:none}' +
     '.jira-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px}' +
     '.jira-title b{color:#1a1a2e;font-size:12px}' +

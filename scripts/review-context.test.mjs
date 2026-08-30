@@ -192,10 +192,10 @@ test('Page context joins only sanitized page-scoped V&V evidence', async () => {
   const context = await contextFor('/host/market-metrics');
   assert.equal(context.verification.available, true);
   assert.deepEqual(context.verification.totals,
-    { testSets: 3, branches: 7, steps: 10, commands: 6, observations: 3, scored: 3 });
+    { testSets: 3, branches: 7, steps: 10, commands: 6, observations: 4, scored: 3 });
   const commands = context.verification.testSets.flatMap((set) =>
     set.branches.flatMap((branch) => branch.steps.flatMap((step) => step.commands)));
-  assert.equal(commands.flatMap((command) => command.evidence).length, 3);
+  assert.equal(commands.flatMap((command) => command.evidence).length, 6);
   assert.ok(commands.flatMap((command) => command.evidence).every((row) => /^EV-[A-Z0-9-]+$/.test(row.ref)));
   assert.equal(commands.filter((command) => command.score).length, 3);
   const serialized = JSON.stringify(context.verification);
@@ -296,7 +296,7 @@ test('JSON import restores multiple reviewers and keeps newer server items', asy
   assert.match(statusHtml, /Save JSON/);
   assert.match(statusHtml, /Import JSON/);
   assert.match(statusHtml, /restorable backup for every page and reviewer/);
-  assert.match(statusHtml, /V&amp;V evidence:<\/b> 39 pages · 97 test sets · 203 branches · 468 steps · 165 commands · 12 observations · 13 scores/);
+  assert.match(statusHtml, /V&amp;V evidence:<\/b> 39 pages · 97 test sets · 203 branches · 468 steps · 165 commands · 31 observations · 31 scores/);
   assert.match(statusHtml, /default <code>review-feedback\/<\/code>/);
   assert.doesNotMatch(statusHtml, new RegExp(feedbackDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 });

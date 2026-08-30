@@ -8,10 +8,10 @@
     "3": "The observed command behavior directly supports the page instruction, including relevant prerequisites, result meaning, and exceptions."
   },
   "counts": {
-    "scored": 13,
-    "score_1": 0,
-    "score_2": 11,
-    "score_3": 2
+    "scored": 31,
+    "score_1": 1,
+    "score_2": 18,
+    "score_3": 12
   },
   "records": [
     {
@@ -20,9 +20,9 @@
       "page_route": "/host/not-in-search",
       "source": "host/not-in-search.mdx:29",
       "execution_status": "PASS",
-      "evidence_ids": ["EV-CLI03-SHOW-USER"],
+      "evidence_ids": ["EV-CLI03-SHOW-USER", "EV-CLI05-HOST-ACCOUNT"],
       "score": 3,
-      "rationale": "The command returned the exact account-context fields needed by the preceding instruction. It exposed that the current account is not Host-enabled and lacks machine_read, correctly preventing misleading interpretation of later searches."
+      "rationale": "The command exposed the failed non-Host prerequisite in the first attempt and then confirmed the role-correct Host context before the successful ordered retest. This directly supports the page's first diagnostic gate."
     },
     {
       "command_id": "CLM-257b1610cec2ed67",
@@ -30,9 +30,9 @@
       "page_route": "/host/not-in-search",
       "source": "host/not-in-search.mdx:35",
       "execution_status": "PASS",
-      "evidence_ids": ["EV-CLI04-SEARCH-DIRECT"],
-      "score": 2,
-      "rationale": "The exact direct lookup was accepted and returned an empty result, but the required same-Host-account precondition failed. The command is relevant; this run cannot establish why the machine is absent."
+      "evidence_ids": ["EV-CLI04-SEARCH-DIRECT", "EV-CLI05-SEARCH-SEQUENCE"],
+      "score": 3,
+      "rationale": "Under the verified Host account, the exact default direct lookup returned empty and the following documented filter-bypass steps exposed the target. The ordered behavior directly supports the page's listed-versus-visible explanation."
     },
     {
       "command_id": "CLM-4791f604141e25b3",
@@ -40,9 +40,9 @@
       "page_route": "/host/not-in-search",
       "source": "host/not-in-search.mdx:41",
       "execution_status": "PASS",
-      "evidence_ids": ["EV-CLI01-SEARCH-N"],
-      "score": 2,
-      "rationale": "The default-filter-suppressed form was accepted and returned an empty result. Because the account precondition failed, it does not yet distinguish filtering from account or machine state."
+      "evidence_ids": ["EV-CLI01-SEARCH-N", "EV-CLI05-SEARCH-SEQUENCE"],
+      "score": 3,
+      "rationale": "After the Host-account precondition passed, suppressing default filters returned two target offers that the default lookup hid. This is the exact behavior the troubleshooting step describes."
     },
     {
       "command_id": "CLM-def825dcfd490760",
@@ -50,9 +50,9 @@
       "page_route": "/host/not-in-search",
       "source": "host/not-in-search.mdx:47",
       "execution_status": "PASS",
-      "evidence_ids": ["EV-CLI01-SEARCH-EXPLICIT"],
-      "score": 2,
-      "rationale": "The explicit offer-state form was accepted and returned an empty result, but it ran after the account-context precondition failed and therefore supplies only partial diagnostic support."
+      "evidence_ids": ["EV-CLI01-SEARCH-EXPLICIT", "EV-CLI05-SEARCH-SEQUENCE"],
+      "score": 3,
+      "rationale": "After the Host-account precondition passed, explicitly widening the common offer-state filters returned the same two target offers as -n. This directly validates the documented alternative."
     },
     {
       "command_id": "CLM-16e21c4911f77054",
@@ -69,80 +69,260 @@
       "procedure_id": "FLT-E01",
       "page_route": "/host/fleet-operations",
       "source": "host/fleet-operations.mdx:22",
-      "execution_status": "BLOCKED",
-      "evidence_ids": ["EV-CLI01-SHOW-MACHINES"],
-      "score": 2,
-      "rationale": "The command path and --raw option are accepted, but the configured key lacks machine_read, so the fleet-state response and scripting behavior remain unverified."
+      "execution_status": "PASS",
+      "evidence_ids": ["EV-CLI01-SHOW-MACHINES", "EV-CLI05-FLEET-READ"],
+      "score": 3,
+      "rationale": "The role-correct Host key returned structured raw fleet records including the authorized target. This directly supports the page's fleet-state scripting instruction and resolves the earlier credential blocker."
     },
     {
       "command_id": "CLM-6187d671dab31354",
       "procedure_id": "FLT-E01",
       "page_route": "/host/fleet-operations",
       "source": "host/fleet-operations.mdx:76",
-      "execution_status": "BLOCKED",
-      "evidence_ids": ["EV-CLI01-SHOW-MACHINES"],
+      "execution_status": "PASS",
+      "evidence_ids": ["EV-CLI01-SHOW-MACHINES", "EV-CLI05-FLEET-READ"],
       "score": 2,
-      "rationale": "The monitoring-loop command is applicable and registered, but no fleet data was returned under the current credential, so the surrounding monitoring sequence is not yet sufficiently supported."
+      "rationale": "A structured fleet snapshot now validates the first monitoring step, but one run does not prove a loop, state-change detection, alerting, or follow-on self-test behavior."
     },
     {
       "command_id": "CLM-fbc68f0587099d0b",
       "procedure_id": "MNT-E01",
       "page_route": "/host/maintenance-windows",
       "source": "host/maintenance-windows.mdx:23",
-      "execution_status": "BLOCKED",
-      "evidence_ids": ["EV-CLI01-SHOW-MACHINES", "EV-CLI01-SHOW-MACHINE"],
+      "execution_status": "PASS",
+      "evidence_ids": ["EV-CLI01-SHOW-MACHINES", "EV-CLI01-SHOW-MACHINE", "EV-CLI05-MAINTENANCE-READ"],
       "score": 2,
-      "rationale": "Both read-only machine-inspection forms are accepted, but the current key cannot read Host machines. Maintenance precondition behavior remains incomplete."
+      "rationale": "Both owned-machine inspection forms returned the documented state and contract-related fields, but the observed machine had no active rental. Multiple-client and latest-contract-end edge cases remain untested."
     },
     {
       "command_id": "CLM-f7d6715b8fd0db3e",
       "procedure_id": "MNT-E02",
       "page_route": "/host/maintenance-windows",
       "source": "host/maintenance-windows.mdx:85",
-      "execution_status": "BLOCKED",
-      "evidence_ids": ["EV-CLI01-SHOW-MAINTS"],
+      "execution_status": "PASS",
+      "evidence_ids": ["EV-CLI01-SHOW-MAINTS", "EV-CLI05-MAINTENANCE-READ"],
       "score": 2,
-      "rationale": "The lookup reached the control plane, which rejected the selected machine as not owned by the configured account. A role-correct Host-account retest is required to support the documented inspection result."
+      "rationale": "The owned-machine lookup succeeded and returned a valid empty maintenance list. It validates access and empty-state behavior, but not the fields of a known scheduled maintenance record."
     },
     {
       "command_id": "CLM-582fe58ab6692d1a",
       "procedure_id": "MET-E02",
       "page_route": "/host/market-metrics",
       "source": "host/market-metrics.mdx:78",
-      "execution_status": "BLOCKED",
-      "evidence_ids": ["EV-CLI01-METRICS-GPU"],
-      "score": 2,
-      "rationale": "The observed 401 exactly matches the page's non-host-account exception, but the intended current-metrics success response remains untested."
+      "execution_status": "PASS",
+      "evidence_ids": ["EV-CLI01-METRICS-GPU", "EV-CLI05-MARKET-METRICS"],
+      "score": 3,
+      "rationale": "The first run reproduced the documented non-Host 401 exception; the Host-account retest returned a nonempty structured current snapshot with the documented field families. The selected raw alternative is directly supported."
     },
     {
       "command_id": "CLM-2c5f078c98fa55fd",
       "procedure_id": "MET-E02",
       "page_route": "/host/market-metrics",
       "source": "host/market-metrics.mdx:86",
-      "execution_status": "BLOCKED",
-      "evidence_ids": ["EV-CLI01-METRICS-TRENDS"],
-      "score": 2,
-      "rationale": "The observed 401 supports the documented access restriction, but no historical-trend response was available to verify the command's primary behavior."
+      "execution_status": "PASS",
+      "evidence_ids": ["EV-CLI01-METRICS-TRENDS", "EV-CLI05-MARKET-METRICS"],
+      "score": 3,
+      "rationale": "The Host-account retest returned the requested GPU series with 504 rows and summary data after the non-Host exception was reproduced. This directly supports the selected raw trend alternative; other filters remain separate alternatives."
     },
     {
       "command_id": "CLM-97607b35ff0cb11f",
       "procedure_id": "MET-E02",
       "page_route": "/host/market-metrics",
       "source": "host/market-metrics.mdx:98",
-      "execution_status": "BLOCKED",
-      "evidence_ids": ["EV-CLI01-METRICS-LOCATIONS"],
-      "score": 2,
-      "rationale": "The observed 401 supports the page's host-account gate, but the locations output and filter behavior remain unverified."
+      "execution_status": "PASS",
+      "evidence_ids": ["EV-CLI01-METRICS-LOCATIONS", "EV-CLI05-MARKET-METRICS"],
+      "score": 3,
+      "rationale": "The Host-account retest returned a nonempty geographic distribution with the documented field families after the access exception was reproduced. This validates the selected raw alternative, not the separate two-hour cache-age claim."
     },
     {
       "command_id": "CLM-7189d68a2d50ea99",
       "procedure_id": "POL-E01",
       "page_route": "/host/workload-policy",
       "source": "host/workload-policy.mdx:53",
-      "execution_status": "BLOCKED",
-      "evidence_ids": ["EV-CLI01-REPORTS"],
+      "execution_status": "PASS",
+      "evidence_ids": ["EV-CLI01-REPORTS", "EV-CLI05-REPORTS"],
       "score": 2,
-      "rationale": "The reports command is accepted, but the current credential cannot read machine reports. It is relevant to the investigation flow but insufficiently verified for the intended Host context."
+      "rationale": "The role-correct owned-machine lookup succeeded, but the observed report list was empty. That validates access and empty-state behavior only; the page's report-to-host-log correlation still needs a representative report."
+    },
+    {
+      "command_id": "CLM-f6e2120b9919f1f0",
+      "procedure_id": "HWP-E01",
+      "page_route": "/host/hardware-prep",
+      "source": "host/hardware-prep.mdx:29",
+      "execution_status": "PASS",
+      "evidence_ids": ["EV-HOST03-HARDWARE-PREP"],
+      "score": 3,
+      "rationale": "The complete ordered inventory block executed before any Host mutation, produced the intended starting-state facts, treated the optional /data0 absence correctly, and preserved raw network/device details privately as the page instructs."
+    },
+    {
+      "command_id": "CLM-595e1c8f67f5692f",
+      "procedure_id": "DAY1-E01",
+      "page_route": "/host/first-24-hours",
+      "source": "host/first-24-hours.mdx:28",
+      "execution_status": "BLOCKED",
+      "evidence_ids": ["EV-HOST03-DAY1"],
+      "score": 2,
+      "rationale": "Current service states, log tails, and range alignment support the snapshot portion, but the exact sudo forms require manual execution and a point observation cannot establish the page's 24-hour stability behavior."
+    },
+    {
+      "command_id": "CLM-1aab40fca6f567f6",
+      "procedure_id": "DIA-E02",
+      "page_route": "/host/common-errors-diagnostics",
+      "source": "host/common-errors-diagnostics.mdx:95",
+      "execution_status": "BLOCKED",
+      "evidence_ids": ["EV-HOST03-DIAGNOSTICS-SERVICE"],
+      "score": 2,
+      "rationale": "The services, bounded logs, and port-range behavior were observed and matched the page's current-state interpretation, but exact privileged execution is pending and no failure/restart-loop branch was present."
+    },
+    {
+      "command_id": "CLM-a1ecff41b73b1413",
+      "procedure_id": "DIA-E02",
+      "page_route": "/host/common-errors-diagnostics",
+      "source": "host/common-errors-diagnostics.mdx:188",
+      "execution_status": "BLOCKED",
+      "evidence_ids": ["EV-HOST03-DIAGNOSTICS-STORAGE"],
+      "score": 2,
+      "rationale": "The range, capacity, filesystem, and project-quota mount facts were directly available, but Docker usage could not be read through the current SSH user's Docker socket or noninteractive sudo."
+    },
+    {
+      "command_id": "CLM-ae94a456c56a5bdb",
+      "procedure_id": "DIA-E03",
+      "page_route": "/host/common-errors-diagnostics",
+      "source": "host/common-errors-diagnostics.mdx:130",
+      "execution_status": "BLOCKED",
+      "evidence_ids": ["EV-HOST03-DIAGNOSTICS-KERNEL"],
+      "score": 2,
+      "rationale": "Current-boot journal evidence was readable and the documented error families were observable, but the exact sudo form and dmesg source remain blocked."
+    },
+    {
+      "command_id": "CLM-121abf61bc80c796",
+      "procedure_id": "DIA-E03",
+      "page_route": "/host/common-errors-diagnostics",
+      "source": "host/common-errors-diagnostics.mdx:137",
+      "execution_status": "BLOCKED",
+      "evidence_ids": ["EV-HOST03-DIAGNOSTICS-KERNEL"],
+      "score": 2,
+      "rationale": "Current, previous, and file-backed log sources returned relevant bounded evidence, but dmesg, compressed history, some rotated files, and exact privileged forms remain incomplete."
+    },
+    {
+      "command_id": "CLM-2113f9109b2c79c5",
+      "procedure_id": "DIA-E03",
+      "page_route": "/host/common-errors-diagnostics",
+      "source": "host/common-errors-diagnostics.mdx:153",
+      "execution_status": "BLOCKED",
+      "evidence_ids": ["EV-HOST03-GPU-INJECTION"],
+      "score": 2,
+      "rationale": "Host GPU enumeration passed, but the paired Docker GPU-injection run was deliberately excluded from the read-only attempt. The block is relevant but only half observed."
+    },
+    {
+      "command_id": "CLM-2ffc62f260fd8010",
+      "procedure_id": "ERR-T02",
+      "page_route": "/host/machine-errors",
+      "source": "host/machine-errors.mdx:98",
+      "execution_status": "BLOCKED",
+      "evidence_ids": ["EV-HOST03-GPU-INJECTION", "EV-HOST03-DIAGNOSTICS-KERNEL"],
+      "score": 2,
+      "rationale": "Host GPU visibility and bounded kernel evidence support two parts of the diagnostic sequence, but the decisive Docker GPU-injection command remains unexecuted."
+    },
+    {
+      "command_id": "CLM-9aa5c400c3ff1241",
+      "procedure_id": "ERR-T02",
+      "page_route": "/host/machine-errors",
+      "source": "host/machine-errors.mdx:113",
+      "execution_status": "BLOCKED",
+      "evidence_ids": ["EV-HOST03-GPU-INJECTION"],
+      "score": 2,
+      "rationale": "The host-side half of the CDI diagnostic passed, but the container-side GPU injection behavior that distinguishes the failure remains untested."
+    },
+    {
+      "command_id": "CLM-2c2c7d94c1bd259f",
+      "procedure_id": "ERR-T02",
+      "page_route": "/host/machine-errors",
+      "source": "host/machine-errors.mdx:129",
+      "execution_status": "FAIL",
+      "evidence_ids": ["EV-HOST03-DOCKER-RUNTIME"],
+      "score": 1,
+      "rationale": "The first three checks worked, but docker info failed as written because the authorized non-root operator lacks Docker-socket access. Adjacent Docker diagnostics use sudo, so this block is not runnable in its stated form for the observed operator context."
+    },
+    {
+      "command_id": "CLM-885315f98e7e1dd9",
+      "procedure_id": "ERR-T02",
+      "page_route": "/host/machine-errors",
+      "source": "host/machine-errors.mdx:145",
+      "execution_status": "BLOCKED",
+      "evidence_ids": ["EV-HOST03-DOCKER-DAEMON"],
+      "score": 2,
+      "rationale": "Docker service and journal checks returned useful state, but the exact sudo docker ps step needs interactive privilege. No daemon-unavailable error was present to exercise the failure interpretation."
+    },
+    {
+      "command_id": "CLM-0bae256f5a9e7bc7",
+      "procedure_id": "ERR-T03",
+      "page_route": "/host/machine-errors",
+      "source": "host/machine-errors.mdx:160",
+      "execution_status": "BLOCKED",
+      "evidence_ids": ["EV-HOST03-DIAGNOSTICS-KERNEL"],
+      "score": 2,
+      "rationale": "The bounded journal evidence covered the documented signal families, but dmesg and exact privileged execution remain unavailable and the page's under-load repetition criterion was not exercised."
+    },
+    {
+      "command_id": "CLM-d2cb5452a0e2063a",
+      "procedure_id": "ERR-T03",
+      "page_route": "/host/machine-errors",
+      "source": "host/machine-errors.mdx:181",
+      "execution_status": "BLOCKED",
+      "evidence_ids": ["EV-HOST03-PCIE"],
+      "score": 2,
+      "rationale": "PCI and NVIDIA enumeration returned the expected four GPUs, but the privileged kernel-log component and an actual missing-GPU failure branch remain unvalidated."
+    },
+    {
+      "command_id": "CLM-9e9b545d694a34cc",
+      "procedure_id": "ERR-T06",
+      "page_route": "/host/machine-errors",
+      "source": "host/machine-errors.mdx:328",
+      "execution_status": "PASS",
+      "evidence_ids": ["EV-HOST03-PCIE"],
+      "score": 2,
+      "rationale": "The exact GPU inventory command ran and its output was retained in the private evidence bundle, but no repeating rental-attempt message existed and the remaining escalation-packet fields and handoff were not exercised."
+    },
+    {
+      "command_id": "CLM-a4c552f07e09986c",
+      "procedure_id": "ERR-T03",
+      "page_route": "/host/machine-errors",
+      "source": "host/machine-errors.mdx:196",
+      "execution_status": "BLOCKED",
+      "evidence_ids": ["EV-HOST03-ECC"],
+      "score": 2,
+      "rationale": "ECC/remap queries completed without a nonzero remap finding, but the privileged Xid-log component and a real uncorrectable-ECC condition were not available."
+    },
+    {
+      "command_id": "CLM-720bb6982a2e7948",
+      "procedure_id": "ERR-T04",
+      "page_route": "/host/machine-errors",
+      "source": "host/machine-errors.mdx:220",
+      "execution_status": "NOT_APPLICABLE",
+      "evidence_ids": ["EV-HOST03-NVSWITCH"],
+      "score": 3,
+      "rationale": "The page explicitly limits Fabric Manager checks to NVSwitch-class systems. The observed non-NVSwitch Host correctly had no unit while topology still returned, directly validating the prerequisite and exception."
+    },
+    {
+      "command_id": "CLM-3959b3397aeb7b35",
+      "procedure_id": "ERR-T05",
+      "page_route": "/host/machine-errors",
+      "source": "host/machine-errors.mdx:245",
+      "execution_status": "BLOCKED",
+      "evidence_ids": ["EV-HOST03-STORAGE"],
+      "score": 2,
+      "rationale": "Capacity and XFS/project-quota mount behavior directly support two checks, but Docker usage remained blocked and no full-storage condition was present."
+    },
+    {
+      "command_id": "CLM-ca44522b22c4c5ee",
+      "procedure_id": "VM-E01",
+      "page_route": "/host/vms",
+      "source": "host/vms.mdx:39",
+      "execution_status": "PASS",
+      "evidence_ids": ["EV-HOST03-VM-CHECK"],
+      "score": 3,
+      "rationale": "The exact command returned pending with exit 0, and the page explicitly lists pending with the observed meaning. Command behavior, result interpretation, and non-mutating prerequisite align exactly."
     }
   ]
 }
