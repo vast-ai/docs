@@ -228,6 +228,16 @@ function vvTotals(testSets) {
     scored: commands.filter((command) => command.score).length,
   };
 }
+function vvSetTotals(set) {
+  const totals = vvTotals([set]);
+  const commands = set.branches.flatMap((branch) =>
+    branch.steps.flatMap((step) => step.commands));
+  return {
+    ...totals,
+    scoreCounts: [1, 2, 3].map((score) =>
+      commands.filter((command) => command.score?.value === score).length),
+  };
+}
 function loadVerificationEvidence() {
   try {
     const bytes = VV_FILES.map((file) => fs.readFileSync(new URL(file, import.meta.url)));
@@ -247,7 +257,9 @@ function loadVerificationEvidence() {
       }
     }
     const scoreByCommand = new Map(vvArray(scores.records).map((score) => {
-      if (typeof score.command_id !== 'string' || !Number.isInteger(score.score)) throw new Error('invalid score');
+      if (typeof score.command_id !== 'string' || !Number.isInteger(score.score) || score.score < 1 || score.score > 3) {
+        throw new Error('invalid score');
+      }
       return [score.command_id, { value: score.score, rationale: vvText(score.rationale),
         executionStatus: vvText(score.execution_status) }];
     }));
@@ -268,23 +280,26 @@ function verificationForPath(pathname) {
   try {
     const page = VERIFICATION_EVIDENCE.pages.find((row) => row.route === pathname);
     if (!page) return { available: false };
-    const testSets = vvArray(page.test_sets).map((set) => ({
-      id: vvText(set.test_set_id), title: vvText(set.title), executionStatus: vvText(set.execution_status),
-      branches: vvArray(set.branches).map((branch) => ({
-        id: vvText(branch.branch_id), condition: vvText(branch.condition),
-        executionStatus: vvText(branch.execution_status),
-        steps: vvArray(branch.steps).map((step) => ({
-          id: vvText(step.step_id), instruction: vvText(step.instruction),
-          executionStatus: vvText(step.execution_status),
-          commands: vvArray(step.commands).map((command) => ({
-            id: vvText(command.command_id), text: vvText(command.text),
-            executionStatus: vvText(command.execution_status),
-            evidence: VERIFICATION_EVIDENCE.evidence.get(command.command_id) || [],
-            score: VERIFICATION_EVIDENCE.scoreByCommand.get(command.command_id) || null,
+    const testSets = vvArray(page.test_sets).map((set) => {
+      const normalized = {
+        id: vvText(set.test_set_id), title: vvText(set.title), executionStatus: vvText(set.execution_status),
+        branches: vvArray(set.branches).map((branch) => ({
+          id: vvText(branch.branch_id), condition: vvText(branch.condition),
+          executionStatus: vvText(branch.execution_status),
+          steps: vvArray(branch.steps).map((step) => ({
+            id: vvText(step.step_id), instruction: vvText(step.instruction),
+            executionStatus: vvText(step.execution_status),
+            commands: vvArray(step.commands).map((command) => ({
+              id: vvText(command.command_id), text: vvText(command.text),
+              executionStatus: vvText(command.execution_status),
+              evidence: VERIFICATION_EVIDENCE.evidence.get(command.command_id) || [],
+              score: VERIFICATION_EVIDENCE.scoreByCommand.get(command.command_id) || null,
+            })),
           })),
         })),
-      })),
-    }));
+      };
+      return { ...normalized, totals: vvSetTotals(normalized) };
+    });
     return { available: true, testSets, totals: vvTotals(testSets) };
   } catch {
     return { available: false };
@@ -1099,7 +1114,9 @@ const OVERLAY_JS = String.raw`
     '.jira-clear{font-size:11px;color:#687188}' +
     '.vv-context{margin-top:7px;border:1px solid #c9d0e2;border-radius:8px;background:#fff;padding:7px 9px}' +
     '.vv-context summary{cursor:pointer;font-size:11px;font-weight:800;color:#34405a}' +
+    '.vv-help{margin:7px 0;padding:6px 7px;border-radius:6px;background:#f0f2ff;color:#525e78;font-size:10px;line-height:1.35}' +
     '.vv-set{margin:7px 0;border-top:1px solid #e7eaf1;padding-top:6px}.vv-set summary{font-weight:700}' +
+    '.vv-set-meta{display:block;margin:2px 0 0 13px;color:#687188;font-size:10px;font-weight:600}' +
     '.vv-branch{margin:7px 0}.vv-branch ol{margin:4px 0;padding-left:20px}.vv-step{margin-bottom:7px}' +
     '.vv-command{margin:5px 0;padding:6px;background:#f7f8fc;border-radius:6px}.vv-command code{white-space:pre-wrap}' +
     '.vv-meta,.vv-evidence,.vv-score{margin-top:3px;font-size:10px;color:#687188}.vv-evidence{padding-left:16px}' +
@@ -1266,12 +1283,26 @@ const OVERLAY_JS = String.raw`
       ' title="' + esc(issue.title || issue.key) + '">' + esc(issue.key) +
       (issue.status ? ' <span class="jira-status">' + esc(issue.status) + '</span>' : '') + '</a>';
   }
+  function countLabel(value, singular) {
+    return value + ' ' + singular + (value === 1 ? '' : 's');
+  }
   function verificationHtml(vv) {
     var html = '<details class="vv-context"><summary>V&amp;V evidence for this page';
     if (!vv || !vv.available) return html + '</summary><div class="vv-meta">Evidence unavailable.</div></details>';
-    html += ' <span class="vv-meta">' + vv.totals.testSets + ' sets · ' + vv.totals.commands + ' commands</span></summary>';
+    html += ' <span class="vv-meta">' + countLabel(vv.totals.testSets, 'set') + ' · ' +
+      countLabel(vv.totals.commands, 'command') + ' · ' + countLabel(vv.totals.observations, 'observation') + ' · ' +
+      vv.totals.scored + '/' + vv.totals.commands + ' scored</span></summary>';
+    html += '<div class="vv-help"><b>Procedure status is separate from command scoring.</b> A set remains <code>UNVALIDATED</code> until every required branch and step is covered, even when some commands already have evidence and scores. ' +
+      'Score 1 = failed to run or produced no relevant semantic result; 2 = worked but gave weak or partial support; 3 = worked and strongly supports the documented claim.</div>';
     vv.testSets.forEach(function (set) {
-      html += '<details class="vv-set"><summary>' + esc(set.title) + ' · ' + esc(set.executionStatus) + '</summary>';
+      var scoreParts = (set.totals.scoreCounts || []).map(function (count, index) {
+        return count ? count + '×' + (index + 1) : '';
+      }).filter(Boolean).reverse();
+      var scoreBreakdown = scoreParts.length ? ' · ' + scoreParts.join(' · ') : '';
+      html += '<details class="vv-set"><summary><span>' + esc(set.title) + ' · ' + esc(set.executionStatus) + '</span>' +
+        '<span class="vv-set-meta">' + countLabel(set.totals.commands, 'command') + ' · ' +
+        countLabel(set.totals.observations, 'observation') + ' · ' +
+        set.totals.scored + '/' + set.totals.commands + ' scored' + scoreBreakdown + '</span></summary>';
       set.branches.forEach(function (branch) {
         html += '<div class="vv-branch"><b>' + esc(branch.id) + '</b> · ' + esc(branch.executionStatus) + '<br>' + esc(branch.condition) + '<ol>';
         branch.steps.forEach(function (step) {

@@ -193,6 +193,11 @@ test('Page context joins only sanitized page-scoped V&V evidence', async () => {
   assert.equal(context.verification.available, true);
   assert.deepEqual(context.verification.totals,
     { testSets: 3, branches: 7, steps: 10, commands: 6, observations: 4, scored: 3 });
+  assert.deepEqual(context.verification.testSets[0].totals,
+    { testSets: 1, branches: 2, steps: 3, commands: 1, observations: 0, scored: 0, scoreCounts: [0, 0, 0] });
+  const cliMatrix = context.verification.testSets.find((set) => set.title === 'CLI market query matrix');
+  assert.deepEqual(cliMatrix.totals,
+    { testSets: 1, branches: 4, steps: 4, commands: 4, observations: 4, scored: 3, scoreCounts: [0, 0, 3] });
   const commands = context.verification.testSets.flatMap((set) =>
     set.branches.flatMap((branch) => branch.steps.flatMap((step) => step.commands)));
   assert.equal(commands.flatMap((command) => command.evidence).length, 6);
@@ -239,6 +244,8 @@ test('Only the review proxy injects the overlay', async () => {
   const overlay = await (await fetch(`${reviewOrigin}/__review__/overlay.js`)).text();
   assert.match(overlay, /Jira context for this page/);
   assert.match(overlay, /V&amp;V evidence for this page/);
+  assert.match(overlay, /Procedure status is separate from command scoring/);
+  assert.match(overlay, /Score 1 = failed to run or produced no relevant semantic result/);
   assert.match(overlay, /REVIEW-TRACEABILITY\.md/);
   assert.match(overlay, /\/context\?path=/);
   assert.match(overlay, /Save JSON/);
