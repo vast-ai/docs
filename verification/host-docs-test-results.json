@@ -1,18 +1,19 @@
 {
   "schema_version": "1.0",
   "record_type": "HOST_DOCS_TEST_RESULTS",
-  "test_set_snapshot_sha256": "63413c9c00fc394f727cb905db29aa787ac1ea3b4b8ef7c45ff6d727ed88a88c",
+  "test_set_snapshot_sha256": "50b010956942a3294ea12cbc3936330fbad2be932948a9b4b3e747c8c72c051a",
   "counts": {
-    "attempts": 15,
-    "command_runs": 31,
+    "attempts": 18,
+    "command_runs": 37,
     "command_pass": 13,
-    "command_blocked": 16,
+    "command_blocked": 18,
     "command_fail": 1,
+    "command_unvalidated": 4,
     "command_not_applicable": 1,
     "signature_checks": 42,
     "signature_pass": 42,
     "host_attempts_blocked": 2,
-    "host_attempts_executed": 1
+    "host_attempts_executed": 2
   },
   "attempts": [
     {
@@ -144,11 +145,13 @@
         "frozen_checks_executed": 41,
         "delta_checks_executed": 14,
         "logical_results": 13,
-        "pass": 2,
+        "pass": 1,
         "blocked": 9,
         "fail": 1,
+        "unvalidated": 1,
         "not_applicable": 1
       },
+      "qualification_superseded_by": "ATTEMPT-2026-08-31-HOST-VM-DISQUALIFICATION-01",
       "evidence_ref": "verification/evidence/2026-08-30-host-readonly-attempt-03/result.md"
     },
     {
@@ -158,6 +161,51 @@
       "execution_state": "EXECUTED",
       "reason": "The latest page-scoped live evidence, 1/3 and 3/3 score controls, independent evidence scrolling, dashboard totals, and privacy checks rendered correctly.",
       "evidence_ref": "verification/evidence/2026-08-30-rendered-review-attempt-02/result.md"
+    },
+    {
+      "attempt_id": "ATTEMPT-2026-08-31-HOST-DOC-DEFECT-RETEST-01",
+      "kind": "SOURCE_CORRECTION_CLI_SIGNATURE",
+      "status": "PARTIAL",
+      "execution_state": "EXECUTED",
+      "summary": {
+        "source_corrections": 4,
+        "cli_signature_pass": 2,
+        "behavior_blocked": 4
+      },
+      "reason": "Four source defects were corrected. Defrag and list-machine syntax passed CLI help checks, but their state-changing behavior was deliberately not exercised on the active Host fleet.",
+      "evidence_ref": "verification/evidence/2026-08-31-host-doc-defect-retest-01/result.md"
+    },
+    {
+      "attempt_id": "ATTEMPT-2026-08-31-HOST-PRIVILEGED-01",
+      "kind": "HOST_PRIVILEGED_STATE_CHANGE",
+      "status": "PARTIAL",
+      "execution_state": "EXECUTED",
+      "summary": {
+        "logical_results": 4,
+        "pass": 1,
+        "fail": 0,
+        "blocked": 0,
+        "unvalidated": 3,
+        "pre_and_post_rentals": 0,
+        "final_vm_status": "off"
+      },
+      "reason": "Docker runtime diagnostics passed. The VM observations are environment-disqualified because the target's VM/IOMMU setup was improper; they do not qualify check, disablement, or enablement.",
+      "evidence_ref": "verification/evidence/2026-08-31-host-privileged-attempt-01/result.md",
+      "qualification_superseded_by": "ATTEMPT-2026-08-31-HOST-VM-DISQUALIFICATION-01"
+    },
+    {
+      "attempt_id": "ATTEMPT-2026-08-31-HOST-VM-DISQUALIFICATION-01",
+      "kind": "EVIDENCE_QUALIFICATION_REVIEW",
+      "status": "UNVALIDATED",
+      "execution_state": "NOT_EXECUTED",
+      "summary": {
+        "commands_disqualified": 3,
+        "results_reclassified": 4,
+        "scores_withdrawn": 3,
+        "retest_required": 3
+      },
+      "reason": "The Host owner confirmed that the target's VM/IOMMU setup was improper. Prior command outputs remain historical observations, but the VM check, off, and on -f procedures are not acceptance-tested and remain unscored pending a repaired-Host retest.",
+      "evidence_ref": "verification/evidence/2026-08-31-host-vm-environment-disqualification-01/result.md"
     }
   ],
   "command_results": [
@@ -652,9 +700,123 @@
       ],
       "planned_form": "python3 /var/lib/vastai_kaalia/enable_vms.py check",
       "process_exit_code": 0,
+      "original_vv_status": "PASS",
+      "vv_status": "UNVALIDATED",
+      "blocker_class": "TEST_ENVIRONMENT_NOT_REPRESENTATIVE",
+      "observation": "UNVALIDATED: the command printed pending, but the Host owner later confirmed that the target's VM/IOMMU setup was improper. This is retained as an observation, not an acceptance test of check behavior.",
+      "evidence_ref": "verification/evidence/2026-08-30-host-readonly-attempt-03/result.md",
+      "qualification_evidence_ref": "verification/evidence/2026-08-31-host-vm-environment-disqualification-01/result.md",
+      "finding_ids": [
+        "F-HOST06-VM-ENVIRONMENT-DISQUALIFIED"
+      ]
+    },
+    {
+      "evidence_id": "EV-HOST04-DOCKER-RUNTIME",
+      "procedure_ids": [
+        "ERR-T02"
+      ],
+      "command_ids": [
+        "CLM-2c2c7d94c1bd259f"
+      ],
+      "planned_form": "type docker; docker --version; docker create --help | grep -- --runtime; sudo docker info | grep -i runtime",
+      "process_exit_code": 0,
       "vv_status": "PASS",
-      "observation": "The exact read-only command returned pending, one of the three states and meanings documented on the page.",
-      "evidence_ref": "verification/evidence/2026-08-30-host-readonly-attempt-03/result.md"
+      "observation": "The corrected privileged diagnostic block resolved Docker, exposed the --runtime option, and reported the registered NVIDIA runtime. All commands and grep pipelines exited 0.",
+      "evidence_ref": "verification/evidence/2026-08-31-host-privileged-attempt-01/result.md",
+      "finding_ids": [
+        "F-HOST03-DOCKER-INFO-SUDO"
+      ]
+    },
+    {
+      "evidence_id": "EV-HOST04-VM-OFF",
+      "procedure_ids": [
+        "VM-E01"
+      ],
+      "command_ids": [
+        "CLM-9cba75bbdc780804"
+      ],
+      "planned_form": "sudo python3 /var/lib/vastai_kaalia/enable_vms.py off",
+      "process_exit_code": 0,
+      "original_vv_status": "PASS",
+      "vv_status": "UNVALIDATED",
+      "blocker_class": "TEST_ENVIRONMENT_NOT_REPRESENTATIVE",
+      "observation": "UNVALIDATED: the helper returned exit 0 and a follow-up check printed off, but the target's VM/IOMMU setup was improper. This does not acceptance-test disablement on a correctly configured VM-capable Host.",
+      "evidence_ref": "verification/evidence/2026-08-31-host-privileged-attempt-01/result.md",
+      "qualification_evidence_ref": "verification/evidence/2026-08-31-host-vm-environment-disqualification-01/result.md",
+      "finding_ids": [
+        "F-HOST06-VM-ENVIRONMENT-DISQUALIFIED"
+      ]
+    },
+    {
+      "evidence_id": "EV-HOST04-VM-ON",
+      "procedure_ids": [
+        "VM-E02"
+      ],
+      "command_ids": [
+        "CLM-ffda5e2c291c470e"
+      ],
+      "planned_form": "sudo python3 /var/lib/vastai_kaalia/enable_vms.py on -f",
+      "process_exit_code": 0,
+      "original_vv_status": "FAIL",
+      "vv_status": "UNVALIDATED",
+      "blocker_class": "TEST_ENVIRONMENT_NOT_REPRESENTATIVE",
+      "observation": "UNVALIDATED: the helper printed 'IOMMU groups not set up for VMs, aborting.' and left status off, but this is an environment-prerequisite observation rather than an acceptance test or a command-defect result.",
+      "evidence_ref": "verification/evidence/2026-08-31-host-privileged-attempt-01/result.md",
+      "qualification_evidence_ref": "verification/evidence/2026-08-31-host-vm-environment-disqualification-01/result.md",
+      "finding_ids": [
+        "F-HOST04-VM-IOMMU",
+        "F-HOST04-VM-EXIT-ZERO",
+        "F-HOST06-VM-ENVIRONMENT-DISQUALIFIED"
+      ]
+    },
+    {
+      "evidence_id": "EV-HOST04-VM-CHECK",
+      "procedure_ids": [
+        "VM-E01",
+        "VM-E02"
+      ],
+      "command_ids": [
+        "CLM-ca44522b22c4c5ee"
+      ],
+      "planned_form": "python3 /var/lib/vastai_kaalia/enable_vms.py check",
+      "process_exit_code": 0,
+      "original_vv_status": "PASS",
+      "vv_status": "UNVALIDATED",
+      "blocker_class": "TEST_ENVIRONMENT_NOT_REPRESENTATIVE",
+      "observation": "UNVALIDATED: the status command printed pending before the attempt and off afterwards, but the improperly configured target is not representative evidence for the documented check procedure.",
+      "evidence_ref": "verification/evidence/2026-08-31-host-privileged-attempt-01/result.md",
+      "qualification_evidence_ref": "verification/evidence/2026-08-31-host-vm-environment-disqualification-01/result.md",
+      "finding_ids": [
+        "F-HOST06-VM-ENVIRONMENT-DISQUALIFIED"
+      ]
+    },
+    {
+      "evidence_id": "EV-HOST05-DEFRAG-STATIC",
+      "procedure_ids": [
+        "FLT-E05"
+      ],
+      "command_ids": [
+        "CLM-be71decb680d1423"
+      ],
+      "planned_form": "vastai defrag machines <machine-id-1> <machine-id-2>",
+      "vv_status": "BLOCKED",
+      "blocker_class": "STATE_CHANGING_LIVE_ACTION_NOT_JUSTIFIED",
+      "observation": "The corrected command now requires explicit reviewed machine IDs, and CLI help accepts one or more integer IDs. Live defragmentation was not run because it mutates Host offers and no operational need was present.",
+      "evidence_ref": "verification/evidence/2026-08-31-host-doc-defect-retest-01/result.md"
+    },
+    {
+      "evidence_id": "EV-HOST05-LIST-MACHINE-STATIC",
+      "procedure_ids": [
+        "PRICE-C01"
+      ],
+      "command_ids": [
+        "CLM-9b86f864cf7df38c"
+      ],
+      "planned_form": "vastai list machine <machine-id> --price_gpu 0.45 --price_min_bid 0.25 --discount_rate 0.30 --min_chunk 1 --end_date 12/31/2026",
+      "vv_status": "BLOCKED",
+      "blocker_class": "STATE_CHANGING_LIVE_ACTION_NOT_JUSTIFIED",
+      "observation": "The corrected example is now a complete list-machine command; CLI help confirms the required machine ID and all documented options. It was not executed because it would create or update live offers.",
+      "evidence_ref": "verification/evidence/2026-08-31-host-doc-defect-retest-01/result.md"
     }
   ],
   "findings": [
@@ -674,7 +836,25 @@
       "finding_id": "F-HOST03-DOCKER-INFO-SUDO",
       "classification": "HOST_DOCS_COMMAND_PERMISSION_DEFECT",
       "observation": "On the authorized non-root Host operator account, docker info failed on Docker-socket permission while adjacent privileged Docker checks use sudo.",
-      "documentation_disposition": "CANDIDATE_FIX_ADD_SUDO_AFTER_INTERACTIVE_PRIVILEGED_RETEST"
+      "documentation_disposition": "RESOLVED_BY_ADDING_SUDO_AND_CONFIRMED_BY_PRIVILEGED_RETEST"
+    },
+    {
+      "finding_id": "F-HOST04-VM-IOMMU",
+      "classification": "HOST_PREREQUISITE_NOT_MET",
+      "observation": "Forced VM enablement aborted because IOMMU groups were not configured on the authorized target; final VM configuration state remained off.",
+      "documentation_disposition": "DOCUMENTED_FAILURE_AND_RETRY_PREREQUISITE; SUCCESSFUL_ENABLEMENT_REMAINS_UNVERIFIED"
+    },
+    {
+      "finding_id": "F-HOST04-VM-EXIT-ZERO",
+      "classification": "HELPER_SEMANTIC_FAILURE_EXIT_ZERO",
+      "observation": "The VM helper printed an abort and left status off while returning process exit 0.",
+      "documentation_disposition": "DOCUMENTED_OUTPUT_AND_POSTCONDITION_CHECK; RETAIN_FOR_HELPER_IMPLEMENTATION_REVIEW"
+    },
+    {
+      "finding_id": "F-HOST06-VM-ENVIRONMENT-DISQUALIFIED",
+      "classification": "TEST_ENVIRONMENT_NOT_REPRESENTATIVE",
+      "observation": "The Host owner confirmed that the VM/IOMMU setup was improper, so observations from this target cannot qualify the check, off, or on -f procedures.",
+      "documentation_disposition": "ALL_THREE_VM_COMMANDS_UNVALIDATED_AND_UNSCORED_PENDING_REPAIRED_HOST_RETEST"
     }
   ],
   "raw_evidence_policy": "Raw artifacts are mode 0600 outside Git; this file contains sanitized observations only."

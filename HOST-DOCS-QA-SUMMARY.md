@@ -1,6 +1,6 @@
 # Host Docs QA summary
 
-## Current procedure-based V&V status — 2026-08-30
+## Current procedure-based V&V status — 2026-08-31
 
 The earlier atomic inventory below is preserved as discovery history, but it is
 not the current acceptance denominator. The current review follows each authored
@@ -10,15 +10,16 @@ are not split into artificial standalone tests.
 
 Current retained results:
 
-- The append-only ledger contains 31 logical behavior observations: 13 `PASS`,
-  16 `BLOCKED`, one `FAIL`, and one `NOT_APPLICABLE`. Historical credential and
+- The ledger contains 37 logical observations: 13 `PASS`, 18 `BLOCKED`, four
+  `UNVALIDATED`, one `FAIL`, and one `NOT_APPLICABLE`. Historical outputs and
   SSH blockers remain preserved rather than overwritten.
-- At the latest-evidence carrier level, 31 of 165 carriers have behavior:
-  15 `PASS`, 14 `BLOCKED`, one `FAIL`, and one `NOT_APPLICABLE`.
+- At the latest-evidence carrier level, 35 of 165 carriers have behavior:
+  15 `PASS`, 16 `BLOCKED`, three `UNVALIDATED`, none `FAIL`, and one
+  `NOT_APPLICABLE`.
 - 42/42 installed CLI leaf-signature help checks pass; syntax evidence is not
   counted as behavioral proof.
-- 31 command carriers have page-context scores: twelve score `3`, eighteen score
-  `2`, and one score `1`. The other 134 remain deliberately unscored until
+- 32 command carriers have page-context scores: twelve score `3`, twenty score
+  `2`, and none score `1`. The other 133 remain deliberately unscored until
   behavior is observed.
 - The port-4000 review tool now shows the sanitized evidence and score beside
   each affected page command. Its focused suite passes 12/12 tests, and rendered
@@ -30,20 +31,27 @@ Current retained results:
   sequence: default lookup empty, then the target visible under `-n` and
   explicit offer-state filters.
 - Corrected SSH access completed all 41 frozen read-only Host checks plus 14
-  bounded deltas. Hardware/GPU inventory and VM-status behavior passed. Exact
-  privileged forms, Docker-socket reads, Docker GPU injection, paid self-test,
-  WAN reachability, and real fault/maintenance/report branches remain bounded
-  rather than overstated.
-- One concrete defect is now evidence-backed: the non-root
-  `docker info | grep -i runtime` instruction fails on Docker-socket permission
-  while adjacent privileged Docker checks use `sudo`. Fix and retest are queued
-  behind an interactive privileged run.
+  bounded deltas. A later authorized root session passed the idle/rental safety
+  gate and retained pre/post state around the narrow VM and Docker retest.
+- The Host owner confirmed that the target's VM/IOMMU setup was improper. The
+  retained `check`, `off`, and `on -f` outputs are therefore exploratory only:
+  all three commands are `UNVALIDATED`, unscored, and require a new full retest
+  after repair. This does not establish a VM-helper defect. The corrected Docker
+  runtime diagnostic is outside that disqualification and remains score `3`.
+- All four source-proven documentation defects are corrected. The Docker
+  correction has privileged behavioral evidence; the VM wording has safety and
+  source/observation support but awaits representative command testing. Defrag
+  and pricing/list-machine have
+  current CLI-signature evidence and score `2`, but live execution remains
+  intentionally blocked because those commands mutate Host offers.
 
 Raw outputs are retained mode `0600` in a restricted local archive outside Git;
 only hashes and sanitized observations are committed. The ephemeral Host-key
-file was zeroed after the API run. Next actions are the short manual privileged
-queue, then separately authorized paid/container/WAN branches if the review
-requires them. See
+file was zeroed after the API run. Next actions are a new VM retest covering
+`check → off → check → on -f → check` after the Host's BIOS/kernel IOMMU
+grouping is corrected, plus separately
+authorized Docker GPU-injection, paid, WAN, and real failure-branch tests if the
+review requires them. See
 [command coverage](./verification/HOST-DOCS-COMMAND-COVERAGE.md),
 [test sets](./verification/host-docs-test-sets.json),
 [results](./verification/host-docs-test-results.json), and

@@ -1,5 +1,7 @@
 # Host Docs read-only Host attempt 03 — result
 
+> **Qualification correction (2026-08-31):** The later Host-owner review determined that the VM target was improperly configured. The retained `pending` observation does not acceptance-test the VM `check` command. Its current status is `UNVALIDATED` and it is unscored pending a repaired-Host retest; see [`../2026-08-31-host-vm-environment-disqualification-01/result.md`](../2026-08-31-host-vm-environment-disqualification-01/result.md).
+
 - Attempt state: `EXECUTED`
 - V&V status: `PARTIAL`
 - Target: restricted alias `HOST_VV_TARGET`
@@ -27,12 +29,13 @@
 | `EV-HOST03-ECC` | `ERR-T03-B04-S01` | `BLOCKED` | ECC/remap queries completed without nonzero remap findings; the exact privileged Xid-log command remains manually blocked. |
 | `EV-HOST03-NVSWITCH` | `ERR-T04-B02-S03` | `NOT_APPLICABLE` | The page correctly scopes Fabric Manager checks to NVSwitch systems; this Host is not such a system and the unit is absent. GPU topology still returned. |
 | `EV-HOST03-STORAGE` | `ERR-T05-B02-S01` | `BLOCKED` | Docker capacity and XFS/project-quota mount facts passed; Docker usage remains blocked by socket privilege. |
-| `EV-HOST03-VM-CHECK` | `VM-E01-S01` | `PASS` | The exact read-only command returned `pending`, one of the three states and meanings documented on the page. |
+| `EV-HOST03-VM-CHECK` | `VM-E01-S01` | `UNVALIDATED` | The exact read-only command returned `pending`, but the target was later confirmed to have improper VM/IOMMU setup; retain the output without treating it as acceptance evidence. |
 
 ## Claim limits and manual queue
 
-This snapshot validates present command behavior, not long-duration stability or
-repair outcomes. It does not validate a Docker GPU container, live load, paid
+For the qualified items, this snapshot validates present command behavior, not
+long-duration stability or repair outcomes. VM `check` is explicitly excluded
+and remains unvalidated. The snapshot does not validate a Docker GPU container, live load, paid
 self-test, listener/WAN reachability, service restart, cleanup, reboot, VM state
 mutation, or any branch requiring an actual observed fault. Exact privileged
 forms must be completed interactively by an authorized operator.

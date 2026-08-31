@@ -296,7 +296,7 @@ test('JSON import restores multiple reviewers and keeps newer server items', asy
   assert.match(statusHtml, /Save JSON/);
   assert.match(statusHtml, /Import JSON/);
   assert.match(statusHtml, /restorable backup for every page and reviewer/);
-  assert.match(statusHtml, /V&amp;V evidence:<\/b> 39 pages · 97 test sets · 203 branches · 468 steps · 165 commands · 31 observations · 31 scores/);
+  assert.match(statusHtml, /V&amp;V evidence:<\/b> 39 pages · 97 test sets · 203 branches · 468 steps · 165 commands · 37 observations · 32 scores/);
   assert.match(statusHtml, /default <code>review-feedback\/<\/code>/);
   assert.doesNotMatch(statusHtml, new RegExp(feedbackDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 });

@@ -46,15 +46,23 @@ Results:
 | --- | --- |
 | `on` | VM support is enabled. |
 | `off` | VM support is disabled or a previous test failed. |
-| `pending` | VM support will be tested when the machine is idle. |
+| `pending` | No enablement attempt has completed; the host may be evaluated when idle. |
+
+These values describe VM configuration state only. They do not confirm that the Host is idle or that a VM workload is healthy.
 
 ## Disable VM Support
 
+<Warning>
+Disabling VM support changes Host configuration and can disrupt running work. Prevent new rentals during the approved maintenance window, then confirm the machine has no active rentals or other workloads.
+</Warning>
+
 ```bash
-python3 /var/lib/vastai_kaalia/enable_vms.py off
+sudo python3 /var/lib/vastai_kaalia/enable_vms.py off
 ```
 
-Most hosts do not need to disable anything; unsupported machines are detected automatically.
+The command marks VM enablement disabled and removes the VM configuration entry when present. It does not stop workloads, end rentals, or verify that the Host is safe to change.
+
+Run [Check VM Status](#check-vm-status) afterwards and confirm it reports `off`. Most hosts do not need to disable anything; unsupported machines are detected automatically.
 
 ## Hardware Requirements
 
@@ -93,8 +101,22 @@ Disable display managers, XOrg/Wayland sessions, and background GPU processes. `
 
 If VM support is off and you want to retry after fixing the host:
 
+<Warning>
+This is a forced, state-changing setup retry—not a simple toggle. It can install VM packages, pull a test image, restart Host services, and run a GPU-passthrough test. Prevent new rentals during the approved maintenance window, then confirm there are no active rentals, containers, or GPU workloads.
+</Warning>
+
 ```bash
 sudo python3 /var/lib/vastai_kaalia/enable_vms.py on -f
 ```
 
-Run this only when the machine is idle.
+Do not use process exit status alone as evidence of success. The helper can print an error such as `IOMMU groups not set up for VMs, aborting.` while exiting with status `0`.
+
+After the command finishes, check the resulting state and basic Host health:
+
+```bash
+python3 /var/lib/vastai_kaalia/enable_vms.py check
+nvidia-smi -L
+systemctl is-active vastai.service docker.service
+```
+
+Treat only exact `on` status, visible expected GPUs, and active Host services as a successful enablement. Treat `pending`, `off`, error or abort text, an unexpected status, a missing GPU, or an inactive service as a failure. If IOMMU groups are not set up, correct the BIOS and kernel IOMMU configuration, reboot, and verify the grouping before retrying.
