@@ -1,55 +1,89 @@
 # Host Docs command V&V coverage
 
-Coverage is counted over the 165 command carriers frozen in
-`host-docs-test-sets.json`. Commands are grouped in page/procedure context; a
-help check proves only that a CLI signature is registered, not that its runtime
-behavior supports the page.
+Coverage is counted over the 165 command carriers in
+`host-docs-test-sets.json`. Commands remain grouped in their page, procedure,
+branch, and ordered-step context. A help/signature check proves only registry or
+static conformance; it does not establish runtime product behavior.
 
-| Latest evidence available | Command carriers |
+## Current functional disposition
+
+| Current status | Command carriers |
 | --- | ---: |
-| Behavior `PASS` | 15 |
-| Behavior attempted but `BLOCKED` | 16 |
-| Behavior observed on a non-representative target and therefore `UNVALIDATED` | 3 |
-| Behavior `FAIL` | 0 |
-| Behavior `NOT_APPLICABLE` | 1 |
-| CLI signature only | 53 |
-| No signature or behavior evidence | 77 |
+| `PASS` | 46 |
+| `BLOCKED` | 34 |
+| `UNVALIDATED` | 58 |
+| `NOT_APPLICABLE` | 27 |
+| `FAIL` | 0 |
 | **Total** | **165** |
 
-The installed CLI passed all 42 leaf-signature help checks. Thirty-eight of
-those signatures occur in the Host-page command population and map to 68
-carriers. Host-account retesting resolved the seven earlier credential or
-ownership blockers and reproduced the `/host/not-in-search` sequence under the
-correct account. A live read-only SSH snapshot added behavior across hardware,
-services, Docker, storage, GPU/kernel, and Fabric Manager. VM status and
-state-transition outputs were also captured, but the Host owner later confirmed
-that the target's VM/IOMMU setup was improper. Those three VM carriers are
-retained as observations only and remain `UNVALIDATED`.
+Each carrier has one exact current projection record. Its status is supported
+by the current reconciliation evidence and must agree with the execution status
+stored beside its semantic assessment. Superseded and disqualified attempts
+remain visible in history but cannot drive the current projection.
 
-Thirty-two carriers now have page-context scores: twelve score `3`, twenty
-score `2`, and none score `1`. A privileged retest of
-`sudo docker info | grep -i runtime` passed and remains score `3`. The three VM
-scores were withdrawn because their target was not representative; they remain
-unscored pending a repaired-Host retest. The remaining 133 carriers stay
-unscored; static syntax and disqualified observations must not be promoted to
-behavioral support.
+## Contextual semantic assessment
 
-## Highest-value next runs
+| Assessment | Command carriers |
+| --- | ---: |
+| Score 1 — failed, irrelevant, unsafe, obsolete, or materially unsupported | 15 |
+| Score 2 — relevant but partial, conditional, static-only, or incomplete | 112 |
+| Score 3 — representative evidence strongly supports the exact page claim | 11 |
+| Approved display-only `NOT_APPLICABLE` | 27 |
+| **Total** | **165** |
 
-1. After repairing and rebooting the Host's BIOS/kernel IOMMU setup, run the
-   controlled VM sequence `check → off → check → on -f → check` with the Host
-   idle and capture state, health, and cleanup evidence.
-2. Complete the remaining short interactive-privilege queue: exact `sudo` log
-   checks, `sudo docker ps`, and `sudo docker system df`.
-3. Separately authorize and bound Docker GPU-injection, paid self-test, and
-   external TCP/UDP reachability if those live branches are required for this
-   review. Record instance, cost, image digest, cleanup, and WAN evidence.
-4. Exercise maintenance/report/fault branches only when a representative safe
-   state exists. Empty current results validate access, not known-record fields
-   or report-to-log correlation.
-5. Keep Host Teams' catalog static: the page presents it as reference material,
-   not as a workflow to execute for coverage.
+Semantic score and functional status are deliberately separate. The shared
+semantic-assessment evidence binds all 165 current carriers without pretending
+that the assessment itself executed them: its 138 numeric targets remain
+`UNVALIDATED` as assessment evidence, while its 27 canonical display targets are
+`NOT_APPLICABLE`. Functional PASS/BLOCKED/UNVALIDATED/N/A comes from the separate
+current-status projection and retained evidence.
 
-Mutating, destructive, paid, installer, reboot, listener, packet-capture,
-container-load, and source-defect-blocked branches remain excluded until their
-specific prerequisites and authority are satisfied.
+The 17 Host Teams catalog tokens are static/catalog score-2 assessments. Their
+`PASS` status means the declared CLI help/catalog path was observed; it does not
+claim that account permissions, billing, or mutation behavior ran successfully.
+
+## Retained corrections and limitations
+
+- Three earlier VM scores remain withdrawn from runtime qualification because
+  the observed Host had an unsuitable VM/IOMMU configuration. Their current
+  semantic score 2 does not restore the disqualified execution evidence.
+- The original multi-target Hardware Prep mount carrier is retained as `STALE`.
+  Its split replacement form passed the corrected read-only inventory procedure.
+- One conditional Fabric Manager score-3 claim was corrected to score 2 because
+  a non-NVSwitch observation cannot prove the executable NVSwitch branch.
+- Two live-follow score-1 findings are retained as superseded history. Corrected
+  bounded stop/exit wording now supports score 2, while runtime stays blocked.
+- The bare `tcpdump` token is an approved display-only N/A carrier. The owning
+  external UDP/WAN procedure remains blocked and is not silently passed.
+
+## Highest-value remaining runs
+
+1. After VM/IOMMU repair and reboot, run the controlled
+   `check → off → check → on -f → check` sequence while the Host is idle and
+   rentals are prevented; retain state, health, and safe-final-state evidence.
+2. With explicit idle/load authorization and a trusted pinned image, run the
+   bounded Docker GPU-injection/load procedure and verify cleanup.
+3. From a genuinely external client, test TCP and UDP separately on one approved
+   unused forwarded port with bounded listener/capture and verified cleanup.
+4. Run one capped paid Self-Test/rental procedure only after a fresh client key
+   is supplied through secure non-chat injection, with numeric spend/runtime
+   limits and cleanup authority.
+5. Leave installer, storage, listing, repricing, maintenance, cleanup, and other
+   mutations blocked unless a disposable/rebuildable target or explicit
+   operational change boundary is provided.
+
+## Canonical evidence
+
+- Inventory: `verification/host-docs-test-sets.json`
+- Results and complete 972-target current projection:
+  `verification/host-docs-test-results.json`
+- Scores and approved N/A records:
+  `verification/host-docs-command-scores.json`
+- Command assessment:
+  `verification/evidence/2026-09-01-host-command-assessment-attempt-01/result.md`
+- Current reconciliation:
+  `verification/evidence/2026-09-01-host-current-reconciliation-attempt-01/result.md`
+
+The port-4000 reviewer is the preferred human entry point because it shows each
+carrier beside its exact page wording, current status, retained history,
+limitations, and semantic score.

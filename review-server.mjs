@@ -212,20 +212,42 @@ function vvText(value) {
   return value
     .replace(/\b[A-Za-z_][A-Za-z0-9._-]*@(?!(?:<|\[))[A-Za-z0-9][A-Za-z0-9.-]*\b/g, '[account-or-host]')
     .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, '[network-address]')
-    .replace(/(?:[A-Za-z]:\\Users\\[^\\\s"'\x60]+|\/(?:Users|home)\/[^\s"'\x60]+|\/(?:private\/tmp|tmp)\/[^\s"'\x60]+)/g, '[local-path]')
+    .replace(/(^|[\s([])((?:[A-Fa-f0-9]{0,4}:){2,}[A-Fa-f0-9]{0,4})(?=$|[\s)\],;])/g,
+      '$1[network-address]')
+    .replace(/(?:[A-Za-z]:\\Users\\[^\\\s"'\x60]+|\/(?:Users|home|root)\/[^\s"'\x60]+|\/(?:private\/tmp|tmp|var\/folders)\/[^\s"'\x60]+)/g, '[local-path]')
     .replace(/\b(?:verification|review-feedback)\/[^\s"'\x60]+/g, '[artifact-ref]')
     .replace(/\b((?:machine|instance|offer|account|user|host)(?:[-_ ]?id)?)\s*[:=]\s*[A-Za-z0-9._-]{4,}\b/gi, '$1=[identifier]')
-    .replace(/\b\d{7,}\b/g, '[identifier]')
-    .replace(/\b((?:api[-_ ]?key|access[-_ ]?token|secret|password))\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi, '$1=[redacted]');
+    .replace(/\b\d{6,}\b/g, '[identifier]')
+    .replace(/\b((?:api[-_ ]?key|access[-_ ]?token|secret|password))\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi, '$1=[redacted]')
+    .replace(/\b[A-Fa-f0-9]{48,}\b/g, (token, offset, source) => {
+      const prefix = source.slice(Math.max(0, offset - 28), offset);
+      return /(?:sha(?:256)?|hash(?:es)?(?:\s+equal)?)\s*[:=]?\s*$/i.test(prefix) ? token : '[redacted-token]';
+    });
 }
-function vvTotals(testSets) {
+function vvRequiredText(value) {
+  const text = vvText(value).trim();
+  if (!text) throw new Error('missing V&V text');
+  return text;
+}
+function vvTotals(testSets, pageHistory = []) {
   const branches = testSets.flatMap((set) => set.branches);
   const steps = branches.flatMap((branch) => branch.steps);
   const commands = steps.flatMap((step) => step.commands);
+  const histories = [pageHistory,
+    ...testSets.map((set) => set.history || []),
+    ...branches.map((branch) => branch.history || []),
+    ...steps.map((step) => step.history || []),
+    ...commands.map((command) => command.history || []),
+  ].flat();
+  const observationIds = new Set([
+    ...commands.flatMap((command) => command.evidence.map((row) => row.ref)),
+    ...histories.flatMap((row) => row.evidenceIds || []),
+  ]);
   return {
     testSets: testSets.length, branches: branches.length, steps: steps.length, commands: commands.length,
-    observations: new Set(commands.flatMap((command) => command.evidence.map((row) => row.ref))).size,
+    observations: observationIds.size,
     scored: commands.filter((command) => command.score).length,
+    notApplicableAssessments: commands.filter((command) => command.notApplicableAssessment).length,
   };
 }
 function vvSetTotals(set) {
@@ -238,40 +260,416 @@ function vvSetTotals(set) {
       commands.filter((command) => command.score?.value === score).length),
   };
 }
+const VV_ATTEMPT_STATUSES = new Set(['PASS', 'FAIL', 'PARTIAL', 'BLOCKED', 'UNVALIDATED', 'STALE', 'NOT_APPLICABLE']);
+const VV_TARGET_STATUSES = new Set(['PASS', 'FAIL', 'BLOCKED', 'UNVALIDATED', 'STALE', 'NOT_APPLICABLE']);
+const VV_STATUS_TARGET_FIELDS = {
+  PAGE: ['page_id'],
+  TEST_SET: ['page_id', 'test_set_id'],
+  BRANCH: ['page_id', 'test_set_id', 'branch_id'],
+  STEP: ['page_id', 'test_set_id', 'branch_id', 'step_id'],
+  COMMAND: ['page_id', 'test_set_id', 'branch_id', 'step_id', 'command_id'],
+};
+function vvObject(value) {
+  if (!value || Array.isArray(value) || typeof value !== 'object') throw new Error('invalid V&V object');
+  return value;
+}
+function vvIdentifier(value) {
+  if (typeof value !== 'string' || value.length > 200 || !/^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(value)) {
+    throw new Error('invalid V&V identifier');
+  }
+  return value;
+}
+function vvEvidenceId(value) {
+  const id = vvIdentifier(value);
+  if (!/^EV-[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(id)) throw new Error('invalid V&V evidence identifier');
+  return id;
+}
+function vvAttemptId(value) {
+  const id = vvIdentifier(value);
+  if (!/^ATTEMPT-[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(id)) throw new Error('invalid V&V attempt identifier');
+  return id;
+}
+function vvApprovalRef(value) {
+  const id = vvIdentifier(value);
+  if (/^CANONICAL_NON_EXECUTABLE_DISPLAY:[a-f0-9]{64}$/.test(id)) return id;
+  return vvText(id);
+}
+function vvStatus(value, allowed = VV_TARGET_STATUSES) {
+  if (typeof value !== 'string' || !allowed.has(value)) throw new Error('invalid V&V status');
+  return value;
+}
+function vvStatusKey(level, target) {
+  const fields = VV_STATUS_TARGET_FIELDS[level];
+  if (!fields) throw new Error('invalid V&V status level');
+  return [level, ...fields.map((field) => target[field] || '')].join('\u0000');
+}
+function canonicalStatusTargets(pages, declaredCounts) {
+  const targets = new Map();
+  const commandById = new Map();
+  const identifiers = new Map(Object.keys(VV_STATUS_TARGET_FIELDS).map((level) => [level, new Set()]));
+  const routes = new Set();
+  const counts = { pages: 0, test_sets: 0, branches: 0, steps: 0, command_carriers: 0, command_bearing_steps: 0 };
+  const add = (level, target) => {
+    const key = vvStatusKey(level, target);
+    if (targets.has(key)) throw new Error('duplicate canonical V&V target');
+    const ownId = target[VV_STATUS_TARGET_FIELDS[level].at(-1)];
+    if (identifiers.get(level).has(ownId)) throw new Error('duplicate canonical V&V identifier');
+    identifiers.get(level).add(ownId);
+    targets.set(key, target);
+  };
+  for (const page of pages) {
+    const pageId = vvIdentifier(page.page_id);
+    if (typeof page.route !== 'string' || !page.route.startsWith('/host/') || routes.has(page.route)) {
+      throw new Error('invalid canonical V&V route');
+    }
+    routes.add(page.route);
+    const sourceFile = vvRequiredText(page.source_file);
+    if (!/^host\/[A-Za-z0-9._/-]+\.mdx$/.test(sourceFile) || sourceFile.split('/').includes('..')) {
+      throw new Error('invalid canonical V&V source path');
+    }
+    if (typeof page.source_sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(page.source_sha256)) {
+      throw new Error('invalid canonical V&V source hash');
+    }
+    const sourceBytes = fs.readFileSync(new URL(`./${sourceFile}`, import.meta.url));
+    if (crypto.createHash('sha256').update(sourceBytes).digest('hex') !== page.source_sha256) {
+      throw new Error('stale canonical V&V page source');
+    }
+    add('PAGE', { page_id: pageId });
+    counts.pages += 1;
+    for (const set of vvArray(page.test_sets)) {
+      const testSetId = vvIdentifier(set.test_set_id);
+      vvStatus(set.execution_status);
+      add('TEST_SET', { page_id: pageId, test_set_id: testSetId });
+      counts.test_sets += 1;
+      for (const branch of vvArray(set.branches)) {
+        const branchId = vvIdentifier(branch.branch_id);
+        vvStatus(branch.execution_status);
+        add('BRANCH', { page_id: pageId, test_set_id: testSetId, branch_id: branchId });
+        counts.branches += 1;
+        for (const step of vvArray(branch.steps)) {
+          const stepId = vvIdentifier(step.step_id);
+          vvStatus(step.execution_status);
+          add('STEP', { page_id: pageId, test_set_id: testSetId, branch_id: branchId, step_id: stepId });
+          counts.steps += 1;
+          const commands = vvArray(step.commands);
+          if (commands.length) counts.command_bearing_steps += 1;
+          for (const command of commands) {
+            const commandId = vvIdentifier(command.command_id);
+            vvStatus(command.execution_status);
+            const target = { page_id: pageId, test_set_id: testSetId, branch_id: branchId,
+              step_id: stepId, command_id: commandId };
+            add('COMMAND', target);
+            counts.command_carriers += 1;
+            const source = vvObject(command.source);
+            const sourceLine = source.line_start;
+            if (source.file !== sourceFile || !Number.isInteger(sourceLine) || sourceLine < 1) {
+              throw new Error('invalid canonical command source');
+            }
+            const treatment = vvIdentifier(command.treatment);
+            commandById.set(commandId, {
+              ...target, route: page.route, procedureId: vvIdentifier(set.procedure_id),
+              source: `${sourceFile}:${sourceLine}`, treatment,
+            });
+          }
+        }
+      }
+    }
+  }
+  const expected = vvObject(declaredCounts);
+  for (const [name, actual] of Object.entries(counts)) {
+    if (expected[name] !== actual) throw new Error('invalid canonical V&V count');
+  }
+  return { targets, commandById, counts };
+}
+function projectionTargetKey(record, canonicalTargets) {
+  const level = vvIdentifier(record.level);
+  const fields = VV_STATUS_TARGET_FIELDS[level];
+  if (!fields) throw new Error('invalid V&V status level');
+  const target = vvObject(record.target);
+  if (Object.keys(target).length !== fields.length || fields.some((field) => !(field in target))) {
+    throw new Error('invalid V&V status target');
+  }
+  for (const field of fields) vvIdentifier(target[field]);
+  const key = vvStatusKey(level, target);
+  if (!canonicalTargets.has(key)) throw new Error('unknown V&V status target');
+  return key;
+}
+function loadCurrentStatusProjection(results, canonicalTargets, attemptsById, procedureEvidence) {
+  if (!('current_status_projection' in results)) return new Map();
+  const projection = vvObject(results.current_status_projection);
+  if (projection.schema_version !== '1.0') throw new Error('invalid V&V status projection version');
+  const statuses = new Map();
+  for (const record of vvArray(projection.records)) {
+    const row = vvObject(record);
+    const key = projectionTargetKey(row, canonicalTargets);
+    if (statuses.has(key)) throw new Error('duplicate current V&V status');
+    const attemptId = vvAttemptId(row.attempt_id);
+    const attempt = attemptsById.get(attemptId);
+    if (!attempt || attempt.supersededBy || attempt.status === 'STALE') {
+      throw new Error('unsafe current V&V status attempt');
+    }
+    const currentStatus = vvStatus(row.current_status);
+    const evidence = vvArray(row.evidence_ids);
+    if (!evidence.length || new Set(evidence).size !== evidence.length) throw new Error('invalid V&V status evidence');
+    const details = [];
+    for (const evidenceId of evidence) {
+      const id = vvEvidenceId(evidenceId);
+      const procedure = procedureEvidence.get(id);
+      if (!procedure || procedure.attemptId !== attemptId || procedure.targets.get(key) !== currentStatus) {
+        throw new Error('mismatched V&V procedure evidence');
+      }
+      details.push(procedure);
+    }
+    const joinDistinct = (field) => [...new Set(details.map((item) => item[field]))].join(' | ');
+    statuses.set(key, {
+      status: currentStatus, attemptId: vvText(attemptId), evidenceIds: evidence.map(vvEvidenceId),
+      method: joinDistinct('method'), observation: joinDistinct('observation'),
+      limitations: joinDistinct('limitations'),
+      rationale: row.rationale == null ? null : vvRequiredText(row.rationale),
+    });
+  }
+  return statuses;
+}
 function loadVerificationEvidence() {
   try {
     const bytes = VV_FILES.map((file) => fs.readFileSync(new URL(file, import.meta.url)));
     const [sets, results, scores] = bytes.map((value) => JSON.parse(value.toString('utf8')));
+    if (sets.schema_version !== '1.0' || sets.record_type !== 'HOST_DOCS_PAGE_TEST_SETS' ||
+      results.schema_version !== '1.0' || results.record_type !== 'HOST_DOCS_TEST_RESULTS' ||
+      scores.schema_version !== '1.0' || scores.record_type !== 'HOST_DOCS_COMMAND_CONTEXT_SCORES') {
+      throw new Error('unsupported V&V package schema');
+    }
     const snapshot = crypto.createHash('sha256').update(bytes[0]).digest('hex');
     if (results.test_set_snapshot_sha256 !== snapshot || scores.test_set_snapshot_sha256 !== snapshot) {
       throw new Error('V&V snapshot mismatch');
     }
     const pages = vvArray(sets.pages);
-    const evidence = new Map();
-    for (const result of vvArray(results.command_results)) {
-      const row = { ref: vvText(result.evidence_id), observation: vvText(result.observation),
-        executionStatus: vvText(result.vv_status) };
-      for (const id of vvArray(result.command_ids)) {
-        if (typeof id !== 'string') throw new Error('invalid command ID');
-        evidence.set(id, [...(evidence.get(id) || []), row]);
+    const canonical = canonicalStatusTargets(pages, sets.counts);
+    const canonicalTargets = canonical.targets;
+    const canonicalCommandIds = new Set(canonical.commandById.keys());
+    const retiredCommandIds = new Set();
+    const withdrawnRecords = [];
+    for (const withdrawn of vvArray(scores.withdrawn_records || [])) {
+      const row = vvObject(withdrawn);
+      const commandId = vvIdentifier(row.command_id);
+      if (retiredCommandIds.has(commandId)) throw new Error('duplicate withdrawn V&V command');
+      retiredCommandIds.add(commandId);
+      const currentScore = row.current_score;
+      if (currentScore !== null && (!Number.isInteger(currentScore) || currentScore < 1 || currentScore > 3)) {
+        throw new Error('invalid withdrawn V&V current score');
+      }
+      withdrawnRecords.push({
+        commandId, pageRoute: vvRequiredText(row.page_route),
+        currentExecutionStatus: vvStatus(row.current_execution_status), currentScore,
+      });
+      vvStatus(row.original_execution_status);
+      if (!Number.isInteger(row.original_score) || row.original_score < 1 || row.original_score > 3) {
+        throw new Error('invalid withdrawn V&V original score');
+      }
+      vvRequiredText(row.reason);
+      vvRequiredText(row.current_reassessment);
+    }
+    const attempts = vvArray(results.attempts);
+    const attemptsById = new Map();
+    for (const attempt of attempts) {
+      const row = vvObject(attempt);
+      const attemptId = vvAttemptId(row.attempt_id);
+      if (attemptsById.has(attemptId)) throw new Error('duplicate V&V attempt');
+      const supersededBy = row.qualification_superseded_by == null ? null : vvAttemptId(row.qualification_superseded_by);
+      attemptsById.set(attemptId, { status: vvStatus(row.status, VV_ATTEMPT_STATUSES), supersededBy });
+    }
+    if (results.counts?.attempts !== attempts.length) throw new Error('invalid V&V attempt count');
+    for (const [attemptId, attempt] of attemptsById) {
+      if (attempt.supersededBy && (attempt.supersededBy === attemptId || !attemptsById.has(attempt.supersededBy))) {
+        throw new Error('invalid V&V supersession');
       }
     }
-    const scoreByCommand = new Map(vvArray(scores.records).map((score) => {
+    const evidence = new Map();
+    const evidenceIds = new Set();
+    const commandEvidenceById = new Map();
+    const commandResults = vvArray(results.command_results);
+    const commandResultCounts = new Map([...VV_TARGET_STATUSES].map((status) => [status, 0]));
+    for (const resultValue of commandResults) {
+      const result = vvObject(resultValue);
+      const evidenceId = vvEvidenceId(result.evidence_id);
+      if (evidenceIds.has(evidenceId)) throw new Error('duplicate V&V evidence');
+      evidenceIds.add(evidenceId);
+      const row = { ref: vvText(result.evidence_id), observation: vvText(result.observation),
+        executionStatus: vvStatus(result.vv_status) };
+      commandResultCounts.set(row.executionStatus, commandResultCounts.get(row.executionStatus) + 1);
+      const commandIds = vvArray(result.command_ids).map(vvIdentifier);
+      if (!commandIds.length || new Set(commandIds).size !== commandIds.length) {
+        throw new Error('invalid V&V command evidence targets');
+      }
+      for (const commandId of commandIds) {
+        if (!canonicalCommandIds.has(commandId) && !retiredCommandIds.has(commandId)) {
+          throw new Error('unknown V&V command evidence target');
+        }
+        if (canonicalCommandIds.has(commandId)) {
+          evidence.set(commandId, [...(evidence.get(commandId) || []), row]);
+        }
+      }
+      commandEvidenceById.set(evidenceId, { commandIds: new Set(commandIds), status: row.executionStatus });
+    }
+    if (results.counts?.command_runs !== commandResults.length) throw new Error('invalid V&V command-run count');
+    for (const [status, field] of Object.entries({ PASS: 'command_pass', BLOCKED: 'command_blocked',
+      FAIL: 'command_fail', UNVALIDATED: 'command_unvalidated', NOT_APPLICABLE: 'command_not_applicable',
+      STALE: 'command_stale' })) {
+      if ((results.counts?.[field] ?? 0) !== commandResultCounts.get(status)) {
+        throw new Error('invalid V&V command-status count');
+      }
+    }
+    const procedureEvidence = new Map();
+    for (const item of vvArray(results.procedure_results || [])) {
+      const row = vvObject(item);
+      const evidenceId = vvEvidenceId(row.evidence_id);
+      const attemptId = vvAttemptId(row.attempt_id);
+      if (evidenceIds.has(evidenceId) || procedureEvidence.has(evidenceId) || !attemptsById.has(attemptId)) {
+        throw new Error('invalid V&V procedure result');
+      }
+      const targets = new Map();
+      const commandIds = new Set();
+      for (const target of vvArray(row.targets)) {
+        const targetRow = vvObject(target);
+        const targetKey = projectionTargetKey(targetRow, canonicalTargets);
+        if (targets.has(targetKey)) throw new Error('duplicate V&V procedure target');
+        targets.set(targetKey, vvStatus(targetRow.vv_status));
+        const canonicalTarget = canonicalTargets.get(targetKey);
+        if (canonicalTarget.command_id) commandIds.add(canonicalTarget.command_id);
+      }
+      if (!targets.size) throw new Error('missing V&V procedure target');
+      procedureEvidence.set(evidenceId, {
+        attemptId, targets, commandIds, method: vvRequiredText(row.method),
+        observation: vvRequiredText(row.observation), limitations: vvRequiredText(row.limitations),
+      });
+      evidenceIds.add(evidenceId);
+    }
+    const historyByTarget = new Map();
+    for (const [evidenceId, procedure] of procedureEvidence) {
+      const attempt = attemptsById.get(procedure.attemptId);
+      for (const [targetKey, status] of procedure.targets) {
+        const history = {
+          evidenceIds: [vvText(evidenceId)], attemptId: vvText(procedure.attemptId), status,
+          method: procedure.method, observation: procedure.observation, limitations: procedure.limitations,
+          supersededBy: attempt.supersededBy ? vvText(attempt.supersededBy) : null,
+        };
+        historyByTarget.set(targetKey, [...(historyByTarget.get(targetKey) || []), history]);
+      }
+    }
+    const assessmentEvidence = (evidenceId, commandId) => {
+      const commandEvidence = commandEvidenceById.get(evidenceId);
+      if (commandEvidence?.commandIds.has(commandId)) return { status: commandEvidence.status };
+      const procedure = procedureEvidence.get(evidenceId);
+      if (procedure?.commandIds.has(commandId)) {
+        const commandTarget = canonical.commandById.get(commandId);
+        return { status: procedure.targets.get(vvStatusKey('COMMAND', commandTarget)) };
+      }
+      return null;
+    };
+    const assessmentIdentity = (row, commandId) => {
+      const command = canonical.commandById.get(commandId);
+      if (!command || row.page_route !== command.route || row.procedure_id !== command.procedureId || row.source !== command.source) {
+        throw new Error('mismatched V&V assessment ancestry');
+      }
+      const ids = vvArray(row.evidence_ids).map(vvEvidenceId);
+      if (!ids.length || new Set(ids).size !== ids.length || ids.some((id) => !assessmentEvidence(id, commandId))) {
+        throw new Error('invalid V&V assessment evidence');
+      }
+      return ids;
+    };
+    const scoreRecords = vvArray(scores.records);
+    const scoreCounts = [0, 0, 0];
+    const scoreByCommand = new Map();
+    for (const scoreValue of scoreRecords) {
+      const score = vvObject(scoreValue);
       if (typeof score.command_id !== 'string' || !Number.isInteger(score.score) || score.score < 1 || score.score > 3) {
         throw new Error('invalid score');
       }
-      return [score.command_id, { value: score.score, rationale: vvText(score.rationale),
-        executionStatus: vvText(score.execution_status) }];
-    }));
+      const commandId = vvIdentifier(score.command_id);
+      if (scoreByCommand.has(commandId)) throw new Error('duplicate score');
+      if (!canonicalCommandIds.has(commandId)) throw new Error('unknown score command');
+      const scoreEvidenceIds = assessmentIdentity(score, commandId);
+      const executionStatus = vvStatus(score.execution_status);
+      if (executionStatus === 'NOT_APPLICABLE') throw new Error('numeric score cannot be NOT_APPLICABLE');
+      scoreCounts[score.score - 1] += 1;
+      scoreByCommand.set(commandId, { value: score.score, rationale: vvRequiredText(score.rationale),
+        executionStatus, evidenceIds: scoreEvidenceIds.map(vvText) });
+    }
+    if (scores.counts?.scored !== scoreRecords.length || scores.counts?.score_1 !== scoreCounts[0] ||
+      scores.counts?.score_2 !== scoreCounts[1] || scores.counts?.score_3 !== scoreCounts[2]) {
+      throw new Error('invalid score counts');
+    }
+    const notApplicableRecords = vvArray(scores.not_applicable_records || []);
+    const notApplicableByCommand = new Map();
+    for (const assessmentValue of notApplicableRecords) {
+      const assessment = vvObject(assessmentValue);
+      const commandId = vvIdentifier(assessment.command_id);
+      if (!canonicalCommandIds.has(commandId) || scoreByCommand.has(commandId) || notApplicableByCommand.has(commandId) ||
+        assessment.execution_status !== 'NOT_APPLICABLE') {
+        throw new Error('invalid NOT_APPLICABLE assessment');
+      }
+      const assessmentEvidenceIds = assessmentIdentity(assessment, commandId);
+      if (assessmentEvidenceIds.some((id) => assessmentEvidence(id, commandId)?.status !== 'NOT_APPLICABLE')) {
+        throw new Error('mismatched NOT_APPLICABLE evidence');
+      }
+      const command = canonical.commandById.get(commandId);
+      const expectedApproval = `CANONICAL_NON_EXECUTABLE_DISPLAY:${snapshot}`;
+      if (command.treatment !== 'NON_EXECUTABLE_DISPLAY' || vvApprovalRef(assessment.approval_ref) !== expectedApproval) {
+        throw new Error('invalid NOT_APPLICABLE classification approval');
+      }
+      notApplicableByCommand.set(commandId, {
+        rationale: vvRequiredText(assessment.rationale), approvalRef: vvApprovalRef(assessment.approval_ref),
+        evidenceIds: assessmentEvidenceIds.map(vvText), executionStatus: 'NOT_APPLICABLE',
+      });
+    }
+    if ((scores.counts?.not_applicable ?? 0) !== notApplicableRecords.length) {
+      throw new Error('invalid NOT_APPLICABLE assessment count');
+    }
+    if (scoreByCommand.size + notApplicableByCommand.size !== canonicalCommandIds.size) {
+      throw new Error('incomplete V&V command assessment coverage');
+    }
+    const currentStatusByTarget = loadCurrentStatusProjection(results, canonicalTargets, attemptsById, procedureEvidence);
+    if (currentStatusByTarget.size !== canonicalTargets.size) {
+      throw new Error('incomplete current V&V status projection');
+    }
+    for (const [commandId, command] of canonical.commandById) {
+      const current = currentStatusByTarget.get(vvStatusKey('COMMAND', command));
+      const assessment = scoreByCommand.get(commandId) || notApplicableByCommand.get(commandId);
+      if (!assessment || !current || current.status !== assessment.executionStatus) {
+        throw new Error('mismatched current V&V command assessment');
+      }
+      if (scoreByCommand.get(commandId)?.value === 3 && current.status !== 'PASS') {
+        throw new Error('score 3 requires current PASS');
+      }
+    }
+    for (const withdrawn of withdrawnRecords) {
+      const command = canonical.commandById.get(withdrawn.commandId);
+      if (!command) {
+        if (withdrawn.currentExecutionStatus !== 'STALE' || withdrawn.currentScore !== null) {
+          throw new Error('invalid retired V&V withdrawal disposition');
+        }
+        continue;
+      }
+      const score = scoreByCommand.get(withdrawn.commandId);
+      const assessment = score || notApplicableByCommand.get(withdrawn.commandId);
+      const expectedScore = score?.value ?? null;
+      if (withdrawn.pageRoute !== command.route || withdrawn.currentExecutionStatus !== assessment.executionStatus ||
+        withdrawn.currentScore !== expectedScore) {
+        throw new Error('stale current V&V withdrawal disposition');
+      }
+    }
     const totals = {
-      pages: sets.counts?.pages, testSets: sets.counts?.test_sets, branches: sets.counts?.branches,
-      steps: sets.counts?.steps, commands: sets.counts?.command_carriers,
-      observations: results.counts?.command_runs, scored: scores.counts?.scored,
+      pages: canonical.counts.pages, testSets: canonical.counts.test_sets, branches: canonical.counts.branches,
+      steps: canonical.counts.steps, commands: canonical.counts.command_carriers,
+      observations: evidenceIds.size, scored: scoreRecords.length, notApplicableAssessments: notApplicableRecords.length,
     };
     if (Object.values(totals).some((value) => !Number.isInteger(value) || value < 0)) throw new Error('invalid totals');
-    return { available: true, pages, evidence, scoreByCommand, totals };
-  } catch {
-    return { available: false, pages: [], evidence: new Map(), scoreByCommand: new Map(), totals: null };
+    return { available: true, pages, evidence, scoreByCommand, notApplicableByCommand,
+      currentStatusByTarget, historyByTarget, totals };
+  } catch (error) {
+    if (process.env.VAST_REVIEW_DEBUG === '1') console.error(`V&V evidence unavailable: ${error.message}`);
+    return { available: false, pages: [], evidence: new Map(), scoreByCommand: new Map(),
+      notApplicableByCommand: new Map(), currentStatusByTarget: new Map(), historyByTarget: new Map(), totals: null };
   }
 }
 const VERIFICATION_EVIDENCE = loadVerificationEvidence();
@@ -280,27 +678,59 @@ function verificationForPath(pathname) {
   try {
     const page = VERIFICATION_EVIDENCE.pages.find((row) => row.route === pathname);
     if (!page) return { available: false };
+    const keyFor = (level, target) => vvStatusKey(level, target);
+    const statusFor = (level, target) => VERIFICATION_EVIDENCE.currentStatusByTarget.get(keyFor(level, target)) || null;
+    const historyFor = (level, target) => VERIFICATION_EVIDENCE.historyByTarget.get(keyFor(level, target)) || [];
+    const pageTarget = { page_id: page.page_id };
+    const pageStatus = statusFor('PAGE', pageTarget);
+    const currentFields = (status, history) => ({
+      currentStatus: status?.status || null, currentStatusAttemptId: status?.attemptId || null,
+      currentEvidenceIds: status?.evidenceIds || [], currentMethod: status?.method || null,
+      currentObservation: status?.observation || null, currentLimitations: status?.limitations || null,
+      currentRationale: status?.rationale || null,
+      history,
+    });
     const testSets = vvArray(page.test_sets).map((set) => {
+      const setTarget = { page_id: page.page_id, test_set_id: set.test_set_id };
+      const setStatus = statusFor('TEST_SET', setTarget);
       const normalized = {
-        id: vvText(set.test_set_id), title: vvText(set.title), executionStatus: vvText(set.execution_status),
-        branches: vvArray(set.branches).map((branch) => ({
+        id: vvText(set.test_set_id), title: vvText(set.title), executionStatus: vvStatus(set.execution_status),
+        ...currentFields(setStatus, historyFor('TEST_SET', setTarget)),
+        branches: vvArray(set.branches).map((branch) => {
+          const branchTarget = { ...setTarget, branch_id: branch.branch_id };
+          const branchStatus = statusFor('BRANCH', branchTarget);
+          return ({
           id: vvText(branch.branch_id), condition: vvText(branch.condition),
-          executionStatus: vvText(branch.execution_status),
-          steps: vvArray(branch.steps).map((step) => ({
+          executionStatus: vvStatus(branch.execution_status),
+          ...currentFields(branchStatus, historyFor('BRANCH', branchTarget)),
+          steps: vvArray(branch.steps).map((step) => {
+            const stepTarget = { ...branchTarget, step_id: step.step_id };
+            const stepStatus = statusFor('STEP', stepTarget);
+            return ({
             id: vvText(step.step_id), instruction: vvText(step.instruction),
-            executionStatus: vvText(step.execution_status),
-            commands: vvArray(step.commands).map((command) => ({
+            executionStatus: vvStatus(step.execution_status),
+            ...currentFields(stepStatus, historyFor('STEP', stepTarget)),
+            commands: vvArray(step.commands).map((command) => {
+              const commandTarget = { ...stepTarget, command_id: command.command_id };
+              const commandStatus = statusFor('COMMAND', commandTarget);
+              return ({
               id: vvText(command.command_id), text: vvText(command.text),
-              executionStatus: vvText(command.execution_status),
+              executionStatus: vvStatus(command.execution_status),
+              ...currentFields(commandStatus, historyFor('COMMAND', commandTarget)),
               evidence: VERIFICATION_EVIDENCE.evidence.get(command.command_id) || [],
               score: VERIFICATION_EVIDENCE.scoreByCommand.get(command.command_id) || null,
-            })),
-          })),
-        })),
+              notApplicableAssessment: VERIFICATION_EVIDENCE.notApplicableByCommand.get(command.command_id) || null,
+              });
+            }),
+            });
+          }),
+          });
+        }),
       };
       return { ...normalized, totals: vvSetTotals(normalized) };
     });
-    return { available: true, testSets, totals: vvTotals(testSets) };
+    const pageHistory = historyFor('PAGE', pageTarget);
+    return { available: true, ...currentFields(pageStatus, pageHistory), testSets, totals: vvTotals(testSets, pageHistory) };
   } catch {
     return { available: false };
   }
@@ -579,7 +1009,7 @@ function statusPage() {
   const open = items.filter((i) => i.status !== 'resolved').length;
   const vv = VERIFICATION_EVIDENCE;
   const vvSummary = vv.available
-    ? `<p><b>V&amp;V evidence:</b> ${vv.totals.pages} pages · ${vv.totals.testSets} test sets · ${vv.totals.branches} branches · ${vv.totals.steps} steps · ${vv.totals.commands} commands · ${vv.totals.observations} observations · ${vv.totals.scored} scores.</p>`
+    ? `<p><b>V&amp;V evidence:</b> ${vv.totals.pages} pages · ${vv.totals.testSets} test sets · ${vv.totals.branches} branches · ${vv.totals.steps} steps · ${vv.totals.commands} commands · ${vv.totals.observations} observations · ${vv.totals.scored} numeric scores · ${vv.totals.notApplicableAssessments} approved N/A.</p>`
     : '<p><b>V&amp;V evidence:</b> unavailable because required review data is missing or invalid.</p>';
   const byReviewer = {};
   for (const it of items) byReviewer[it.reviewer || '?'] = (byReviewer[it.reviewer || '?'] || 0) + 1;
@@ -1120,6 +1550,7 @@ const OVERLAY_JS = String.raw`
     '.vv-branch{margin:7px 0}.vv-branch ol{margin:4px 0;padding-left:20px}.vv-step{margin-bottom:7px}' +
     '.vv-command{margin:5px 0;padding:6px;background:#f7f8fc;border-radius:6px}.vv-command code{white-space:pre-wrap}' +
     '.vv-meta,.vv-evidence,.vv-score{margin-top:3px;font-size:10px;color:#687188}.vv-evidence{padding-left:16px}' +
+    '.vv-history{margin:4px 0 6px}.vv-history summary{font-size:10px!important;font-weight:650!important;color:#687188!important}' +
     '#selectionTools{padding:10px 14px;border-bottom:1px solid #e7eaf1;background:#f7f8ff}' +
     '#selectionTools .selection-empty{color:#5c677d;line-height:1.45}' +
     '#selectionTools .selection-ready-body{display:none;gap:8px;flex-direction:column}' +
@@ -1289,30 +1720,65 @@ const OVERLAY_JS = String.raw`
   function verificationHtml(vv) {
     var html = '<details class="vv-context"><summary>V&amp;V evidence for this page';
     if (!vv || !vv.available) return html + '</summary><div class="vv-meta">Evidence unavailable.</div></details>';
+    function currentStatusSuffix(row) {
+      return row.currentStatus ? ' · current ' + esc(row.currentStatus) +
+        ' via ' + esc(row.currentStatusAttemptId) : '';
+    }
+    function currentEvidenceHtml(row) {
+      if (!row.currentEvidenceIds || !row.currentEvidenceIds.length) return '';
+      return '<div class="vv-meta"><b>Current evidence</b> <code>' +
+        row.currentEvidenceIds.map(esc).join('</code>, <code>') + '</code><br>' +
+        '<b>Method:</b> ' + esc(row.currentMethod) + '<br><b>Observation:</b> ' + esc(row.currentObservation) +
+        '<br><b>Limitations:</b> ' + esc(row.currentLimitations) +
+        (row.currentRationale ? '<br><b>Current rationale:</b> ' + esc(row.currentRationale) : '') + '</div>';
+    }
+    function historyHtml(row) {
+      if (!row.history || !row.history.length) return '';
+      return '<details class="vv-history"><summary>Attempt history (' + row.history.length + ')</summary><ul class="vv-evidence">' +
+        row.history.map(function (item) {
+          return '<li><b>' + esc(item.status) + '</b> via <code>' + esc(item.attemptId) + '</code> · <code>' +
+            (item.evidenceIds || []).map(esc).join('</code>, <code>') + '</code>' +
+            (item.supersededBy ? ' · superseded by <code>' + esc(item.supersededBy) + '</code>' : '') +
+            '<br><b>Method:</b> ' + esc(item.method) + '<br><b>Observation:</b> ' + esc(item.observation) +
+            '<br><b>Limitations:</b> ' + esc(item.limitations) + '</li>';
+        }).join('') + '</ul></details>';
+    }
     html += ' <span class="vv-meta">' + countLabel(vv.totals.testSets, 'set') + ' · ' +
       countLabel(vv.totals.commands, 'command') + ' · ' + countLabel(vv.totals.observations, 'observation') + ' · ' +
-      vv.totals.scored + '/' + vv.totals.commands + ' scored</span></summary>';
+      vv.totals.scored + '/' + vv.totals.commands + ' numeric scores · ' +
+      vv.totals.notApplicableAssessments + ' approved N/A</span></summary>';
     html += '<div class="vv-help"><b>Procedure status is separate from command scoring.</b> A set remains <code>UNVALIDATED</code> until every required branch and step is covered, even when some commands already have evidence and scores. ' +
-      'Score 1 = failed to run or produced no relevant semantic result; 2 = worked but gave weak or partial support; 3 = worked and strongly supports the documented claim.</div>';
+      'Score 1 = failed to run or produced no relevant semantic result; 2 = worked but gave weak or partial support; 3 = worked and strongly supports the documented claim. An unscored N/A requires retained evidence, rationale, and approval.</div>';
+    if (vv.currentStatus) html += '<div class="vv-meta">Page current status: ' + esc(vv.currentStatus) +
+      ' via ' + esc(vv.currentStatusAttemptId) + '.</div>' + currentEvidenceHtml(vv);
+    html += historyHtml(vv);
     vv.testSets.forEach(function (set) {
       var scoreParts = (set.totals.scoreCounts || []).map(function (count, index) {
         return count ? count + '×' + (index + 1) : '';
       }).filter(Boolean).reverse();
       var scoreBreakdown = scoreParts.length ? ' · ' + scoreParts.join(' · ') : '';
-      html += '<details class="vv-set"><summary><span>' + esc(set.title) + ' · ' + esc(set.executionStatus) + '</span>' +
+      html += '<details class="vv-set"><summary><span>' + esc(set.title) + ' · frozen baseline ' + esc(set.executionStatus) + currentStatusSuffix(set) + '</span>' +
         '<span class="vv-set-meta">' + countLabel(set.totals.commands, 'command') + ' · ' +
         countLabel(set.totals.observations, 'observation') + ' · ' +
-        set.totals.scored + '/' + set.totals.commands + ' scored' + scoreBreakdown + '</span></summary>';
+        set.totals.scored + '/' + set.totals.commands + ' numeric scores · ' + set.totals.notApplicableAssessments +
+        ' N/A' + scoreBreakdown + '</span></summary>';
+      html += currentEvidenceHtml(set) + historyHtml(set);
       set.branches.forEach(function (branch) {
-        html += '<div class="vv-branch"><b>' + esc(branch.id) + '</b> · ' + esc(branch.executionStatus) + '<br>' + esc(branch.condition) + '<ol>';
+        html += '<div class="vv-branch"><b>' + esc(branch.id) + '</b> · frozen baseline ' + esc(branch.executionStatus) + currentStatusSuffix(branch) + '<br>' + esc(branch.condition) + currentEvidenceHtml(branch) + historyHtml(branch) + '<ol>';
         branch.steps.forEach(function (step) {
-          html += '<li class="vv-step"><b>' + esc(step.id) + '</b> · ' + esc(step.executionStatus) + '<br>' + esc(step.instruction);
+          html += '<li class="vv-step"><b>' + esc(step.id) + '</b> · frozen baseline ' + esc(step.executionStatus) + currentStatusSuffix(step) + '<br>' + esc(step.instruction) + currentEvidenceHtml(step) + historyHtml(step);
           step.commands.forEach(function (command) {
-            html += '<div class="vv-command"><code>' + esc(command.text) + '</code><div class="vv-meta">' + esc(command.id) + ' · ' + esc(command.executionStatus) + '</div>';
+            html += '<div class="vv-command"><code>' + esc(command.text) + '</code><div class="vv-meta">' + esc(command.id) + ' · frozen baseline ' + esc(command.executionStatus) + currentStatusSuffix(command) + '</div>' + currentEvidenceHtml(command) + historyHtml(command);
             if (command.evidence.length) html += '<ul class="vv-evidence">' + command.evidence.map(function (row) {
               return '<li>' + esc(row.executionStatus) + ' · ' + esc(row.observation) + ' · <code>' + esc(row.ref) + '</code></li>';
             }).join('') + '</ul>';
-            if (command.score) html += '<div class="vv-score">Score ' + command.score.value + '/3 · ' + esc(command.score.rationale) + '</div>';
+            if (command.score) html += '<div class="vv-score">Score ' + command.score.value + '/3 · execution basis ' +
+              esc(command.score.executionStatus) + ' · ' + esc(command.score.rationale) + ' · evidence <code>' +
+              command.score.evidenceIds.map(esc).join('</code>, <code>') + '</code></div>';
+            if (command.notApplicableAssessment) html += '<div class="vv-score">Semantic assessment: NOT_APPLICABLE · ' +
+              esc(command.notApplicableAssessment.rationale) + ' · approval <code>' +
+              esc(command.notApplicableAssessment.approvalRef) + '</code> · evidence <code>' +
+              command.notApplicableAssessment.evidenceIds.map(esc).join('</code>, <code>') + '</code></div>';
             html += '</div>';
           });
           html += '</li>';

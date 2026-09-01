@@ -6,18 +6,18 @@ This inventory answers two separate questions: whether documented examples are s
 
 ## Coverage and current result
 
-- Source revision: `5088d76b89856185f3ab15a628e4152ff140ab26`
-- Content fingerprint: `sha256:bc59a848d0cb8698097787b911bb9e5b6875570c7c58815baa6d1f48b2504b4d`
+- Source revision: `7a8a2c4c571dcf64341055e8277083e5aea380bf`
+- Content fingerprint: `sha256:1f68160491e2cba46e6ac23cf66fbc3608536cd4eeaf6bbc63784b7cf9d1d81f`
 - Pages scanned: **72** (38 authored, 33 generated-cli-sdk, 1 generated-self-test)
 - Imported Host snippet dependencies scanned: **33**
-- Unique verification targets: **474** across **529** occurrences
+- Unique verification targets: **484** across **540** occurrences
 - Structural/local-reference issues: **0**
 - Documented commands executed: **0** (intentional safety boundary)
 
 | Kind | Unique items |
 |---|---:|
-| behavior-claim | 203 |
-| command | 176 |
+| behavior-claim | 207 |
+| command | 182 |
 | error | 77 |
 | threshold | 18 |
 
@@ -37,16 +37,16 @@ The first command regenerates this Markdown report plus JSON and CSV. `--check` 
 
 | Tier | Count | Meaning |
 |---|---:|---|
-| account-read-only | 42 | Needs current CLI plus a non-production authenticated account; should not mutate state. |
+| account-read-only | 43 | Needs current CLI plus a non-production authenticated account; should not mutate state. |
 | credential-bearing | 7 | Needs an approved test credential and redaction/logging review. |
 | destructive-or-mutating | 45 | Needs disposable/non-production state and peer-reviewed execution. |
-| environment-dependent | 9 | Needs matching OS, GPU, Docker, storage, or network conditions. |
+| environment-dependent | 10 | Needs matching OS, GPU, Docker, storage, or network conditions. |
 | generated-source | 62 | Must be regenerated from the exact upstream source revision. |
-| local-safe | 28 | Help/availability and static syntax can be checked locally; placeholders must remain non-production. |
+| local-safe | 29 | Help/availability and static syntax can be checked locally; placeholders must remain non-production. |
 | paid-live | 6 | Can create billable resources; requires explicit budget/target approval and exact evidence metadata. |
-| privileged-host | 39 | Needs a disposable supported host and records of before/after state. |
+| privileged-host | 42 | Needs a disposable supported host and records of before/after state. |
 | source-or-fixture | 48 | Needs a code source and/or captured redacted runtime fixture. |
-| source-owner | 188 | Needs the owning code, policy, or stakeholder confirmation. |
+| source-owner | 192 | Needs the owning code, policy, or stakeholder confirmation. |
 
 ## Command execution access groups
 
@@ -58,9 +58,9 @@ See [Host Docs command access groups](./HOST-DOCS-COMMAND-ACCESS.md) for every c
 |---|---:|---|
 | Paid and Host root | 0 | Needs both approved spend and root on a disposable Host machine. |
 | Paid resource, no Host root | 6 | Creates or uses a billable resource; the documented command itself does not require Host root. |
-| Host root/privileged access, no paid resource | 52 | Conservatively requires root or privileged Host access and does not itself create a paid resource. |
-| Host machine, no root in command | 14 | Needs a representative Host or Host artifact, but the documented command does not itself use root. |
-| No paid resource or Host root | 104 | Can be checked without paid spend or Host root; account, credential, mutation, environment, or external-client gates may still apply. |
+| Host root/privileged access, no paid resource | 55 | Conservatively requires root or privileged Host access and does not itself create a paid resource. |
+| Host machine, no root in command | 15 | Needs a representative Host or Host artifact, but the documented command does not itself use root. |
+| No paid resource or Host root | 106 | Can be checked without paid spend or Host root; account, credential, mutation, environment, or external-client gates may still apply. |
 
 ## Issues found by the generator
 
@@ -90,7 +90,7 @@ These remain open even if every local test passes.
 | com-2384e2069c | [host/common-errors-diagnostics.mdx:79](./host/common-errors-diagnostics.mdx#L79) | vastai dump-logs &lt;machine_id&gt; | local-safe | static-syntax-passed-not-executed |
 | com-022b4a74b6 | [host/common-errors-diagnostics.mdx:85](./host/common-errors-diagnostics.mdx#L85) | vastai dump-logs &lt;machine_id&gt; --include-local-host-artifacts | local-safe | static-syntax-passed-not-executed |
 | com-c80bebc3e2 | [host/common-errors-diagnostics.mdx:96](./host/common-errors-diagnostics.mdx#L96) | systemctl is-active vastai.service vast_metrics.service docker nvidia-persistenced.service sudo journalctl -u vastai.service -n 80 --no-pager sudo journalctl -u vast_metrics.service -n 80 --no-pager sudo tail -n 100 /va… | privileged-host | static-syntax-passed-not-executed |
-| com-78e9ae3e71 | [host/common-errors-diagnostics.mdx:121](./host/common-errors-diagnostics.mdx#L121), [host/common-errors-diagnostics.mdx:181](./host/common-errors-diagnostics.mdx#L181), [host/hardware-prep.mdx:52](./host/hardware-prep.mdx#L52) (+8 more in JSON/CSV) | nvidia-smi | environment-dependent | inventoried-not-executed |
+| com-78e9ae3e71 | [host/common-errors-diagnostics.mdx:121](./host/common-errors-diagnostics.mdx#L121), [host/common-errors-diagnostics.mdx:181](./host/common-errors-diagnostics.mdx#L181), [host/hardware-prep.mdx:58](./host/hardware-prep.mdx#L58) (+8 more in JSON/CSV) | nvidia-smi | environment-dependent | inventoried-not-executed |
 | com-d9cdba8b45 | [host/common-errors-diagnostics.mdx:131](./host/common-errors-diagnostics.mdx#L131) | sudo journalctl -k -b --no-pager \| grep -Ei 'NVRM\|Xid\|AER\|PCIe\|fallen\|GPU has fallen' sudo dmesg -T \| grep -Ei 'NVRM\|Xid\|AER\|PCIe\|fallen\|GPU has fallen' | privileged-host | static-syntax-passed-not-executed |
 | com-ffe2351a20 | [host/common-errors-diagnostics.mdx:138](./host/common-errors-diagnostics.mdx#L138) | sudo journalctl -k -b --no-pager \| grep -Ei 'AER\|PCIe Bus Error\|pcieport\|NVRM\|Xid' sudo journalctl -k -b -1 --no-pager \| grep -Ei 'AER\|PCIe Bus Error\|pcieport\|NVRM\|Xid' sudo dmesg -T \| grep -Ei 'AER\|PCIe Bus Error\|pciep… | privileged-host | static-syntax-passed-not-executed |
 | com-84ff05e985 | [host/common-errors-diagnostics.mdx:148](./host/common-errors-diagnostics.mdx#L148) | sudo journalctl -kf \| grep --line-buffered -Ei 'AER\|PCIe Bus Error\|pcieport\|NVRM\|Xid' | privileged-host | static-syntax-passed-not-executed |
@@ -102,10 +102,12 @@ These remain open even if every local test passes.
 | com-9441748e81 | [host/fleet-operations.mdx:32](./host/fleet-operations.mdx#L32) | vastai list machines &lt;selected-machines&gt; -e 12/31/2026 --retry 6 | account-read-only | static-syntax-passed-not-executed |
 | com-433c2e0c1e | [host/fleet-operations.mdx:44](./host/fleet-operations.mdx#L44) | vastai schedule maint &lt;selected-machine&gt; --sdate 1782950400 --duration 2 --maintenance_category power vastai show maints --ids &lt;selected-machine&gt; vastai cancel maint &lt;selected-machine&gt; | destructive-or-mutating | static-syntax-passed-not-executed |
 | com-da95adbc5a | [host/fleet-operations.mdx:56](./host/fleet-operations.mdx#L56) | vastai set defjob &lt;ID&gt; --price_gpu 0.20 --image &lt;your-image&gt; --args &lt;container-args&gt; vastai remove defjob &lt;ID&gt; | destructive-or-mutating | static-syntax-passed-not-executed |
-| com-f946d81373 | [host/fleet-operations.mdx:67](./host/fleet-operations.mdx#L67) | vastai defrag machines $(vastai show machines -q) | destructive-or-mutating | static-syntax-passed-not-executed |
+| com-fae9e6d825 | [host/fleet-operations.mdx:64](./host/fleet-operations.mdx#L64), [host/host-teams.mdx:145](./host/host-teams.mdx#L145), [snippets/host/cli/show-machines.mdx:20](./snippets/host/cli/show-machines.mdx#L20) | vastai show machines | account-read-only | inventoried-not-executed |
+| com-18f0bfbec6 | [host/fleet-operations.mdx:67](./host/fleet-operations.mdx#L67) | vastai defrag machines &lt;machine-id-1&gt; &lt;machine-id-2&gt; | destructive-or-mutating | static-syntax-passed-not-executed |
 | com-1d8b80405d | [host/fleet-operations.mdx:82](./host/fleet-operations.mdx#L82) | vastai metrics | account-read-only | inventoried-not-executed |
 | com-4da5ff7519 | [host/fleet-operations.mdx:89](./host/fleet-operations.mdx#L89) | vastai cleanup machine &lt;selected-machine&gt; | destructive-or-mutating | static-syntax-passed-not-executed |
-| com-f1391f0c85 | [host/hardware-prep.mdx:30](./host/hardware-prep.mdx#L30) | lsb_release -a uname -a lscpu \| sed -n '1,25p' lspci \| grep -i nvidia lsblk -f findmnt / /data0 /var/lib/docker df -h / ip -brief address | privileged-host | static-syntax-passed-not-executed |
+| com-cb21dc4ecf | [host/hardware-prep.mdx:30](./host/hardware-prep.mdx#L30) | lsb_release -a uname -a lscpu \| sed -n '1,25p' lspci \| grep -i nvidia lsblk -f findmnt / findmnt /data0 findmnt /var/lib/docker df -h / ip -brief address | privileged-host | static-syntax-passed-not-executed |
+| com-d84772e920 | [host/hardware-prep.mdx:42](./host/hardware-prep.mdx#L42) | findmnt | environment-dependent | inventoried-not-executed |
 | com-874c732c2a | [host/headless-install.mdx:23](./host/headless-install.mdx#L23) | ssh-keygen -R HOST_PUBLIC_IP ssh ubuntu@HOST_PUBLIC_IP | local-safe | static-syntax-passed-not-executed |
 | com-12a15290e5 | [host/headless-install.mdx:31](./host/headless-install.mdx#L31) | apt-get | local-safe | inventoried-not-executed |
 | com-383857bc9c | [host/headless-install.mdx:34](./host/headless-install.mdx#L34) | sudo apt-get update APT_OPTS="-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold" sudo DEBIAN_FRONTEND=noninteractive apt-get $APT_OPTS upgrade -y sudo DEBIAN_FRONTEND=noninteractive apt-get $APT_OPTS… | privileged-host | static-syntax-passed-not-executed |
@@ -152,7 +154,6 @@ These remain open even if every local test passes.
 | com-b489e9f10e | [host/host-teams.mdx:144](./host/host-teams.mdx#L144) | vastai show api-keys | credential-bearing | inventoried-not-executed |
 | com-5bec4c77f5 | [host/host-teams.mdx:145](./host/host-teams.mdx#L145), [host/workload-policy.mdx:97](./host/workload-policy.mdx#L97) | vastai reports | local-safe | inventoried-not-executed |
 | com-c92d595bcc | [host/host-teams.mdx:145](./host/host-teams.mdx#L145) | vastai show machine | account-read-only | inventoried-not-executed |
-| com-fae9e6d825 | [host/host-teams.mdx:145](./host/host-teams.mdx#L145), [snippets/host/cli/show-machines.mdx:20](./snippets/host/cli/show-machines.mdx#L20) | vastai show machines | account-read-only | inventoried-not-executed |
 | com-e257182447 | [host/host-teams.mdx:146](./host/host-teams.mdx#L146) | vastai cancel maint | destructive-or-mutating | inventoried-not-executed |
 | com-2a33ef71c6 | [host/host-teams.mdx:146](./host/host-teams.mdx#L146) | vastai list machines | account-read-only | inventoried-not-executed |
 | com-4a77a9892e | [host/host-teams.mdx:146](./host/host-teams.mdx#L146) | vastai schedule maint | destructive-or-mutating | inventoried-not-executed |
@@ -169,19 +170,23 @@ These remain open even if every local test passes.
 | com-a779ffb6f3 | [host/host-teams.mdx:148](./host/host-teams.mdx#L148) | vastai show earnings | account-read-only | inventoried-not-executed |
 | com-5ee0a63bd9 | [host/host-teams.mdx:149](./host/host-teams.mdx#L149) | vastai show audit-logs | account-read-only | inventoried-not-executed |
 | com-4b947134f6 | [host/how-to-self-test.mdx:29](./host/how-to-self-test.mdx#L29) | vastai set api-key &lt;API_KEY&gt; | credential-bearing | static-syntax-passed-not-executed |
+| com-f9b2adefe4 | [host/how-to-self-test.mdx:112](./host/how-to-self-test.mdx#L112) | tail | local-safe | inventoried-not-executed |
 | com-78458123e4 | [host/how-to-self-test.mdx:115](./host/how-to-self-test.mdx#L115), [host/installing-host-software.mdx:142](./host/installing-host-software.mdx#L142) | sudo tail -f /var/lib/vastai_kaalia/self_test.log | privileged-host | static-syntax-passed-not-executed |
 | com-d2c5470675 | [host/installing-host-software.mdx:73](./host/installing-host-software.mdx#L73) | mkdir -p ~/vast-install cd ~/vast-install wget https://console.vast.ai/install -O install read -rsp "Paste fresh Vast host setup key: " VAST_HOST_KEY echo sudo python3 ./install "$VAST_HOST_KEY" \ --no-driver \ --docker… | credential-bearing | static-syntax-passed-not-executed |
 | com-2a23e0232e | [host/installing-host-software.mdx:126](./host/installing-host-software.mdx#L126) | systemctl is-active vastai.service vast_metrics.service docker nvidia-persistenced.service findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS sudo xfs_quota -x -c "state" /var/lib/docker sudo cat /var/lib/vastai_kaalia/h… | privileged-host | static-syntax-passed-not-executed |
 | com-db95034439 | [host/machine-errors.mdx:87](./host/machine-errors.mdx#L87) | tcpdump | environment-dependent | inventoried-not-executed |
 | com-5f2dd22e09 | [host/machine-errors.mdx:99](./host/machine-errors.mdx#L99) | nvidia-smi -L sudo docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi -L sudo journalctl -k -b --no-pager \| grep -Ei 'NVRM\|Xid\|AER\|PCIe\|fallen' | destructive-or-mutating | static-syntax-passed-not-executed |
-| com-1c801ac26f | [host/machine-errors.mdx:130](./host/machine-errors.mdx#L130) | type docker docker --version docker create --help \| grep -- --runtime docker info \| grep -i runtime | environment-dependent | static-syntax-passed-not-executed |
-| com-96afc5e240 | [host/machine-errors.mdx:146](./host/machine-errors.mdx#L146) | systemctl is-active docker sudo journalctl -u docker -n 100 --no-pager sudo docker ps | privileged-host | static-syntax-passed-not-executed |
-| com-7500ddad88 | [host/machine-errors.mdx:161](./host/machine-errors.mdx#L161) | sudo journalctl -k -b --no-pager \| grep -Ei 'AER\|PCIe\|NVRM\|Xid\|fallen' sudo dmesg -T \| grep -Ei 'AER\|PCIe\|NVRM\|Xid\|fallen' | privileged-host | static-syntax-passed-not-executed |
-| com-0bf87a86d8 | [host/machine-errors.mdx:182](./host/machine-errors.mdx#L182) | lspci \| grep -i nvidia nvidia-smi -L sudo journalctl -k -b --no-pager \| grep -Ei 'NVRM\|Xid\|fallen\|AER\|PCIe' | privileged-host | static-syntax-passed-not-executed |
-| com-456080e046 | [host/machine-errors.mdx:197](./host/machine-errors.mdx#L197) | nvidia-smi -q -d ECC nvidia-smi -q \| grep -iE 'Xid\|Remapped\|Pending' sudo journalctl -k -b --no-pager \| grep -i xid | privileged-host | static-syntax-passed-not-executed |
-| com-ad7d6b4e74 | [host/machine-errors.mdx:221](./host/machine-errors.mdx#L221), [host/self-test-reference.mdx:231](./host/self-test-reference.mdx#L231) | systemctl status nvidia-fabricmanager journalctl -u nvidia-fabricmanager --since "-24h" nvidia-smi -q \| grep -i -A 2 Fabric nvidia-smi topo -m | environment-dependent | static-syntax-passed-not-executed |
-| com-b328c66905 | [host/machine-errors.mdx:246](./host/machine-errors.mdx#L246) | df -h /var/lib/docker sudo docker system df findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS | privileged-host | static-syntax-passed-not-executed |
-| com-211f355106 | [host/machine-errors.mdx:328](./host/machine-errors.mdx#L328) | nvidia-smi -L | environment-dependent | inventoried-not-executed |
+| com-934aff3a9e | [host/machine-errors.mdx:130](./host/machine-errors.mdx#L130) | type docker docker --version docker create --help \| grep -- --runtime sudo docker info \| grep -i runtime | privileged-host | static-syntax-passed-not-executed |
+| com-a217c3ac8d | [host/machine-errors.mdx:136](./host/machine-errors.mdx#L136) | docker | environment-dependent | inventoried-not-executed |
+| com-57a21eae16 | [host/machine-errors.mdx:136](./host/machine-errors.mdx#L136) | grep | local-safe | inventoried-not-executed |
+| com-74a04693cb | [host/machine-errors.mdx:136](./host/machine-errors.mdx#L136) | sudo | privileged-host | inventoried-not-executed |
+| com-96afc5e240 | [host/machine-errors.mdx:148](./host/machine-errors.mdx#L148) | systemctl is-active docker sudo journalctl -u docker -n 100 --no-pager sudo docker ps | privileged-host | static-syntax-passed-not-executed |
+| com-7500ddad88 | [host/machine-errors.mdx:163](./host/machine-errors.mdx#L163) | sudo journalctl -k -b --no-pager \| grep -Ei 'AER\|PCIe\|NVRM\|Xid\|fallen' sudo dmesg -T \| grep -Ei 'AER\|PCIe\|NVRM\|Xid\|fallen' | privileged-host | static-syntax-passed-not-executed |
+| com-0bf87a86d8 | [host/machine-errors.mdx:184](./host/machine-errors.mdx#L184) | lspci \| grep -i nvidia nvidia-smi -L sudo journalctl -k -b --no-pager \| grep -Ei 'NVRM\|Xid\|fallen\|AER\|PCIe' | privileged-host | static-syntax-passed-not-executed |
+| com-456080e046 | [host/machine-errors.mdx:199](./host/machine-errors.mdx#L199) | nvidia-smi -q -d ECC nvidia-smi -q \| grep -iE 'Xid\|Remapped\|Pending' sudo journalctl -k -b --no-pager \| grep -i xid | privileged-host | static-syntax-passed-not-executed |
+| com-ad7d6b4e74 | [host/machine-errors.mdx:223](./host/machine-errors.mdx#L223), [host/self-test-reference.mdx:231](./host/self-test-reference.mdx#L231) | systemctl status nvidia-fabricmanager journalctl -u nvidia-fabricmanager --since "-24h" nvidia-smi -q \| grep -i -A 2 Fabric nvidia-smi topo -m | environment-dependent | static-syntax-passed-not-executed |
+| com-b328c66905 | [host/machine-errors.mdx:248](./host/machine-errors.mdx#L248) | df -h /var/lib/docker sudo docker system df findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS | privileged-host | static-syntax-passed-not-executed |
+| com-211f355106 | [host/machine-errors.mdx:330](./host/machine-errors.mdx#L330) | nvidia-smi -L | environment-dependent | inventoried-not-executed |
 | com-1a004d614a | [host/maintenance-windows.mdx:23](./host/maintenance-windows.mdx#L23) | vastai show machines vastai show machine &lt;machine-id&gt; | account-read-only | static-syntax-passed-not-executed |
 | com-c1fb38fd20 | [host/maintenance-windows.mdx:37](./host/maintenance-windows.mdx#L37) | vastai list machine &lt;machine-id&gt; --end_date MM/DD/YYYY | account-read-only | static-syntax-passed-not-executed |
 | com-edd32128a9 | [host/maintenance-windows.mdx:43](./host/maintenance-windows.mdx#L43) | vastai list machines &lt;machine-id-1&gt; &lt;machine-id-2&gt; --end_date MM/DD/YYYY --retry 6 | account-read-only | static-syntax-passed-not-executed |
@@ -208,7 +213,7 @@ These remain open even if every local test passes.
 | com-4c0b44cb3d | [host/not-in-search.mdx:41](./host/not-in-search.mdx#L41) | vastai search offers -n 'machine_id=&lt;machine_id&gt;' --limit 200 | account-read-only | static-syntax-passed-not-executed |
 | com-18499929d1 | [host/not-in-search.mdx:47](./host/not-in-search.mdx#L47) | vastai search offers 'machine_id=&lt;machine_id&gt; rentable=any rented=any verified=any external=any' --limit 200 | account-read-only | static-syntax-passed-not-executed |
 | com-2d9a5a9719 | [host/not-in-search.mdx:57](./host/not-in-search.mdx#L57) | vastai search offers 'gpu_name=RTX_4090 cpu_ram&gt;257 cpu_ram&lt;258' | account-read-only | static-syntax-passed-not-executed |
-| com-7fa3c4e802 | [host/pricing-your-listing.mdx:70](./host/pricing-your-listing.mdx#L70) | --price_gpu 0.45 \ --price_min_bid 0.25 \ --discount_rate 0.30 \ --min_chunk 1 \ --end_date 12/31/2026 | local-safe | static-syntax-passed-not-executed |
+| com-3dc48b563a | [host/pricing-your-listing.mdx:70](./host/pricing-your-listing.mdx#L70) | vastai list machine &lt;machine-id&gt; \ --price_gpu 0.45 \ --price_min_bid 0.25 \ --discount_rate 0.30 \ --min_chunk 1 \ --end_date 12/31/2026 | account-read-only | static-syntax-passed-not-executed |
 | com-28abf8b7db | [host/self-test-reference.mdx:22](./host/self-test-reference.mdx#L22) | vastai self-test machine &lt;machine&gt; | paid-live | inventoried-not-executed |
 | com-9a996bbff5 | [host/self-test-reference.mdx:244](./host/self-test-reference.mdx#L244) | vastai dump-logs &lt;machine&gt; | local-safe | inventoried-not-executed |
 | com-476ff797ac | [host/self-test-reference.mdx:245](./host/self-test-reference.mdx#L245) | vastai dump-logs &lt;machine&gt; --include-local-host-artifacts | local-safe | inventoried-not-executed |
@@ -220,9 +225,10 @@ These remain open even if every local test passes.
 | com-c713443f59 | [host/storage-setup.mdx:74](./host/storage-setup.mdx#L74) | export VAST_DOCKER_DEVICE=/dev/mapper/vg1-lv--1 lsblk -f "$VAST_DOCKER_DEVICE" findmnt -S "$VAST_DOCKER_DEVICE" \|\| true if findmnt -S "$VAST_DOCKER_DEVICE" &gt;/dev/null; then sudo umount "$VAST_DOCKER_DEVICE" fi sudo mkfs… | destructive-or-mutating | static-syntax-passed-not-executed |
 | com-e9e5f3e438 | [host/storage-setup.mdx:135](./host/storage-setup.mdx#L135) | sudo python3 ./install "$VAST_HOST_KEY" \ --no-driver \ --docker-partition /dev/mapper/vg1-lv--1 \ --ports 40000 40799 | privileged-host | static-syntax-passed-not-executed |
 | com-302ca0fd12 | [host/vms.mdx:40](./host/vms.mdx#L40) | python3 /var/lib/vastai_kaalia/enable_vms.py check | privileged-host | static-syntax-passed-not-executed |
-| com-2fd0739dc0 | [host/vms.mdx:54](./host/vms.mdx#L54) | python3 /var/lib/vastai_kaalia/enable_vms.py off | privileged-host | static-syntax-passed-not-executed |
-| com-81ab748278 | [host/vms.mdx:84](./host/vms.mdx#L84) | sudo update-grub sudo reboot | destructive-or-mutating | static-syntax-passed-not-executed |
-| com-26894c03c2 | [host/vms.mdx:97](./host/vms.mdx#L97) | sudo python3 /var/lib/vastai_kaalia/enable_vms.py on -f | privileged-host | static-syntax-passed-not-executed |
+| com-1dc2b87b9a | [host/vms.mdx:60](./host/vms.mdx#L60) | sudo python3 /var/lib/vastai_kaalia/enable_vms.py off | privileged-host | static-syntax-passed-not-executed |
+| com-81ab748278 | [host/vms.mdx:92](./host/vms.mdx#L92) | sudo update-grub sudo reboot | destructive-or-mutating | static-syntax-passed-not-executed |
+| com-26894c03c2 | [host/vms.mdx:109](./host/vms.mdx#L109) | sudo python3 /var/lib/vastai_kaalia/enable_vms.py on -f | privileged-host | static-syntax-passed-not-executed |
+| com-b345adca68 | [host/vms.mdx:117](./host/vms.mdx#L117) | python3 /var/lib/vastai_kaalia/enable_vms.py check nvidia-smi -L systemctl is-active vastai.service docker.service | privileged-host | static-syntax-passed-not-executed |
 | com-339f383601 | [host/workload-policy.mdx:53](./host/workload-policy.mdx#L53) | vastai reports &lt;machine_id&gt; | local-safe | inventoried-not-executed |
 | com-b29f78b7c0 | [host/workload-policy.mdx:54](./host/workload-policy.mdx#L54) | vastai logs &lt;instance_id&gt; --daemon-logs | local-safe | inventoried-not-executed |
 | com-c7eadc7ae0 | [snippets/host/cli/cancel-maint.mdx:8](./snippets/host/cli/cancel-maint.mdx#L8) | vastai cancel maint id | destructive-or-mutating | static-syntax-passed-not-executed |
@@ -275,38 +281,38 @@ These remain open even if every local test passes.
 | err-179cfc5093 | [host/common-errors-diagnostics.mdx:179](./host/common-errors-diagnostics.mdx#L179) | failed to inject CDI devices or unresolvable CDI devices | source-or-fixture | source-confirmation-required |
 | err-2dfc0c5371 | [host/common-errors-diagnostics.mdx:179](./host/common-errors-diagnostics.mdx#L179) | unresolvable CDI devices | source-or-fixture | source-confirmation-required |
 | err-fc97a14e80 | [host/common-errors-diagnostics.mdx:182](./host/common-errors-diagnostics.mdx#L182) | Full client storage, no space left on device, or missing expected disk space | source-or-fixture | source-confirmation-required |
-| err-1a1f302163 | [host/common-errors-diagnostics.mdx:182](./host/common-errors-diagnostics.mdx#L182), [host/machine-errors.mdx:58](./host/machine-errors.mdx#L58), [host/machine-errors.mdx:241](./host/machine-errors.mdx#L241) | no space left on device | source-or-fixture | source-confirmation-required |
+| err-1a1f302163 | [host/common-errors-diagnostics.mdx:182](./host/common-errors-diagnostics.mdx#L182), [host/machine-errors.mdx:58](./host/machine-errors.mdx#L58), [host/machine-errors.mdx:243](./host/machine-errors.mdx#L243) | no space left on device | source-or-fixture | source-confirmation-required |
 | err-ebaeded3ed | [host/common-errors-diagnostics.mdx:226](./host/common-errors-diagnostics.mdx#L226) | Machine error strings | source-or-fixture | source-confirmation-required |
-| err-54ea18668b | [host/how-to-self-test.mdx:61](./host/how-to-self-test.mdx#L61), [host/machine-errors.mdx:56](./host/machine-errors.mdx#L56), [host/machine-errors.mdx:214](./host/machine-errors.mdx#L214) (+3 more in JSON/CSV) | nccl_failed | source-or-fixture | source-confirmation-required |
+| err-54ea18668b | [host/how-to-self-test.mdx:61](./host/how-to-self-test.mdx#L61), [host/machine-errors.mdx:56](./host/machine-errors.mdx#L56), [host/machine-errors.mdx:216](./host/machine-errors.mdx#L216) (+3 more in JSON/CSV) | nccl_failed | source-or-fixture | source-confirmation-required |
 | err-ec431f7e6b | [host/machine-errors.mdx:43](./host/machine-errors.mdx#L43) | Port issue, port networking issues, Port Networking Issues | source-or-fixture | source-confirmation-required |
 | err-84cd7ca64d | [host/machine-errors.mdx:46](./host/machine-errors.mdx#L46), [host/machine-errors.mdx:92](./host/machine-errors.mdx#L92) | nvidia-container-cli: device error: | source-or-fixture | source-confirmation-required |
 | err-54a90fef1d | [host/machine-errors.mdx:47](./host/machine-errors.mdx#L47), [host/machine-errors.mdx:109](./host/machine-errors.mdx#L109) | failed to inject CDI devices: unresolvable CDI devices | source-or-fixture | source-confirmation-required |
 | err-e079e6d870 | [host/machine-errors.mdx:48](./host/machine-errors.mdx#L48), [host/machine-errors.mdx:123](./host/machine-errors.mdx#L123) | unknown or invalid runtime nvidia | source-or-fixture | source-confirmation-required |
 | err-caa6731db5 | [host/machine-errors.mdx:49](./host/machine-errors.mdx#L49), [host/machine-errors.mdx:125](./host/machine-errors.mdx#L125) | unknown flag: runtime | source-or-fixture | source-confirmation-required |
-| err-e9e53e0036 | [host/machine-errors.mdx:50](./host/machine-errors.mdx#L50), [host/machine-errors.mdx:141](./host/machine-errors.mdx#L141) | Cannot connect to the Docker daemon | source-or-fixture | source-confirmation-required |
+| err-e9e53e0036 | [host/machine-errors.mdx:50](./host/machine-errors.mdx#L50), [host/machine-errors.mdx:143](./host/machine-errors.mdx#L143) | Cannot connect to the Docker daemon | source-or-fixture | source-confirmation-required |
 | err-04dcbb3035 | [host/machine-errors.mdx:51](./host/machine-errors.mdx#L51) | GPU PCIE issue, AER, PCIe, Xid 79, fallen off bus | source-or-fixture | source-confirmation-required |
-| err-94840c1cf3 | [host/machine-errors.mdx:54](./host/machine-errors.mdx#L54), [host/machine-errors.mdx:192](./host/machine-errors.mdx#L192) | CUDA error: uncorrectable ECC error encountered | source-or-fixture | source-confirmation-required |
-| err-a733eb697e | [host/machine-errors.mdx:55](./host/machine-errors.mdx#L55), [host/machine-errors.mdx:207](./host/machine-errors.mdx#L207) | CUDA is not available | source-or-fixture | source-confirmation-required |
+| err-94840c1cf3 | [host/machine-errors.mdx:54](./host/machine-errors.mdx#L54), [host/machine-errors.mdx:194](./host/machine-errors.mdx#L194) | CUDA error: uncorrectable ECC error encountered | source-or-fixture | source-confirmation-required |
+| err-a733eb697e | [host/machine-errors.mdx:55](./host/machine-errors.mdx#L55), [host/machine-errors.mdx:209](./host/machine-errors.mdx#L209) | CUDA is not available | source-or-fixture | source-confirmation-required |
 | err-9b00a90ceb | [host/machine-errors.mdx:56](./host/machine-errors.mdx#L56) | nccl_failed, NCCL initialization, sync, or communicator error | source-or-fixture | source-confirmation-required |
 | err-0220e2a7c2 | [host/machine-errors.mdx:58](./host/machine-errors.mdx#L58) | Full client storage, no space left on device | source-or-fixture | source-confirmation-required |
 | err-5c9e9d893d | [host/machine-errors.mdx:59](./host/machine-errors.mdx#L59) | Machine not found or not rentable | source-or-fixture | source-confirmation-required |
 | err-a89e0ad71c | [host/machine-errors.mdx:60](./host/machine-errors.mdx#L60) | Red machine error / unhealthy / deverified | source-or-fixture | source-confirmation-required |
-| err-be182c8321 | [host/machine-errors.mdx:286](./host/machine-errors.mdx#L286) | Error: machine does not support VMs. | source-or-fixture | source-confirmation-required |
-| err-1dfdfcee5b | [host/machine-errors.mdx:287](./host/machine-errors.mdx#L287) | Error: Unexpected configuration change; cannot assign GPUs to VMs. | source-or-fixture | source-confirmation-required |
-| err-3537eb2c69 | [host/machine-errors.mdx:288](./host/machine-errors.mdx#L288) | Error: Machine incompatible with VMs after host change. Please destroy the instance and find a new machine. | source-or-fixture | source-confirmation-required |
-| err-fbc1762373 | [host/machine-errors.mdx:289](./host/machine-errors.mdx#L289) | Error: unable to complete out-of-memory-check | source-or-fixture | source-confirmation-required |
-| err-d645c4fbcb | [host/machine-errors.mdx:290](./host/machine-errors.mdx#L290) | Secrets fetch failed: machine authentication denied (HTTP 401) | source-or-fixture | source-confirmation-required |
-| err-70ecfccb88 | [host/machine-errors.mdx:291](./host/machine-errors.mdx#L291) | Error: GPU error, unable to start instance. | source-or-fixture | source-confirmation-required |
-| err-8dafadb60b | [host/machine-errors.mdx:302](./host/machine-errors.mdx#L302) | Error: Internal error. | source-or-fixture | source-confirmation-required |
-| err-bd0ee3d9f6 | [host/machine-errors.mdx:303](./host/machine-errors.mdx#L303) | Error: container is mounted | source-or-fixture | source-confirmation-required |
-| err-8cb61a2c48 | [host/machine-errors.mdx:304](./host/machine-errors.mdx#L304) | Error: Requested volume does not exist: | source-or-fixture | source-confirmation-required |
-| err-cd3c817852 | [host/machine-errors.mdx:308](./host/machine-errors.mdx#L308) | Secrets fetch failed: network/subprocess error | source-or-fixture | source-confirmation-required |
-| err-2ad35403c1 | [host/machine-errors.mdx:309](./host/machine-errors.mdx#L309) | Secrets fetch failed: empty response | source-or-fixture | source-confirmation-required |
-| err-2753934b06 | [host/machine-errors.mdx:310](./host/machine-errors.mdx#L310) | Secrets fetch failed: instance not found or access denied (HTTP 404) | source-or-fixture | source-confirmation-required |
-| err-3dce35eb2b | [host/machine-errors.mdx:311](./host/machine-errors.mdx#L311) | Secrets fetch failed: bad request (HTTP 400) | source-or-fixture | source-confirmation-required |
-| err-33b1fdbb2c | [host/machine-errors.mdx:313](./host/machine-errors.mdx#L313) | Secrets fetch failed: server error (HTTP ) | source-or-fixture | source-confirmation-required |
-| err-8a9102cdf9 | [host/machine-errors.mdx:314](./host/machine-errors.mdx#L314) | Secrets fetch failed: unexpected HTTP | source-or-fixture | source-confirmation-required |
-| err-520bbb7a21 | [host/machine-errors.mdx:315](./host/machine-errors.mdx#L315) | Secrets fetch JSON parse error | source-or-fixture | source-confirmation-required |
+| err-be182c8321 | [host/machine-errors.mdx:288](./host/machine-errors.mdx#L288) | Error: machine does not support VMs. | source-or-fixture | source-confirmation-required |
+| err-1dfdfcee5b | [host/machine-errors.mdx:289](./host/machine-errors.mdx#L289) | Error: Unexpected configuration change; cannot assign GPUs to VMs. | source-or-fixture | source-confirmation-required |
+| err-3537eb2c69 | [host/machine-errors.mdx:290](./host/machine-errors.mdx#L290) | Error: Machine incompatible with VMs after host change. Please destroy the instance and find a new machine. | source-or-fixture | source-confirmation-required |
+| err-fbc1762373 | [host/machine-errors.mdx:291](./host/machine-errors.mdx#L291) | Error: unable to complete out-of-memory-check | source-or-fixture | source-confirmation-required |
+| err-d645c4fbcb | [host/machine-errors.mdx:292](./host/machine-errors.mdx#L292) | Secrets fetch failed: machine authentication denied (HTTP 401) | source-or-fixture | source-confirmation-required |
+| err-70ecfccb88 | [host/machine-errors.mdx:293](./host/machine-errors.mdx#L293) | Error: GPU error, unable to start instance. | source-or-fixture | source-confirmation-required |
+| err-8dafadb60b | [host/machine-errors.mdx:304](./host/machine-errors.mdx#L304) | Error: Internal error. | source-or-fixture | source-confirmation-required |
+| err-bd0ee3d9f6 | [host/machine-errors.mdx:305](./host/machine-errors.mdx#L305) | Error: container is mounted | source-or-fixture | source-confirmation-required |
+| err-8cb61a2c48 | [host/machine-errors.mdx:306](./host/machine-errors.mdx#L306) | Error: Requested volume does not exist: | source-or-fixture | source-confirmation-required |
+| err-cd3c817852 | [host/machine-errors.mdx:310](./host/machine-errors.mdx#L310) | Secrets fetch failed: network/subprocess error | source-or-fixture | source-confirmation-required |
+| err-2ad35403c1 | [host/machine-errors.mdx:311](./host/machine-errors.mdx#L311) | Secrets fetch failed: empty response | source-or-fixture | source-confirmation-required |
+| err-2753934b06 | [host/machine-errors.mdx:312](./host/machine-errors.mdx#L312) | Secrets fetch failed: instance not found or access denied (HTTP 404) | source-or-fixture | source-confirmation-required |
+| err-3dce35eb2b | [host/machine-errors.mdx:313](./host/machine-errors.mdx#L313) | Secrets fetch failed: bad request (HTTP 400) | source-or-fixture | source-confirmation-required |
+| err-33b1fdbb2c | [host/machine-errors.mdx:315](./host/machine-errors.mdx#L315) | Secrets fetch failed: server error (HTTP ) | source-or-fixture | source-confirmation-required |
+| err-8a9102cdf9 | [host/machine-errors.mdx:316](./host/machine-errors.mdx#L316) | Secrets fetch failed: unexpected HTTP | source-or-fixture | source-confirmation-required |
+| err-520bbb7a21 | [host/machine-errors.mdx:317](./host/machine-errors.mdx#L317) | Secrets fetch JSON parse error | source-or-fixture | source-confirmation-required |
 | err-63f21218e4 | [host/notifications.mdx:54](./host/notifications.mdx#L54) | machine_offline | source-or-fixture | source-confirmation-required |
 | err-8b79be9bf7 | [host/notifications.mdx:55](./host/notifications.mdx#L55) | machine_error | source-or-fixture | source-confirmation-required |
 | err-bd2d931003 | [host/notifications.mdx:62](./host/notifications.mdx#L62) | host:machine_offline | source-or-fixture | source-confirmation-required |
@@ -386,6 +392,7 @@ These remain open even if every local test passes.
 | beh-ab2e66c478 | [host/earning.mdx:69](./host/earning.mdx#L69) | Use P90 only when your machine has a real advantage: strong reliability, better network, fast storage, better location, datacenter status, or scarce GPU supply. Then add realistic storage, bandwidth, and volume assumpti… | source-owner | source-confirmation-required |
 | beh-dd1aa99e09 | [host/earning.mdx:83](./host/earning.mdx#L83) | If actual earnings are lower than the estimate, check utilization first, then compare storage, bandwidth, and volume settings. A higher price does not help if renters choose cheaper or healthier machines. | source-owner | source-confirmation-required |
 | beh-9a8024e679 | [host/first-24-hours.mdx:74](./host/first-24-hours.mdx#L74) | - Ports do not hang at "connecting." | source-owner | source-confirmation-required |
+| beh-2d93632478 | [host/fleet-operations.mdx:64](./host/fleet-operations.mdx#L64) | On multi-GPU machines, defragmentation can free larger GPU groups. Select and review the intended machine IDs first; do not expand vastai show machines inside this state-changing command. | source-owner | source-confirmation-required |
 | beh-225adb6264 | [host/glossary.mdx:23](./host/glossary.mdx#L23) | Carrier-grade NAT. Your router does not have its own public IPv4 address, so inbound connections cannot reliably reach the host. Vast hosting requires a real public inbound TCP/UDP path; CGNAT and double NAT without pub… | source-owner | source-confirmation-required |
 | beh-fafadbf5d8 | [host/glossary.mdx:35](./host/glossary.mdx#L35) | Externally reachable TCP/UDP ports forwarded to the host. Self-test requires at least 3 per listed GPU; production hosts should usually plan about 100 per listed GPU for headroom. See Network &amp; Ports. | source-owner | source-confirmation-required |
 | beh-9f06729417 | [host/glossary.mdx:51](./host/glossary.mdx#L51) | Lower-priority bid rental. Higher bids run first; stopped containers and data remain on the machine. See rental types. | source-owner | source-confirmation-required |
@@ -396,9 +403,9 @@ These remain open even if every local test passes.
 | beh-36f9f5f49e | [host/guide-to-taxes.mdx:19](./host/guide-to-taxes.mdx#L19) | Vast.ai does not provide tax documents or tax advice to hosts residing outside the United States. International hosts are responsible for understanding and complying with their local tax obligations. | source-owner | source-confirmation-required |
 | beh-084ce3943a | [host/guide-to-taxes.mdx:46](./host/guide-to-taxes.mdx#L46) | Vast.ai is based in California and does not currently collect or remit VAT. | source-owner | source-confirmation-required |
 | beh-aebfd4d42a | [host/hardware-prep.mdx:23](./host/hardware-prep.mdx#L23) | For CPU capacity, use the physical-core rule: the host should have at least one visible physical CPU core per visible GPU. Hyperthreads and logical CPUs do not count as physical cores. | source-owner | source-confirmation-required |
-| beh-9b0fdcb866 | [host/hardware-prep.mdx:45](./host/hardware-prep.mdx#L45) | Use Ubuntu 24.04 LTS for new installs when possible. Ubuntu 22.04 LTS also works and may be useful when a driver or operational constraint requires it. Confirm the OS works with your GPU driver, Docker, storage setup, a… | source-owner | source-confirmation-required |
-| beh-11247b826e | [host/hardware-prep.mdx:47](./host/hardware-prep.mdx#L47) | Do not blindly copy old Ubuntu 22.04 cgroup-v1 workaround commands onto Ubuntu 24.04. Docker, kernel, and cgroup defaults differ by OS version; follow the current Vast host installer path for the OS you are actually usi… | source-owner | source-confirmation-required |
-| beh-a654b4826d | [host/hardware-prep.mdx:52](./host/hardware-prep.mdx#L52) | Use a stable NVIDIA driver that supports your GPU and a CUDA runtime compatible with the Vast self-test image family. Verification requires CUDA-compatible driver/runtime support for CUDA 11.8 or newer. Verify GPU visib… | source-owner | source-confirmation-required |
+| beh-9b0fdcb866 | [host/hardware-prep.mdx:51](./host/hardware-prep.mdx#L51) | Use Ubuntu 24.04 LTS for new installs when possible. Ubuntu 22.04 LTS also works and may be useful when a driver or operational constraint requires it. Confirm the OS works with your GPU driver, Docker, storage setup, a… | source-owner | source-confirmation-required |
+| beh-11247b826e | [host/hardware-prep.mdx:53](./host/hardware-prep.mdx#L53) | Do not blindly copy old Ubuntu 22.04 cgroup-v1 workaround commands onto Ubuntu 24.04. Docker, kernel, and cgroup defaults differ by OS version; follow the current Vast host installer path for the OS you are actually usi… | source-owner | source-confirmation-required |
+| beh-a654b4826d | [host/hardware-prep.mdx:58](./host/hardware-prep.mdx#L58) | Use a stable NVIDIA driver that supports your GPU and a CUDA runtime compatible with the Vast self-test image family. Verification requires CUDA-compatible driver/runtime support for CUDA 11.8 or newer. Verify GPU visib… | source-owner | source-confirmation-required |
 | beh-6786f48b56 | [host/headless-install.mdx:27](./host/headless-install.mdx#L27) | Do not accept a changed fingerprint if you cannot explain why it changed. | source-owner | source-confirmation-required |
 | beh-dff9b07d23 | [host/headless-install.mdx:31](./host/headless-install.mdx#L31) | For SSH-only installs, use noninteractive apt-get so provider image config prompts do not block the session: | source-owner | source-confirmation-required |
 | beh-dd9f3e3b62 | [host/headless-install.mdx:129](./host/headless-install.mdx#L129) | The steps below wipe the target drive. If your OS is on /dev/nvme0n1, do not use that device. Check with lsblk first. | source-owner | source-confirmation-required |
@@ -471,21 +478,22 @@ These remain open even if every local test passes.
 | beh-c17a772a8b | [host/machine-errors.mdx:104](./host/machine-errors.mdx#L104) | If Docker cannot inject GPUs into a normal container, fix driver/runtime/GPU health before listing again. See Host Diagnostics: Failed To Inject CDI Devices. | source-owner | source-confirmation-required |
 | beh-0f95fda563 | [host/machine-errors.mdx:118](./host/machine-errors.mdx#L118) | If both fail, investigate driver, NVML, PCIe, Xid, and Docker/NVIDIA runtime health. Do not assume a CDI regeneration command fixes the underlying issue. | source-owner | source-confirmation-required |
 | beh-9ea520ddd9 | [host/machine-errors.mdx:123](./host/machine-errors.mdx#L123) | unknown or invalid runtime nvidia usually means Docker cannot use the NVIDIA runtime. | source-owner | source-confirmation-required |
-| beh-35e3ca7d5d | [host/machine-errors.mdx:141](./host/machine-errors.mdx#L141) | Cannot connect to the Docker daemon means the host software could not talk to Docker. | source-owner | source-confirmation-required |
-| beh-3d6964e97d | [host/machine-errors.mdx:209](./host/machine-errors.mdx#L209) | Check that nvidia-smi works on the host, Docker GPU injection works, the NVIDIA driver supports the CUDA runtime used by the image, and no GPU is missing or unhealthy. Verification requires CUDA-compatible driver/runtim… | source-owner | source-confirmation-required |
-| beh-d5289f483a | [host/machine-errors.mdx:218](./host/machine-errors.mdx#L218) | On HGX, DGX, or other NVSwitch systems, also check Fabric Manager/NVLSM on the host. The self-test container can show NCCL symptoms, but it cannot prove host service state: | source-owner | source-confirmation-required |
-| beh-f807779713 | [host/machine-errors.mdx:234](./host/machine-errors.mdx#L234) | Vast uses Docker storage quotas for renter containers. Do not bypass the error by removing Docker quota settings. Move or remount /var/lib/docker onto the intended XFS filesystem, enable pquota or prjquota in /etc/fstab… | source-owner | source-confirmation-required |
-| beh-9e680d7326 | [host/machine-errors.mdx:251](./host/machine-errors.mdx#L251) | Do not manually delete renter data. For expired or deleted rentals that did not release storage, use vastai cleanup machine. | source-owner | source-confirmation-required |
-| beh-d0dded11b7 | [host/machine-errors.mdx:265](./host/machine-errors.mdx#L265) | A red machine error means the host software or platform detected a machine-health, network, storage, driver, container, VM, or policy issue. Fix the specific cause first, then allow the platform to refresh. | source-owner | source-confirmation-required |
-| beh-bf45ce724b | [host/machine-errors.mdx:267](./host/machine-errors.mdx#L267) | If the host looks healthy but the console state remains wrong, collect logs and escalate to Vast support. Do not assume support can manually verify ordinary machines; verification and most eligibility checks are automat… | source-owner | source-confirmation-required |
-| beh-f9e8dfabb1 | [host/machine-errors.mdx:274](./host/machine-errors.mdx#L274) | Do not try to clear this by resetting machine identity or running internal scripts. Review the visible console message, collect host logs and recent-change details, then follow up with Vast support. | source-owner | source-confirmation-required |
-| beh-c1922d50bb | [host/machine-errors.mdx:280](./host/machine-errors.mdx#L280) | VM-related messages can disable VM GPU-passthrough offers while leaving ordinary container rentals listed. These errors clear after the underlying condition is fixed and the machine reports clean state again, but exact… | source-owner | source-confirmation-required |
-| beh-162e8dc673 | [host/machine-errors.mdx:286](./host/machine-errors.mdx#L286) | Error: machine does not support VMs. \| A VM failed because hardware virtualization or IOMMU is not enabled or available. \| Enable Intel VT-d or AMD-Vi/IOMMU in BIOS if the hardware supports it. | source-owner | source-confirmation-required |
-| beh-d7e7fe293d | [host/machine-errors.mdx:287](./host/machine-errors.mdx#L287) | Error: Unexpected configuration change; cannot assign GPUs to VMs. \| GPU IOMMU grouping changed since verification. \| Review BIOS, kernel, driver, and GPU-slot changes made after listing. | source-owner | source-confirmation-required |
-| beh-8c42b88876 | [host/machine-errors.mdx:288](./host/machine-errors.mdx#L288) | Error: Machine incompatible with VMs after host change. Please destroy the instance and find a new machine. \| Host configuration changed and the machine no longer meets VM-passthrough prerequisites. \| Treat this as VM-s… | source-owner | source-confirmation-required |
-| beh-429aa09a73 | [host/machine-errors.mdx:290](./host/machine-errors.mdx#L290) | Secrets fetch failed: machine authentication denied (HTTP 401) \| Machine credentials were rejected while fetching instance secrets. \| Collect logs and escalate if it repeats; do not use machine-ID reset workflows. | source-owner | source-confirmation-required |
-| beh-f45021fc04 | [host/machine-errors.mdx:298](./host/machine-errors.mdx#L298) | Some messages are logged against a specific rental attempt and do not change the machine's verification or listing by themselves. They can still explain why a specific rental failed. | source-owner | source-confirmation-required |
-| beh-7f4cde0f9a | [host/machine-errors.mdx:304](./host/machine-errors.mdx#L304) | Error: Requested volume does not exist: \| The requested storage volume was deleted or never existed. | source-owner | source-confirmation-required |
+| beh-4e6a2e6783 | [host/machine-errors.mdx:136](./host/machine-errors.mdx#L136) | The final command requires Docker-daemon access; use interactive sudo when the operator is not in the docker group. An exit status of 1 from grep means no matching runtime was found. | source-owner | source-confirmation-required |
+| beh-35e3ca7d5d | [host/machine-errors.mdx:143](./host/machine-errors.mdx#L143) | Cannot connect to the Docker daemon means the host software could not talk to Docker. | source-owner | source-confirmation-required |
+| beh-3d6964e97d | [host/machine-errors.mdx:211](./host/machine-errors.mdx#L211) | Check that nvidia-smi works on the host, Docker GPU injection works, the NVIDIA driver supports the CUDA runtime used by the image, and no GPU is missing or unhealthy. Verification requires CUDA-compatible driver/runtim… | source-owner | source-confirmation-required |
+| beh-d5289f483a | [host/machine-errors.mdx:220](./host/machine-errors.mdx#L220) | On HGX, DGX, or other NVSwitch systems, also check Fabric Manager/NVLSM on the host. The self-test container can show NCCL symptoms, but it cannot prove host service state: | source-owner | source-confirmation-required |
+| beh-f807779713 | [host/machine-errors.mdx:236](./host/machine-errors.mdx#L236) | Vast uses Docker storage quotas for renter containers. Do not bypass the error by removing Docker quota settings. Move or remount /var/lib/docker onto the intended XFS filesystem, enable pquota or prjquota in /etc/fstab… | source-owner | source-confirmation-required |
+| beh-9e680d7326 | [host/machine-errors.mdx:253](./host/machine-errors.mdx#L253) | Do not manually delete renter data. For expired or deleted rentals that did not release storage, use vastai cleanup machine. | source-owner | source-confirmation-required |
+| beh-d0dded11b7 | [host/machine-errors.mdx:267](./host/machine-errors.mdx#L267) | A red machine error means the host software or platform detected a machine-health, network, storage, driver, container, VM, or policy issue. Fix the specific cause first, then allow the platform to refresh. | source-owner | source-confirmation-required |
+| beh-bf45ce724b | [host/machine-errors.mdx:269](./host/machine-errors.mdx#L269) | If the host looks healthy but the console state remains wrong, collect logs and escalate to Vast support. Do not assume support can manually verify ordinary machines; verification and most eligibility checks are automat… | source-owner | source-confirmation-required |
+| beh-f9e8dfabb1 | [host/machine-errors.mdx:276](./host/machine-errors.mdx#L276) | Do not try to clear this by resetting machine identity or running internal scripts. Review the visible console message, collect host logs and recent-change details, then follow up with Vast support. | source-owner | source-confirmation-required |
+| beh-c1922d50bb | [host/machine-errors.mdx:282](./host/machine-errors.mdx#L282) | VM-related messages can disable VM GPU-passthrough offers while leaving ordinary container rentals listed. These errors clear after the underlying condition is fixed and the machine reports clean state again, but exact… | source-owner | source-confirmation-required |
+| beh-162e8dc673 | [host/machine-errors.mdx:288](./host/machine-errors.mdx#L288) | Error: machine does not support VMs. \| A VM failed because hardware virtualization or IOMMU is not enabled or available. \| Enable Intel VT-d or AMD-Vi/IOMMU in BIOS if the hardware supports it. | source-owner | source-confirmation-required |
+| beh-d7e7fe293d | [host/machine-errors.mdx:289](./host/machine-errors.mdx#L289) | Error: Unexpected configuration change; cannot assign GPUs to VMs. \| GPU IOMMU grouping changed since verification. \| Review BIOS, kernel, driver, and GPU-slot changes made after listing. | source-owner | source-confirmation-required |
+| beh-8c42b88876 | [host/machine-errors.mdx:290](./host/machine-errors.mdx#L290) | Error: Machine incompatible with VMs after host change. Please destroy the instance and find a new machine. \| Host configuration changed and the machine no longer meets VM-passthrough prerequisites. \| Treat this as VM-s… | source-owner | source-confirmation-required |
+| beh-429aa09a73 | [host/machine-errors.mdx:292](./host/machine-errors.mdx#L292) | Secrets fetch failed: machine authentication denied (HTTP 401) \| Machine credentials were rejected while fetching instance secrets. \| Collect logs and escalate if it repeats; do not use machine-ID reset workflows. | source-owner | source-confirmation-required |
+| beh-f45021fc04 | [host/machine-errors.mdx:300](./host/machine-errors.mdx#L300) | Some messages are logged against a specific rental attempt and do not change the machine's verification or listing by themselves. They can still explain why a specific rental failed. | source-owner | source-confirmation-required |
+| beh-7f4cde0f9a | [host/machine-errors.mdx:306](./host/machine-errors.mdx#L306) | Error: Requested volume does not exist: \| The requested storage volume was deleted or never existed. | source-owner | source-confirmation-required |
 | beh-444ce3394f | [host/maintenance-windows.mdx:18](./host/maintenance-windows.mdx#L18) | Wait until active rental contracts have ended, or until the machine has no running instances, before planned maintenance. Unlisting prevents new rental contracts, but it does not end existing contracts. | source-owner | source-confirmation-required |
 | beh-130ddbc25a | [host/maintenance-windows.mdx:28](./host/maintenance-windows.mdx#L28) | A single machine can have multiple active rental contracts from different clients. Do not take the machine offline until every active rental contract has ended. | source-owner | source-confirmation-required |
 | beh-11a3a22f83 | [host/maintenance-windows.mdx:34](./host/maintenance-windows.mdx#L34) | For planned work, set the offer end date to the maintenance date so new rentals do not run past your planned downtime. Existing contracts keep their accepted end date, so choose a date that still honors the latest activ… | source-owner | source-confirmation-required |
@@ -510,8 +518,8 @@ These remain open even if every local test passes.
 | beh-637c582202 | [host/persona-decision-guide.mdx:39](./host/persona-decision-guide.mdx#L39) | Expecting guaranteed verification or earnings \| Eligibility does not guarantee search placement, rentals, or revenue. | source-owner | source-confirmation-required |
 | beh-8b2241e97e | [host/persona-decision-guide.mdx:71](./host/persona-decision-guide.mdx#L71) | What if I do not have a public IP? \| Network &amp; Ports | source-owner | source-confirmation-required |
 | beh-025c7d009f | [host/pricing-your-listing.mdx:50](./host/pricing-your-listing.mdx#L50) | 4. Set min_gpu/--min_chunk to 1 unless you have a reason to require larger rentals. | source-owner | source-confirmation-required |
-| beh-3927536d05 | [host/pricing-your-listing.mdx:86](./host/pricing-your-listing.mdx#L86) | Shorten offer end date \| New contracts use the new date; active rental end dates do not shorten. | source-owner | source-confirmation-required |
-| beh-097012bd00 | [host/pricing-your-listing.mdx:96](./host/pricing-your-listing.mdx#L96) | Always rented \| Test a modest increase for future contracts. | source-owner | source-confirmation-required |
+| beh-3927536d05 | [host/pricing-your-listing.mdx:87](./host/pricing-your-listing.mdx#L87) | Shorten offer end date \| New contracts use the new date; active rental end dates do not shorten. | source-owner | source-confirmation-required |
+| beh-097012bd00 | [host/pricing-your-listing.mdx:97](./host/pricing-your-listing.mdx#L97) | Always rented \| Test a modest increase for future contracts. | source-owner | source-confirmation-required |
 | beh-1ca03c2b09 | [host/reliability-uptime.mdx:20](./host/reliability-uptime.mdx#L20) | If you must take the machine offline, minimize the offline time. The score also takes the machine's average earnings into account: machines with lower earnings are penalized less for offline time. | source-owner | source-confirmation-required |
 | beh-7d3b961ccc | [host/reliability-uptime.mdx:25](./host/reliability-uptime.mdx#L25) | Reliability recovery depends on sustained stable operation and the machine's recent incident history. Some error messages can clear after the underlying issue is resolved, but reliability score recovery should not be tr… | source-owner | source-confirmation-required |
 | beh-2f6be4f838 | [host/reliability-uptime.mdx:34](./host/reliability-uptime.mdx#L34) | Do not use --ignore-requirements as a verification shortcut. It is only useful for advanced runtime validation, and the machine still needs enough direct ports for the runtime test to work. | source-owner | source-confirmation-required |
@@ -554,9 +562,11 @@ These remain open even if every local test passes.
 | beh-21e32db945 | [host/vms.mdx:16](./host/vms.mdx#L16) | VMs interact more directly with hardware than containers. Enable them only when the machine supports IOMMU and remains stable. | source-owner | source-confirmation-required |
 | beh-9a805c8f69 | [host/vms.mdx:47](./host/vms.mdx#L47) | on \| VM support is enabled. | source-owner | source-confirmation-required |
 | beh-8fc8caad84 | [host/vms.mdx:48](./host/vms.mdx#L48) | off \| VM support is disabled or a previous test failed. | source-owner | source-confirmation-required |
-| beh-ef4c07129b | [host/vms.mdx:57](./host/vms.mdx#L57) | Most hosts do not need to disable anything; unsupported machines are detected automatically. | source-owner | source-confirmation-required |
-| beh-9e91fcdeb4 | [host/vms.mdx:61](./host/vms.mdx#L61) | VM support requires CPU/chipset support for Intel VT-d or AMD-Vi, plus BIOS virtualization support. | source-owner | source-confirmation-required |
-| beh-e98022c7ca | [host/vms.mdx:100](./host/vms.mdx#L100) | Run this only when the machine is idle. | source-owner | source-confirmation-required |
+| beh-46c880fb01 | [host/vms.mdx:51](./host/vms.mdx#L51) | These values describe VM configuration state only. They do not confirm that the Host is idle or that a VM workload is healthy. | source-owner | source-confirmation-required |
+| beh-b6ca05d5b6 | [host/vms.mdx:63](./host/vms.mdx#L63) | The command marks VM enablement disabled and removes the VM configuration entry when present. It does not stop workloads, end rentals, or verify that the Host is safe to change. | source-owner | source-confirmation-required |
+| beh-2b6e894b54 | [host/vms.mdx:65](./host/vms.mdx#L65) | Run Check VM Status afterwards and confirm it reports off. Most hosts do not need to disable anything; unsupported machines are detected automatically. | source-owner | source-confirmation-required |
+| beh-9e91fcdeb4 | [host/vms.mdx:69](./host/vms.mdx#L69) | VM support requires CPU/chipset support for Intel VT-d or AMD-Vi, plus BIOS virtualization support. | source-owner | source-confirmation-required |
+| beh-ebc9ee2926 | [host/vms.mdx:112](./host/vms.mdx#L112) | Do not use process exit status alone as evidence of success. The helper can print an error such as IOMMU groups not set up for VMs, aborting. while exiting with status 0. | source-owner | source-confirmation-required |
 | beh-5f9c4be220 | [host/workload-policy.mdx:15](./host/workload-policy.mdx#L15) | This is a host-operator summary. The source of truth is always the Host Agreement and Terms of Service. | source-owner | source-confirmation-required |
 | beh-820df2c3ba | [host/workload-policy.mdx:18](./host/workload-policy.mdx#L18) | Do not use this page as legal advice or as a replacement for the agreement and terms. | source-owner | source-confirmation-required |
 | beh-612bdb9c73 | [host/workload-policy.mdx:26](./host/workload-policy.mdx#L26) | - Do not run local gaming, mining, benchmarks, display workloads, or background GPU jobs. | source-owner | source-confirmation-required |

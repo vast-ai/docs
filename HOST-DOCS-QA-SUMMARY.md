@@ -1,58 +1,132 @@
 # Host Docs QA summary
 
-## Current procedure-based V&V status — 2026-08-31
+## Current procedure-based V&V status — 2026-09-01
 
-The earlier atomic inventory below is preserved as discovery history, but it is
-not the current acceptance denominator. The current review follows each authored
-Host page as a logical, ordered procedure: **39 pages → 97 test sets → 165
-command carriers**. Related commands remain together and sequential instructions
-are not split into artificial standalone tests.
+**Evidence package outcome: `EVIDENCE_PACKAGE_COMPLETE`.** Every current Host
+target has an ancestry-bound status, retained method/evidence or explicit
+blocker, and a sanitized rationale. Every command carrier has either a numeric
+semantic assessment or an approved display-only `NOT_APPLICABLE` disposition.
 
-Current retained results:
+**Acceptance outcome: not yet `TARGET_ACCEPTANCE_CANDIDATE`.** The package is
+complete enough to review independently, but it deliberately contains blocked
+and unvalidated behavior. Final acceptance belongs to the human reviewer.
 
-- The ledger contains 37 logical observations: 13 `PASS`, 18 `BLOCKED`, four
-  `UNVALIDATED`, one `FAIL`, and one `NOT_APPLICABLE`. Historical outputs and
-  SSH blockers remain preserved rather than overwritten.
-- At the latest-evidence carrier level, 35 of 165 carriers have behavior:
-  15 `PASS`, 16 `BLOCKED`, three `UNVALIDATED`, none `FAIL`, and one
-  `NOT_APPLICABLE`.
-- 42/42 installed CLI leaf-signature help checks pass; syntax evidence is not
-  counted as behavioral proof.
-- 32 command carriers have page-context scores: twelve score `3`, twenty score
-  `2`, and none score `1`. The other 133 remain deliberately unscored until
-  behavior is observed.
-- The port-4000 review tool now shows the sanitized evidence and score beside
-  each affected page command. Its focused suite passes 12/12 tests, and rendered
-  browser QA confirms the evidence panel, dashboard totals, and the previously
-  missing pricing image.
-- A role-correct Host key completed 11/11 read-only CLI/API calls with exit `0`
-  and empty stderr. It resolved all seven earlier account/ownership blockers,
-  returned live market data, and reproduced the documented search-filter
-  sequence: default lookup empty, then the target visible under `-n` and
-  explicit offer-state filters.
-- Corrected SSH access completed all 41 frozen read-only Host checks plus 14
-  bounded deltas. A later authorized root session passed the idle/rental safety
-  gate and retained pre/post state around the narrow VM and Docker retest.
-- The Host owner confirmed that the target's VM/IOMMU setup was improper. The
-  retained `check`, `off`, and `on -f` outputs are therefore exploratory only:
-  all three commands are `UNVALIDATED`, unscored, and require a new full retest
-  after repair. This does not establish a VM-helper defect. The corrected Docker
-  runtime diagnostic is outside that disqualification and remains score `3`.
-- All four source-proven documentation defects are corrected. The Docker
-  correction has privileged behavioral evidence; the VM wording has safety and
-  source/observation support but awaits representative command testing. Defrag
-  and pricing/list-machine have
-  current CLI-signature evidence and score `2`, but live execution remains
-  intentionally blocked because those commands mutate Host offers.
+### Reconciled scope and current status
 
-Raw outputs are retained mode `0600` in a restricted local archive outside Git;
-only hashes and sanitized observations are committed. The ephemeral Host-key
-file was zeroed after the API run. Next actions are a new VM retest covering
-`check → off → check → on -f → check` after the Host's BIOS/kernel IOMMU
-grouping is corrected, plus separately
-authorized Docker GPU-injection, paid, WAN, and real failure-branch tests if the
-review requires them. See
-[command coverage](./verification/HOST-DOCS-COMMAND-COVERAGE.md),
+| Level | Total | `PASS` | `BLOCKED` | `UNVALIDATED` | `NOT_APPLICABLE` |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Pages | 39 | 1 | 30 | 8 | 0 |
+| Test sets | 97 | 5 | 68 | 24 | 0 |
+| Branches | 203 | 6 | 148 | 49 | 0 |
+| Steps | 468 | 20 | 309 | 138 | 1 |
+| Command carriers | 165 | 46 | 34 | 58 | 27 |
+| **All targets** | **972** | **78** | **589** | **277** | **28** |
+
+No current target is `FAIL`; the initial FAQ route failure and the original
+Hardware Prep mount-form failure remain in attempt history and are linked to
+their successful correction retests. This is an audit-trail statement, not a
+claim that blocked or unvalidated behavior passed.
+
+### Functional status and semantic support remain separate
+
+All 165 command carriers are assessed in page and procedure context:
+
+- 15 score `1`: failed, irrelevant, unsafe, obsolete, or materially unsupported
+  for the exact surrounding claim;
+- 112 score `2`: useful or relevant, but incomplete, conditional, statically
+  supported only, or still missing representative runtime behavior;
+- 11 score `3`: current representative evidence strongly supports the exact
+  documented command and context;
+- 27 approved `NOT_APPLICABLE`: canonical non-executable/display carriers.
+
+The semantic-assessment attempt did not execute 165 commands. Its evidence is
+kept separate from the functional projection: command execution status is
+derived from retained current evidence and exact blockers, while the 1–3 score
+describes how well that evidence supports the page wording.
+
+### Evidence retained in this pass
+
+- 30 attempts, 37 command observations, and 14 procedure evidence records are
+  joined to the final test-set snapshot.
+- Authorized read-only Host collection covered service state, bounded logs,
+  configured port range, Docker daemon/storage, kernel history, PCI/GPU state,
+  and ECC state. It did not run a GPU container, GPU load, WAN probe, paid
+  rental, VM transition, or Host mutation.
+- The invalid multi-target Hardware Prep mount check was preserved as a failed
+  attempt, split into observable checks, and retested successfully.
+- Three FAQ ownership defects were preserved, corrected, and fully retested.
+- Two live-follow instructions now require a bounded window, `Ctrl+C`, and exit
+  confirmation. Static retest supports score `2`; runtime remains blocked.
+- The third-party GPU-burn manifest and entrypoint were checked statically. The
+  mutable tag and unexecuted GPU workload remain explicit limitations.
+- The bare `tcpdump` prose token is correctly treated as display-only N/A; its
+  owning external TCP/UDP capture procedure remains blocked.
+
+Raw sensitive outputs remain outside Git. Committed evidence contains sanitized
+observations, hashes, opaque evidence IDs, and target aliases only.
+
+### Reviewer verification
+
+- Review-context suite: 17/17 passing, including fail-closed malformed, stale,
+  incomplete, ancestry, score/status, N/A, withdrawal, and sanitization cases.
+- Persona/frontmatter check: 39/39 pages passing.
+- Canonical JSON, exact 972-target joins, all 39 current page hashes, JavaScript
+  syntax, and Git whitespace checks pass.
+- Browser QA confirms current status, evidence, rationales, scores, blockers,
+  and retained attempt history on Hosting Overview, Hardware Prep, Common Host
+  Questions, Host Diagnostics, and Machine Errors.
+- The Pricing Your Listing image loads successfully from
+  `/images/host-listing-pricing-controls.webp` with descriptive alt text.
+
+### How to review
+
+```bash
+gh repo clone vast-ai/docs vast-docs-pr185
+cd vast-docs-pr185
+gh pr checkout 185
+npm ci
+```
+
+Start the plain preview in one terminal:
+
+```bash
+npm run dev:review
+```
+
+Start the review proxy in a second terminal:
+
+```bash
+node review-server.mjs --port 4000 --target http://127.0.0.1:3000
+```
+
+Then open:
+
+- review interface: `http://127.0.0.1:4000/host/hosting-overview`;
+- review dashboard/export: `http://127.0.0.1:4000/__review__/`;
+- plain documentation: `http://127.0.0.1:3000/host/hosting-overview`.
+
+On any Host page, click **Review**, expand **V&V evidence for this page**, and
+open a test set to inspect branches, steps, commands, observations, current
+status, limitations, and semantic scores. Use **Comment on selection** or
+**Page note** for anything questionable; export with **Save JSON**, Markdown,
+or Jira CSV.
+
+### Remaining execution and acceptance gates
+
+- paid Self-Test/rental: fresh client credential through secure non-chat
+  injection, numeric spend/runtime caps, and cleanup authority;
+- external TCP/UDP: an approved unused forwarded port, external client, bounded
+  listener/capture, and verified cleanup;
+- Docker GPU injection/load: explicit idle/load authorization and a trusted,
+  pinned image;
+- VM sequence: repaired BIOS/kernel IOMMU state, reboot, idle/rental prevention,
+  and operation-specific approval;
+- install, storage, listing, pricing, maintenance, and other mutations: a
+  disposable/rebuildable target or explicit operational risk decision;
+- product/source-owner confirmation for private behavior and independent human
+  acceptance.
+
+Canonical detail is in [command coverage](./verification/HOST-DOCS-COMMAND-COVERAGE.md),
 [test sets](./verification/host-docs-test-sets.json),
 [results](./verification/host-docs-test-results.json), and
 [scores](./verification/host-docs-command-scores.json).

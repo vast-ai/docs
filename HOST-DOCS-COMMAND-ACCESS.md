@@ -4,9 +4,9 @@
 
 This view groups every documented command by the resources needed for a representative execution. It is an execution-planning aid, not authorization to run the commands. Existing safety tiers, stable IDs, source lines, and non-execution status remain authoritative.
 
-- Source revision: `5088d76b89856185f3ab15a628e4152ff140ab26`
-- Content fingerprint: `sha256:bc59a848d0cb8698097787b911bb9e5b6875570c7c58815baa6d1f48b2504b4d`
-- Unique command targets: **176**
+- Source revision: `7a8a2c4c571dcf64341055e8277083e5aea380bf`
+- Content fingerprint: `sha256:1f68160491e2cba46e6ac23cf66fbc3608536cd4eeaf6bbc63784b7cf9d1d81f`
+- Unique command targets: **182**
 - Documented commands executed while generating this report: **0**
 
 ## Access matrix
@@ -15,9 +15,9 @@ This view groups every documented command by the resources needed for a represen
 |---|---:|---|
 | Paid and Host root | 0 | Needs both approved spend and root on a disposable Host machine. |
 | Paid resource, no Host root | 6 | Creates or uses a billable resource; the documented command itself does not require Host root. |
-| Host root/privileged access, no paid resource | 52 | Conservatively requires root or privileged Host access and does not itself create a paid resource. |
-| Host machine, no root in command | 14 | Needs a representative Host or Host artifact, but the documented command does not itself use root. |
-| No paid resource or Host root | 104 | Can be checked without paid spend or Host root; account, credential, mutation, environment, or external-client gates may still apply. |
+| Host root/privileged access, no paid resource | 55 | Conservatively requires root or privileged Host access and does not itself create a paid resource. |
+| Host machine, no root in command | 15 | Needs a representative Host or Host artifact, but the documented command does not itself use root. |
+| No paid resource or Host root | 106 | Can be checked without paid spend or Host root; account, credential, mutation, environment, or external-client gates may still apply. |
 
 ## Non-exclusive resource totals
 
@@ -26,8 +26,8 @@ A command may appear in more than one resource total.
 | Resource | Commands |
 |---|---:|
 | Approved paid resource/budget | 6 |
-| Representative Host machine or Host artifact | 66 |
-| Host root/privileged access required or conservatively assumed | 52 |
+| Representative Host machine or Host artifact | 70 |
+| Host root/privileged access required or conservatively assumed | 55 |
 | Separate external client/network vantage point | 5 |
 
 ## How to use the groups
@@ -65,7 +65,7 @@ No command targets are currently classified in this group.
 | com-fdf15c8683 | [host/common-errors-diagnostics.mdx:161](./host/common-errors-diagnostics.mdx#L161) | sudo docker run --rm --gpus all oguzpastirmaci/gpu-burn 60 | destructive-or-mutating | destructive-or-mutating, matching-environment |
 | com-53cebfb71d | [host/common-errors-diagnostics.mdx:189](./host/common-errors-diagnostics.mdx#L189) | sudo cat /var/lib/vastai_kaalia/host_port_range df -h /var/lib/docker sudo docker system df findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS | privileged-host | matching-environment |
 | com-348b4a5efd | [host/first-24-hours.mdx:29](./host/first-24-hours.mdx#L29) | systemctl is-active vastai.service vast_metrics.service docker nvidia-persistenced.service systemctl --no-pager --full status vastai.service vast_metrics.service docker nvidia-persistenced.service sudo journalctl -u vas… | privileged-host | matching-environment |
-| com-f1391f0c85 | [host/hardware-prep.mdx:30](./host/hardware-prep.mdx#L30) | lsb_release -a uname -a lscpu \| sed -n '1,25p' lspci \| grep -i nvidia lsblk -f findmnt / /data0 /var/lib/docker df -h / ip -brief address | privileged-host | matching-environment |
+| com-cb21dc4ecf | [host/hardware-prep.mdx:30](./host/hardware-prep.mdx#L30) | lsb_release -a uname -a lscpu \| sed -n '1,25p' lspci \| grep -i nvidia lsblk -f findmnt / findmnt /data0 findmnt /var/lib/docker df -h / ip -brief address | privileged-host | matching-environment |
 | com-383857bc9c | [host/headless-install.mdx:34](./host/headless-install.mdx#L34) | sudo apt-get update APT_OPTS="-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold" sudo DEBIAN_FRONTEND=noninteractive apt-get $APT_OPTS upgrade -y sudo DEBIAN_FRONTEND=noninteractive apt-get $APT_OPTS… | privileged-host | none |
 | com-a8171f44c3 | [host/headless-install.mdx:46](./host/headless-install.mdx#L46) | APT_OPTS="-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold" sudo DEBIAN_FRONTEND=noninteractive apt-get $APT_OPTS install --install-recommends linux-generic-hwe-24.04 -y | privileged-host | none |
 | com-cfe34cebde | [host/headless-install.mdx:53](./host/headless-install.mdx#L53), [host/headless-install.mdx:80](./host/headless-install.mdx#L80), [host/headless-install.mdx:280](./host/headless-install.mdx#L280) | sudo reboot | destructive-or-mutating | destructive-or-mutating |
@@ -91,11 +91,13 @@ No command targets are currently classified in this group.
 | com-d2c5470675 | [host/installing-host-software.mdx:73](./host/installing-host-software.mdx#L73) | mkdir -p ~/vast-install cd ~/vast-install wget https://console.vast.ai/install -O install read -rsp "Paste fresh Vast host setup key: " VAST_HOST_KEY echo sudo python3 ./install "$VAST_HOST_KEY" \ --no-driver \ --docker… | credential-bearing | credential, matching-environment |
 | com-2a23e0232e | [host/installing-host-software.mdx:126](./host/installing-host-software.mdx#L126) | systemctl is-active vastai.service vast_metrics.service docker nvidia-persistenced.service findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS sudo xfs_quota -x -c "state" /var/lib/docker sudo cat /var/lib/vastai_kaalia/h… | privileged-host | matching-environment |
 | com-5f2dd22e09 | [host/machine-errors.mdx:99](./host/machine-errors.mdx#L99) | nvidia-smi -L sudo docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi -L sudo journalctl -k -b --no-pager \| grep -Ei 'NVRM\|Xid\|AER\|PCIe\|fallen' | destructive-or-mutating | destructive-or-mutating, matching-environment |
-| com-96afc5e240 | [host/machine-errors.mdx:146](./host/machine-errors.mdx#L146) | systemctl is-active docker sudo journalctl -u docker -n 100 --no-pager sudo docker ps | privileged-host | matching-environment |
-| com-7500ddad88 | [host/machine-errors.mdx:161](./host/machine-errors.mdx#L161) | sudo journalctl -k -b --no-pager \| grep -Ei 'AER\|PCIe\|NVRM\|Xid\|fallen' sudo dmesg -T \| grep -Ei 'AER\|PCIe\|NVRM\|Xid\|fallen' | privileged-host | matching-environment |
-| com-0bf87a86d8 | [host/machine-errors.mdx:182](./host/machine-errors.mdx#L182) | lspci \| grep -i nvidia nvidia-smi -L sudo journalctl -k -b --no-pager \| grep -Ei 'NVRM\|Xid\|fallen\|AER\|PCIe' | privileged-host | matching-environment |
-| com-456080e046 | [host/machine-errors.mdx:197](./host/machine-errors.mdx#L197) | nvidia-smi -q -d ECC nvidia-smi -q \| grep -iE 'Xid\|Remapped\|Pending' sudo journalctl -k -b --no-pager \| grep -i xid | privileged-host | matching-environment |
-| com-b328c66905 | [host/machine-errors.mdx:246](./host/machine-errors.mdx#L246) | df -h /var/lib/docker sudo docker system df findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS | privileged-host | matching-environment |
+| com-934aff3a9e | [host/machine-errors.mdx:130](./host/machine-errors.mdx#L130) | type docker docker --version docker create --help \| grep -- --runtime sudo docker info \| grep -i runtime | privileged-host | matching-environment |
+| com-74a04693cb | [host/machine-errors.mdx:136](./host/machine-errors.mdx#L136) | sudo | privileged-host | none |
+| com-96afc5e240 | [host/machine-errors.mdx:148](./host/machine-errors.mdx#L148) | systemctl is-active docker sudo journalctl -u docker -n 100 --no-pager sudo docker ps | privileged-host | matching-environment |
+| com-7500ddad88 | [host/machine-errors.mdx:163](./host/machine-errors.mdx#L163) | sudo journalctl -k -b --no-pager \| grep -Ei 'AER\|PCIe\|NVRM\|Xid\|fallen' sudo dmesg -T \| grep -Ei 'AER\|PCIe\|NVRM\|Xid\|fallen' | privileged-host | matching-environment |
+| com-0bf87a86d8 | [host/machine-errors.mdx:184](./host/machine-errors.mdx#L184) | lspci \| grep -i nvidia nvidia-smi -L sudo journalctl -k -b --no-pager \| grep -Ei 'NVRM\|Xid\|fallen\|AER\|PCIe' | privileged-host | matching-environment |
+| com-456080e046 | [host/machine-errors.mdx:199](./host/machine-errors.mdx#L199) | nvidia-smi -q -d ECC nvidia-smi -q \| grep -iE 'Xid\|Remapped\|Pending' sudo journalctl -k -b --no-pager \| grep -i xid | privileged-host | matching-environment |
+| com-b328c66905 | [host/machine-errors.mdx:248](./host/machine-errors.mdx#L248) | df -h /var/lib/docker sudo docker system df findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS | privileged-host | matching-environment |
 | com-c3fe8ff9b0 | [host/network-ports.mdx:40](./host/network-ports.mdx#L40) | sudo python3 ./install "$VAST_HOST_KEY" --ports 40000 40799 | privileged-host | none |
 | com-460064e69e | [host/network-ports.mdx:68](./host/network-ports.mdx#L68) | sudo python3 -m http.server 40000 --bind 0.0.0.0 sudo ss -ltnp \| grep ':40000' | privileged-host | none |
 | com-c1f4adc29f | [host/network-ports.mdx:91](./host/network-ports.mdx#L91) | sudo tcpdump -ni any udp port 40000 | privileged-host | matching-environment |
@@ -105,9 +107,10 @@ No command targets are currently classified in this group.
 | com-c713443f59 | [host/storage-setup.mdx:74](./host/storage-setup.mdx#L74) | export VAST_DOCKER_DEVICE=/dev/mapper/vg1-lv--1 lsblk -f "$VAST_DOCKER_DEVICE" findmnt -S "$VAST_DOCKER_DEVICE" \|\| true if findmnt -S "$VAST_DOCKER_DEVICE" &gt;/dev/null; then sudo umount "$VAST_DOCKER_DEVICE" fi sudo mkfs… | destructive-or-mutating | destructive-or-mutating, matching-environment |
 | com-e9e5f3e438 | [host/storage-setup.mdx:135](./host/storage-setup.mdx#L135) | sudo python3 ./install "$VAST_HOST_KEY" \ --no-driver \ --docker-partition /dev/mapper/vg1-lv--1 \ --ports 40000 40799 | privileged-host | matching-environment |
 | com-302ca0fd12 | [host/vms.mdx:40](./host/vms.mdx#L40) | python3 /var/lib/vastai_kaalia/enable_vms.py check | privileged-host | none |
-| com-2fd0739dc0 | [host/vms.mdx:54](./host/vms.mdx#L54) | python3 /var/lib/vastai_kaalia/enable_vms.py off | privileged-host | none |
-| com-81ab748278 | [host/vms.mdx:84](./host/vms.mdx#L84) | sudo update-grub sudo reboot | destructive-or-mutating | destructive-or-mutating |
-| com-26894c03c2 | [host/vms.mdx:97](./host/vms.mdx#L97) | sudo python3 /var/lib/vastai_kaalia/enable_vms.py on -f | privileged-host | none |
+| com-1dc2b87b9a | [host/vms.mdx:60](./host/vms.mdx#L60) | sudo python3 /var/lib/vastai_kaalia/enable_vms.py off | privileged-host | none |
+| com-81ab748278 | [host/vms.mdx:92](./host/vms.mdx#L92) | sudo update-grub sudo reboot | destructive-or-mutating | destructive-or-mutating |
+| com-26894c03c2 | [host/vms.mdx:109](./host/vms.mdx#L109) | sudo python3 /var/lib/vastai_kaalia/enable_vms.py on -f | privileged-host | none |
+| com-b345adca68 | [host/vms.mdx:117](./host/vms.mdx#L117) | python3 /var/lib/vastai_kaalia/enable_vms.py check nvidia-smi -L systemctl is-active vastai.service docker.service | privileged-host | matching-environment |
 
 ## Host machine, no root in command
 
@@ -115,16 +118,17 @@ No command targets are currently classified in this group.
 |---|---|---|---|---|
 | com-71fd03b28a | [host/common-errors-diagnostics.mdx:31](./host/common-errors-diagnostics.mdx#L31) | cat vast_host_install.log | local-safe | none |
 | com-4c96f697d8 | [host/common-errors-diagnostics.mdx:37](./host/common-errors-diagnostics.mdx#L37) | tar -xzvf vastai_install_logs.tar.gz cat vast_host_install.log | local-safe | none |
-| com-78e9ae3e71 | [host/common-errors-diagnostics.mdx:121](./host/common-errors-diagnostics.mdx#L121), [host/common-errors-diagnostics.mdx:181](./host/common-errors-diagnostics.mdx#L181), [host/hardware-prep.mdx:52](./host/hardware-prep.mdx#L52) (+8 more in JSON/CSV) | nvidia-smi | environment-dependent | matching-environment |
+| com-78e9ae3e71 | [host/common-errors-diagnostics.mdx:121](./host/common-errors-diagnostics.mdx#L121), [host/common-errors-diagnostics.mdx:181](./host/common-errors-diagnostics.mdx#L181), [host/hardware-prep.mdx:58](./host/hardware-prep.mdx#L58) (+8 more in JSON/CSV) | nvidia-smi | environment-dependent | matching-environment |
+| com-d84772e920 | [host/hardware-prep.mdx:42](./host/hardware-prep.mdx#L42) | findmnt | environment-dependent | matching-environment |
 | com-874c732c2a | [host/headless-install.mdx:23](./host/headless-install.mdx#L23) | ssh-keygen -R HOST_PUBLIC_IP ssh ubuntu@HOST_PUBLIC_IP | local-safe | external-client |
 | com-12a15290e5 | [host/headless-install.mdx:31](./host/headless-install.mdx#L31) | apt-get | local-safe | none |
 | com-1bec33cec9 | [host/headless-install.mdx:67](./host/headless-install.mdx#L67) | ubuntu-drivers devices | local-safe | none |
 | com-642b2a3fd4 | [host/headless-install.mdx:129](./host/headless-install.mdx#L129) | lsblk | environment-dependent | matching-environment |
 | com-7526ba6636 | [host/headless-install.mdx:220](./host/headless-install.mdx#L220) | tmux new -s vast-install | local-safe | none |
 | com-db95034439 | [host/machine-errors.mdx:87](./host/machine-errors.mdx#L87) | tcpdump | environment-dependent | matching-environment |
-| com-1c801ac26f | [host/machine-errors.mdx:130](./host/machine-errors.mdx#L130) | type docker docker --version docker create --help \| grep -- --runtime docker info \| grep -i runtime | environment-dependent | matching-environment |
-| com-ad7d6b4e74 | [host/machine-errors.mdx:221](./host/machine-errors.mdx#L221), [host/self-test-reference.mdx:231](./host/self-test-reference.mdx#L231) | systemctl status nvidia-fabricmanager journalctl -u nvidia-fabricmanager --since "-24h" nvidia-smi -q \| grep -i -A 2 Fabric nvidia-smi topo -m | environment-dependent | matching-environment |
-| com-211f355106 | [host/machine-errors.mdx:328](./host/machine-errors.mdx#L328) | nvidia-smi -L | environment-dependent | matching-environment |
+| com-a217c3ac8d | [host/machine-errors.mdx:136](./host/machine-errors.mdx#L136) | docker | environment-dependent | matching-environment |
+| com-ad7d6b4e74 | [host/machine-errors.mdx:223](./host/machine-errors.mdx#L223), [host/self-test-reference.mdx:231](./host/self-test-reference.mdx#L231) | systemctl status nvidia-fabricmanager journalctl -u nvidia-fabricmanager --since "-24h" nvidia-smi -q \| grep -i -A 2 Fabric nvidia-smi topo -m | environment-dependent | matching-environment |
+| com-211f355106 | [host/machine-errors.mdx:330](./host/machine-errors.mdx#L330) | nvidia-smi -L | environment-dependent | matching-environment |
 | com-5f6cbd64ae | [host/self-test-reference.mdx:250](./host/self-test-reference.mdx#L250) | dmesg | environment-dependent | matching-environment |
 | com-f57c6df68d | [host/self-test-reference.mdx:250](./host/self-test-reference.mdx#L250) | journalctl | environment-dependent | matching-environment |
 
@@ -138,7 +142,8 @@ No command targets are currently classified in this group.
 | com-9441748e81 | [host/fleet-operations.mdx:32](./host/fleet-operations.mdx#L32) | vastai list machines &lt;selected-machines&gt; -e 12/31/2026 --retry 6 | account-read-only | account-authentication, destructive-or-mutating |
 | com-433c2e0c1e | [host/fleet-operations.mdx:44](./host/fleet-operations.mdx#L44) | vastai schedule maint &lt;selected-machine&gt; --sdate 1782950400 --duration 2 --maintenance_category power vastai show maints --ids &lt;selected-machine&gt; vastai cancel maint &lt;selected-machine&gt; | destructive-or-mutating | account-authentication, destructive-or-mutating |
 | com-da95adbc5a | [host/fleet-operations.mdx:56](./host/fleet-operations.mdx#L56) | vastai set defjob &lt;ID&gt; --price_gpu 0.20 --image &lt;your-image&gt; --args &lt;container-args&gt; vastai remove defjob &lt;ID&gt; | destructive-or-mutating | account-authentication, destructive-or-mutating |
-| com-f946d81373 | [host/fleet-operations.mdx:67](./host/fleet-operations.mdx#L67) | vastai defrag machines $(vastai show machines -q) | destructive-or-mutating | account-authentication, destructive-or-mutating |
+| com-fae9e6d825 | [host/fleet-operations.mdx:64](./host/fleet-operations.mdx#L64), [host/host-teams.mdx:145](./host/host-teams.mdx#L145), [snippets/host/cli/show-machines.mdx:20](./snippets/host/cli/show-machines.mdx#L20) | vastai show machines | account-read-only | account-authentication |
+| com-18f0bfbec6 | [host/fleet-operations.mdx:67](./host/fleet-operations.mdx#L67) | vastai defrag machines &lt;machine-id-1&gt; &lt;machine-id-2&gt; | destructive-or-mutating | account-authentication, destructive-or-mutating |
 | com-1d8b80405d | [host/fleet-operations.mdx:82](./host/fleet-operations.mdx#L82) | vastai metrics | account-read-only | account-authentication |
 | com-4da5ff7519 | [host/fleet-operations.mdx:89](./host/fleet-operations.mdx#L89) | vastai cleanup machine &lt;selected-machine&gt; | destructive-or-mutating | account-authentication, destructive-or-mutating |
 | com-392fd1e954 | [host/headless-install.mdx:223](./host/headless-install.mdx#L223) | python3 install | local-safe | none |
@@ -161,7 +166,6 @@ No command targets are currently classified in this group.
 | com-b489e9f10e | [host/host-teams.mdx:144](./host/host-teams.mdx#L144) | vastai show api-keys | credential-bearing | account-authentication, credential |
 | com-5bec4c77f5 | [host/host-teams.mdx:145](./host/host-teams.mdx#L145), [host/workload-policy.mdx:97](./host/workload-policy.mdx#L97) | vastai reports | local-safe | account-authentication |
 | com-c92d595bcc | [host/host-teams.mdx:145](./host/host-teams.mdx#L145) | vastai show machine | account-read-only | account-authentication |
-| com-fae9e6d825 | [host/host-teams.mdx:145](./host/host-teams.mdx#L145), [snippets/host/cli/show-machines.mdx:20](./snippets/host/cli/show-machines.mdx#L20) | vastai show machines | account-read-only | account-authentication |
 | com-e257182447 | [host/host-teams.mdx:146](./host/host-teams.mdx#L146) | vastai cancel maint | destructive-or-mutating | account-authentication, destructive-or-mutating |
 | com-2a33ef71c6 | [host/host-teams.mdx:146](./host/host-teams.mdx#L146) | vastai list machines | account-read-only | account-authentication, destructive-or-mutating |
 | com-4a77a9892e | [host/host-teams.mdx:146](./host/host-teams.mdx#L146) | vastai schedule maint | destructive-or-mutating | account-authentication, destructive-or-mutating |
@@ -177,6 +181,8 @@ No command targets are currently classified in this group.
 | com-a779ffb6f3 | [host/host-teams.mdx:148](./host/host-teams.mdx#L148) | vastai show earnings | account-read-only | account-authentication |
 | com-5ee0a63bd9 | [host/host-teams.mdx:149](./host/host-teams.mdx#L149) | vastai show audit-logs | account-read-only | account-authentication |
 | com-4b947134f6 | [host/how-to-self-test.mdx:29](./host/how-to-self-test.mdx#L29) | vastai set api-key &lt;API_KEY&gt; | credential-bearing | account-authentication, credential, destructive-or-mutating |
+| com-f9b2adefe4 | [host/how-to-self-test.mdx:112](./host/how-to-self-test.mdx#L112) | tail | local-safe | none |
+| com-57a21eae16 | [host/machine-errors.mdx:136](./host/machine-errors.mdx#L136) | grep | local-safe | none |
 | com-1a004d614a | [host/maintenance-windows.mdx:23](./host/maintenance-windows.mdx#L23) | vastai show machines vastai show machine &lt;machine-id&gt; | account-read-only | account-authentication |
 | com-c1fb38fd20 | [host/maintenance-windows.mdx:37](./host/maintenance-windows.mdx#L37) | vastai list machine &lt;machine-id&gt; --end_date MM/DD/YYYY | account-read-only | account-authentication, destructive-or-mutating |
 | com-edd32128a9 | [host/maintenance-windows.mdx:43](./host/maintenance-windows.mdx#L43) | vastai list machines &lt;machine-id-1&gt; &lt;machine-id-2&gt; --end_date MM/DD/YYYY --retry 6 | account-read-only | account-authentication, destructive-or-mutating |
@@ -200,7 +206,7 @@ No command targets are currently classified in this group.
 | com-4c0b44cb3d | [host/not-in-search.mdx:41](./host/not-in-search.mdx#L41) | vastai search offers -n 'machine_id=&lt;machine_id&gt;' --limit 200 | account-read-only | account-authentication |
 | com-18499929d1 | [host/not-in-search.mdx:47](./host/not-in-search.mdx#L47) | vastai search offers 'machine_id=&lt;machine_id&gt; rentable=any rented=any verified=any external=any' --limit 200 | account-read-only | account-authentication |
 | com-2d9a5a9719 | [host/not-in-search.mdx:57](./host/not-in-search.mdx#L57) | vastai search offers 'gpu_name=RTX_4090 cpu_ram&gt;257 cpu_ram&lt;258' | account-read-only | account-authentication |
-| com-7fa3c4e802 | [host/pricing-your-listing.mdx:70](./host/pricing-your-listing.mdx#L70) | --price_gpu 0.45 \ --price_min_bid 0.25 \ --discount_rate 0.30 \ --min_chunk 1 \ --end_date 12/31/2026 | local-safe | none |
+| com-3dc48b563a | [host/pricing-your-listing.mdx:70](./host/pricing-your-listing.mdx#L70) | vastai list machine &lt;machine-id&gt; \ --price_gpu 0.45 \ --price_min_bid 0.25 \ --discount_rate 0.30 \ --min_chunk 1 \ --end_date 12/31/2026 | account-read-only | account-authentication, destructive-or-mutating |
 | com-9a996bbff5 | [host/self-test-reference.mdx:244](./host/self-test-reference.mdx#L244) | vastai dump-logs &lt;machine&gt; | local-safe | account-authentication |
 | com-476ff797ac | [host/self-test-reference.mdx:245](./host/self-test-reference.mdx#L245) | vastai dump-logs &lt;machine&gt; --include-local-host-artifacts | local-safe | account-authentication |
 | com-339f383601 | [host/workload-policy.mdx:53](./host/workload-policy.mdx#L53) | vastai reports &lt;machine_id&gt; | local-safe | account-authentication |
@@ -239,6 +245,6 @@ No command targets are currently classified in this group.
 
 ## Reconciliation
 
-The five mutually exclusive groups contain **176** commands, matching the **176** unique command targets in the full inventory.
+The five mutually exclusive groups contain **182** commands, matching the **182** unique command targets in the full inventory.
 
 Use [`host-docs-command-access.json`](./host-docs-command-access.json) for the same classification in machine-readable form.
