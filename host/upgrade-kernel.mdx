@@ -7,18 +7,19 @@ Ubuntu releases kernel updates regularly. Installing them is part of normal
 upkeep on a host machine, and it is one of the
 [verification requirements](/host/verification-stages).
 
-This page has two paths. The first upgrades the whole system, which is the
-shorter route if you already keep the machine current. The numbered steps that
-follow it update the kernel only: they do not move Ubuntu to a newer version,
-for example 22.04 to 24.04, and they leave your other software alone.
+This page has two paths. **Full system upgrade** is the shorter route for a
+machine you already keep current, and it patches the kernel along with
+everything else. **Kernel-only upgrade** moves the kernel and leaves the rest of
+the system where it is. Neither moves Ubuntu to a newer version, for example
+22.04 to 24.04.
 
 The steps are the same on Ubuntu Server 22.04 and 24.04.
 
 <Note>
 An up-to-date kernel is one requirement out of several. On its own it does not
 mean the machine will pass verification. Ubuntu also releases updates for the
-rest of the system; the whole-system path below installs those as well, while
-the numbered steps leave them alone.
+rest of the system. The full system upgrade installs those as well; the
+kernel-only path leaves them alone.
 </Note>
 
 <Warning>
@@ -31,10 +32,12 @@ window with
 notified and can save their work.
 </Warning>
 
-## Upgrading the whole system instead
+---
 
-If you already keep this machine's packages current, the kernel moves with
-everything else and the numbered steps below collapse to three commands:
+## Full system upgrade (packages included)
+
+For a machine whose packages you already keep current. The kernel moves with
+everything else, and the whole upgrade is three commands:
 
 ```bash
 sudo apt-get update
@@ -43,19 +46,19 @@ sudo reboot
 ```
 
 This path also covers machines running a non-generic kernel, such as
-`linux-oem-22.04` on certified OEM hardware or `linux-nvidia`, where step 1
-matches nothing.
+`linux-oem-22.04` on certified OEM hardware or `linux-nvidia`, where step 1 of
+the kernel-only path matches nothing.
 
 <Warning>
 This is a full system upgrade, not a kernel upgrade. Every package with an
 update available moves inside the same maintenance window. The kernel-only
-command in step 3 reports `24 not upgraded`, and that is the point of it; this
+path reports `24 not upgraded` at step 3, and that is the point of it; this
 path upgrades those 24 as well. Docker, containerd and libvirt are upgraded and
 their services restarted along with the rest, so if the machine misbehaves after
 the reboot you have the whole upgrade to work through rather than one variable.
 
 Take this path only if you are prepared to own that. If you want the kernel to
-move on its own, use the numbered steps.
+move on its own, use the kernel-only path below.
 </Warning>
 
 `--with-new-pkgs` is not optional here. A kernel upgrade pulls in new versioned
@@ -88,10 +91,15 @@ lists every GPU on a machine that never took the patch. Comparing the running
 kernel against the newest one in `/boot` is what catches it.
 </Warning>
 
-The rest of this page is the kernel-only path, and the recovery sections at the
-end apply to both.
+---
 
-## 1. Find your kernel metapackage
+## Kernel-only upgrade
+
+For a machine where you want the kernel to move on its own and the rest of the
+system to stay where it is. The five steps below query the metapackage names
+rather than assuming them, install the update, and confirm it took.
+
+### 1. Find your kernel metapackage
 
 Find which kernel metapackages are installed. These are the names you will
 upgrade in step 3, and they differ between machines, so save them to a variable
@@ -156,7 +164,7 @@ leave you with an inaccurate record: the machine is still on its old kernel, but
 the run looks like it succeeded. Step 5 is what catches it.
 </Warning>
 
-## 2. Check for updates
+### 2. Check for updates
 
 Refresh the package lists first, or you will be comparing against stale data.
 
@@ -205,7 +213,7 @@ but not the install in step 3.
 If they differ, `Candidate` is the version you are about to install, and the
 remaining steps need a maintenance window.
 
-## 3. Install the kernel update
+### 3. Install the kernel update
 
 ```bash
 sudo apt install --only-upgrade $KERNEL_METAPACKAGES
@@ -239,7 +247,7 @@ disappear on the next boot.
 Your previous kernel is deliberately left installed. It stays in the boot menu
 and is what you fall back to if the new one does not work.
 
-## 4. Reboot
+### 4. Reboot
 
 The kernel you installed in step 3 does not become the running kernel until the
 machine restarts.
@@ -253,7 +261,7 @@ you are inside your maintenance window and that there are no active rentals.
 sudo reboot
 ```
 
-## 5. Verify
+### 5. Verify
 
 Once the machine is back, check that the new kernel is the one running:
 
@@ -303,7 +311,14 @@ the machine for your own maintenance log; the next check reads the current state
 from `apt-cache policy` rather than from that record.
 </Check>
 
-## If the machine booted the old kernel
+---
+
+## Recovery
+
+Both paths end in a reboot. These two sections cover the ways that reboot goes
+wrong, and they apply whichever path you took.
+
+### If the machine booted the old kernel
 
 Step 5 is what surfaces this: `uname -r` reports an older version than the
 newest kernel in `/boot`, while `Installed` and `Candidate` match. The upgrade
@@ -401,7 +416,7 @@ sudo reboot
 
 Then repeat step 5. `uname -r` should now match the newest kernel in `/boot`.
 
-## If the machine does not come back
+### If the machine does not come back
 
 You need access that does not go through SSH: the machine's IPMI, iDRAC, iLO, or
 other BMC console, or a monitor and keyboard attached to it.
