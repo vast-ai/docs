@@ -7,15 +7,18 @@ Ubuntu releases kernel updates regularly. Installing them is part of normal
 upkeep on a host machine, and it is one of the
 [verification requirements](/host/verification-stages).
 
-This updates the kernel only. It does not move Ubuntu to a newer version, for
-example 22.04 to 24.04, and it leaves your other software alone.
+This page has two paths. The first upgrades the whole system, which is the
+shorter route if you already keep the machine current. The numbered steps that
+follow it update the kernel only: they do not move Ubuntu to a newer version,
+for example 22.04 to 24.04, and they leave your other software alone.
 
 The steps are the same on Ubuntu Server 22.04 and 24.04.
 
 <Note>
 An up-to-date kernel is one requirement out of several. On its own it does not
-mean the machine will pass verification. Ubuntu also releases updates for the rest of the system, which this
-guide does not cover.
+mean the machine will pass verification. Ubuntu also releases updates for the
+rest of the system; the whole-system path below installs those as well, while
+the numbered steps leave them alone.
 </Note>
 
 <Warning>
@@ -27,6 +30,65 @@ window with
 [`vastai schedule maintenance`](/host/cli/schedule-maint) so renters are
 notified and can save their work.
 </Warning>
+
+## Upgrading the whole system instead
+
+If you already keep this machine's packages current, the kernel moves with
+everything else and the numbered steps below collapse to three commands:
+
+```bash
+sudo apt-get update
+sudo apt-get upgrade --with-new-pkgs
+sudo reboot
+```
+
+This path also covers machines running a non-generic kernel, such as
+`linux-aws` or `linux-lowlatency`, where step 1 matches nothing.
+
+<Warning>
+This is a full system upgrade, not a kernel upgrade. Every package with an
+update available moves inside the same maintenance window. The kernel-only
+command in step 3 reports `24 not upgraded`, and that is the point of it; this
+path upgrades those 24 as well. Docker, containerd and libvirt are upgraded and
+their services restarted along with the rest, so if the machine misbehaves after
+the reboot you have the whole upgrade to work through rather than one variable.
+
+Take this path only if you are prepared to own that. If you want the kernel to
+move on its own, use the numbered steps.
+</Warning>
+
+`--with-new-pkgs` is not optional here. A kernel upgrade pulls in new versioned
+packages such as `linux-image-5.15.0-190-generic`, and plain `apt-get upgrade`
+will not install packages that are not already present, so it holds the kernel
+back:
+
+```
+The following packages have been kept back:
+  linux-generic linux-headers-generic linux-image-generic
+```
+
+The machine then reboots onto the kernel it was already running.
+`--with-new-pkgs` allows those additions, and it never removes a package.
+
+Confirm the new kernel is the one running, because the reboot on its own proves
+nothing:
+
+```bash
+uname -r; ls -1 /boot/vmlinuz-* | sed 's|.*/vmlinuz-||' | sort -V | tail -1
+```
+
+Differing values mean GRUB booted the old kernel. See
+[If the machine booted the old kernel](#if-the-machine-booted-the-old-kernel).
+
+<Warning>
+`nvidia-smi` does not substitute for that check. When GRUB boots the old kernel,
+the DKMS module built against that kernel is still in place, so `nvidia-smi`
+lists every GPU on a machine that never took the patch. Comparing the running
+kernel against the newest one in `/boot` is what catches it.
+</Warning>
+
+The rest of this page is the kernel-only path, and the recovery sections at the
+end apply to both.
 
 ## 1. Find your kernel metapackage
 
