@@ -30,12 +30,12 @@ notified and can save their work.
 
 ## 1. Find your kernel metapackage
 
-Find which kernel metapackage is installed. This is the name you will upgrade in
-step 3, and it differs between machines, so save it to a variable that the later
-commands read:
+Find which kernel metapackages are installed. These are the names you will
+upgrade in step 3, and they differ between machines, so save them to a variable
+that the later commands read:
 
 ```bash
-KERNEL_METAPACKAGE=$(dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 'linux-generic*' 2>/dev/null | awk '$1 == "ii" { print $2 }' | sort | tail -1); echo "$KERNEL_METAPACKAGE"
+KERNEL_METAPACKAGES=$(dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 'linux-generic*' 2>/dev/null | awk '$1 == "ii" { print $2 }' | sort -V); echo "$KERNEL_METAPACKAGES"
 ```
 
 On a machine running the GA kernel:
@@ -54,7 +54,19 @@ Every command from here on can be pasted as written. If `echo` printed nothing,
 stop: no `linux-generic*` metapackage is installed, and steps 2 and 3 have
 nothing to act on.
 
-`KERNEL_METAPACKAGE` lives only in the shell session you set it in. If your
+More than one line is a valid result, and every one of them is upgraded
+together:
+
+```
+linux-generic-hwe-22.04
+linux-generic-hwe-22.04-edge
+```
+
+Each metapackage pulls its own image and headers, so these are separate stacks
+rather than one being a newer form of the other. Upgrading a single name leaves
+the other stack on its old kernel, and GRUB can still boot that one.
+
+`KERNEL_METAPACKAGES` lives only in the shell session you set it in. If your
 connection drops, or you open a second terminal, set it again before
 continuing.
 
@@ -67,7 +79,7 @@ installations default to GA and offer HWE as an option, so most machines report
 </Note>
 
 <Warning>
-This is why the name is queried rather than hardcoded. On an HWE machine
+This is why the names are queried rather than hardcoded. On an HWE machine
 `linux-generic` is not installed, and passing it to the upgrade command in step
 3 reports success while patching nothing:
 
@@ -92,7 +104,7 @@ sudo apt update
 Then look at what you have against what the archive is offering:
 
 ```bash
-apt-cache policy "$KERNEL_METAPACKAGE"
+apt-cache policy $KERNEL_METAPACKAGES
 ```
 
 ```
@@ -108,7 +120,9 @@ linux-generic:
         100 /var/lib/dpkg/status
 ```
 
-This is the comparison that decides whether you go on.
+This is the comparison that decides whether you go on. Step 1 printing more
+than one metapackage gives you one block per name here, and every block has to
+be considered, not just the first.
 
 If `Installed` and `Candidate` are the same, the machine is already at the
 current patch level and step 3 has nothing to do. That is the normal result of a
@@ -131,7 +145,7 @@ remaining steps need a maintenance window.
 ## 3. Install the kernel update
 
 ```bash
-sudo apt install --only-upgrade "$KERNEL_METAPACKAGE"
+sudo apt install --only-upgrade $KERNEL_METAPACKAGES
 ```
 
 The summary line is the part worth reading:
@@ -199,7 +213,7 @@ That confirms the right kernel booted. Confirm the patch actually landed as
 well, which is the direct comparison from step 2 run again:
 
 ```bash
-KERNEL_METAPACKAGE=$(dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 'linux-generic*' 2>/dev/null | awk '$1 == "ii" { print $2 }' | sort | tail -1); apt-cache policy "$KERNEL_METAPACKAGE"
+KERNEL_METAPACKAGES=$(dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 'linux-generic*' 2>/dev/null | awk '$1 == "ii" { print $2 }' | sort -V); apt-cache policy $KERNEL_METAPACKAGES
 ```
 
 `Installed` and `Candidate` must now be the same value. If `Installed` is still
@@ -235,16 +249,20 @@ worked and the new kernel is on disk. GRUB did not boot it.
 The machine is up and reachable here, so unlike the section below, this is
 fixable over SSH.
 
-Start with the entry GRUB is configured to boot:
+Start with the entry GRUB is configured to boot. `grub-mkconfig` reads
+`/etc/default/grub` first and then every `/etc/default/grub.d/*.cfg`, so a
+drop-in overrides the main file and reading the main file alone can show you a
+value that is not the one in effect. Resolve it the way `grub-mkconfig` does:
 
 ```bash
-grep -E '^GRUB_DEFAULT=|^GRUB_SAVEDEFAULT=' /etc/default/grub
+bash -c '. /etc/default/grub; shopt -s nullglob; for f in /etc/default/grub.d/*.cfg; do . "$f"; done; echo "GRUB_DEFAULT=$GRUB_DEFAULT"; echo "GRUB_SAVEDEFAULT=$GRUB_SAVEDEFAULT"'
 ```
 
 A machine that picks up new kernels on its own reports:
 
 ```
 GRUB_DEFAULT=0
+GRUB_SAVEDEFAULT=
 ```
 
 Entry `0` is the first entry in the generated menu, and Ubuntu builds that menu
@@ -261,18 +279,32 @@ ignores newer ones:
 GRUB_DEFAULT="Advanced options for Ubuntu>Ubuntu, with Linux 5.15.0-25-generic"
 ```
 
+Find which file sets it, since that is the file to edit:
+
+```bash
+grep -rE '^GRUB_DEFAULT=' /etc/default/grub /etc/default/grub.d/
+```
+
 Set it back to `0`, keeping a copy of the file first:
 
 ```bash
-sudo cp /etc/default/grub /etc/default/grub.bak && sudo sed -i 's/^GRUB_DEFAULT=.*/GRUB_DEFAULT=0/' /etc/default/grub && grep '^GRUB_DEFAULT=' /etc/default/grub
+[ -f /etc/default/grub.bak ] || sudo cp /etc/default/grub /etc/default/grub.bak; sudo sed -i 's/^GRUB_DEFAULT=.*/GRUB_DEFAULT=0/' /etc/default/grub && grep '^GRUB_DEFAULT=' /etc/default/grub
 ```
+
+The backup is only taken when there is not one already, so running this a second
+time keeps the copy of the original rather than overwriting it with the edited
+file.
 
 <Note>
 `GRUB_SAVEDEFAULT` only has an effect when `GRUB_DEFAULT=saved`, so once the
 default is `0` it can stay as it is.
 </Note>
 
-Editing that file changes nothing on its own. Regenerate the menu:
+If the grep listed a file under `/etc/default/grub.d/`, correct `GRUB_DEFAULT`
+there as well. That file is sourced after the main one, so leaving it alone
+means it overrides the edit you just made.
+
+Editing the configuration changes nothing on its own. Regenerate the menu:
 
 ```bash
 sudo update-grub
@@ -287,9 +319,13 @@ Found linux image: /boot/vmlinuz-5.15.0-25-generic
 Found initrd image: /boot/initrd.img-5.15.0-25-generic
 ```
 
-If the new kernel is absent, the menu never had an entry for it, which is the
-other way a machine boots the old kernel: the install wrote the kernel but the
-menu was never rebuilt. `update-grub` is itself the fix for that.
+If the new kernel is absent, stop here and do not reboot. This output is the
+menu that was just generated, so a menu still missing the kernel is not
+something re-running `update-grub` will change, and rebooting only lands you on
+the old kernel again. Absence means `grub-mkconfig` did not find the kernel to
+begin with: check that `/boot` is mounted and that
+`/boot/vmlinuz-<version>` and the matching `/boot/initrd.img-<version>` both
+exist for the version you installed.
 
 <Warning>
 Booting the corrected default takes another reboot, which stops every running
