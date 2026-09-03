@@ -1,0 +1,684 @@
+---
+title: "Check SSD Health"
+description: "Read the SMART data on a host machine's drives, tell a worn drive from a failing one, and replace one before it takes instances down with it."
+---
+
+Drives are the part of a host machine that wears out on their own schedule. A
+failing drive rarely stops all at once. It starts logging errors, containers
+fail to start, the filesystem drops to read-only, and the machine deverifies
+while the drive is still technically working.
+
+Vast requires SSD storage, a drive of at least 200 GB dedicated to Docker
+container storage, and 20 GB free on the root partition. See the
+[verification requirements](/host/verification-stages).
+
+The steps are the same on Ubuntu Server 22.04 and 24.04 except in step 6.
+22.04 ships smartmontools 7.2 and 24.04 ships 7.4, and NVMe self-tests need
+7.4.
+
+<Note>
+Steps 2 to 5 and step 7 are read-only. They report on the drive without
+changing anything and are safe on a machine with instances running. Step 1
+installs a package and starts a service, step 6 competes with client I/O, and
+step 8 takes the machine down. Plan those three.
+</Note>
+
+## 1. Install smartmontools
+
+`nvme-cli` covers the NVMe self-test that smartmontools 7.2 cannot run, so
+install both.
+
+```bash
+sudo apt-get update
+sudo apt-get install -y smartmontools nvme-cli
+```
+
+Check which smartmontools you have. Two NVMe features, starting a self-test
+with `-t` and reading the result with `-l selftest`, exist only in 7.4.
+
+```bash
+dpkg -s smartmontools | grep ^Version
+```
+
+```
+Version: 7.4-2build1
+```
+
+## 2. Find the drives
+
+```bash
+lsblk -d -o NAME,ROTA,SIZE,MODEL,TRAN
+```
+
+```
+NAME    ROTA  SIZE MODEL                   TRAN
+sda        0  3.6T WDC WDS400T2B0A-00SM50  sata
+sdb        0  1.8T WDC WDS200T1R0A-68A4W0  sata
+zram0      0 31.3G                         
+nvme0n1    0  1.8T Samsung SSD 990 EVO 2TB nvme
+```
+
+`TRAN` tells you which rows are physical drives. `sata`, `sas` and `nvme` are
+drives. Rows with no `TRAN` value are not: `loop` devices come from snaps,
+which Ubuntu Server installs by default, and some systems add a `zram` device
+for compressed swap. A stock Ubuntu Server has the former and not the latter.
+
+`ROTA` is the next column to read. `0` means the drive is not rotational, so it
+is an SSD. `1` is a spinning disk, which does not meet the storage requirement
+for the storage the platform uses.
+
+<Warning>
+Do not filter this command by major number. Linux spreads SATA and SAS disks
+across majors 8, 65 to 71, and 128 to 135, so a filter that names only major 8
+silently hides every drive past the sixteenth on a dense chassis.
+</Warning>
+
+Now map the mountpoints back to physical drives. Ubuntu Server's guided
+installer uses LVM by default, often over LUKS, so the filesystem is several
+layers above the disk:
+
+```bash
+lsblk -e 7 -o NAME,SIZE,TYPE,MOUNTPOINTS
+```
+
+```
+NAME                          SIZE TYPE  MOUNTPOINTS
+nvme0n1                     953.9G disk  
+├─nvme0n1p1                     1G part  /boot/efi
+├─nvme0n1p2                     2G part  /boot
+└─nvme0n1p3                 950.8G part  
+  └─dm_crypt-0              950.8G crypt 
+    └─ubuntu--vg-ubuntu--lv 950.8G lvm   /
+```
+
+Read up the tree from the mountpoint to the `disk` row. That top-level name is
+what you pass to `smartctl`. Here `/` lives on a logical volume, inside LUKS,
+on a partition of `nvme0n1`, so the drive to check is `/dev/nvme0`.
+
+The machine above has full-disk encryption, which adds the `crypt` row. A stock
+Ubuntu Server install has the same shape without it: partition, then LVM, then
+the mountpoint. Either way you are reading upward to the `disk` row.
+
+Container storage matters most, because that is where client instances live:
+
+```bash
+docker info | grep "Docker Root Dir"
+df -h /var/lib/docker /
+```
+
+```
+ Docker Root Dir: /var/lib/docker
+```
+
+```
+Filesystem                         Size  Used Avail Use% Mounted on
+/dev/mapper/ubuntu--vg-ubuntu--lv  935G   35G  853G   4% /
+/dev/mapper/ubuntu--vg-ubuntu--lv  935G   35G  853G   4% /
+```
+
+The same filesystem on both lines, as above, means Docker is sharing the root
+partition rather than using a dedicated drive.
+
+<Note>
+This page is about whether the drive is failing, not whether it is full. A
+drive that is out of space but healthy is a different problem with a different
+fix.
+</Note>
+
+### If the drives are behind a RAID controller
+
+Host machines often put their SSDs behind a hardware RAID controller. The
+operating system then shows a single virtual disk, and every command on this
+page reads that virtual disk rather than the drives inside it. The drives can
+be wearing out or failing while the checks come back clean.
+
+Look for a controller first:
+
+```bash
+lspci | grep -i raid
+```
+
+A hit means the machine has a RAID-capable controller, though not necessarily
+an array: an Intel chipset in RAID mode matches this too. Confirm by asking
+smartctl what it makes of the device. `-d test` reports the type it detects,
+then exits without running anything else:
+
+```bash
+sudo smartctl -d test /dev/nvme0
+```
+
+```
+/dev/nvme0: Device of type 'nvme' [NVMe] detected
+/dev/nvme0: Device of type 'nvme' [NVMe] opened
+```
+
+A directly attached drive names its own type, as above. A controller's virtual
+disk opens as a plain `scsi` device, and the per-drive SMART data is not behind
+it. If `-d test` says `scsi` on something you know is an SSD, you are looking
+at the array, not the drive.
+
+To reach the physical drives, name the controller type and the drive number:
+
+| Controller | Device type | Example |
+| --- | --- | --- |
+| MegaRAID, Dell PERC | `megaraid,N` | `smartctl -x -d megaraid,2 /dev/sda` |
+| Adaptec | `aacraid,H,L,ID` | `smartctl -x -d aacraid,0,0,2 /dev/sda` |
+| HP Smart Array, cciss driver | `cciss,N` | `smartctl -x -d cciss,0 /dev/cciss/c0d0` |
+| HP Smart Array, hpsa or hpahcisr | `cciss,N` | `smartctl -x -d cciss,0 /dev/sg2` |
+| Areca | `areca,N` | `smartctl -x -d areca,2 /dev/sg2` |
+| 3ware | `3ware,N` | `smartctl -x -d 3ware,1 /dev/twl0` |
+
+`N` is the drive's number on the controller: 0 to 127 for MegaRAID and 3ware,
+0 to 15 for cciss, and 1 to 24 for Areca. Once the device type is right, steps
+3 through 6 work as written, one drive at a time.
+
+<Warning>
+Address the controller, not the array. smartmontools is explicit that you use
+the device nodes corresponding to the RAID controllers, not the nodes
+corresponding to logical drives. Areca controllers are reached through a SCSI
+generic node such as `/dev/sg2`, which is deliberately not the node the array
+reads and writes through.
+</Warning>
+
+To work out which generic node belongs to which device:
+
+```bash
+cat /proc/scsi/sg/device_hdr /proc/scsi/sg/devices
+```
+
+<Note>
+This gets you per-drive health through the controller. Whether the array itself
+is healthy, degraded, or rebuilding is a separate question that SMART cannot
+answer: use `zpool status` for ZFS, `/proc/mdstat` for mdadm, or the
+controller's own tool such as `storcli`, `ssacli` or `arcconf`.
+</Note>
+
+## 3. Check the overall verdict
+
+Start with the drive's own one-line summary. Use the controller name for NVMe
+(`/dev/nvme0`), and the disk name for SATA and SAS (`/dev/sda`).
+
+```bash
+sudo smartctl -H /dev/nvme0
+```
+
+```
+=== START OF SMART DATA SECTION ===
+SMART overall-health self-assessment test result: PASSED
+```
+
+`FAILED` means the drive has already failed or predicts its own failure within
+the next 24 hours. Stop renting the machine: unlist it with
+`vastai unlist machine`, and if instances are running, schedule the window with
+[`vastai schedule maintenance`](/host/cli/schedule-maint). If the machine has
+already dropped off the platform, work through
+[Machine Offline](/host/machine-offline).
+
+<Warning>
+`PASSED` is a low bar, not a clean bill of health. On NVMe it reflects a single
+byte, the Critical Warning field. On SATA it is one boolean the firmware
+returns. A drive can report `PASSED` while it is visibly wearing out or
+throwing media errors, which is why steps 4 and 5 exist.
+</Warning>
+
+## 4. Read an NVMe drive
+
+```bash
+sudo smartctl -x /dev/nvme0
+```
+
+The section to read is the health log:
+
+```
+SMART/Health Information (NVMe Log 0x02)
+Critical Warning:                   0x00
+Temperature:                        45 Celsius
+Available Spare:                    100%
+Available Spare Threshold:          10%
+Percentage Used:                    0%
+Data Units Read:                    2,367,761 [1.21 TB]
+Data Units Written:                 921,611 [471 GB]
+Host Read Commands:                 7,110,627
+Host Write Commands:                6,955,764
+Controller Busy Time:               180
+Power Cycles:                       136
+Power On Hours:                     40
+Unsafe Shutdowns:                   18
+Media and Data Integrity Errors:    0
+Error Information Log Entries:      0
+Warning  Comp. Temperature Time:    0
+Critical Comp. Temperature Time:    0
+Temperature Sensor 1:               39 Celsius
+Temperature Sensor 2:               39 Celsius
+```
+
+Four fields decide whether the drive stays in the machine:
+
+| Field | Healthy | Act when |
+| --- | --- | --- |
+| Critical Warning | `0x00` | anything else |
+| Available Spare | comfortably above the threshold | it falls below Available Spare Threshold |
+| Media and Data Integrity Errors | `0` | above `0`, and especially if it climbs between checks |
+| Percentage Used | any value | it is not on its own a reason to replace |
+
+**Critical Warning** is the field the drive itself considers an alarm. Each bit
+is a separate warning: available spare below threshold, a temperature
+threshold crossed, NVM subsystem reliability degraded, all media placed in
+read-only mode, volatile memory backup failed, or the persistent memory region
+gone read-only. Anything other than `0x00` needs explaining before the machine
+takes another rental.
+
+**Available Spare** is the percentage of spare capacity left for the drive to
+remap failing blocks with. **Available Spare Threshold** is the level the drive
+manufacturer set as the point of concern, `10%` in the output above. The drive
+raises the matching Critical Warning bit once spare has fallen below it.
+
+**Media and Data Integrity Errors** counts occurrences where the controller hit
+an unrecovered data integrity error, such as an uncorrectable ECC failure, a
+CRC checksum failure, or an LBA tag mismatch. On a drive holding client data,
+this number should be zero. A drive whose count is rising between maintenance
+windows is corrupting data, not aging gracefully.
+
+<Warning>
+**Percentage Used is not a failure indicator.** It is the manufacturer's
+estimate of how much of the drive's rated endurance has been consumed. A value
+of 100 means the rated endurance has been used up, which the NVMe specification
+says may not indicate a failure. The value is allowed to exceed 100, and
+anything above 254 is reported as 255. It also updates only once per power-on
+hour, so re-reading it minutes later tells you nothing. Replace on Critical
+Warning, spare capacity, and media errors; use Percentage Used to plan ahead.
+</Warning>
+
+**Temperature** is a composite figure the controller computes. Compare it with
+the thresholds printed further up in the information section:
+
+```
+Warning  Comp. Temp. Threshold:     86 Celsius
+Critical Comp. Temp. Threshold:     87 Celsius
+```
+
+Individual sensors can read hotter than the composite value, so a single high
+sensor reading is not automatically a problem. `Warning Comp. Temperature Time`
+climbing between checks is, and it usually means airflow rather than the drive.
+Both temperature-time fields accumulate over the life of the drive, so a
+non-zero value may be entirely historical.
+
+**Unsafe Shutdowns** counts power losses where the drive was not told to shut
+down first. It is a record of how the machine has been treated rather than a
+fault in the drive, but each one is a chance the filesystem was left
+inconsistent, which is what step 7 checks. A number that grows every
+maintenance window points at how the machine is being powered off.
+
+## 5. Read a SATA or SAS SSD
+
+```bash
+sudo smartctl -x /dev/sda
+```
+
+<Note>
+Use `-x` rather than `-a` on SATA and SAS drives. `-a` does not enable the
+options that need 48-bit ATA commands, so it leaves out logs this page relies
+on. On NVMe the two are equivalent.
+</Note>
+
+SATA drives report a table of vendor attributes instead of a fixed log:
+
+```
+ID# ATTRIBUTE_NAME          FLAGS    VALUE WORST THRESH FAIL RAW_VALUE
+  5 Reallocated_Sector_Ct   -O--CK   100   100   ---    -    0
+  9 Power_On_Hours          -O--CK   100   100   ---    -    39285
+ 12 Power_Cycle_Count       -O--CK   100   100   ---    -    974
+165 Block_Erase_Count       -O--CK   100   100   ---    -    55313019
+166 Minimum_PE_Cycles_TLC   -O--CK   100   100   ---    -    2
+167 Max_Bad_Blocks_per_Die  -O--CK   100   100   ---    -    178
+168 Maximum_PE_Cycles_TLC   -O--CK   100   100   ---    -    15
+169 Total_Bad_Blocks        -O--CK   100   100   ---    -    4640
+170 Grown_Bad_Blocks        -O--CK   100   100   ---    -    0
+171 Program_Fail_Count      -O--CK   100   100   ---    -    0
+172 Erase_Fail_Count        -O--CK   100   100   ---    -    0
+173 Average_PE_Cycles_TLC   -O--CK   100   100   ---    -    7
+174 Unexpected_Power_Loss   -O--CK   100   100   ---    -    87
+184 End-to-End_Error        -O--CK   100   100   ---    -    0
+187 Reported_Uncorrect      -O--CK   100   100   ---    -    0
+188 Command_Timeout         -O--CK   100   100   ---    -    17
+194 Temperature_Celsius     -O---K   067   063   ---    -    33 (Min/Max 17/63)
+199 UDMA_CRC_Error_Count    -O--CK   100   100   ---    -    0
+230 Media_Wearout_Indicator -O--CK   001   001   ---    -    0x011b0046011b
+232 Available_Reservd_Space PO--CK   100   100   004    -    100
+233 NAND_GB_Written_TLC     -O--CK   100   100   ---    -    29388
+234 NAND_GB_Written_SLC     -O--CK   100   100   ---    -    39719
+241 Host_Writes_GiB         ----CK   253   253   ---    -    37031
+242 Host_Reads_GiB          ----CK   253   253   ---    -    39685
+244 Temp_Throttle_Status    -O--CK   000   100   ---    -    0
+                            ||||||_ K auto-keep
+                            |||||__ C event count
+                            ||||___ R error rate
+                            |||____ S speed/performance
+                            ||_____ O updated online
+                            |______ P prefailure warning
+```
+
+The `FAIL` column is the drive's own verdict, but it only works where there is
+a threshold to compare against. In `-x` output it reads `NOW` if the normalized
+`VALUE` has dropped to or below `THRESH`, `Past` if it did so earlier and
+recovered, and `-` otherwise.
+
+<Warning>
+**A dash in `FAIL` does not mean the attribute is healthy.** `---` in `THRESH`
+means smartctl could not obtain a threshold for that attribute, and an
+attribute with no threshold can never report `NOW` or `Past` no matter how bad
+its raw value gets.
+
+In the table above, `5 Reallocated_Sector_Ct` and `187 Reported_Uncorrect` both
+show `THRESH ---`. A drive with thousands of reallocated sectors would print
+the same `-` in that column as this healthy one. Read the raw values of the
+attributes below directly; do not scan the `FAIL` column and conclude the drive
+is fine.
+</Warning>
+
+These are the attributes to read directly, whatever the `FAIL` column says:
+
+| Attribute | What it means |
+| --- | --- |
+| `5 Reallocated_Sector_Ct` | Sectors retired and remapped. Should be `0`; a rising count is the drive consuming its spares |
+| `197 Current_Pending_Sector` | Sectors the drive could not read and has not yet remapped. Anything above `0` is data at risk right now |
+| `198 Offline_Uncorrectable` | Sectors that failed an offline read and could not be recovered |
+| `187 Reported_Uncorrect` | Errors the drive could not correct. Should be `0` on a drive holding client data |
+| `232 Available_Reservd_Space` | Spare capacity left, the SATA equivalent of NVMe Available Spare. One of the few here with a real `THRESH`, `004`, and the `P` prefailure flag |
+| `199 UDMA_CRC_Error_Count` | Data corrupted in transit on the cable, not on the drive |
+
+Not every drive reports every attribute. The sample above has no `197` or
+`198`; a drive that does not report an attribute simply omits the row.
+
+<Warning>
+Attribute numbers are vendor-specific, and the names smartctl prints are only
+correct when the drive is in the smartmontools database. On an unrecognised
+drive the ID may be right while the name and raw interpretation are wrong.
+</Warning>
+
+The raw values themselves are not standardized either. The conversion from a
+raw value to anything physical is not defined by the SMART specification, and
+vendors use their own conventions. The table above is a healthy drive with four
+and a half years of power-on hours, and it shows the trap:
+`230 Media_Wearout_Indicator` has a `VALUE` of `001`, which reads like 1% of
+life remaining. Its raw value is `0x011b0046011b`, a packed vendor field rather
+than a percentage, and the drive is fine.
+
+For wear specifically, prefer the standardized figure in the device statistics
+log over any vendor attribute:
+
+```
+0x07  =====  =               =  ===  == Solid State Device Statistics (rev 1) ==
+0x07  0x008  1               0  N--  Percentage Used Endurance Indicator
+```
+
+<Tip>
+A non-zero `199 UDMA_CRC_Error_Count`, or non-zero ICRC errors under
+`SATA Phy Event Counters`, points at the SATA cable or connector rather than
+the drive. Reseat both ends before condemning a disk. Attribute 199 is a
+lifetime count, so what matters is whether it grows between maintenance
+windows. The Phy counters can be cleared with `-l sataphy,reset` if you want a
+clean baseline before a soak test.
+</Tip>
+
+<Note>
+**SAS drives report differently.** A SAS SSD returns SCSI-format output rather
+than the ATA attribute table above: look for the grown defect list, the
+non-medium error count, and the read/write error counters. The overall verdict
+in step 3 and the self-test in step 6 work the same way.
+</Note>
+
+## 6. Run a self-test
+
+The health log records what the drive noticed during normal use. A self-test
+makes it go and look.
+
+<Warning>
+A self-test runs on a machine in normal use, but it competes with client I/O
+and will slow the drive down while it runs. Run it during a maintenance window,
+not while instances are working.
+</Warning>
+
+A short test takes a couple of minutes and checks a sample of the media. A long
+test reads the whole surface, takes hours on a large drive, and is the one that
+finds media errors a short test walks past. Use `-t long` when you suspect the
+drive but a short test came back clean.
+
+### SATA and SAS
+
+Works on both Ubuntu releases.
+
+```bash
+sudo smartctl -t short /dev/sda
+```
+
+The drive reports how long to wait in the `Short self-test routine recommended
+polling time` line of its `-x` output. Check progress or read the result with:
+
+```bash
+sudo smartctl -l selftest /dev/sda
+```
+
+While a test is running the log reports `Self-test routine in progress` with a
+percentage remaining. When it finishes, the result appears under
+`SMART Extended Self-test Log`. `Completed without error` is what you want; a
+read failure naming a block the drive could not read is a replacement, not a
+repair.
+
+### NVMe
+
+On Ubuntu 24.04, smartmontools handles it:
+
+```bash
+sudo smartctl -t short /dev/nvme0
+```
+
+```
+Self-test has begun
+Use smartctl -X to abort test
+```
+
+```bash
+sudo smartctl -l selftest /dev/nvme0
+```
+
+```
+Self-test Log (NVMe Log 0x06)
+Self-test status: No self-test in progress
+Num  Test_Description  Status                       Power_on_Hours  Failing_LBA  NSID Seg SCT Code
+ 0   Short             Completed without error                  41            -     -   -   -    -
+ 1   Short             Completed without error                  40            -     -   -   -    -
+```
+
+The drive keeps the last 20 results, so you can tell a new failure from an old
+one.
+
+<Warning>
+On Ubuntu 22.04, smartmontools 7.2 cannot run NVMe self-tests, and it fails
+**silently**. `smartctl -t short /dev/nvme0` exits successfully with a message
+suggesting you run `-a` instead, so it looks like the test started when nothing
+did. Its `-x` output has no self-test section at all.
+</Warning>
+
+Use `nvme-cli` instead on 22.04, which does support them:
+
+```bash
+sudo nvme device-self-test /dev/nvme0 --self-test-code=1
+sudo nvme self-test-log /dev/nvme0
+```
+
+`--self-test-code=1` is the short test; `2` is the extended test.
+
+## 7. Check what the kernel saw
+
+The drive's own logs miss failures that happen between the drive and the rest
+of the machine. The kernel does not.
+
+```bash
+sudo dmesg -T --level=err,warn | grep -iE "nvme|ata[0-9]|sd[a-z]|I/O error|EXT4-fs error"
+```
+
+Anything here changes the priority. I/O errors, controller resets, and link
+retraining mean the machine is already losing operations, whatever SMART says.
+
+A filesystem that has dropped to read-only is the clearest signal of the set,
+and it fails every container start on that drive:
+
+```bash
+findmnt -no OPTIONS / | tr ',' '\n' | grep -x "ro\|rw"
+```
+
+```
+rw
+```
+
+`ro` on a filesystem that is supposed to be writable means the kernel remounted
+it after an error. Take the machine out of service as described in step 3.
+
+## 8. Replace a failing drive
+
+<Warning>
+Replacing a drive usually means powering the machine down, which stops every
+running instance on it. Instances are not destroyed, but the workloads inside
+them are interrupted. Wait until all active rental contracts have ended, or
+schedule the window with
+[`vastai schedule maintenance`](/host/cli/schedule-maint) so renters are
+notified and can save their work.
+
+Hot-swap bays on a redundant array can take a replacement without powering
+down. Treat that as something you have confirmed for your hardware, not as the
+assumption you start from.
+</Warning>
+
+Before the window, decide what the drive was holding:
+
+- **The Docker storage drive.** Client instances live here. Replacing it means
+  the machine comes back with no cached images, so the first renters after the
+  swap will wait for a full image pull.
+- **The root drive.** This is a rebuild: reinstall Ubuntu Server, the NVIDIA
+  driver, and the Vast host software, then re-verify.
+- **One member of a redundant array.** The array rebuilds onto the replacement
+  and the data survives, so this is the one case where a swap does not cost you
+  the contents of the drive. The rebuild competes with client I/O for as long
+  as it runs, so let it finish before you relist. Check on it with
+  `zpool status`, `/proc/mdstat`, or your controller's tool.
+
+After the swap, confirm the new drive presents correctly before relisting:
+
+```bash
+lsblk -d -o NAME,ROTA,SIZE,MODEL,TRAN
+sudo smartctl -H /dev/sda
+```
+
+Check `ROTA` is `0` on the replacement, that the machine reports the storage
+you expect, and that the root partition still has its 20 GB free. Then run the
+platform's own [machine self-test](/host/how-to-self-test), which checks the
+GPUs and network as well, before you relist.
+
+## Recovery
+
+### smartctl says SMART is disabled
+
+```
+SMART support is: Available - device has SMART capability.
+SMART support is: Disabled
+```
+
+Nothing in steps 3 to 6 will return useful data until you turn it on:
+
+```bash
+sudo smartctl -s on /dev/sda
+```
+
+### smartctl cannot work out the device type
+
+If a command returns `Unknown USB bridge` or a type you did not expect, ask it
+what it detected:
+
+```bash
+sudo smartctl -d test /dev/sda
+```
+
+Then name the type explicitly. `-d sat` covers most SATA drives behind a SAS
+or USB bridge, and the RAID pass-through types are in step 2.
+
+### A drive is missing from lsblk entirely
+
+A drive that does not appear at all has dropped off the bus, and that is a
+stronger failure signal than anything SMART would have told you. Check the
+kernel log from step 7 for the device disappearing, then reseat its data and
+power cables. A drive that stays missing is a replacement.
+
+## Get told before it fails
+
+Everything above is a point-in-time check. `smartd` watches continuously and
+logs when a drive starts failing, which is how you find out without logging in
+to look. Installing the package enables it, so this is usually a check rather
+than a change:
+
+```bash
+systemctl is-active smartmontools.service
+```
+
+```
+active
+```
+
+If it comes back `inactive`, start it:
+
+```bash
+sudo systemctl enable --now smartmontools.service
+```
+
+<Warning>
+**The service refuses to start inside a VM.** Both releases ship the unit with
+`ConditionVirtualization=no`, so on a host that runs its GPUs through a VM with
+PCI passthrough, `enable --now` completes without starting anything and
+`is-active` still reports `inactive`. Override it with
+`sudo systemctl edit smartmontools.service`, adding:
+
+```
+[Unit]
+ConditionVirtualization=
+```
+</Warning>
+
+<Note>
+`smartd.service` works as a name on both releases; the package ships it as an
+alias of `smartmontools.service`. Either name is fine.
+</Note>
+
+Its configuration lives in `/etc/smartd.conf`. Both releases ship the same
+single active line, which scans every device it can see and mails `root`:
+
+```
+DEVICESCAN -d removable -n standby -m root -M exec /usr/share/smartmontools/smartd-runner
+```
+
+<Warning>
+`DEVICESCAN` does not cover everything this page checks. On NVMe drives smartd
+alerts on the Critical Warning byte, temperature, and new error log entries
+only. It does not watch Available Spare, Percentage Used, or Media and Data
+Integrity Errors, which are three of the four fields step 4 uses to decide
+whether a drive stays in the machine. Drives behind a RAID controller need
+their own explicit lines with the `-d` type from step 2. Neither case is
+covered by the shipped default, so keep running steps 3 to 5 by hand each
+window.
+</Warning>
+
+To be told directly, change `-m root` to your own address and leave the rest of
+the line alone. Mail only reaches you if the machine has a working mail
+transport, which a stock Ubuntu Server install does not. Without one, the
+warnings still land in the journal:
+
+```bash
+sudo journalctl -u smartmontools.service --since "1 week ago" -p warning
+```
+
+<Check>
+You are done when every drive returns `PASSED`, NVMe drives show
+`Critical Warning: 0x00` with spare capacity above the threshold and no media
+errors, SATA drives show no `NOW` or `Past` in the `FAIL` column and zero
+reallocated, pending, and uncorrectable sectors, the kernel log from step 7 is
+clean, and `smartmontools.service` is active.
+</Check>
