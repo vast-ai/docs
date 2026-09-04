@@ -1,0 +1,79 @@
+openapi: 3.0.0
+info:
+  title: Vast.ai Host Volume Offer API
+  description: API endpoint for publishing local storage as a volume offer.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/volumes/:
+    post:
+      summary: list volume storage
+      description: |
+        Publishes local storage on one or more Host machines as a volume offer.
+
+        CLI Usage: `vastai list volume <machine_id> [options]`
+        CLI Usage: `vastai list volumes <machine_id> [<machine_id> ...] [options]`
+      security:
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - machine
+              - size
+              - price_disk
+              properties:
+                machine:
+                  oneOf:
+                  - type: integer
+                    description: ID of one Host machine
+                  - type: array
+                    description: IDs of multiple Host machines receiving the same offer settings
+                    minItems: 1
+                    items:
+                      type: integer
+                size:
+                  type: integer
+                  description: Volume-offer capacity in GB
+                  default: 15
+                price_disk:
+                  type: number
+                  format: float
+                  description: Price per GB per month
+                  default: 0.10
+                end_date:
+                  type: number
+                  format: double
+                  description: Optional offer expiration as a Unix timestamp
+      responses:
+        '200':
+          description: API response after the volume-offer publication request
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      tags:
+      - Volumes
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer authentication with API key in the Authorization header
+x-cli-commands:
+- name: list__volume
+  description: Publish local storage on one Host machine
+  endpoint: /api/v0/volumes/
+  method: post
+  example: vastai list volume 12345 --size 100 --price_disk 0.10
+- name: list__volumes
+  description: Publish the same local-storage settings on multiple Host machines
+  endpoint: /api/v0/volumes/
+  method: post
+  example: vastai list volumes 12345 67890 --size 100 --price_disk 0.10
