@@ -1,0 +1,106 @@
+---
+title: "Accounts and Sudo"
+description: "Audit the accounts that can log in to a host machine, check who can become root, and remove accounts left from the machine's previous life."
+---
+
+Key-only SSH does not help if the machine has five accounts and you can only
+account for two of them.
+
+## Find every account that can log in
+
+```bash
+awk -F: '$3>=1000 && $3<65534 {print $1, $3, $7}' /etc/passwd
+```
+
+```
+youruser 1000 /bin/bash
+ubuntu 1001 /bin/bash
+oldadmin 1002 /bin/bash
+```
+
+On a machine dedicated to hosting there should be one account per person who
+administers it, and nothing else. `ubuntu` from a cloud image and `oldadmin`
+from the machine's previous life are what to look for.
+
+## Check for accounts with no password set
+
+```bash
+sudo awk -F: '$2 == "" {print $1 " HAS NO PASSWORD"}' /etc/shadow
+```
+
+```
+(no output)
+```
+
+No output is the correct result.
+
+## See who can become root
+
+```bash
+getent group sudo
+```
+
+```
+sudo:x:27:youruser
+```
+
+Then check for anyone who can `sudo` without being prompted:
+
+```bash
+sudo grep -rE 'NOPASSWD' /etc/sudoers /etc/sudoers.d/ 2>/dev/null
+```
+
+```
+(no output)
+```
+
+A `NOPASSWD` line is not automatically wrong — some monitoring agents need one
+— but every line should be scoped to specific commands and be one you put there
+deliberately.
+
+## Remove what is no longer needed
+
+Lock an account first rather than deleting it. Locking is reversible, and it
+tells you quickly whether anything depended on that account:
+
+```bash
+sudo usermod -L -e 1 oldadmin
+```
+
+<Warning>
+Never run this against your own account. Your current session and `sudo` keep
+working, so nothing looks wrong until the next time you try to log in.
+</Warning>
+
+To undo it, you need both halves. `usermod -U` unlocks the password but leaves
+the expiry date in place, and the account still refuses logins with
+`Your account has expired`:
+
+```bash
+sudo usermod -U -e '' oldadmin
+```
+
+Before deleting anything, see what the account owns. `-xdev` keeps `find` on
+the root filesystem instead of descending into container storage and network
+mounts, which on a host machine can take a very long time and compete with
+client I/O:
+
+```bash
+sudo find / -xdev -user oldadmin 2>/dev/null | head
+ps -u oldadmin
+```
+
+<Note>
+Container filesystems store raw numeric UIDs, so files created inside an
+instance can appear to belong to a host account that happens to share the
+number. Files under Docker's storage directory are not evidence that a host
+account is in use. Note also that once you delete an account its UID is free,
+and the next account created can inherit ownership of those files.
+</Note>
+
+Once you are sure nothing depended on it, remove it along with its home
+directory and its keys:
+
+```bash
+sudo deluser --remove-home oldadmin
+```

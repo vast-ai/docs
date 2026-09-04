@@ -1,0 +1,147 @@
+---
+title: "Security Hardening"
+description: "Set up SSH keys, a host firewall, management interfaces, and updates on a host machine, with a command to check each one."
+---
+
+A host machine runs on a public IPv4 address with a range of ports forwarded to
+it, and it serves clients continuously. Keeping its configuration correct and
+current is part of operating it well, and several of the settings involved are
+[verification requirements](/host/verification-stages).
+
+These pages cover that configuration: what each setting should be, the command
+that shows you what it is now, and how to change it without interrupting the
+clients on the machine. The steps are the same on Ubuntu Server 22.04 and
+24.04.
+
+## Before you start
+
+These pages assume a **fresh Ubuntu Server install** on a machine that is not
+yet listed. Work through them in order before the machine takes its first
+rental. That is the safest time to do all of it, because nothing you change
+can interrupt a client.
+
+<Warning>
+**Do not work through these pages end to end on a machine that is already
+configured and renting.** Several steps close network access, change who can
+log in, or restart a service. On a machine with instances running, that can cut
+clients off mid-workload, lock you out of your own machine, or take it offline
+and cost you reliability.
+
+On an existing machine, take each page on its own: run the check command first
+to see where you stand, change one thing, confirm the machine is still
+reachable from outside, then move on. Do the disruptive parts in a
+[maintenance window](/host/cli/schedule-maint).
+</Warning>
+
+Every page gives you a command that shows the machine's current state, so you
+can check a setting before you change it and confirm it afterwards.
+
+<Note>
+**Configuring the machine is the host's responsibility.** Vast does not
+configure your hardware, your network, or your operating system, and cannot do
+it for you. The [verification requirements](/host/verification-stages) describe
+what the platform checks automatically; these pages are the setup those
+requirements assume.
+
+Vast cannot ensure verification for a machine that has not been set up this
+way. Working through these pages does not guarantee verification either —
+machines also fail or lose verification for reliability, performance, and
+network reasons unrelated to any of this.
+</Note>
+
+## Have a way in that is not SSH
+
+[SSH Access](/host/security/ssh-access) and
+[The Host Firewall](/host/security/host-firewall) can both leave you unable to
+reach the machine over SSH. Sort out your fallback before you start, not
+afterwards.
+
+**If the machine has a BMC** — IPMI, iDRAC, or iLO — that console is your
+fallback. Confirm you can actually reach it and log in *now*, before you change
+anything.
+
+**If the machine has no BMC**, which is common on consumer and workstation
+boards, your only fallback is a monitor and keyboard attached to the machine.
+If you cannot get to it physically, give yourself an automatic undo before each
+risky change. This schedules a command to run in ten minutes and cancels it
+once you have confirmed the change worked:
+
+```bash
+sudo systemd-run --on-active=10m --unit=undo-firewall ufw disable
+```
+
+```
+Running timer as unit: undo-firewall.timer
+```
+
+Make your change, open a **new** connection from outside to prove the machine
+is still reachable, then cancel the undo:
+
+```bash
+sudo systemctl stop undo-firewall.timer
+```
+
+If the change locked you out instead, the machine undoes it on its own and you
+can reconnect.
+
+<Note>
+An SSH tunnel through the host is a convenient way to reach a BMC day to day,
+but it is not a fallback. The failures in these pages are failures of SSH, and
+a tunnel through SSH is gone at exactly the moment you need it.
+</Note>
+
+## Setting up a machine
+
+Work through these in order on a new machine.
+
+<CardGroup cols={2}>
+
+<Card title="SSH Access" href="/host/security/ssh-access" icon="key">
+Key-only login, a unique key pair per machine, and removing keys no longer in use
+</Card>
+
+<Card title="Accounts and Sudo" href="/host/security/accounts-and-sudo" icon="users">
+Who can log in, who can become root, and clearing out what is left over
+</Card>
+
+<Card title="The Host Firewall" href="/host/security/host-firewall" icon="shield-halved">
+What ufw covers, what Docker handles instead, and verifying from outside
+</Card>
+
+<Card title="Management Interfaces" href="/host/security/management-interfaces" icon="server">
+BMC, IPMI, iDRAC, and iLO credentials, and keeping them off the public internet
+</Card>
+
+<Card title="Keeping the System Current" href="/host/security/system-updates" icon="arrows-rotate">
+Automatic updates off, and checking for kernel updates as regular maintenance
+</Card>
+
+</CardGroup>
+
+## Keeping it that way
+
+<CardGroup cols={2}>
+
+<Card title="Checking for Drift" href="/host/security/checking-for-drift" icon="magnifying-glass">
+Re-run every check on a schedule, and review recent logins
+</Card>
+
+<Card title="Per-Machine Checklist" href="/host/security/checklist" icon="clipboard-check">
+One pass to run against every machine you operate
+</Card>
+
+</CardGroup>
+
+## If something goes wrong
+
+<CardGroup cols={2}>
+
+<Card title="Recovery" href="/host/security/recovery" icon="life-ring">
+Undo a change that locked you out: SSH config, keys, firewall rules, accounts
+</Card>
+
+<Card title="Offline Machine" href="/host/machine-offline" icon="plug-circle-xmark">
+Diagnose a machine that has dropped off the marketplace
+</Card>
+
+</CardGroup>

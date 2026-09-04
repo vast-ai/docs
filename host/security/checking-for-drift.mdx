@@ -1,0 +1,90 @@
+---
+title: "Checking for Drift"
+description: "Re-run every configuration check on a host machine on a schedule, and review recent logins."
+---
+
+The other pages describe the machine on the day you set it up. A distro
+upgrade rewrites `sshd_config`, a vendor package adds a file to
+`sshd_config.d/`, a colleague adds a key, a service installed for one afternoon
+is still listening a year later.
+
+## Re-run the checks
+
+Every command here is read-only and safe on a machine with instances running.
+Run it on a schedule and after any upgrade:
+
+```bash
+echo "== ssh =="; sudo sshd -T | grep -E '^(permitrootlogin|passwordauthentication|kbdinteractiveauthentication|permitemptypasswords)'
+echo "== match blocks =="; sudo grep -rn '^[[:space:]]*Match' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/ || echo "none"
+echo "== accounts =="; awk -F: '$3>=1000 && $3<65534 {print $1}' /etc/passwd
+echo "== sudo =="; getent group sudo
+echo "== firewall =="; sudo ufw status verbose | head -4
+echo "== listening =="; sudo ss -tulpn | grep -E 'LISTEN|UNCONN'
+echo "== auto-updates =="; cat /etc/apt/apt.conf.d/20auto-upgrades 2>/dev/null
+echo "== reboot =="; ls /var/run/reboot-required 2>/dev/null || echo "none pending"
+```
+
+Save the output. The value is in the difference from last month, not in any
+single run.
+
+<Note>
+UDP sockets are reported with state `UNCONN` rather than `LISTEN`, so filtering
+on `LISTEN` alone silently drops every UDP service.
+</Note>
+
+## What should be listening
+
+The `listening` line above is the one that looks alarming the first time. Read
+the **Local Address** column first: `127.0.0.1` or `127.0.0.53` means the
+service is only reachable from the machine itself, and `0.0.0.0` means it is
+listening on every interface.
+
+On a working host machine, expect all of the following on `0.0.0.0`:
+
+| Process | What it is |
+| --- | --- |
+| `sshd`, or `systemd` on 24.04 | Your SSH access. On 24.04 the socket belongs to systemd until a connection arrives |
+| `docker-proxy` | One per published instance port. There will be many, and they come and go with rentals |
+| `dockerd`, `containerd` | The container runtime the platform runs instances on |
+| `vastai` | The Vast daemon |
+
+<Warning>
+Never stop or disable `docker`, `containerd`, or `vastai`. Stopping Docker ends
+every running instance immediately, and stopping the daemon takes the machine
+off the marketplace. `systemctl disable --now` also prevents them starting at
+boot, so the machine stays down until you undo it.
+</Warning>
+
+What is worth noticing is a listener that was not there last month.
+
+## Review recent logins
+
+Successful logins should all be ones you can place:
+
+```bash
+sudo journalctl -u ssh --since "7 days ago" | grep "Accepted"
+```
+
+```
+Sep 01 08:12:44 gpu01 sshd[2891]: Accepted publickey for youruser from 203.0.113.9 port 51234 ssh2: ED25519 SHA256:xK9...
+```
+
+Check the last login recorded for each account too. An account nobody has used
+in a year is one to ask about:
+
+```bash
+lastlog -u 1000-65533
+```
+
+```
+Username         Port     From                                       Latest
+youruser         pts/0    203.0.113.9                                Tue Sep  1 08:12:44 +0000 2026
+oldadmin                                                             **Never logged in**
+```
+
+<Note>
+Column widths differ between releases — 24.04 leaves room for IPv6 addresses,
+so `Latest` sits further right than on 22.04. Use `journalctl -u ssh` rather
+than reading `/var/log/auth.log`: it works on both releases, and on minimal or
+cloud images `rsyslog` may not be installed and that file will not exist.
+</Note>
