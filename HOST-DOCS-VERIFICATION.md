@@ -6,7 +6,7 @@ This inventory answers two separate questions: whether documented examples are s
 
 ## Coverage and current result
 
-- Source revision: `2ea65a084fcd82aa9db0c0cc4f47f165add0737a`
+- Source revision: `709b088419c900d031660993c57146acebd15abe`
 - Content fingerprint: `sha256:b7aadf26fcbef4a5092e27777ab2655d22904600a996dad52e59a5902d9738f2`
 - Primary Host pages scanned: **40** (39 authored, 1 generated Self-Test reference)
 - Central-reference CLI/SDK support routes scanned: **33** (support layers, not separate Host workflows)

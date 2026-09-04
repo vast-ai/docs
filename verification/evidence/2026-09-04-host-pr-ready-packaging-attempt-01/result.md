@@ -97,6 +97,13 @@ evidence for itself.
   retained pre-edit Git identity preserves the starting state, and the final
   Git tree/commit seals the complete publication candidate. A regression now
   rejects reintroduction of parent-`HEAD` provenance.
+- The first committed-`HEAD` inventory replay then correctly reported five
+  provenance-bearing inventory/access outputs as stale: their exact Host-content
+  revision predated the two commits that introduced the authored and generated
+  Host pages. Regeneration advanced only that revision binding while preserving
+  the same `sha256:b7aadf26fcbef4a5092e27777ab2655d22904600a996dad52e59a5902d9738f2`
+  content fingerprint, 73 routes, 501 targets, 193 commands, and five access
+  groups. The unchanged freshness replay passed; no claim status changed.
 
 No documented Host command was executed by this replay. In particular, the
 API-key permission failure remains bounded to its retained synthetic local
@@ -140,10 +147,10 @@ The eventual local Git tree/commit is the whole-package seal.
 | `scripts/reconcile_host_vv_repository.py` | `21947b44d3127b2b8929da55e6eb2c6aa0ba0e71ebacf40e476604fa1b5afb21` |
 | `scripts/test_reconcile_host_vv_repository.py` | `fff378367fbeb471fdc301b12e1cc72623e3e2d9ffefc82c2d46d3cb34cc4e45` |
 | `host-docs-cli-command-check.json` | `0a26455debd3d436720aee8ad3344d40475cab5b8d436afd0c17bab07c4c800c` |
-| `host-docs-command-access.json` | `6911d69e2f4e59af4d28f2f7282c89a7eb849b709e3352a3be061eb638c8a626` |
-| `host-docs-verification-inventory.json` | `c59ffc1b36628064168e71111eb203d289a8b73176b552feb0f8dd7d2292044b` |
-| `verification/host-docs-test-sets.json` | `baaa0ea6b61d44b34b8e163518d28138581326350b79b4de1832d90d43ef2fe9` |
-| `verification/host-docs-command-scores.json` | `39960dff355b4642967d5eab043c40057a7a87aef1a087a633fdf0a5b968ad01` |
+| `host-docs-command-access.json` | `72dd1bc0ecf51ccf462b72500dfca035c1a6cc975a0a41699f9a32cd7207d639` |
+| `host-docs-verification-inventory.json` | `7d21d5472d2af73dc087569c1465711917a545bea4e786f4e1ef6fdc0e9825a8` |
+| `verification/host-docs-test-sets.json` | `31c558256f6be82c74aad5361bfd4a0092041b1d7819d56cc23cc6a0333d9f65` |
+| `verification/host-docs-command-scores.json` | `7cc3215192bb5a767cd60c367db6ad9468895842e8c54a358ee00b9b337f2817` |
 | `verification/runtime-operator-blockers.md` | `97ab309c173bc5385eb3d284786437a5318ba6cc39105a6f2542a963a606a2e6` |
 | `verification/source-owner-blockers.md` | `0df7a30530a1ef6e51504b31416802834614ce31d9e31ea35fd899d8ec4aad67` |
 | `HOST-DOCS-VV-HANDOFF.md` | `f9a70d905e18193c9374d3a211e989a82c7da46b7a1f64444f06971630dbe835` |

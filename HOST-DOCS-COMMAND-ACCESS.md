@@ -4,7 +4,7 @@
 
 This view groups every documented command by the resources needed for a representative execution. It is an execution-planning aid, not authorization to run the commands. Existing safety tiers, stable IDs, source lines, and non-execution status remain authoritative.
 
-- Source revision: `2ea65a084fcd82aa9db0c0cc4f47f165add0737a`
+- Source revision: `709b088419c900d031660993c57146acebd15abe`
 - Content fingerprint: `sha256:b7aadf26fcbef4a5092e27777ab2655d22904600a996dad52e59a5902d9738f2`
 - Unique command targets: **193**
 - Documented commands executed while generating this report: **0**
