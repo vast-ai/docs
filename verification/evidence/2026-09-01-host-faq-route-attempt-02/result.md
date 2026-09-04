@@ -1,5 +1,12 @@
 # TS-FAQ-C01 attempt 02 — local/static route audit
 
+> **Portability amendment (2026-09-03; clarified 2026-09-04):** The original
+> committed record is preserved as Git blob
+> `0390063e4affbccbf26edff273a5d72b90f88774`. This amendment removes the
+> workstation-local detail-file dependency by retaining the complete reviewable
+> result here. It does not change the attempt's target, method, observation,
+> status, or limitations.
+
 ## Scope
 
 - Attempt ID: `ATTEMPT-2026-09-01-HOST-FAQ-ROUTE-02`.
@@ -22,6 +29,8 @@ Proposed disposition: step `PASS`, branch `PASS`, test set `PASS`.
 
 ## Evidence and limitations
 
-Detailed sanitized report: [FAQ route audit attempt 02](../../../.orchestra/host-vv-reconciliation-20260901/findings/faq-route-audit-attempt-02.html).
+This tracked record is the complete retained result. The coverage totals, corrected
+source lines, disposition, and limitations needed to review the claim are recorded here;
+no ignored or workstation-local report is a dependency.
 
-This supports only static source/anchor and semantic-owner conformance, not rendered-site navigation or runtime behavior. Attempt 01 remains unchanged. The prior Mint result is context only and does not determine this Host-only audit.
+This supports only static source/anchor and semantic-owner conformance, not rendered-site navigation or runtime behavior. Attempt 01's outcome remains unchanged; its tracked record carries the same dated portability amendment. The prior Mint result is context only and does not determine this Host-only audit.

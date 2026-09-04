@@ -1,5 +1,12 @@
 # Common Host questions route and ownership audit — attempt 01
 
+> **Portability amendment (2026-09-03; clarified 2026-09-04):** The original
+> committed record is preserved as Git blob
+> `ddfbc6701e8bb10d1726e312876f5ca2e7a639d8`. This amendment removes the
+> workstation-local detail-file dependency by reproducing the reviewable
+> observations in this tracked record. It does not change the attempt's target,
+> method, observation, status, or limitations.
+
 - Attempt ID: `ATTEMPT-2026-09-01-HOST-FAQ-ROUTE-01`
 - Evidence ID: `EV-FAQ-C01-ROUTES-01`
 - Procedure: `FAQ-C01`
@@ -23,8 +30,10 @@
    answer. A syntactically valid link was not accepted when the destination covered only
    part of the question or was merely a supporting diagnostic page.
 
-The detailed sanitized table is retained at
-`.orchestra/host-vv-reconciliation-20260901/findings/faq-route-audit.html`.
+This tracked record is the retained review artifact. The original working-table digest
+is recorded above for history, but no ignored or workstation-local file is required to
+review the failed claims: all three affected questions, observed defects, source basis,
+disposition, and retest requirement are reproduced below.
 
 ## Observation
 

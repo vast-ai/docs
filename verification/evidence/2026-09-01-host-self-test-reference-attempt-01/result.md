@@ -1,5 +1,12 @@
 # Generated Self-Test reference parity — attempt 01
 
+> **Portability amendment (2026-09-03; clarified 2026-09-04):** The original
+> committed record is preserved as Git blob
+> `d9bd1a626ce95dd474cf49597858c6181adfbed0`. This amendment removes the
+> workstation-local detail-file dependency while retaining the original failed
+> observation and corrective replay in this tracked record. It changes no
+> attempt result or claim status.
+
 - Attempt ID: `ATTEMPT-2026-09-01-HOST-SELF-TEST-REFERENCE-01`
 - Evidence ID: `EV-STR-C01-PARITY-01`
 - Procedure: `STR-C01`
@@ -19,9 +26,9 @@
 
 The first isolated run supplied the current local CLI and self-test source checkouts. The
 generator exited `1` before output because that CLI checkout lacks the required
-`vastai.cli.self_test.machine_diagnostics` module. That observation remains retained in
-`.orchestra/host-vv-reconciliation-20260901/findings/self-test-reference-parity.html`; it
-is not converted into a documentation defect or overwritten by the corrective run.
+`vastai.cli.self_test.machine_diagnostics` module. That observation is preserved in this
+tracked record and is not converted into a documentation defect or overwritten by the
+corrective run. No ignored or workstation-local report is required to review it.
 
 ## Corrective historical-source method
 
