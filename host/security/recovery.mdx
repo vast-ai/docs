@@ -1,0 +1,57 @@
+---
+title: "Recovery"
+description: "Undo a change that locked you out of a host machine: SSH configuration, removed keys, firewall rules, and locked accounts."
+---
+
+Undo a change that has left you unable to reach the machine. Each of these
+reverses one step from the setup pages.
+
+## Locked out over SSH
+
+Use your fallback access — the BMC console, or a monitor and keyboard. Restore
+every copy you saved and remove the file you added:
+
+```bash
+sudo sh -c 'for f in /etc/ssh/sshd_config.orig /etc/ssh/sshd_config.d/*.orig; do [ -e "$f" ] && cp "$f" "${f%.orig}"; done'
+sudo rm -f /etc/ssh/sshd_config.d/01-vast-hardening.conf
+sudo sshd -t && sudo systemctl restart ssh.service
+```
+
+Restoring only `/etc/ssh/sshd_config` is not enough. The files in
+`/etc/ssh/sshd_config.d/` are read first, so they keep your settings in force
+until they are restored too.
+
+Log in with your password, fix your key, and start again at step 2 of
+[SSH Access](/host/security/ssh-access). Password login has to go back off
+before the machine will verify.
+
+## Removed a key you still needed
+
+Restore the backup you took before pruning:
+
+```bash
+sudo sh -c 'for f in /root/.ssh/authorized_keys.bak /home/*/.ssh/authorized_keys.bak; do [ -e "$f" ] && cp "$f" "${f%.bak}"; done'
+```
+
+## Firewall blocking access
+
+```bash
+sudo ufw disable
+```
+
+To clear every rule and start the firewall page again:
+
+```bash
+sudo ufw --force reset
+```
+
+This leaves ufw disabled with no rules, which is where the machine started.
+
+## Locked an account by mistake
+
+```bash
+sudo usermod -U -e '' oldadmin
+```
+
+Both parts are needed. `-U` alone leaves the expiry date set and the account
+still refuses logins.

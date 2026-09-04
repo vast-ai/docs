@@ -1,0 +1,79 @@
+---
+title: "Keeping the System Current"
+description: "Keep automatic updates off on a host machine and check for kernel and package updates as part of regular maintenance."
+---
+
+Updates on a host machine are deliberate work done in a maintenance window,
+not something the machine does on its own. An update that lands mid-rental can
+restart a service or swap a driver out from under a running instance, which
+interrupts the client and counts against you.
+
+## Confirm automatic updates are off
+
+```bash
+cat /etc/apt/apt.conf.d/20auto-upgrades 2>/dev/null
+systemctl is-enabled apt-daily-upgrade.timer unattended-upgrades.service
+```
+
+```
+APT::Periodic::Update-Package-Lists "0";
+APT::Periodic::Unattended-Upgrade "0";
+disabled
+disabled
+```
+
+Both periodic settings should read `"0"`. If they read `"1"`, or the timer
+reports `enabled`, turn them off:
+
+```bash
+sudo tee /etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
+APT::Periodic::Update-Package-Lists "0";
+APT::Periodic::Unattended-Upgrade "0";
+EOF
+sudo systemctl disable --now apt-daily-upgrade.timer unattended-upgrades.service
+```
+
+<Note>
+`systemctl is-enabled unattended-upgrades` on its own is not a useful check.
+That unit is the shutdown-time helper; the daily run is driven by
+`apt-daily-upgrade.timer` and gated on the `20auto-upgrades` settings shown
+above. Check all three together.
+</Note>
+
+## Check for updates as part of regular maintenance
+
+With automatic updates off, checking becomes something you do on a schedule.
+Package lists are no longer refreshed in the background, so update them
+yourself first:
+
+```bash
+sudo apt update
+apt list --upgradable 2>/dev/null | grep -E 'linux-image|linux-generic|nvidia'
+```
+
+```
+linux-generic/noble-updates 6.8.0-79.79 amd64 [upgradable from: 6.8.0-71.71]
+linux-image-generic/noble-updates 6.8.0-79.79 amd64 [upgradable from: 6.8.0-71.71]
+```
+
+Also check whether the machine is already waiting on a reboot from a previous
+update:
+
+```bash
+ls /var/run/reboot-required 2>/dev/null && cat /var/run/reboot-required.pkgs
+```
+
+```
+/var/run/reboot-required
+linux-image-6.8.0-79-generic
+```
+
+## Apply them in a maintenance window
+
+Keeping the kernel at the latest security patch level for your release is a
+[verification requirement](/host/verification-stages), and a kernel update does
+not take effect until a reboot. When there is one to install, schedule a window
+with [`vastai schedule maintenance`](/host/cli/schedule-maint) so clients are
+notified, then follow
+[Upgrade the Kernel](/host/upgrade-kernel) for the full procedure, including
+what the NVIDIA driver needs afterwards.

@@ -1,0 +1,56 @@
+---
+title: "Per-Machine Checklist"
+description: "A checklist covering SSH, accounts, firewall, management interfaces, and updates for every machine you operate."
+---
+
+Run this against every machine you operate, not just the newest one.
+
+<Warning>
+The checks here are read-only, but several of the fixes are not. On a machine
+that is currently renting, confirm the state first and schedule anything that
+changes SSH, the firewall, or running services into a
+[maintenance window](/host/cli/schedule-maint).
+</Warning>
+
+## SSH
+
+- [ ] `sudo sshd -T` reports `passwordauthentication no`
+- [ ] `sudo sshd -T` reports `kbdinteractiveauthentication no`
+- [ ] `sudo sshd -T` reports `permitrootlogin without-password` or `no`
+- [ ] No unexpected `Match` blocks in `sshd_config` or `sshd_config.d/`
+- [ ] This machine has its own key pair, not one shared with other machines
+- [ ] Every line in every `authorized_keys` is a key still in use
+
+## Accounts
+
+- [ ] One account per administrator, no leftovers from the machine's last life
+- [ ] No account has an empty password field in `/etc/shadow`
+- [ ] The `sudo` group contains only people who should have root
+- [ ] Every `NOPASSWD` sudoers line is scoped and deliberate
+
+## Network
+
+- [ ] `ufw` is active with `deny incoming` and `allow outgoing`
+- [ ] Your admin SSH port is allowed, and rate limited
+- [ ] The forwarded range matches what your router actually forwards
+- [ ] Reachability confirmed by a scan from outside the network, not from `ufw status`
+
+## Management interfaces
+
+- [ ] BMC credentials changed from the vendor default, confirmed with `ipmitool user list 1`
+- [ ] BMC address known, and confirmed unreachable from outside by scan
+- [ ] BMC firmware version checked against the vendor's current release
+- [ ] You have logged in to the BMC console since changing it
+
+## Updates
+
+- [ ] `20auto-upgrades` reads `"0"` for both settings
+- [ ] `apt-daily-upgrade.timer` is disabled
+- [ ] Package lists refreshed and upgrades reviewed since the last window
+- [ ] No pending reboot left unscheduled
+
+## Drift
+
+- [ ] The combined check has been run since the last system upgrade
+- [ ] Every `0.0.0.0` listener is either on the expected list or accounted for
+- [ ] Recent successful logins are all accounted for
