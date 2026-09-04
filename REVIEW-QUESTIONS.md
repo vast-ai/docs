@@ -6,7 +6,7 @@
 > to see what is implemented, what still needs sign-off, and the CON-1519
 > bundle-ownership decisions for the meeting.
 >
-> The eight cross-cutting decisions below gate the Host Docs review. A current
+> The nine cross-cutting decisions below gate the Host Docs review. A current
 > Jira audit also found page-specific questions for account setup, Network &
 > Ports, Self-Test, and Host Diagnostics. Those appear beside the comments on
 > the affected page in the port 4000 review panel, with direct Jira links.
@@ -42,7 +42,7 @@ Blocks: scheduling of every content round. Detail: CON-1518, CON-1584.
 
 **Owner: Gobind / Solutions Engineering · Round 3 · CON-1256**
 
-Review the business/pricing positioning: [Pricing Your Listing](https://github.com/jjziets/docs/blob/CON-1584-host-cli-api-sdk/host/pricing-your-listing.mdx), [Market Metrics](https://github.com/jjziets/docs/blob/CON-1584-host-cli-api-sdk/host/market-metrics.mdx), [Optimize Your Earnings](https://github.com/jjziets/docs/blob/CON-1584-host-cli-api-sdk/host/optimization-guide.mdx) — in the preview: `/host/pricing-your-listing`, `/host/market-metrics`, `/host/optimization-guide`.
+Review the business/pricing positioning: [Pricing Your Listing](./host/pricing-your-listing.mdx), [Market Metrics](./host/market-metrics.mdx), [Optimize Your Earnings](./host/optimization-guide.mdx) — in the preview: `/host/pricing-your-listing`, `/host/market-metrics`, `/host/optimization-guide`.
 
 Blocks: CON-1256 sign-off. Detail: CON-1256.
 
@@ -50,7 +50,7 @@ Blocks: CON-1256 sign-off. Detail: CON-1256.
 
 **Owner: Backend source owner (Hanran) · CON-1531**
 
-Seven confirmations that set the "how long it persists" copy on [Machine Error Reference](https://github.com/jjziets/docs/blob/CON-1584-host-cli-api-sdk/host/machine-errors.mdx) (`/host/machine-errors` in the preview):
+Seven confirmations that set the "how long it persists" copy on [Machine Error Reference](./host/machine-errors.mdx) (`/host/machine-errors` in the preview):
 
 1. Is the 2026-06-24 error catalog complete for host-visible machine errors?
 2. For each error, which field displays it to hosts (`error_msg`, `error_note`, `error_description`, `vm_error_msg`, `vm_error_level`, other)?
@@ -66,7 +66,7 @@ Blocks: final wording on Machine Error Reference. Detail: CON-1531.
 
 **Owner: Product · Rounds 0/2**
 
-Approve the Host Installer Wizard (TUI) screenshot in [Installing Host Software](https://github.com/jjziets/docs/blob/CON-1584-host-cli-api-sdk/host/installing-host-software.mdx) (`/host/installing-host-software#host-installer-wizard` in the preview) — or supply a replacement asset.
+Approve the Host Installer Wizard (TUI) screenshot in [Installing Host Software](./host/installing-host-software.mdx) (`/host/installing-host-software#host-installer-wizard` in the preview) — or supply a replacement asset.
 
 Blocks: production merge (flagged since 2026-06-17). Detail: CON-1518 Jira attachment `image-20260617-135801.png`.
 
@@ -74,7 +74,7 @@ Blocks: production merge (flagged since 2026-06-17). Detail: CON-1518 Jira attac
 
 **Owner: Product · Round 1**
 
-Confirm [Supported Hardware](https://github.com/jjziets/docs/blob/CON-1584-host-cli-api-sdk/host/supported-hardware.mdx) (`/host/supported-hardware` in the preview): exact GPU-family coverage, OS/cgroup guidance, and alignment of the CPU rule between docs, self-test #6, and vast-cli #413. Related product asks on the radar: payment/tax edge cases (incl. W-8 for non-US hosts) and datacenter requirements wording.
+Confirm [Supported Hardware](./host/supported-hardware.mdx) (`/host/supported-hardware` in the preview): exact GPU-family coverage, OS/cgroup guidance, and alignment of the CPU rule between docs, self-test #6, and vast-cli #413. Related product asks on the radar: payment/tax edge cases (incl. W-8 for non-US hosts) and datacenter requirements wording.
 
 Blocks: CON-1516 sign-off; the highest-prevention doc going live. Detail: CON-1516.
 
@@ -82,7 +82,7 @@ Blocks: CON-1516 sign-off; the highest-prevention doc going live. Detail: CON-15
 
 **Owner: Engineering · Round 6 · CON-1581**
 
-Five answers that gate publishing [Host Teams](https://github.com/jjziets/docs/blob/CON-1584-host-cli-api-sdk/host/host-teams.mdx) (`/host/host-teams` in the preview):
+Five answers that gate publishing [Host Teams](./host/host-teams.mdx) (`/host/host-teams` in the preview):
 
 1. Individual→team migration: what happens to existing machines and accrued earnings?
 2. Install-command `undefined` bug in team context — status?
@@ -96,9 +96,30 @@ Blocks: Host Teams page publication. Detail: CON-1581.
 
 **Owner: Docs team · Round 5**
 
-Do the generated `host/cli/*` and `host/sdk/*` reference pages need persona chips, or are generated reference pages exempt? All 39 authored pages are tagged and chip-synced (now lint-enforced via `npm run check-persona-chips`); the 33 generated pages are currently exempt by convention.
+Do the generated `host/cli/*` and `host/sdk/*` reference pages need persona chips, or are generated reference pages exempt? All 40 top-level Host pages—39 authored pages plus the generated Self-Test reference—are tagged and chip-synced (now lint-enforced via `npm run check-persona-chips`). The 33 generated CLI/SDK wrapper routes are central-reference support layers and are currently exempt by convention.
 
 Blocks: the literal reading of CON-1518's "tag every page"; the only remaining implementation wrinkle. Detail: CON-1518 (2026-06-29 comment).
+
+## Input 9. Owner-evidence acceptance contract
+
+**Owner: documentation-governance owner with Product, Finance, Legal, and canonical-source owners**
+
+Define who may approve each authority class and the minimum retained record for
+that approval. A reply, PR/Jira comment, or link is candidate evidence—not
+acceptance. For each exact claim, provide its claim ID and missing prerequisite,
+the accountable role, the dated source or decision locator, the exact scope and
+limitations, and an outcome: `supplied` or `unavailable` for source evidence;
+`confirm`, `narrow`, or `reject` for owner or citation evidence.
+
+An independent reviewer must bind that record to the current source occurrence
+and hash. `Supplied` or `confirm` can satisfy only the named evidence lane;
+`narrow` or `reject` requires a documentation correction and focused retest.
+Every other required lane remains open. Until this contract is approved and the
+reviewer schema and positive/adverse tests implement it, owner input is
+non-promoting context and cannot change a claim to `PASS`.
+
+Blocks: promotion of future Product, Finance, Legal, or source-owner evidence.
+The current package records no owner acceptance.
 
 ## Additional page-specific Jira gates
 

@@ -85,7 +85,9 @@ async function runReviewServer(args) {
 }
 
 async function isolatedVerificationContext(mode, pathname = '/host/network-ports') {
-  const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'vast-review-vv-'));
+  // Keep the isolated checkout beside the task worktree so the strict loader can
+  // resolve the pinned Vast CLI/self-test sibling repositories without network access.
+  const fixtureRoot = await fs.mkdtemp(path.join(path.dirname(ROOT), '.vast-review-vv-'));
   const script = path.join(fixtureRoot, 'review-server.mjs');
   await fs.copyFile(path.join(ROOT, 'review-server.mjs'), script);
   if (!mode) {
@@ -96,7 +98,17 @@ async function isolatedVerificationContext(mode, pathname = '/host/network-ports
   } else {
     const verificationDir = path.join(fixtureRoot, 'verification');
     await fs.mkdir(verificationDir);
-    await fs.cp(path.join(ROOT, 'host'), path.join(fixtureRoot, 'host'), { recursive: true });
+    await fs.copyFile(path.join(ROOT, '.git'), path.join(fixtureRoot, '.git'));
+    for (const directory of ['api-reference', 'cli', 'guides', 'host', 'scripts', 'sdk', 'snippets']) {
+      await fs.cp(path.join(ROOT, directory), path.join(fixtureRoot, directory), { recursive: true });
+    }
+    for (const name of [
+      'docs.json', 'host-docs-cli-command-check.json', 'host-docs-command-access.json',
+      'host-docs-verification-inventory.json',
+    ]) {
+      await fs.copyFile(path.join(ROOT, name), path.join(fixtureRoot, name));
+    }
+    await fs.cp(path.join(ROOT, 'verification', 'evidence'), path.join(verificationDir, 'evidence'), { recursive: true });
     for (const name of ['host-docs-test-sets.json', 'host-docs-test-results.json', 'host-docs-command-scores.json']) {
       await fs.copyFile(path.join(ROOT, 'verification', name), path.join(verificationDir, name));
     }
@@ -105,7 +117,8 @@ async function isolatedVerificationContext(mode, pathname = '/host/network-ports
     const scoresFile = path.join(verificationDir, 'host-docs-command-scores.json');
     const results = JSON.parse(await fs.readFile(resultsFile, 'utf8'));
     const scores = JSON.parse(await fs.readFile(scoresFile, 'utf8'));
-    const testSets = JSON.parse(await fs.readFile(testSetsFile, 'utf8'));
+    const originalTestSetsBytes = await fs.readFile(testSetsFile);
+    const testSets = JSON.parse(originalTestSetsBytes.toString('utf8'));
     const commandById = new Map();
     const allProjectionTargets = [];
     for (const page of testSets.pages) {
@@ -133,12 +146,10 @@ async function isolatedVerificationContext(mode, pathname = '/host/network-ports
         }
       }
     }
-    const fixtureAttemptId = 'ATTEMPT-FIXTURE-CURRENT-01';
-    if (!results.attempts.some((attempt) => attempt.attempt_id === fixtureAttemptId)) {
-      results.attempts.push({ attempt_id: fixtureAttemptId, kind: 'ISOLATED_REVIEW_FIXTURE', status: 'PASS',
-        execution_state: 'EXECUTED', reason: 'Synthetic complete fixture for fail-closed loader tests.' });
-    }
-    results.counts.attempts = results.attempts.length;
+    const activeFixtureAttempt = results.attempts.find((attempt) =>
+      attempt.execution_state === 'EXECUTED' && !attempt.qualification_superseded_by);
+    const fixtureAttemptId = activeFixtureAttempt.attempt_id;
+    const fixtureEvidenceRef = activeFixtureAttempt.evidence_ref;
     const refreshScoreCounts = () => {
       scores.counts = {
         scored: scores.records.length,
@@ -169,7 +180,22 @@ async function isolatedVerificationContext(mode, pathname = '/host/network-ports
     const appendProcedure = (records, fields) => {
       results.procedure_results = [...(results.procedure_results || []), procedureFor(records, fields)];
     };
-    const ensureScore = (commandId, evidenceIds, executionStatus = 'PASS', value = 2) => {
+    const appendCommandEvidence = (commandId, evidenceId, vvStatus = 'PASS', fields = {}) => {
+      results.command_results.push({
+        evidence_id: evidenceId,
+        attempt_id: fixtureAttemptId,
+        evidence_ref: fixtureEvidenceRef,
+        command_ids: [commandId],
+        planned_form: 'fixture command --exact',
+        process_exit_code: vvStatus === 'PASS' ? 0 : 1,
+        vv_status: vvStatus,
+        observation: 'The isolated command-execution fixture produced the requested result.',
+        claim_limit: 'This is a loader regression fixture, not retained Host qualification evidence.',
+        ...fields,
+      });
+    };
+    const ensureScore = (commandId, evidenceIds, executionStatus = 'PASS', value = 2,
+      directEvidenceIds = [], directRole = 'DIRECT_FUNCTIONAL_EXACT_FULL', directCeiling = directRole) => {
       const command = commandById.get(commandId);
       let score = scores.records.find((row) => row.command_id === commandId);
       if (!score) {
@@ -178,34 +204,36 @@ async function isolatedVerificationContext(mode, pathname = '/host/network-ports
         scores.records.push(score);
       }
       Object.assign(score, { page_route: command.route, procedure_id: command.procedureId,
-        source: command.source, evidence_ids: evidenceIds, execution_status: executionStatus, score: value });
+        source: command.source, evidence_ids: evidenceIds, direct_evidence_ids: directEvidenceIds,
+        execution_status: executionStatus, score: value });
+      scores.direct_evidence_bindings = (scores.direct_evidence_bindings || [])
+        .filter((binding) => binding.command_id !== commandId);
+      for (const evidenceId of directEvidenceIds) {
+        scores.direct_evidence_bindings.push({ command_id: commandId, evidence_id: evidenceId, role: directRole });
+        const ceiling = (results.direct_proof_ceilings || []).find((row) => row.evidence_id === evidenceId);
+        if (ceiling) ceiling.ceiling = directCeiling;
+        else results.direct_proof_ceilings.push({ evidence_id: evidenceId, ceiling: directCeiling });
+      }
       return score;
     };
     const fixtureTargetKey = (level, target) => [level, target.page_id, target.test_set_id,
       target.branch_id, target.step_id, target.command_id].filter((value) => value != null).join('\u0000');
-    const baseEvidenceId = 'EV-FIXTURE-CURRENT-BASE-01';
-    const baseRecords = allProjectionTargets.map(([level, target]) => statusRecord(level, target, baseEvidenceId));
-    results.procedure_results = [procedureFor(baseRecords, {
-      method: 'Synthetic complete fixture projection',
-      observation: 'Every canonical target has a retained fixture status.',
-      limitations: 'This fixture validates loader behavior, not Host product behavior.',
-    })];
-    results.current_status_projection = { schema_version: '1.0', records: baseRecords };
-    scores.records = [];
-    scores.not_applicable_records = [];
-    for (const commandId of commandById.keys()) ensureScore(commandId, [baseEvidenceId]);
-    for (const withdrawn of scores.withdrawn_records || []) {
-      const command = commandById.get(withdrawn.command_id);
-      if (command) {
-        withdrawn.page_route = command.route;
-        withdrawn.current_execution_status = 'PASS';
-        withdrawn.current_score = 2;
-      } else {
-        withdrawn.current_execution_status = 'STALE';
-        withdrawn.current_score = null;
+    const baseRecords = results.current_status_projection.records;
+    const baseEvidenceId = results.procedure_results[0].evidence_id;
+    const projectionCounts = (records) => {
+      const levels = ['PAGE', 'TEST_SET', 'BRANCH', 'STEP', 'COMMAND'];
+      const statuses = ['PASS', 'FAIL', 'BLOCKED', 'UNVALIDATED', 'STALE', 'NOT_APPLICABLE'];
+      const levelCounts = Object.fromEntries(levels.map((level) => [level, 0]));
+      const statusCounts = Object.fromEntries(statuses.map((status) => [status, 0]));
+      const byLevel = Object.fromEntries(levels.map((level) =>
+        [level, Object.fromEntries(statuses.map((status) => [status, 0]))]));
+      for (const record of records) {
+        levelCounts[record.level] += 1;
+        statusCounts[record.current_status] += 1;
+        byLevel[record.level][record.current_status] += 1;
       }
-    }
-    refreshScoreCounts();
+      return { targets: records.length, levels: levelCounts, statuses: statusCounts, by_level: byLevel };
+    };
     const projectionRecordFor = (level, target) => results.current_status_projection.records.find((record) =>
       fixtureTargetKey(record.level, record.target) === fixtureTargetKey(level, target));
     const useCurrentEvidence = (targets, evidenceId, currentStatus = 'PASS', fields = {}) => {
@@ -217,30 +245,25 @@ async function isolatedVerificationContext(mode, pathname = '/host/network-ports
       appendProcedure(records, fields);
       return records;
     };
-    const canonicalApprovalRecords = [];
     if (mode === 'snapshot-mismatch') {
       results.test_set_snapshot_sha256 = '0'.repeat(64);
+    } else if (mode === 'valid-blocker-classification') {
+      // The canonical Volume Offers package already exercises typed leaf and
+      // derived blocker prerequisites; do not synthesize authority or runtime proof.
     } else if (mode === 'valid-current-status' || mode === 'valid-sanitized-current-status') {
-      const records = useCurrentEvidence(projectionTargets, 'EV-PROJECTION-1');
-      const score = ensureScore('CLM-582fe58ab6692d1a', ['EV-PROJECTION-1'], 'PASS', 3);
       if (mode === 'valid-sanitized-current-status') {
-        const procedure = results.procedure_results.at(-1);
-        procedure.method = `Inspected /Users/alice/private at 2001:db8::1 with token ${'a'.repeat(64)}.`;
-        procedure.observation = 'Machine 424242 returned <img src=x onerror=alert(1)>.';
-        procedure.limitations = 'Scratch path /var/folders/2f/private was excluded.';
-        records[0].rationale = 'password=fixture-secret remained unavailable.';
-        score.rationale = 'api_key=fixture-secret; output stayed relevant.';
+        for (const procedure of results.procedure_results) {
+          procedure.observation = `Inspected /Users/alice/private at 2001:db8::1 with token ${'a'.repeat(64)}.`;
+          procedure.limitations = 'Machine 424242 used scratch path /var/folders/2f/private; password=fixture-secret.';
+        }
+        for (const commandResult of results.command_results) {
+          commandResult.observation = 'Machine 424242 returned <img src=x onerror=alert(1)> at 2001:db8::1.';
+          commandResult.claim_limit = 'Scratch path /Users/alice/private; token=fixture-secret.';
+        }
+        for (const score of scores.records) score.rationale = 'api_key=fixture-secret; output stayed relevant.';
       }
     } else if (mode === 'valid-history') {
-      const target = projectionTargets.find(([level]) => level === 'STEP')[1];
-      const superseded = results.attempts.find((attempt) => attempt.qualification_superseded_by);
-      const failed = statusRecord('STEP', target, 'EV-HISTORY-FAIL-1', 'FAIL', superseded.attempt_id);
-      const passed = projectionRecordFor('STEP', target);
-      passed.evidence_ids = ['EV-HISTORY-PASS-2'];
-      appendProcedure([failed], { method: 'Initial retained check', observation: 'The first attempt failed.',
-        limitations: 'The failed attempt was corrected and retained.' });
-      appendProcedure([passed], { method: 'Correction retest', observation: 'The corrected retest passed.',
-        limitations: 'The result is limited to the fixture target.' });
+      // Canonical FAQ and hardware-prep attempts retain failures and linked retests.
     } else if (mode === 'unknown-status-target' || mode === 'duplicate-status' || mode === 'unknown-status-attempt' ||
       mode === 'unknown-status-evidence' || mode === 'unsafe-status-attempt' || mode === 'partial-current-status' ||
       mode === 'mismatched-procedure-evidence' || mode === 'superseded-current-attempt' || mode === 'command-evidence-current-status') {
@@ -265,36 +288,29 @@ async function isolatedVerificationContext(mode, pathname = '/host/network-ports
       }
       if (mode === 'duplicate-status') results.current_status_projection.records.push({ ...record, target: { ...record.target } });
     } else if (mode === 'partial-procedure-target') {
-      const record = statusRecord('PAGE', { page_id: 'PAGE-host-market-metrics' }, 'EV-PARTIAL-PROCEDURE-1', 'PARTIAL');
-      appendProcedure([record]);
+      results.procedure_results[0].targets[0].vv_status = 'PARTIAL';
     } else if (mode === 'valid-not-applicable' || mode === 'invalid-not-applicable-approval' ||
       mode === 'numeric-not-applicable-status' || mode === 'not-applicable-nondisplay') {
+      if (mode === 'valid-not-applicable') {
+        // Exercise a canonical approved display-only classification unchanged.
+      } else {
       const requested = mode === 'not-applicable-nondisplay'
         ? [...commandById.values()].find((item) => item.treatment !== 'NON_EXECUTABLE_DISPLAY')
-        : commandById.get('CLM-9bb850ad51054679');
+        : commandById.get(scores.not_applicable_records[0].command_id);
       const command = requested;
-      const target = { page_id: command.page_id, test_set_id: command.test_set_id, branch_id: command.branch_id,
-        step_id: command.step_id, command_id: command.commandId };
-      const records = useCurrentEvidence([['COMMAND', target]], 'EV-FIXTURE-NOT-APPLICABLE-1', 'NOT_APPLICABLE', {
-        method: 'Static inventory classification review',
-        observation: 'The selected carrier is classified as not independently executable.',
-        limitations: 'The owning manual diagnostic procedure remains separately assessed.',
-      });
-      scores.records = scores.records.filter((row) => row.command_id !== command.commandId);
       if (mode === 'numeric-not-applicable-status') {
-        scores.records.push({ command_id: command.commandId, procedure_id: command.procedureId,
-          page_route: command.route, source: command.source, execution_status: 'NOT_APPLICABLE',
-          evidence_ids: ['EV-FIXTURE-NOT-APPLICABLE-1'], score: 2,
+        const assessment = scores.not_applicable_records.shift();
+        scores.records.push({ ...scores.records[0], command_id: assessment.command_id,
+          procedure_id: assessment.procedure_id, page_route: assessment.page_route,
+          source: assessment.source, execution_status: 'NOT_APPLICABLE',
+          evidence_ids: assessment.evidence_ids, direct_evidence_ids: [], score: 2,
           rationale: 'Invalid numeric N/A fixture.' });
-      } else {
-        const assessment = { command_id: command.commandId, procedure_id: command.procedureId,
-          page_route: command.route, source: command.source, execution_status: 'NOT_APPLICABLE',
-          evidence_ids: ['EV-FIXTURE-NOT-APPLICABLE-1'], rationale: 'Display-only command name is excluded from execution scoring.',
-          approval_ref: mode === 'invalid-not-applicable-approval' ? 'APPROVAL:FIXTURE-1' : 'CANONICAL_PENDING' };
-        scores.not_applicable_records.push(assessment);
-        if (mode !== 'invalid-not-applicable-approval') canonicalApprovalRecords.push(assessment);
+      } else if (mode === 'invalid-not-applicable-approval') {
+        scores.not_applicable_records[0].approval_ref = 'APPROVAL:FIXTURE-1';
+      } else if (mode === 'not-applicable-nondisplay') {
+        scores.not_applicable_records[0].command_id = command.commandId;
       }
-      assert.equal(records.length, 1);
+      }
     } else if (mode === 'assessment-current-status-mismatch') {
       const command = commandById.get('CLM-582fe58ab6692d1a');
       const target = { page_id: command.page_id, test_set_id: command.test_set_id, branch_id: command.branch_id,
@@ -307,20 +323,79 @@ async function isolatedVerificationContext(mode, pathname = '/host/network-ports
       appendProcedure([projected]);
       ensureScore(command.commandId, ['EV-ASSESSMENT-PASS-1'], 'PASS', 2);
     } else if (mode === 'valid-score-status-separation') {
-      const command = commandById.get('CLM-582fe58ab6692d1a');
-      const target = { page_id: command.page_id, test_set_id: command.test_set_id, branch_id: command.branch_id,
-        step_id: command.step_id, command_id: command.commandId };
-      const semantic = statusRecord('COMMAND', target, 'EV-SCORE-CONTEXT-1', 'UNVALIDATED');
-      appendProcedure([semantic], { method: 'Static semantic assessment',
-        observation: 'The command occurrence is directly relevant to the documented context.',
-        limitations: 'This evidence does not establish runtime execution.' });
-      ensureScore(command.commandId, ['EV-SCORE-CONTEXT-1'], 'PASS', 3);
+      // The canonical assessment manifest is context-only while exact command
+      // execution evidence independently supplies current PASS results.
     } else if (mode === 'score3-current-not-pass') {
       const command = [...commandById.values()][0];
       const target = { page_id: command.page_id, test_set_id: command.test_set_id, branch_id: command.branch_id,
         step_id: command.step_id, command_id: command.commandId };
       useCurrentEvidence([['COMMAND', target]], 'EV-SCORE3-BLOCKED-1', 'BLOCKED');
-      ensureScore(command.commandId, ['EV-SCORE3-BLOCKED-1'], 'BLOCKED', 3);
+      appendCommandEvidence(command.commandId, 'EV-SCORE3-DIRECT-PASS-1');
+      ensureScore(command.commandId, ['EV-SCORE3-BLOCKED-1'], 'BLOCKED', 3,
+        ['EV-SCORE3-DIRECT-PASS-1']);
+    } else if (mode === 'score3-missing-direct-evidence' || mode === 'score3-duplicate-direct-evidence') {
+      const commandId = 'CLM-582fe58ab6692d1a';
+      appendCommandEvidence(commandId, 'EV-SCORE3-DIRECT-PASS-1');
+      const directIds = mode === 'score3-duplicate-direct-evidence'
+        ? ['EV-SCORE3-DIRECT-PASS-1', 'EV-SCORE3-DIRECT-PASS-1'] : [];
+      ensureScore(commandId, [baseEvidenceId], 'PASS', 3, directIds);
+    } else if (mode === 'score3-direct-not-pass') {
+      const command = commandById.get('CLM-582fe58ab6692d1a');
+      const target = { page_id: command.page_id, test_set_id: command.test_set_id,
+        branch_id: command.branch_id, step_id: command.step_id, command_id: command.commandId };
+      appendCommandEvidence(command.commandId, 'EV-SCORE3-DIRECT-BLOCKED-1', 'BLOCKED');
+      ensureScore(command.commandId, [baseEvidenceId], 'PASS', 3, ['EV-SCORE3-DIRECT-BLOCKED-1']);
+    } else if (mode === 'score3-direct-wrong-command') {
+      const command = commandById.get('CLM-582fe58ab6692d1a');
+      const other = [...commandById.values()].find((row) => row.commandId !== command.commandId);
+      const otherTarget = { page_id: other.page_id, test_set_id: other.test_set_id,
+        branch_id: other.branch_id, step_id: other.step_id, command_id: other.commandId };
+      appendCommandEvidence(other.commandId, 'EV-SCORE3-DIRECT-WRONG-1');
+      ensureScore(command.commandId, [baseEvidenceId], 'PASS', 3, ['EV-SCORE3-DIRECT-WRONG-1']);
+    } else if (mode === 'score3-static-procedure-direct' || mode === 'score3-static-relabelled-full') {
+      const command = commandById.get('CLM-582fe58ab6692d1a');
+      const target = { page_id: command.page_id, test_set_id: command.test_set_id,
+        branch_id: command.branch_id, step_id: command.step_id, command_id: command.commandId };
+      appendProcedure([statusRecord('COMMAND', target, 'EV-SCORE3-STATIC-PASS-1', 'PASS')], {
+        method: 'Static source conformance fixture',
+        observation: 'The static fixture found matching command text.',
+        limitations: 'No Host behavior or command execution was exercised.',
+      });
+      const role = mode === 'score3-static-relabelled-full'
+        ? 'DIRECT_FUNCTIONAL_EXACT_FULL' : 'BOUNDED_STATIC_SUPPORT';
+      ensureScore(command.commandId, [baseEvidenceId], 'PASS', 3, ['EV-SCORE3-STATIC-PASS-1'],
+        role, 'BOUNDED_STATIC_SUPPORT');
+    } else if (mode === 'score3-partial-relabelled-full') {
+      const command = commandById.get('CLM-582fe58ab6692d1a');
+      appendCommandEvidence(command.commandId, 'EV-SCORE3-PARTIAL-PASS-1');
+      ensureScore(command.commandId, [baseEvidenceId], 'PASS', 3, ['EV-SCORE3-PARTIAL-PASS-1'],
+        'DIRECT_FUNCTIONAL_EXACT_FULL', 'DIRECT_FUNCTIONAL_PARTIAL');
+    } else if (mode === 'score3-scoped-superseded-direct') {
+      const commandId = 'CLM-2c2c7d94c1bd259f';
+      const attempt = results.attempts.find((row) => row.attempt_id === 'ATTEMPT-2026-08-31-HOST-PRIVILEGED-01');
+      attempt.qualification_superseded_targets.command_ids.push(commandId);
+      ensureScore(commandId, [baseEvidenceId], 'PASS', 3, ['EV-HOST04-DOCKER-RUNTIME']);
+    } else if (mode === 'qualification-command-uncovered') {
+      const attempt = results.attempts.find((row) =>
+        row.attempt_id === 'ATTEMPT-2026-08-31-HOST-PRIVILEGED-01');
+      attempt.qualification_superseded_targets.command_ids =
+        attempt.qualification_superseded_targets.command_ids.filter((commandId) =>
+          commandId !== 'CLM-ffda5e2c291c470e');
+    } else if (mode === 'not-applicable-parent-child-mismatch') {
+      const [, stepTarget] = allProjectionTargets.find(([level, target]) =>
+        level === 'STEP' && allProjectionTargets.some(([childLevel, child]) => childLevel === 'COMMAND' &&
+          child.page_id === target.page_id && child.test_set_id === target.test_set_id &&
+          child.branch_id === target.branch_id && child.step_id === target.step_id));
+      useCurrentEvidence([['STEP', stepTarget]], 'EV-FIXTURE-NOT-APPLICABLE-PARENT-1', 'NOT_APPLICABLE');
+    } else if (mode === 'missing-attempt-evidence-ref') {
+      results.attempts[0].evidence_ref = 'verification/evidence/missing/result.md';
+    } else if (mode === 'unsafe-attempt-evidence-ref') {
+      results.attempts[0].evidence_ref = '../outside.md';
+    } else if (mode === 'nonportable-attempt-evidence-content') {
+      await fs.appendFile(path.join(fixtureRoot, results.attempts[0].evidence_ref),
+        '\nUntracked detail: .orchestra/private/result.html\n');
+    } else if (mode === 'direct-command-missing-evidence-ref') {
+      delete results.command_results.find((row) => row.evidence_id === 'EV-CLI05-MARKET-METRICS').evidence_ref;
     } else if (mode === 'schema-mismatch') {
       results.schema_version = '2.0';
     } else if (mode === 'record-type-mismatch') {
@@ -336,11 +411,32 @@ async function isolatedVerificationContext(mode, pathname = '/host/network-ports
       source.find((command) => command.command_id === commands[1].commandId).command_id = commands[0].commandId;
     } else if (mode === 'stale-page-source') {
       await fs.appendFile(path.join(fixtureRoot, 'host', 'market-metrics.mdx'), '\n<!-- stale fixture -->\n');
+    } else if (mode === 'invalid-canonical-route') {
+      testSets.pages[0].route = '/host/../review-questions';
+    } else if (mode === 'invalid-step-source-span') {
+      testSets.pages[0].test_sets[0].branches[0].steps[0].source_lines = [{ start: 1, end: 999999 }];
+    } else if (mode === 'invalid-step-source-section') {
+      testSets.pages[0].test_sets[0].branches[0].steps[0].source_sections = ['Heading that does not exist'];
+    } else if (mode === 'invalid-command-source-span') {
+      const command = testSets.pages.flatMap((page) => page.test_sets).flatMap((set) => set.branches)
+        .flatMap((branch) => branch.steps).flatMap((step) => step.commands)[0];
+      command.source.line_start = 1;
+      command.source.line_end = 1;
+    } else if (mode === 'invalid-command-source-section') {
+      const command = testSets.pages.flatMap((page) => page.test_sets).flatMap((set) => set.branches)
+        .flatMap((branch) => branch.steps).flatMap((step) => step.commands)[0];
+      command.source.section = 'Heading that does not own this command';
     }
     if (mode === 'missing-assessment-coverage') scores.records.pop();
     if (mode === 'missing-current-projection') results.current_status_projection.records.pop();
     if (mode === 'unknown-score-command') scores.records[0].command_id = 'CLM-unknown';
     if (mode === 'score-empty-evidence') scores.records[0].evidence_ids = [];
+    if (mode === 'pass-missing-direct-evidence') {
+      const score = scores.records.find((row) => row.execution_status === 'PASS' && row.score === 2);
+      score.direct_evidence_ids = [];
+      scores.direct_evidence_bindings = scores.direct_evidence_bindings.filter((row) =>
+        row.command_id !== score.command_id);
+    }
     if (mode === 'score-duplicate-evidence') scores.records[0].evidence_ids = [scores.records[0].evidence_ids[0], scores.records[0].evidence_ids[0]];
     if (mode === 'score-wrong-command-evidence') {
       const score = scores.records[0];
@@ -352,7 +448,8 @@ async function isolatedVerificationContext(mode, pathname = '/host/network-ports
       scores.withdrawn_records.find((row) => commandById.has(row.command_id)).current_execution_status = 'BLOCKED';
     }
     if (mode === 'withdrawn-current-score-mismatch') {
-      scores.withdrawn_records.find((row) => commandById.has(row.command_id)).current_score = 3;
+      const withdrawn = scores.withdrawn_records.find((row) => commandById.has(row.command_id));
+      withdrawn.current_score = withdrawn.current_score === 1 ? 2 : 1;
     }
     if (mode === 'invalid-retired-withdrawal') {
       const retired = scores.withdrawn_records.find((row) => !commandById.has(row.command_id));
@@ -360,14 +457,29 @@ async function isolatedVerificationContext(mode, pathname = '/host/network-ports
       retired.current_score = 2;
     }
     refreshScoreCounts();
+    const commandCountFields = {
+      PASS: 'command_pass', BLOCKED: 'command_blocked', FAIL: 'command_fail',
+      UNVALIDATED: 'command_unvalidated', NOT_APPLICABLE: 'command_not_applicable',
+    };
+    results.counts.command_runs = results.command_results.length;
+    for (const [status, field] of Object.entries(commandCountFields)) {
+      results.counts[field] = results.command_results.filter((row) => row.vv_status === status).length;
+    }
+    results.current_status_projection.counts = projectionCounts(results.current_status_projection.records);
+    if (mode === 'projection-count-mismatch') results.current_status_projection.counts.targets += 1;
     await fs.writeFile(testSetsFile, JSON.stringify(testSets));
     const snapshot = crypto.createHash('sha256').update(await fs.readFile(testSetsFile)).digest('hex');
     if (mode !== 'snapshot-mismatch') {
       results.test_set_snapshot_sha256 = snapshot;
     }
     scores.test_set_snapshot_sha256 = snapshot;
-    for (const assessment of canonicalApprovalRecords) {
-      assessment.approval_ref = `CANONICAL_NON_EXECUTABLE_DISPLAY:${snapshot}`;
+    for (const record of results.current_status_projection.records) {
+      record.status_basis.source_snapshot_sha256 = snapshot;
+    }
+    if (mode !== 'invalid-not-applicable-approval') {
+      for (const assessment of scores.not_applicable_records) {
+        assessment.approval_ref = `CANONICAL_NON_EXECUTABLE_DISPLAY:${snapshot}`;
+      }
     }
     await fs.writeFile(resultsFile, JSON.stringify(results));
     if (mode === 'score-count-mismatch') {
@@ -386,7 +498,10 @@ async function isolatedVerificationContext(mode, pathname = '/host/network-ports
     for (let i = 0; i < 80; i += 1) {
       try {
         const response = await fetch(`http://127.0.0.1:${port}/__review__/api/context?path=${encodeURIComponent(pathname)}`);
-        if (response.ok) return response.json();
+        // Consume the response body before the `finally` block terminates the
+        // isolated server; returning the unresolved promise makes large
+        // contexts race the shutdown and intermittently fail with UND_ERR_SOCKET.
+        if (response.ok) return await response.json();
       } catch { /* wait for startup */ }
       await new Promise((resolve) => setTimeout(resolve, 25));
     }
@@ -436,6 +551,10 @@ test('Host Teams shows its Jira sources and only its page blockers', async () =>
   const context = await contextFor('/host/host-teams');
   assert.deepEqual(context.epics.map((issue) => issue.key), ['CON-1187']);
   assert.deepEqual(context.issues.map((issue) => issue.key), ['CON-1581', 'CON-1584']);
+  for (const issue of [...context.epics, ...context.issues]) {
+    assert.equal(issue.statusAsOf, '2026-07-13');
+    assert.equal(issue.statusVerification, 'UNVERIFIED_SNAPSHOT');
+  }
   assert.equal(context.blockers.length, 4);
   assert.ok(context.blockers.some((item) => item.question.includes('accrued earnings')));
   assert.ok(context.blockers.every((item) => item.issue.url.startsWith('https://vastai.atlassian.net/browse/')));
@@ -487,11 +606,32 @@ test('Page context joins only sanitized page-scoped V&V evidence', async () => {
   assert.ok(cliMatrix.totals.observations >= 4);
   const commands = context.verification.testSets.flatMap((set) =>
     set.branches.flatMap((branch) => branch.steps.flatMap((step) => step.commands)));
-  assert.equal(commands.flatMap((command) => command.evidence).length, 6);
+  // The retained sandbox BLOCKED and isolated PASS CLI-install attempts add two
+  // history rows for the same install carrier. The later REST authorization
+  // attempt adds one page-scoped row for the curl carrier.
+  assert.equal(commands.flatMap((command) => command.evidence).length, 9);
   assert.ok(commands.flatMap((command) => command.evidence).every((row) => /^EV-[A-Z0-9-]+$/.test(row.ref)));
   assert.ok(commands.filter((command) => command.score || command.notApplicableAssessment).length >= 3);
+  const directlyScored = commands.find((command) => command.score?.directEvidence.length > 0);
+  assert.ok(directlyScored.score.directEvidence.every((row) =>
+    /^verification\/evidence\/[A-Za-z0-9._/-]+$/.test(row.evidenceRef)));
+  const retained = await fetch(`${reviewOrigin}/__review__/evidence?ref=${encodeURIComponent(
+    directlyScored.score.directEvidence[0].evidenceRef)}`);
+  assert.equal(retained.status, 200);
+  assert.match(retained.headers.get('content-type'), /^text\/plain/);
+  assert.ok((await retained.text()).length > 20);
+  assert.equal((await fetch(`${reviewOrigin}/__review__/evidence?ref=${encodeURIComponent('../outside')}`)).status, 404);
+  const search = await contextFor('/host/not-in-search');
+  const searchCommands = search.verification.testSets.flatMap((set) => set.branches)
+    .flatMap((branch) => branch.steps).flatMap((step) => step.commands);
+  const score3 = searchCommands.find((command) => command.score?.value === 3);
+  assert.ok(score3.score.directEvidence.length > 0);
+  assert.ok(score3.score.directEvidence.every((row) => row.status === 'PASS'));
+  assert.ok(score3.score.directEvidence.some((row) =>
+    ['DIRECT_FUNCTIONAL_EXACT_FULL', 'DIRECT_FUNCTIONAL_EQUIVALENT_FULL'].includes(row.proofRole)));
   const serialized = JSON.stringify(context.verification);
-  assert.doesNotMatch(serialized, /evidence_ref|source_file|source_context|test_set_snapshot_sha256|\/private\/tmp|\/Users\//);
+  assert.doesNotMatch(serialized,
+    /evidence_ref|source_file|source_context|source_sections|source_lines|line_start|line_end|test_set_snapshot_sha256|\/private\/tmp|\/Users\//);
 
   const network = await contextFor('/host/network-ports');
   const networkCommands = network.verification.testSets.flatMap((set) =>
@@ -501,50 +641,445 @@ test('Page context joins only sanitized page-scoped V&V evidence', async () => {
   assert.doesNotMatch(redacted.text, /(?:\d{1,3}\.){3}\d{1,3}/);
 });
 
+test('Self-test command proof keeps pinned source signatures separate from runtime status', async () => {
+  const context = await contextFor('/host/how-to-self-test');
+  assert.equal(context.verification.available, true);
+  const commands = context.verification.testSets.flatMap((set) => set.branches)
+    .flatMap((branch) => branch.steps).flatMap((step) => step.commands);
+  const byId = new Map(commands.map((command) => [command.id, command]));
+  const revision = 'ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd';
+  const expectedSources = new Map([
+    ['CLM-b3cd48630e5f2b0c', {
+      findingId: 'cli-dae1e5fb9b',
+      href: `https://github.com/vast-ai/vast-cli/blob/${revision}/vastai/cli/commands/auth.py#L199-L204`,
+      path: 'vastai/cli/commands/auth.py', lineStart: 199, lineEnd: 204, symbol: 'set__api_key',
+    }],
+    ['CLM-3ba3b25f5c3ddac1', {
+      findingId: 'cli-4caeeed44e',
+      href: `https://github.com/vast-ai/vast-cli/blob/${revision}/vastai/cli/commands/machines.py#L699-L717`,
+      path: 'vastai/cli/commands/machines.py', lineStart: 699, lineEnd: 717, symbol: 'self_test__machine',
+    }],
+    ['CLM-3fa5d5948b34fc6a', {
+      findingId: 'cli-268cbc7b03',
+      href: `https://github.com/vast-ai/vast-cli/blob/${revision}/vastai/cli/commands/machines.py#L699-L717`,
+      path: 'vastai/cli/commands/machines.py', lineStart: 699, lineEnd: 717, symbol: 'self_test__machine',
+    }],
+  ]);
+  for (const [commandId, expected] of expectedSources) {
+    const command = byId.get(commandId);
+    assert.ok(command, commandId);
+    assert.equal(command.sourceSignature.status, 'PASS');
+    assert.equal(command.sourceSignature.result, 'pass');
+    assert.equal(command.sourceSignature.sourceRevision, revision);
+    assert.match(command.sourceSignature.claimLimit, /Static parser\/handler registration only/);
+    assert.deepEqual(command.sourceSignature.handlerSource, {
+      repository: 'vast-ai/vast-cli', revision, path: expected.path, symbol: expected.symbol,
+      lineStart: expected.lineStart, lineEnd: expected.lineEnd, href: expected.href,
+    });
+    assert.equal(command.sourceSignature.recordHref,
+      `/__review__/cli-signature?finding=${expected.findingId}&binding=${commandId}`);
+  }
+
+  const setApiKey = byId.get('CLM-b3cd48630e5f2b0c');
+  assert.equal(setApiKey.currentStatus, 'FAIL');
+  assert.equal(setApiKey.verificationContract.basisKind, 'CONFIRMED_DEFECT');
+  assert.match(setApiKey.currentObservation, /mode 0644/);
+  assert.deepEqual(setApiKey.score.directEvidence.map((row) =>
+    [row.status, row.proofRole, row.binding]), [
+    ['FAIL', 'DIRECT_FUNCTIONAL_PARTIAL', setApiKey.id],
+  ]);
+
+  const plainSelfTest = byId.get('CLM-3ba3b25f5c3ddac1');
+  assert.equal(plainSelfTest.currentStatus, 'UNVALIDATED');
+  assert.equal(plainSelfTest.verificationContract.basisKind, 'NO_CLAIM_SUITABLE_EVIDENCE');
+  assert.deepEqual(plainSelfTest.verificationContract.requiredEvidenceTypes,
+    ['RUNTIME_OR_UI_OBSERVATION']);
+  assert.match(plainSelfTest.verificationContract.nextAction,
+    /representative idle listed Host/);
+  assert.doesNotMatch(plainSelfTest.verificationContract.nextAction,
+    /REPOSITORY_STATIC_CHECK/);
+  assert.match(plainSelfTest.currentLimitations, /Static source\/topology\/accounting evidence only/);
+  assert.deepEqual(plainSelfTest.score.directEvidence, []);
+  assert.match(plainSelfTest.sourceSignature.claimLimit,
+    /No API command, Host operation, credentialed authentication, rental, or workload was executed/);
+
+  const supportBundle = byId.get('CLM-3fa5d5948b34fc6a');
+  assert.equal(supportBundle.currentStatus, 'BLOCKED');
+  assert.equal(supportBundle.verificationContract.basisKind, 'UNAVAILABLE_PREREQUISITE');
+  assert.equal(supportBundle.verificationContract.unavailablePrerequisite.kind, 'PERMISSION');
+  assert.match(supportBundle.currentObservation, /reached select_offer.*api_permission_failed/);
+  assert.deepEqual(supportBundle.score.directEvidence.map((row) =>
+    [row.status, row.proofRole, row.binding]), [
+    ['BLOCKED', 'DIRECT_FUNCTIONAL_PARTIAL', supportBundle.id],
+  ]);
+
+  assert.notEqual(setApiKey.sourceSignature.status, setApiKey.currentStatus);
+  assert.notEqual(plainSelfTest.sourceSignature.status, plainSelfTest.currentStatus);
+  assert.notEqual(supportBundle.sourceSignature.status, supportBundle.currentStatus);
+});
+
+test('VM command proof does not promote incomplete parent procedures', async () => {
+  const context = await contextFor('/host/vms');
+  assert.equal(context.verification.available, true);
+  const inspectOrDisable = context.verification.testSets.find((set) => set.id === 'TS-VM-E01');
+  const commands = inspectOrDisable.branches.flatMap((branch) => branch.steps)
+    .flatMap((step) => step.commands);
+  const check = commands.find((command) => command.id === 'CLM-ca44522b22c4c5ee');
+  const disable = commands.find((command) => command.id === 'CLM-9cba75bbdc780804');
+
+  assert.equal(check.currentStatus, 'PASS');
+  assert.equal(check.score.executionStatus, 'PASS');
+  assert.deepEqual(check.score.directEvidence.map((row) =>
+    [row.id, row.status, row.proofRole, row.binding]), [[
+    'EV-HOST-SAFE-READONLY-02-VM-CHECK', 'PASS', 'DIRECT_FUNCTIONAL_EXACT_FULL', check.id,
+  ]]);
+  assert.match(check.score.directEvidence[0].limitations, /state-query carrier only/);
+
+  assert.equal(disable.currentStatus, 'UNVALIDATED');
+  assert.equal(disable.verificationContract.basisKind, 'NO_CLAIM_SUITABLE_EVIDENCE');
+  assert.deepEqual(disable.verificationContract.requiredEvidenceTypes,
+    ['CANONICAL_IMPLEMENTATION_SOURCE', 'RUNTIME_OR_UI_OBSERVATION']);
+  assert.match(disable.verificationContract.nextAction,
+    /check → off → check → on -f → check/);
+  assert.deepEqual(disable.score.directEvidence, []);
+  assert.ok(disable.withdrawnRecords.length > 0);
+  assert.ok(disable.withdrawnRecords.every((row) => /improperly configured target/i.test(row.reason)));
+  assert.ok(disable.withdrawnRecords.every((row) =>
+    /does not restore the withdrawn runtime PASS/i.test(row.currentReassessment)));
+
+  const checkBranch = inspectOrDisable.branches.find((branch) => branch.id === 'VM-E01-B-check');
+  assert.equal(checkBranch.currentStatus, 'UNVALIDATED');
+  assert.equal(checkBranch.steps[0].currentStatus, 'UNVALIDATED');
+  assert.equal(inspectOrDisable.currentStatus, 'UNVALIDATED');
+  assert.equal(context.verification.currentStatus, 'BLOCKED');
+  assert.notEqual(checkBranch.currentStatus, 'PASS');
+  assert.notEqual(inspectOrDisable.currentStatus, 'PASS');
+  assert.notEqual(context.verification.currentStatus, 'PASS');
+});
+
+test('Exact CLI-signature and retained-evidence links preserve command proof context', async () => {
+  const context = await contextFor('/host/how-to-self-test');
+  const commands = context.verification.testSets.flatMap((set) => set.branches)
+    .flatMap((branch) => branch.steps).flatMap((step) => step.commands);
+  const setApiKey = commands.find((command) => command.id === 'CLM-b3cd48630e5f2b0c');
+  const plainSelfTest = commands.find((command) => command.id === 'CLM-3ba3b25f5c3ddac1');
+
+  const signatureResponse = await fetch(`${reviewOrigin}${setApiKey.sourceSignature.recordHref}`);
+  assert.equal(signatureResponse.status, 200);
+  assert.match(signatureResponse.headers.get('content-type'), /^text\/plain/);
+  const signature = await signatureResponse.text();
+  assert.match(signature, /^Exact command source\/signature binding/m);
+  assert.match(signature, /^Page: \/host\/how-to-self-test$/m);
+  assert.match(signature, /^Heading: Before You Run It$/m);
+  assert.match(signature, /^Command: vastai set api-key <API_KEY>$/m);
+  assert.match(signature, /^Command ID: CLM-b3cd48630e5f2b0c$/m);
+  assert.match(signature, /^Static signature result: PASS$/m);
+  assert.match(signature,
+    /^Canonical source URL: https:\/\/github\.com\/vast-ai\/vast-cli\/blob\/ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd\/vastai\/cli\/commands\/auth\.py#L199-L204$/m);
+  assert.match(signature, /proves only.*registered in the pinned CLI source.*not runtime proof/s);
+
+  const wrongBinding = await fetch(`${reviewOrigin}/__review__/cli-signature?finding=${
+    encodeURIComponent(setApiKey.sourceSignature.findingId)}&binding=${encodeURIComponent(plainSelfTest.id)}`);
+  assert.equal(wrongBinding.status, 404);
+  assert.equal(await wrongBinding.text(), 'Exact CLI signature binding not found.');
+
+  const runtimeEvidence = setApiKey.score.directEvidence[0];
+  const runtimeResponse = await fetch(`${reviewOrigin}/__review__/evidence?ref=${
+    encodeURIComponent(runtimeEvidence.evidenceRef)}&binding=${encodeURIComponent(setApiKey.id)}`);
+  assert.equal(runtimeResponse.status, 200);
+  assert.match(runtimeResponse.headers.get('content-type'), /^text\/html/);
+  const runtime = await runtimeResponse.text();
+  assert.match(runtime, /<pre>Reviewer navigation context \(generated; not retained evidence\)/);
+  assert.match(runtime, /^Exact command evidence binding$/m);
+  assert.match(runtime, /^Page: \/host\/how-to-self-test$/m);
+  assert.match(runtime, /^Heading: Before You Run It$/m);
+  assert.match(runtime, /^Command: vastai set api-key &lt;API_KEY&gt;$/m);
+  assert.match(runtime, /^Evidence proof role: DIRECT_FUNCTIONAL_PARTIAL$/m);
+  assert.match(runtime, /id="review-page-link" href="\/host\/how-to-self-test"/);
+  assert.match(runtime,
+    /id="review-heading-link" href="\/host\/how-to-self-test#before-you-run-it"/);
+  assert.match(runtime, /The retained artifact begins below\. This generated header is not proof\./);
+
+  const accountingEvidence = plainSelfTest.currentEvidence[0];
+  const accountingResponse = await fetch(`${reviewOrigin}/__review__/evidence?ref=${
+    encodeURIComponent(accountingEvidence.evidenceRef)}&binding=${encodeURIComponent(plainSelfTest.id)}`);
+  assert.equal(accountingResponse.status, 200);
+  assert.match(accountingResponse.headers.get('content-type'), /^text\/html/);
+  const accounting = await accountingResponse.text();
+  assert.match(accounting, /^Exact command evidence binding$/m);
+  assert.match(accounting, /^Page: \/host\/how-to-self-test$/m);
+  assert.match(accounting, /^Heading: Run The Test$/m);
+  assert.match(accounting, /^Command: vastai self-test machine &lt;machine_id&gt;$/m);
+  assert.match(accounting, /^Evidence proof role: ACCOUNTING_STATUS_DERIVATION_ONLY_NOT_RUNTIME_PROOF$/m);
+  assert.match(accounting, /id="review-page-link" href="\/host\/how-to-self-test"/);
+  assert.match(accounting,
+    /id="review-heading-link" href="\/host\/how-to-self-test#run-the-test"/);
+  assert.match(accounting,
+    /explains status classification\/accounting only\. It does not show that the command executed or worked\./);
+  assert.match(accounting, /The retained artifact begins below\. This generated header is not proof\./);
+
+  const rebaseRef =
+    'verification/evidence/2026-09-03-host-repository-rebase-01/result.md';
+  const boundNavigationCases = [
+    ['VOL-C01', '/host/volume-offers', null],
+    ['SUPPORT-CLI-cancel-maint', '/host/cli/cancel-maint', null],
+    ['PAGE:PAGE-host-hosting-overview', '/host/hosting-overview',
+      '/host/hosting-overview#maintenance'],
+  ];
+  for (const [binding, pageHref, headingHref] of boundNavigationCases) {
+    const response = await fetch(`${reviewOrigin}/__review__/evidence?ref=${
+      encodeURIComponent(rebaseRef)}&binding=${encodeURIComponent(binding)}`);
+    assert.equal(response.status, 200, binding);
+    assert.match(response.headers.get('content-type'), /^text\/html/, binding);
+    const evidenceHtml = await response.text();
+    assert.match(evidenceHtml,
+      new RegExp(`id="review-page-link" href="${pageHref.replaceAll('/', '\\/')}"`),
+      binding);
+    if (headingHref) {
+      assert.match(evidenceHtml,
+        new RegExp(`id="review-heading-link" href="${headingHref.replaceAll('/', '\\/')}"`),
+        binding);
+    }
+  }
+});
+
+test('Host V&V context separates non-command checks, executable targets, and display-only references', async () => {
+  const overview = await contextFor('/host/hosting-overview');
+  assert.equal(overview.verification.available, true);
+  assert.equal(overview.verification.totals.commands, 0);
+  assert.equal(overview.verification.totals.executableIntentCommands, 0);
+  assert.equal(overview.verification.totals.displayOnlyCommands, 0);
+  assert.equal(overview.verification.totals.nonCommandSteps, overview.verification.totals.steps);
+  assert.ok(Number.isInteger(overview.verification.totals.retainedEvidenceRecords));
+  assert.deepEqual(overview.verification.checkedContent,
+    { route: '/host/hosting-overview', pageTitle: 'Hosting Overview', sections: [] });
+  assert.ok(overview.verification.testSets.every((set) => set.totals.commands === 0));
+  assert.ok(overview.verification.testSets.every((set) => set.branches.every((branch) =>
+    branch.steps.every((step) => step.executionClassification))));
+  assert.ok(overview.verification.testSets.flatMap((set) => set.branches).flatMap((branch) => branch.steps)
+    .some((step) => step.executionClassification === 'MANUAL_OR_CONTEXT'));
+  const contractModel = overview.verification.testSets.find((set) => set.id === 'TS-HOV-C01');
+  assert.deepEqual(contractModel.checkedContent.sections,
+    ['Offers And Rental Contracts', 'The Rental Contract', 'Volume Offers', 'Maintenance']);
+  const firstHostRoute = overview.verification.testSets.find((set) => set.id === 'TS-HOV-P01');
+  assert.deepEqual(firstHostRoute.checkedContent.sections, ['Start Here']);
+  assert.equal(overview.verification.currentStatus, 'UNVALIDATED');
+  assert.deepEqual(overview.verification.blockerDetails, []);
+  assert.deepEqual(contractModel.blockerDetails, []);
+  assert.deepEqual(firstHostRoute.blockerDetails, []);
+  assert.deepEqual(contractModel.evidenceLaneHints.map((item) => item.code), ['ACCOUNTABLE_OWNER']);
+  assert.deepEqual(firstHostRoute.evidenceLaneHints.map((item) => item.code), ['RUNTIME_OBSERVATION']);
+  assert.deepEqual(overview.verification.evidenceLaneHints.map((item) => item.code),
+    ['RUNTIME_OBSERVATION', 'ACCOUNTABLE_OWNER']);
+  const overviewBranches = overview.verification.testSets.flatMap((set) => set.branches);
+  const overviewSteps = overviewBranches.flatMap((branch) => branch.steps);
+  assert.equal(overviewSteps.length, 9);
+  assert.ok(overviewSteps.every((step) => step.currentStatus === 'UNVALIDATED'));
+  assert.ok(overviewSteps.every((step) => /missing evidence alone is UNVALIDATED/.test(step.currentRationale)));
+  assert.ok(overviewSteps.every((step) => step.blockerDetails.length === 0));
+  assert.deepEqual(overviewSteps.find((step) => step.id === 'HOV-C01-S03').checkedContent.sections,
+    ['Volume Offers']);
+  assert.ok([overview.verification, ...overview.verification.testSets, ...overviewBranches, ...overviewSteps]
+    .every((row) => row.checkedContent.route === '/host/hosting-overview'));
+
+  const diagnostics = await contextFor('/host/common-errors-diagnostics');
+  const escalation = diagnostics.verification.testSets.find((set) => set.title === 'Redacted escalation packet');
+  assert.equal(escalation.totals.commands, 0);
+  assert.equal(escalation.totals.nonCommandSteps, escalation.totals.steps);
+  assert.ok(diagnostics.verification.totals.executableIntentCommands > 0);
+  const diagnosticCommands = diagnostics.verification.testSets.flatMap((set) => set.branches)
+    .flatMap((branch) => branch.steps).flatMap((step) => step.commands);
+  assert.deepEqual(diagnosticCommands.find((command) => command.id === 'CLM-a86c033f7e767f31').checkedContent.sections,
+    ['GPU And Kernel Diagnostics']);
+
+  const glossary = await contextFor('/host/glossary');
+  const glossarySets = glossary.verification.testSets;
+  const glossaryBranches = glossarySets.flatMap((set) => set.branches);
+  const glossarySteps = glossaryBranches.flatMap((branch) => branch.steps);
+  const glossaryCommands = glossarySteps.flatMap((step) => step.commands);
+  assert.ok(glossarySteps.some((step) => step.checkedContent.sections.includes('Direct ports (direct_port_count)')));
+  assert.ok([glossary.verification, ...glossarySets, ...glossaryBranches, ...glossarySteps, ...glossaryCommands]
+    .every((row) => row.checkedContent.sections.every((section) => !section.includes('`'))));
+
+  const teams = await contextFor('/host/host-teams');
+  assert.ok(teams.verification.totals.displayOnlyCommands > 0);
+  assert.equal(teams.verification.totals.executableIntentCommands, 0);
+  assert.ok(teams.verification.totals.scored > 0);
+  assert.equal(teams.verification.totals.scored, teams.verification.totals.displayOnlyScored);
+  assert.equal(teams.verification.totals.executableIntentScored, 0);
+  assert.equal(teams.verification.totals.displayOnlyScored + teams.verification.totals.notApplicableAssessments,
+    teams.verification.totals.displayOnlyCommands);
+  const catalog = teams.verification.testSets.find((set) => set.title === 'Host team CLI command support catalog');
+  assert.equal(catalog.totals.displayOnlyCommands, catalog.totals.commands);
+  assert.ok(catalog.totals.displayOnlyScored > 0);
+  assert.ok(catalog.branches.flatMap((branch) => branch.steps).every((step) =>
+    step.commands.every((command) => command.treatment === 'NON_EXECUTABLE_DISPLAY')));
+  assert.ok(catalog.goal && catalog.accessClasses.length && catalog.safetyConstraints.length && catalog.limitations.length);
+
+  const volume = await contextFor('/host/volume-offers');
+  assert.equal(volume.verification.available, true);
+  assert.equal(volume.verification.checkedContent.route, '/host/volume-offers');
+  assert.deepEqual(volume.verification.testSets.map((set) => set.id),
+    ['TS-VOL-C01', 'TS-VOL-E01', 'TS-VOL-E02', 'TS-VOL-C02']);
+  assert.equal(volume.verification.totals.testSets, 4);
+  assert.equal(volume.verification.totals.branches, 4);
+  assert.equal(volume.verification.totals.steps, 9);
+  assert.equal(volume.verification.totals.commands, 11);
+  assert.equal(volume.verification.materialClaims.length, 39);
+});
+
+test('Canonical material-claim, citation, and page dispositions remain fully accounted', async () => {
+  const testSets = JSON.parse(await fs.readFile(
+    path.join(ROOT, 'verification', 'host-docs-test-sets.json'), 'utf8'));
+  assert.equal(testSets.pages.length, 40);
+  const contexts = await Promise.all(testSets.pages.map((page) => contextFor(page.route)));
+  assert.ok(contexts.every((context) => context.verification.available));
+  const claims = contexts.flatMap((context) => context.verification.materialClaims);
+  assert.equal(claims.length, 1687);
+  assert.equal(new Set(claims.map((claim) => claim.id)).size, 1687);
+
+  const countBy = (items, valueFor) => items.reduce((counts, item) => {
+    const value = valueFor(item);
+    counts[value] = (counts[value] || 0) + 1;
+    return counts;
+  }, {});
+  assert.deepEqual(countBy(claims, (claim) => claim.current.status), {
+    PASS: 167, FAIL: 153, BLOCKED: 23, UNVALIDATED: 1344,
+  });
+  assert.deepEqual(countBy(claims, (claim) => claim.citation.state), {
+    ABSENT: 153, PRESENT_UNVERIFIED: 19, NOT_REQUIRED: 1515,
+  });
+  assert.deepEqual(countBy(contexts, (context) => context.verification.materialDisposition.status), {
+    FAIL: 26, BLOCKED: 3, UNVALIDATED: 11,
+  });
+});
+
+test('Blocker causes and access-derived evidence hints stay separate and conservative', async () => {
+  const context = await isolatedVerificationContext('valid-blocker-classification', '/host/volume-offers');
+  const vv = context.verification;
+  assert.equal(vv.currentStatus, 'BLOCKED');
+  assert.match(vv.currentRationale, /rollup/);
+  assert.deepEqual(new Set(vv.blockerDetails.map((item) => item.code)),
+    new Set(['DERIVED_FROM_CHILDREN', 'MULTIPLE']));
+  assert.ok(vv.blockerDetails.every((item) => item.nextAction && item.claimImpact && item.evidenceIds.length));
+  const blockedSteps = vv.testSets.flatMap((set) => set.branches)
+    .flatMap((branch) => branch.steps).filter((step) => step.currentStatus === 'BLOCKED');
+  assert.equal(blockedSteps.length, 3);
+  assert.ok(blockedSteps.every((step) => step.blockerDetails.length === 1));
+  assert.ok(blockedSteps.every((step) => step.blockerDetails[0].code === 'MULTIPLE'));
+
+  assert.deepEqual(vv.testSets[0].evidenceLaneHints.map((item) => item.code),
+    ['IMPLEMENTATION_SOURCE', 'ACCOUNTABLE_OWNER', 'DOCUMENTATION_CITATION']);
+  assert.deepEqual(vv.testSets[1].evidenceLaneHints.map((item) => item.code),
+    ['IMPLEMENTATION_SOURCE', 'ACCOUNTABLE_OWNER', 'DOCUMENTATION_CITATION']);
+  assert.deepEqual(vv.evidenceLaneHints.map((item) => item.code), [
+    'IMPLEMENTATION_SOURCE', 'ACCOUNTABLE_OWNER', 'DOCUMENTATION_CITATION',
+  ]);
+});
+
+test('Retained V&V references are repository-relative and do not depend on .orchestra state', async () => {
+  const results = JSON.parse(await fs.readFile(path.join(ROOT, 'verification', 'host-docs-test-results.json'), 'utf8'));
+  const scores = JSON.parse(await fs.readFile(path.join(ROOT, 'verification', 'host-docs-command-scores.json'), 'utf8'));
+  const refs = [
+    ...results.attempts.map((row) => row.evidence_ref),
+    ...results.command_results.flatMap((row) => [row.evidence_ref, row.qualification_evidence_ref]),
+    ...(scores.withdrawn_records || []).map((row) => row.qualification_evidence_ref),
+  ].filter(Boolean);
+  const historicalBaseline =
+    'verification/evidence/2026-09-03-host-repository-rebase-01/pre-edit-working-tree-baseline-sanitized.txt';
+  for (const ref of refs) {
+    assert.match(ref, /^verification\/evidence\/[A-Za-z0-9._/-]+$/);
+    assert.ok(!ref.split('/').includes('..'));
+    const file = path.join(ROOT, ref);
+    const stat = await fs.lstat(file);
+    assert.equal(stat.isFile(), true, ref);
+    assert.equal(stat.isSymbolicLink(), false, ref);
+    const contents = await fs.readFile(file, 'utf8');
+    if (ref === historicalBaseline) {
+      assert.match(contents, /^\? \.orchestra\/$/m,
+        'the sanitized pre-edit projection must preserve the observed untracked path');
+      assert.match(contents,
+        /b1bd6a1b423da195f68987e8a9b5ffe29bef7be00e0288eb3dbbc7f248ea981b/,
+        'the sanitized projection must bind the restricted raw capture');
+      assert.doesNotMatch(contents,
+        /(?:\/Users\/|\/private\/tmp\/|\/var\/folders\/|github\.com\/(?!vast-ai\/)[^/\s]+\/(?:docs|vast-python|self-test)(?=[\s)/#]|$))/,
+        'the public projection must not expose workstation paths');
+    } else {
+      assert.doesNotMatch(contents, /(?:^|[\s("'])\.orchestra\//m, ref);
+    }
+  }
+});
+
 test('Missing or malformed verification input fails closed', async () => {
-  assert.deepEqual((await isolatedVerificationContext()).verification, { available: false });
+  const missing = (await isolatedVerificationContext()).verification;
+  assert.equal(missing.available, false);
+  assert.match(missing.unavailableReason, /^ENOENT:.*\[local-path\]/);
+  const failureReasons = new Set();
   for (const mode of [
     'malformed', 'snapshot-mismatch', 'schema-mismatch', 'record-type-mismatch',
     'inventory-count-mismatch', 'invalid-baseline-status', 'duplicate-canonical-command', 'stale-page-source',
+    'invalid-canonical-route',
+    'invalid-step-source-span', 'invalid-step-source-section', 'invalid-command-source-span',
+    'invalid-command-source-section',
     'unknown-status-target', 'duplicate-status', 'unknown-status-attempt', 'unknown-status-evidence',
     'unsafe-status-attempt', 'partial-current-status', 'partial-procedure-target',
     'mismatched-procedure-evidence', 'superseded-current-attempt', 'command-evidence-current-status',
-    'unknown-score-command', 'score-empty-evidence', 'score-duplicate-evidence',
+    'unknown-score-command', 'score-empty-evidence', 'pass-missing-direct-evidence', 'score-duplicate-evidence',
     'score-wrong-command-evidence', 'score-ancestry-mismatch', 'score-source-mismatch',
     'numeric-not-applicable-status', 'assessment-current-status-mismatch',
     'score-count-mismatch', 'invalid-not-applicable-approval', 'not-applicable-nondisplay',
     'missing-assessment-coverage', 'missing-current-projection', 'score3-current-not-pass',
+    'score3-missing-direct-evidence', 'score3-duplicate-direct-evidence', 'score3-direct-not-pass',
+    'score3-direct-wrong-command', 'score3-static-procedure-direct', 'score3-static-relabelled-full',
+    'score3-partial-relabelled-full', 'score3-scoped-superseded-direct',
+    'qualification-command-uncovered',
+    'not-applicable-parent-child-mismatch', 'projection-count-mismatch',
+    'missing-attempt-evidence-ref', 'unsafe-attempt-evidence-ref',
+    'nonportable-attempt-evidence-content', 'direct-command-missing-evidence-ref',
     'withdrawn-current-status-mismatch', 'withdrawn-current-score-mismatch', 'invalid-retired-withdrawal',
   ]) {
-    assert.deepEqual((await isolatedVerificationContext(mode)).verification, { available: false }, mode);
+    const verification = (await isolatedVerificationContext(mode)).verification;
+    assert.equal(verification.available, false, mode);
+    assert.ok(verification.unavailableReason, mode);
+    assert.doesNotMatch(verification.unavailableReason, /\/Users\/|\/private\/tmp|\/var\/folders/, mode);
+    failureReasons.add(verification.unavailableReason);
   }
+  assert.ok(failureReasons.size >= 20,
+    `expected distinct fail-closed integrity gates, observed ${failureReasons.size}`);
 });
 
 test('Current status projection preserves frozen execution status and supports procedure evidence', async () => {
-  const context = await isolatedVerificationContext('valid-current-status', '/host/market-metrics');
+  const context = await isolatedVerificationContext('valid-current-status', '/host/common-host-questions');
   assert.equal(context.verification.available, true);
   assert.equal(context.verification.currentStatus, 'PASS');
-  assert.equal(context.verification.currentStatusAttemptId, 'ATTEMPT-FIXTURE-CURRENT-01');
-  assert.deepEqual(context.verification.currentEvidenceIds, ['EV-PROJECTION-1']);
-  assert.equal(context.verification.currentMethod, 'Retained static procedure review');
-  assert.equal(context.verification.currentObservation, 'Sanitized fixture procedure observation.');
-  assert.equal(context.verification.currentLimitations, 'No live Host product behavior was exercised.');
-  const set = context.verification.testSets.find((row) => row.id === 'TS-MET-E02');
-  const branch = set.branches.find((row) => row.id === 'MET-E02-current');
-  const step = branch.steps.find((row) => row.id === 'MET-E02-current-s01');
-  const command = step.commands.find((row) => row.id === 'CLM-582fe58ab6692d1a');
-  for (const row of [set, branch, step, command]) {
-    assert.equal(row.executionStatus, 'UNVALIDATED');
+  assert.equal(context.verification.currentStatusAttemptId,
+    'ATTEMPT-2026-09-01-HOST-CURRENT-RECONCILIATION-01');
+  assert.deepEqual(context.verification.currentEvidenceIds, ['EV-HOST-CURRENT-RECONCILIATION-01']);
+  assert.deepEqual(context.verification.currentEvidence, [{
+    id: 'EV-HOST-CURRENT-RECONCILIATION-01',
+    evidenceRef: 'verification/evidence/2026-09-01-host-current-reconciliation-attempt-01/result.md',
+    binding: 'PAGE:PAGE-host-common-host-questions',
+  }]);
+  assert.equal(context.verification.currentMethod, 'CURRENT_SOURCE_AND_RETAINED_EVIDENCE_RECONCILIATION');
+  assert.match(context.verification.currentObservation, /Final topology reconciled/);
+  assert.match(context.verification.currentLimitations, /Classification only, not command execution/);
+  const set = context.verification.testSets.find((row) => row.id === 'TS-FAQ-C01');
+  const branch = set.branches.find((row) => row.id === 'FAQ-C01-routes');
+  const step = branch.steps.find((row) => row.id === 'FAQ-C01-routes-s01');
+  for (const row of [set, branch]) {
+    assert.equal(row.executionStatus, 'PASS');
     assert.equal(row.currentStatus, 'PASS');
-    assert.equal(row.currentStatusAttemptId, 'ATTEMPT-FIXTURE-CURRENT-01');
-    assert.deepEqual(row.currentEvidenceIds, ['EV-PROJECTION-1']);
-    assert.equal(row.currentMethod, 'Retained static procedure review');
-    assert.equal(row.currentObservation, 'Sanitized fixture procedure observation.');
-    assert.equal(row.currentLimitations, 'No live Host product behavior was exercised.');
-    assert.ok(row.history.some((item) => item.evidenceIds.includes('EV-PROJECTION-1')));
+    assert.equal(row.currentStatusAttemptId, 'ATTEMPT-2026-09-01-HOST-CURRENT-RECONCILIATION-01');
+    assert.deepEqual(row.currentEvidenceIds, ['EV-HOST-CURRENT-RECONCILIATION-01']);
+    assert.ok(row.history.some((item) => item.evidenceIds.includes('EV-HOST-CURRENT-RECONCILIATION-01')));
   }
-  assert.deepEqual(command.score.evidenceIds, ['EV-PROJECTION-1']);
-  assert.equal(command.score.value, 3);
+  assert.equal(step.executionStatus, 'PASS');
+  assert.equal(step.currentStatus, 'PASS');
+  assert.equal(step.currentStatusAttemptId, 'ATTEMPT-2026-09-01-HOST-FAQ-ROUTE-02');
+  assert.deepEqual(step.currentEvidenceIds, ['EV-FAQ-C01-ROUTES-02']);
+  assert.equal(step.currentMethod, 'LOCAL_STATIC_ROUTE_OWNERSHIP_AUDIT');
+  assert.ok(step.history.some((item) => item.evidenceIds.includes('EV-FAQ-C01-ROUTES-01') &&
+    item.status === 'FAIL' && item.supersededBy === 'ATTEMPT-2026-09-01-HOST-FAQ-ROUTE-02'));
   assert.doesNotMatch(JSON.stringify(context.verification), /\/private\/tmp|\/Users\//);
 });
 
@@ -552,9 +1087,15 @@ test('Current evidence and score text are sanitized before reaching the review c
   const context = await isolatedVerificationContext('valid-sanitized-current-status', '/host/market-metrics');
   assert.equal(context.verification.available, true);
   const serialized = JSON.stringify(context.verification);
-  assert.doesNotMatch(serialized, /\/Users\/alice|\/var\/folders|2001:db8|424242|a{64}|fixture-secret/);
+  for (const unsafe of [/\/Users\/alice/, /\/var\/folders/, /2001:db8/, /424242/, /a{64}/]) {
+    const match = unsafe.exec(serialized);
+    assert.equal(match, null, match
+      ? `unsanitized fixture value matched ${unsafe}: ${serialized.slice(Math.max(0, match.index - 100), match.index + 180)}`
+      : `unsanitized fixture value matched ${unsafe}`);
+  }
   assert.match(serialized, /\[local-path\]|\[network-address\]|\[identifier\]|\[redacted-token\]|\[redacted\]/);
-  assert.match(context.verification.currentRationale, /password=\[redacted\]/);
+  assert.match(context.verification.currentObservation, /\[local-path\].*\[network-address\].*\[redacted-token\]/);
+  assert.match(context.verification.currentLimitations, /password=\[redacted\]/);
   const command = context.verification.testSets.find((row) => row.id === 'TS-MET-E02').branches
     .find((row) => row.id === 'MET-E02-current').steps[0].commands
     .find((row) => row.id === 'CLM-582fe58ab6692d1a');
@@ -562,17 +1103,17 @@ test('Current evidence and score text are sanitized before reaching the review c
 });
 
 test('Approved NOT_APPLICABLE semantic assessment remains separate from numeric scores', async () => {
-  const context = await isolatedVerificationContext('valid-not-applicable', '/host/machine-errors');
+  const context = await isolatedVerificationContext('valid-not-applicable', '/host/fleet-operations');
   assert.equal(context.verification.available, true);
   const command = context.verification.testSets.flatMap((set) => set.branches)
     .flatMap((branch) => branch.steps).flatMap((step) => step.commands)
-    .find((row) => row.id === 'CLM-9bb850ad51054679');
+    .find((row) => row.id === 'CLM-949ef36e5c67b2ef');
   assert.equal(command.executionStatus, 'NOT_APPLICABLE');
   assert.equal(command.currentStatus, 'NOT_APPLICABLE');
   assert.equal(command.score, null);
   assert.match(command.notApplicableAssessment.approvalRef,
     /^CANONICAL_NON_EXECUTABLE_DISPLAY:[a-f0-9]{64}$/);
-  assert.deepEqual(command.notApplicableAssessment.evidenceIds, ['EV-FIXTURE-NOT-APPLICABLE-1']);
+  assert.deepEqual(command.notApplicableAssessment.evidenceIds, ['EV-HOST-COMMAND-ASSESSMENT-01']);
 });
 
 test('Semantic score evidence can remain UNVALIDATED while current execution separately supplies PASS', async () => {
@@ -583,29 +1124,32 @@ test('Semantic score evidence can remain UNVALIDATED while current execution sep
     .find((row) => row.id === 'MET-E02-current-s01').commands
     .find((row) => row.id === 'CLM-582fe58ab6692d1a');
   assert.equal(command.currentStatus, 'PASS');
-  assert.deepEqual(command.currentEvidenceIds, ['EV-FIXTURE-CURRENT-BASE-01']);
-  assert.equal(command.score.value, 3);
+  assert.deepEqual(command.currentEvidenceIds, ['EV-CLI05-MARKET-METRICS']);
+  assert.equal(command.score.value, 2);
   assert.equal(command.score.executionStatus, 'PASS');
-  assert.deepEqual(command.score.evidenceIds, ['EV-SCORE-CONTEXT-1']);
-  const semantic = command.history.find((row) => row.evidenceIds.includes('EV-SCORE-CONTEXT-1'));
+  assert.deepEqual(command.score.evidenceIds, ['EV-HOST-COMMAND-ASSESSMENT-01']);
+  assert.deepEqual(command.score.directEvidenceIds, ['EV-CLI05-MARKET-METRICS']);
+  assert.equal(command.score.directEvidence[0].status, 'PASS');
+  assert.equal(command.score.directEvidence[0].proofRole, 'DIRECT_FUNCTIONAL_PARTIAL');
+  const semantic = command.history.find((row) => row.evidenceIds.includes('EV-HOST-COMMAND-ASSESSMENT-01'));
   assert.equal(semantic.status, 'UNVALIDATED');
-  assert.match(semantic.limitations, /does not establish runtime execution/);
+  assert.match(semantic.limitations, /Score-traceability evidence only/);
 });
 
 test('Procedure history retains the failed attempt and linked correction retest', async () => {
-  const context = await isolatedVerificationContext('valid-history', '/host/market-metrics');
+  const context = await isolatedVerificationContext('valid-history', '/host/common-host-questions');
   assert.equal(context.verification.available, true);
-  const step = context.verification.testSets.find((row) => row.id === 'TS-MET-E02').branches
-    .find((row) => row.id === 'MET-E02-current').steps
-    .find((row) => row.id === 'MET-E02-current-s01');
+  const step = context.verification.testSets.find((row) => row.id === 'TS-FAQ-C01').branches
+    .find((row) => row.id === 'FAQ-C01-routes').steps
+    .find((row) => row.id === 'FAQ-C01-routes-s01');
   assert.equal(step.currentStatus, 'PASS');
-  const failed = step.history.find((row) => row.evidenceIds.includes('EV-HISTORY-FAIL-1'));
-  const passed = step.history.find((row) => row.evidenceIds.includes('EV-HISTORY-PASS-2'));
+  const failed = step.history.find((row) => row.evidenceIds.includes('EV-FAQ-C01-ROUTES-01'));
+  const passed = step.history.find((row) => row.evidenceIds.includes('EV-FAQ-C01-ROUTES-02'));
   assert.equal(failed.status, 'FAIL');
-  assert.ok(failed.supersededBy);
+  assert.equal(failed.supersededBy, 'ATTEMPT-2026-09-01-HOST-FAQ-ROUTE-02');
   assert.equal(passed.status, 'PASS');
   assert.equal(passed.supersededBy, null);
-  assert.match(passed.observation, /corrected retest passed/);
+  assert.match(passed.observation, /passed after the three focused semantic-owner corrections/);
 });
 
 test('Unmapped Host pages retain epic provenance without invented blockers', async () => {
@@ -621,7 +1165,8 @@ test('Non-Host pages do not inherit Host Jira context', async () => {
   assert.deepEqual(context.epics, []);
   assert.deepEqual(context.issues, []);
   assert.deepEqual(context.blockers, []);
-  assert.deepEqual(context.verification, { available: false });
+  assert.equal(context.verification.available, false);
+  assert.ok(['page-not-in-inventory', 'package-integrity-failure'].includes(context.verification.unavailableReason));
 });
 
 test('Only the review proxy injects the overlay', async () => {
@@ -631,18 +1176,96 @@ test('Only the review proxy injects the overlay', async () => {
   assert.match(reviewHtml, /__review__\/overlay\.js/);
   const overlay = await (await fetch(`${reviewOrigin}/__review__/overlay.js`)).text();
   assert.match(overlay, /Jira context for this page/);
+  assert.match(overlay, /issue\.status \+ ' · snapshot ' \+ \(issue\.statusAsOf \|\| 'unknown'\) \+ ' \(unverified\)'/);
   assert.match(overlay, /V&amp;V evidence for this page/);
+  assert.match(overlay, /This page contains no executable command instructions/);
+  assert.match(overlay, /Command scoring does not apply/);
+  assert.match(overlay, /Without retained evidence a check remains <code>UNVALIDATED<\/code>/);
+  assert.match(overlay, /BLOCKED<\/code> only when a concrete prerequisite is unavailable and named/);
+  assert.match(overlay, /numeric semantic scores assess documentation support and relevance only/);
+  assert.match(overlay, /Semantic documentation score/);
+  assert.match(overlay, /non-command check/);
+  assert.match(overlay, /command-reference check/);
+  assert.match(overlay, /source-defect command check/);
+  assert.match(overlay, /display-only command reference/);
+  assert.match(overlay, /retained evidence record/);
+  assert.match(overlay, /Recorded outcome/);
+  assert.match(overlay, /page is not in the current V&amp;V inventory/);
+  assert.match(overlay, /V&amp;V package is fail-closed/);
+  assert.match(overlay, /Specific failed prerequisite/);
   assert.match(overlay, /Procedure status is separate from command scoring/);
-  assert.match(overlay, /Score 1 = failed to run or produced no relevant semantic result/);
-  assert.match(overlay, /frozen baseline/);
-  assert.match(overlay, /Current evidence/);
+  assert.match(overlay, /score 1 = failed or gave no relevant support/);
+  assert.match(overlay, /Direct functional\/static evidence/);
+  assert.match(overlay, /Open retained evidence/);
+  assert.match(overlay, /Page under review:/);
+  assert.match(overlay, /under review:/);
+  assert.match(overlay, /Declared section/);
+  assert.match(overlay, /Declared-scope links open the page or section each record says it evaluates/);
+  assert.match(overlay, /A scope link is not evidence/);
+  assert.match(overlay, /retained-evidence total counts records, not independently proved claims/);
+  assert.match(overlay, /it is not a page-load result/);
+  assert.match(overlay, /Procedure V&amp;V blocker/);
+  assert.match(overlay, /Recorded unavailable prerequisite/);
+  assert.match(overlay, /Evidence source guide/);
+  assert.match(overlay, /Status rule/);
+  assert.match(overlay, /What this docs review can address/);
+  assert.match(overlay, /Reviewer handoff/);
+  assert.match(overlay, /Implementation\/source/);
+  assert.match(overlay, /Runtime\/UI/);
+  assert.match(overlay, /Product\/Finance\/Legal authority/);
+  assert.match(overlay, /Documentation\/citation/);
+  assert.match(overlay, /missing evidence alone is/);
+  assert.match(overlay, /concrete prerequisite is unavailable and named/);
+  assert.match(overlay, /documentation text is the claim under review, not proof of itself/);
+  assert.match(overlay, /canonical Vast source code, API schemas or configuration/);
+  assert.match(overlay, /code alone may not be authoritative/);
+  assert.match(overlay, /Material-claim page disposition/);
+  assert.match(overlay, /Evidence access\/authority needed/);
+  assert.match(overlay, /Open the retained evidence artifact/);
+  assert.match(overlay, /vv-evidence-link/);
+  assert.match(overlay, /Page procedure V&amp;V status/);
+  assert.match(overlay, /section anchor unavailable/);
+  assert.match(overlay, /Page introduction/);
+  assert.match(overlay, /aria-controls="panel" aria-expanded="false"/);
+  assert.match(overlay, /aria-labelledby="reviewPanelTitle" aria-hidden="true"/);
+  assert.match(overlay, /aria-label="Close docs review panel"/);
+  assert.match(overlay, /pill\.setAttribute\('aria-expanded', 'true'\)/);
+  assert.match(overlay, /e\.key !== 'Escape'/);
+  assert.match(overlay, /Topology status mirror/);
+  assert.match(overlay, /Accounting\/status derivation only — not command proof/);
+  assert.match(overlay, /Exact command proof/);
+  assert.match(overlay, /Source\/signature support/);
+  assert.match(overlay, /Runtime behavior/);
+  assert.match(overlay, /recordedActionCoversRuntime/);
+  assert.match(overlay, /Exact next action/);
+  assert.match(overlay, /Runtime-proof next action/);
+  assert.match(overlay,
+    /runtimeStatus === 'UNVALIDATED'[\s\S]*To prove that the command works at runtime/);
+  assert.match(overlay,
+    /Source\/signature support proves that syntax is present in pinned code; it never proves execution/);
+  assert.match(overlay, /Pinned source revision/);
+  assert.match(overlay,
+    /Compare its recorded revision and environment with the pinned source revision/);
+  assert.match(overlay, /source portion is now shown as PASS above/);
+  assert.match(overlay, /var commandTitle = signature && signature\.handlerSource/);
+  assert.match(overlay,
+    /'<a class="vv-command-source" href="' \+ esc\(signature\.handlerSource\.href\)[\s\S]*title="Open the pinned canonical CLI registration"><code>' \+[\s\S]*esc\(command\.text\)/);
+  assert.match(overlay, /open exact static-check record/);
+  assert.match(overlay, /Current supporting evidence/);
   assert.match(overlay, /Attempt history/);
   assert.match(overlay, /Semantic assessment: NOT_APPLICABLE/);
-  assert.match(overlay, /REVIEW-TRACEABILITY\.md/);
+  assert.match(overlay,
+    /https:\/\/github\.com\/vast-ai\/docs\/pull\/185\/files#diff-5ff737a240842e44cbef287f5e73e05da3ae18bd6e4d4f55626941405cfbfae1/);
+  assert.doesNotMatch(
+    overlay,
+    /https:\/\/github\.com\/(?!vast-ai\/)[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+/,
+  );
   assert.match(overlay, /\/context\?path=/);
   assert.match(overlay, /Save JSON/);
   assert.match(overlay, /Import JSON/);
   assert.match(overlay, /\/import/);
+  assert.match(overlay, /no review notes/);
+  assert.match(overlay, /this is not a V&V score/);
 });
 
 test('JSON import restores multiple reviewers and keeps newer server items', async () => {
@@ -695,7 +1318,10 @@ test('JSON import restores multiple reviewers and keeps newer server items', asy
   assert.match(statusHtml, /Save JSON/);
   assert.match(statusHtml, /Import JSON/);
   assert.match(statusHtml, /restorable backup for every page and reviewer/);
-  assert.match(statusHtml, /V&amp;V evidence:<\/b> 39 pages · 97 test sets · 203 branches · 468 steps · 165 commands · \d+ observations · \d+ numeric scores · \d+ approved N\/A/);
+  assert.match(statusHtml, /V&amp;V evidence:<\/b> 40 primary Host pages · 1687 material claims · 101 test sets · 207 branches · 477 checks · 356 non-command checks · 126 executable command targets · 53 display-only command references · 96 retained evidence records · 152 numeric semantic scores \(126 executable-intent scores, 26 display-only semantic scores\) · 27 approved display-only N\/A · 18 CLI and 15 SDK central-reference support layers \(not Host workflows\)/);
+  assert.match(statusHtml,
+    /Material-claim disposition:<\/b> PASS=167 · FAIL=153 · BLOCKED=23 · UNVALIDATED=1344/);
+  assert.match(statusHtml, /Page semantic disposition:<\/b> FAIL=26 · BLOCKED=3 · UNVALIDATED=11/);
   assert.match(statusHtml, /default <code>review-feedback\/<\/code>/);
   assert.doesNotMatch(statusHtml, new RegExp(feedbackDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 });
@@ -705,15 +1331,22 @@ test('JSON import rejects an invalid backup before writing any reviewer state', 
     format: 'vast-docs-review-feedback', version: 1,
     items: [
       {
-        id: 'atomic-valid', reviewer: 'Charlie', page: '/host/quickstart', comment: 'Would otherwise be valid.',
+        id: 'atomic-valid', reviewer: 'Charlie', page: '/host/quickstart', pageTitle: 'Quickstart',
+        type: 'page', quote: '', prefix: '', suffix: '', heading: '', category: 'Question', severity: 'Minor',
+        comment: 'Would otherwise be valid.', status: 'open', createdAt: '2026-07-13T09:59:00.000Z',
         updatedAt: '2026-07-13T10:00:00.000Z',
       },
-      { id: 'atomic-invalid', page: '/host/quickstart', comment: 'Missing reviewer.' },
+      {
+        id: 'atomic-invalid', page: '/host/quickstart', pageTitle: 'Quickstart', type: 'page', quote: '',
+        prefix: '', suffix: '', heading: '', category: 'Question', severity: 'Minor',
+        comment: 'Missing reviewer.', status: 'open', createdAt: '2026-07-13T10:00:00.000Z',
+        updatedAt: '2026-07-13T10:00:00.000Z',
+      },
     ],
   });
   assert.equal(response.status, 400);
   const error = await response.json();
-  assert.match(error.error, /missing a valid reviewer/);
+  assert.match(error.error, /invalid feedback reviewer/);
   const charlieState = await reviewerState('Charlie');
   assert.deepEqual(charlieState.items, []);
 });

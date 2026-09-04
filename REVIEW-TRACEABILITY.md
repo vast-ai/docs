@@ -1,6 +1,8 @@
 # Host docs review traceability
 
-Snapshot: 2026-07-13
+Jira status snapshot: 2026-07-13 (not re-verified by this repository review)
+
+Repository V&V reconciliation: 2026-09-03
 
 Review PR: [vast-ai/docs#185](https://github.com/vast-ai/docs/pull/185)
 
@@ -107,6 +109,44 @@ owner for each evidence class.
   product assets, then choose the merge/review sequence for PR #185.
 
 ## Validation evidence
+
+### How command proof is presented
+
+The review panel now keeps two evidence lanes separate for every exact command:
+
+- **Source/signature support** links to the immutable Vast CLI handler and to
+  the repository-local argparse check. This proves only that the documented
+  executable, command signature, and options exist in the pinned source. It
+  does not prove execution.
+- **Runtime behavior** links to the retained command attempt, identifies its
+  proof role and limitations, and states the concrete next action when the
+  result is incomplete.
+
+Status-reconciliation records are shown as accounting only, not as command
+proof. Every retained-evidence link carries its exact page, heading, target or
+command, current status, proof role, and limitations into the evidence view.
+
+Current examples reviewers can use:
+
+| Page and command | Source/signature | Runtime result | Meaning |
+|---|---|---|---|
+| [How to Self-Test — Before You Run It](/host/how-to-self-test#before-you-run-it) — `vastai set api-key <API_KEY>` | PASS at pinned [`set__api_key` source](https://github.com/vast-ai/vast-cli/blob/ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd/vastai/cli/commands/auth.py#L199-L204) | FAIL — [retained isolated result](https://github.com/vast-ai/docs/pull/185/files#diff-4f5c08df9a17c2408167b8eeb03e88105ebed7f9651672660450a59648f95d27) | The synthetic value was written, but the file was mode `0644`; this is not proof of real Host authentication. |
+| [How to Self-Test — Run The Test](/host/how-to-self-test#run-the-test) — `vastai self-test machine <machine_id>` | PASS at pinned [`self_test__machine` source](https://github.com/vast-ai/vast-cli/blob/ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd/vastai/cli/commands/machines.py#L699-L717) | UNVALIDATED — no direct retained runtime result | The command exists; successful rental, workload, result, and cleanup behavior are not proved. |
+| [How to Self-Test — Run The Test](/host/how-to-self-test#run-the-test) — `--support-bundle-dir /path/to/output` variant | PASS at pinned [`self_test__machine` source](https://github.com/vast-ai/vast-cli/blob/ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd/vastai/cli/commands/machines.py#L699-L717) | BLOCKED/PARTIAL — [retained attempt](https://github.com/vast-ai/docs/pull/185/files#diff-c886a1940ad73cc0cd932cc4661dee8a9d76e7748a9b6f15ba33f2e7292680e9) | The exact form reached offer selection and produced early-failure bundle evidence, but permission failed before instance creation. |
+| [VMs — Check VM Status](/host/vms#check-vm-status) — `enable_vms.py check` | No immutable helper-source binding | PASS — [retained representative read-only result](https://github.com/vast-ai/docs/pull/185/files#diff-1e34fca669c5308f4e7359fe41ed5ca31fd991ae69f661083bd60a4a36bad660) | The exact query returned `off`; broader status interpretation and state-transition claims remain separate. |
+| [VMs — Disable VM Support](/host/vms#disable-vm-support) — `enable_vms.py off` | UNVALIDATED | UNVALIDATED — prior run was [disqualified as non-representative](https://github.com/vast-ai/docs/pull/185/files#diff-47c65eaaa665010583ea2af9497f03fdb46a7d0cd487c47085ba9ac5a59e47d9) | A suitable idle VM-capable Host, mutation authorization, before/after observation, cleanup, and canonical helper source are still needed. |
+
+The generated [Host CLI registry check](./HOST-DOCS-CLI-COMMAND-CHECK.md)
+links every recognized Host Docs CLI occurrence to its pinned canonical handler
+and explicitly records that no API command was executed.
+
+The initial correction remains in
+[reviewer attempt 01](https://github.com/vast-ai/docs/pull/185/files#diff-0d7ac13642ddf099b2df6fecf9c4944347be90bbde1f1b05a0f1ddab3ad11b31).
+The complete post-change failure, correction, retest, and limitation chain is
+retained separately in
+[reviewer attempt 02](https://github.com/vast-ai/docs/pull/185/files#diff-f2f0f374040d89b371ff06383a605611cf433c0486baf421692bbafe5b2629e8).
+The final repository-local package and its exact artifact identities are in
+[PR-ready packaging attempt 01](https://github.com/vast-ai/docs/pull/185/files#diff-bd9dfc2ac184fc347b116686588390a790a86868cd89511469cf1e4589ad87a3).
 
 - `npm run test-review-context` covers page-scoped Jira context and verifies that
   the overlay exists only on the port 4000 review proxy.

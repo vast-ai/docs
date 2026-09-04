@@ -1,0 +1,388 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vast.ai/schemas/host-docs-live-vv-authorization.schema.json",
+  "title": "Host Docs live V&V authorization record",
+  "description": "Schema for the restricted, outside-Git authorization record required before Host, WAN, Host self-test, or paid-rental execution. It records authorization and secret availability, never secret values.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "authorization_id",
+    "approver",
+    "window",
+    "target",
+    "operations",
+    "wan",
+    "host_self_test",
+    "paid",
+    "credentials",
+    "cleanup",
+    "decision"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "host-docs-live-vv-authorization/1.1"
+    },
+    "authorization_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "approver": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["full_name", "exact_role", "approval_recorded_at"],
+      "properties": {
+        "full_name": {"type": "string", "minLength": 1},
+        "exact_role": {"type": "string", "minLength": 1},
+        "approval_recorded_at": {"type": "string", "format": "date-time"},
+        "approval_reference": {"type": ["string", "null"]}
+      }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end", "timezone"],
+      "properties": {
+        "start": {"type": "string", "format": "date-time"},
+        "end": {"type": "string", "format": "date-time"},
+        "timezone": {"type": "string", "minLength": 1}
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_alias",
+        "active_or_shared",
+        "disposable_or_isolated",
+        "absence_of_affected_workloads_confirmed",
+        "backup_or_recovery_plan_confirmed",
+        "restricted_target_details_present"
+      ],
+      "properties": {
+        "target_alias": {"const": "HOST_VV_TARGET"},
+        "active_or_shared": {"type": "boolean"},
+        "disposable_or_isolated": {"type": "boolean"},
+        "absence_of_affected_workloads_confirmed": {"type": "boolean"},
+        "backup_or_recovery_plan_confirmed": {"type": "boolean"},
+        "restricted_target_details_present": {"type": "boolean"}
+      }
+    },
+    "operations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowed", "forbidden"],
+      "properties": {
+        "allowed": {
+          "$ref": "#/$defs/operation_decisions"
+        },
+        "forbidden": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        }
+      }
+    },
+    "wan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "external_client_available",
+        "confirmed_unused_port_present",
+        "approved_protocols",
+        "temporary_listener_cleanup_approved"
+      ],
+      "properties": {
+        "external_client_available": {"type": "boolean"},
+        "confirmed_unused_port_present": {"type": "boolean"},
+        "approved_protocols": {
+          "type": "array",
+          "items": {"enum": ["TCP", "UDP"]},
+          "uniqueItems": true
+        },
+        "temporary_listener_cleanup_approved": {"type": "boolean"}
+      }
+    },
+    "host_self_test": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_runtime_minutes",
+        "polling_interval_seconds",
+        "automatic_stop_condition",
+        "cleanup_escalation_trigger",
+        "machine_read_permission_confirmed",
+        "one_attempt_at_a_time"
+      ],
+      "properties": {
+        "max_runtime_minutes": {"type": "number", "minimum": 0},
+        "polling_interval_seconds": {"type": "number", "exclusiveMinimum": 0},
+        "automatic_stop_condition": {"type": "string", "minLength": 1},
+        "cleanup_escalation_trigger": {"type": "string", "minLength": 1},
+        "machine_read_permission_confirmed": {"type": "boolean"},
+        "one_attempt_at_a_time": {"type": "boolean"}
+      }
+    },
+    "paid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_spend_usd",
+        "max_runtime_minutes",
+        "polling_interval_seconds",
+        "automatic_stop_condition",
+        "cleanup_escalation_trigger",
+        "client_or_renter_role_confirmed",
+        "provider_hard_spend_cap_available",
+        "bounded_monitored_execution_approved_without_provider_hard_cap",
+        "one_attempt_at_a_time"
+      ],
+      "properties": {
+        "max_spend_usd": {"type": "number", "minimum": 0},
+        "max_runtime_minutes": {"type": "number", "minimum": 0},
+        "polling_interval_seconds": {"type": "number", "exclusiveMinimum": 0},
+        "automatic_stop_condition": {"type": "string", "minLength": 1},
+        "cleanup_escalation_trigger": {"type": "string", "minLength": 1},
+        "client_or_renter_role_confirmed": {"type": "boolean"},
+        "provider_hard_spend_cap_available": {"type": "boolean"},
+        "bounded_monitored_execution_approved_without_provider_hard_cap": {"type": "boolean"},
+        "one_attempt_at_a_time": {"type": "boolean"}
+      }
+    },
+    "credentials": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "client"],
+      "properties": {
+        "host": {"$ref": "#/$defs/credential_availability"},
+        "client": {"$ref": "#/$defs/credential_availability"}
+      }
+    },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authority_granted", "escalation_contact", "cleanup_only_on_uncertainty"],
+      "properties": {
+        "authority_granted": {"type": "boolean"},
+        "escalation_contact": {"type": "string", "minLength": 1},
+        "cleanup_only_on_uncertainty": {"type": "boolean"}
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host_read_only", "host_privileged_read_only", "wan", "host_mutating", "host_self_test", "paid"],
+      "properties": {
+        "host_read_only": {"enum": ["APPROVED", "NOT_APPROVED"]},
+        "host_privileged_read_only": {"enum": ["APPROVED", "NOT_APPROVED"]},
+        "wan": {"enum": ["APPROVED", "NOT_APPROVED"]},
+        "host_mutating": {"enum": ["APPROVED", "NOT_APPROVED"]},
+        "host_self_test": {"enum": ["APPROVED", "NOT_APPROVED"]},
+        "paid": {"enum": ["APPROVED", "NOT_APPROVED"]}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"decision": {"properties": {"host_read_only": {"const": "APPROVED"}}}}
+      },
+      "then": {
+        "properties": {
+          "target": {"properties": {"restricted_target_details_present": {"const": true}}},
+          "operations": {"properties": {"allowed": {"properties": {"ssh_read_only": {"const": true}}}}},
+          "credentials": {"properties": {"host": {"properties": {
+            "role_confirmed": {"const": true},
+            "secure_non_chat_injection_ready": {"const": true},
+            "secret_value_recorded_here": {"const": false}
+          }}}}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"decision": {"properties": {"host_self_test": {"const": "APPROVED"}}}}
+      },
+      "then": {
+        "properties": {
+          "target": {"properties": {"restricted_target_details_present": {"const": true}}},
+          "host_self_test": {"properties": {
+            "max_runtime_minutes": {"exclusiveMinimum": 0},
+            "machine_read_permission_confirmed": {"const": true},
+            "one_attempt_at_a_time": {"const": true}
+          }},
+          "credentials": {"properties": {"host": {"properties": {
+            "role_confirmed": {"const": true},
+            "secure_non_chat_injection_ready": {"const": true},
+            "secret_value_recorded_here": {"const": false}
+          }}}},
+          "cleanup": {"properties": {"authority_granted": {"const": true}}},
+          "operations": {"properties": {"allowed": {"properties": {
+            "host_self_test": {"const": true},
+            "workload_impact": {"const": true}
+          }}}}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"decision": {"properties": {"host_privileged_read_only": {"const": "APPROVED"}}}}
+      },
+      "then": {
+        "properties": {
+          "operations": {"properties": {"allowed": {"properties": {"sudo_read_only": {"const": true}}}}}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"decision": {"properties": {"wan": {"const": "APPROVED"}}}}
+      },
+      "then": {
+        "properties": {
+          "target": {"properties": {"restricted_target_details_present": {"const": true}}},
+          "wan": {
+            "properties": {
+              "external_client_available": {"const": true},
+              "confirmed_unused_port_present": {"const": true},
+              "approved_protocols": {"minItems": 1},
+              "temporary_listener_cleanup_approved": {"const": true}
+            }
+          },
+          "cleanup": {"properties": {"authority_granted": {"const": true}}},
+          "operations": {
+            "properties": {
+              "allowed": {
+                "properties": {"external_port_probe": {"const": true}},
+                "anyOf": [
+                  {"properties": {"temporary_tcp_listener": {"const": true}}},
+                  {"properties": {"temporary_udp_listener": {"const": true}}}
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"decision": {"properties": {"host_mutating": {"const": "APPROVED"}}}}
+      },
+      "then": {
+        "properties": {
+          "target": {"properties": {
+            "disposable_or_isolated": {"const": true},
+            "absence_of_affected_workloads_confirmed": {"const": true},
+            "backup_or_recovery_plan_confirmed": {"const": true}
+          }},
+          "cleanup": {"properties": {"authority_granted": {"const": true}}},
+          "operations": {
+            "properties": {
+              "allowed": {
+                "anyOf": [
+                  {"properties": {"service_mutation": {"const": true}}},
+                  {"properties": {"package_installation": {"const": true}}},
+                  {"properties": {"reboot": {"const": true}}},
+                  {"properties": {"storage_change": {"const": true}}},
+                  {"properties": {"network_change": {"const": true}}},
+                  {"properties": {"workload_impact": {"const": true}}}
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"decision": {"properties": {"paid": {"const": "APPROVED"}}}}
+      },
+      "then": {
+        "properties": {
+          "paid": {
+            "properties": {
+              "max_spend_usd": {"exclusiveMinimum": 0},
+              "max_runtime_minutes": {"exclusiveMinimum": 0},
+              "client_or_renter_role_confirmed": {"const": true},
+              "one_attempt_at_a_time": {"const": true}
+            },
+            "anyOf": [
+              {"properties": {"provider_hard_spend_cap_available": {"const": true}}},
+              {"properties": {"bounded_monitored_execution_approved_without_provider_hard_cap": {"const": true}}}
+            ]
+          },
+          "credentials": {"properties": {"client": {"properties": {
+            "role_confirmed": {"const": true},
+            "secure_non_chat_injection_ready": {"const": true},
+            "secret_value_recorded_here": {"const": false}
+          }}}},
+          "cleanup": {"properties": {
+            "authority_granted": {"const": true},
+            "cleanup_only_on_uncertainty": {"const": true}
+          }},
+          "operations": {
+            "properties": {
+              "allowed": {
+                "properties": {"paid_rental": {"const": true}}
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "operation_decisions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ssh_read_only",
+        "sudo_read_only",
+        "temporary_tcp_listener",
+        "temporary_udp_listener",
+        "external_port_probe",
+        "service_inspection",
+        "service_mutation",
+        "package_installation",
+        "reboot",
+        "storage_change",
+        "network_change",
+        "workload_impact",
+        "host_self_test",
+        "paid_rental"
+      ],
+      "properties": {
+        "ssh_read_only": {"type": "boolean"},
+        "sudo_read_only": {"type": "boolean"},
+        "temporary_tcp_listener": {"type": "boolean"},
+        "temporary_udp_listener": {"type": "boolean"},
+        "external_port_probe": {"type": "boolean"},
+        "service_inspection": {"type": "boolean"},
+        "service_mutation": {"type": "boolean"},
+        "package_installation": {"type": "boolean"},
+        "reboot": {"type": "boolean"},
+        "storage_change": {"type": "boolean"},
+        "network_change": {"type": "boolean"},
+        "workload_impact": {"type": "boolean"},
+        "host_self_test": {"type": "boolean"},
+        "paid_rental": {"type": "boolean"}
+      }
+    },
+    "credential_availability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role_confirmed",
+        "fresh_or_rotation_planned",
+        "secure_non_chat_injection_ready",
+        "secret_value_recorded_here"
+      ],
+      "properties": {
+        "role_confirmed": {"type": "boolean"},
+        "fresh_or_rotation_planned": {"type": "boolean"},
+        "secure_non_chat_injection_ready": {"type": "boolean"},
+        "secret_value_recorded_here": {"const": false}
+      }
+    }
+  }
+}
