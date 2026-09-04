@@ -85,8 +85,12 @@ DESTRUCTIVE_RE = re.compile(
     r"\bshutdown\b|systemctl\s+(?:stop|restart|disable)|\bkill\b)",
     re.I,
 )
+HOST_SELF_TEST_RE = re.compile(
+    r"\bvastai\s+self-test\s+machine\b",
+    re.I,
+)
 PAID_LIVE_RE = re.compile(
-    r"vastai\s+(?:self-test\s+machine|create\s+instance|create\s+bid|rent\b)",
+    r"\bvastai\s+(?:create\s+instance|create\s+bid|create\s+volume|rent\b)",
     re.I,
 )
 MUTATING_RE = re.compile(
@@ -96,7 +100,7 @@ MUTATING_RE = re.compile(
 )
 ACCOUNT_MUTATION_RE = re.compile(
     r"vastai\s+(?:create|destroy|delete|invite|remove|update|set|schedule|cancel|"
-    r"cleanup|defrag|unlist|list\s+machines?\b)",
+    r"cleanup|defrag|unlist|list\s+(?:machines?|volumes?)\b)",
     re.I,
 )
 PRIVILEGED_RE = re.compile(
@@ -119,6 +123,10 @@ ROOT_ACTION_RE = re.compile(
     r"(?:\bsudo\b|\bsu\s+-|/etc/|/var/lib/|\b(?:mount|umount|mkfs(?:\.[\w-]+)?|"
     r"wipefs|cfdisk|update-grub|reboot|shutdown|nvidia-xconfig)\b|"
     r"\bsystemctl\s+(?:stop|restart|disable|mask|enable)\b)",
+    re.I,
+)
+READ_ONLY_HOST_HELPER_RE = re.compile(
+    r"^\s*python(?:3)?\s+/var/lib/vastai_kaalia/enable_vms\.py\s+check\s*$",
     re.I,
 )
 HOST_MACHINE_RE = re.compile(
@@ -199,12 +207,21 @@ def canonical_route(path: Path) -> str:
 
 
 def command_tier(command: str) -> tuple[str, str]:
+    if HOST_SELF_TEST_RE.search(command):
+        return (
+            "host-owned-self-test",
+            "Run from an authenticated Host-owner account against a representative idle Host; record CLI SHA, machine, result, and cleanup/return-to-idle proof.",
+        )
     if PAID_LIVE_RE.search(command):
         return (
             "paid-live",
             "Use an approved test machine/account and budget; record CLI SHA, image digest, machine, instance, cost, and result.",
         )
-    if DESTRUCTIVE_RE.search(command) or MUTATING_RE.search(command):
+    if (
+        DESTRUCTIVE_RE.search(command)
+        or MUTATING_RE.search(command)
+        or ACCOUNT_MUTATION_RE.search(command)
+    ):
         return (
             "destructive-or-mutating",
             "Verify in a disposable/non-production environment with peer review and recorded before/after state.",
@@ -213,6 +230,11 @@ def command_tier(command: str) -> tuple[str, str]:
         return (
             "credential-bearing",
             "Verify only with redacted placeholders and an approved test credential; confirm no secret appears in logs or history.",
+        )
+    if READ_ONLY_HOST_HELPER_RE.fullmatch(command):
+        return (
+            "environment-dependent",
+            "Verify on a representative Host without assuming root; retain the exact read-only state and environment prerequisites.",
         )
     if PRIVILEGED_RE.search(command):
         return (
@@ -242,9 +264,14 @@ def command_execution_access(command: str) -> dict[str, Any]:
     precedence-based and can hide intersections such as a credential-bearing
     installer that also uses sudo.
     """
+    host_self_test = bool(HOST_SELF_TEST_RE.search(command))
     paid_resource = bool(PAID_LIVE_RE.search(command))
-    root_required = bool(ROOT_ACTION_RE.search(command))
-    host_machine = root_required or bool(HOST_MACHINE_RE.search(command))
+    read_only_host_helper = bool(READ_ONLY_HOST_HELPER_RE.fullmatch(command))
+    root_required = bool(ROOT_ACTION_RE.search(command)) and not read_only_host_helper
+    host_machine = (
+        host_self_test or read_only_host_helper or root_required
+        or bool(HOST_MACHINE_RE.search(command))
+    )
     external_client = bool(EXTERNAL_CLIENT_RE.search(command))
     account_authentication = bool(re.search(r"\bvastai\s", command, re.I)) or bool(
         re.search(r"console\.vast\.ai/api/", command, re.I)
@@ -255,7 +282,7 @@ def command_execution_access(command: str) -> dict[str, Any]:
         or ACCOUNT_MUTATION_RE.search(command)
     )
     credential = bool(SECRET_RE.search(command))
-    matching_environment = bool(ENVIRONMENT_RE.search(command))
+    matching_environment = read_only_host_helper or bool(ENVIRONMENT_RE.search(command))
 
     if paid_resource and root_required:
         group = "paid-and-host-root"
@@ -266,6 +293,9 @@ def command_execution_access(command: str) -> dict[str, Any]:
     elif root_required:
         group = "host-root"
         reason = "Conservatively requires a disposable supported Host with root or privileged access; no paid resource is created by the documented command."
+    elif host_self_test:
+        group = "host-machine-no-root"
+        reason = "Requires Host-owner account authentication and a representative idle Host; retain the self-test result and cleanup/return-to-idle proof."
     elif host_machine:
         group = "host-machine-no-root"
         reason = "Requires a representative Host machine or Host artifact, but the documented command does not itself require root."
@@ -276,6 +306,9 @@ def command_execution_access(command: str) -> dict[str, Any]:
     additional_gates: list[str] = []
     for gate, required in (
         ("account-authentication", account_authentication),
+        ("host-owner-account-authentication", host_self_test),
+        ("representative-idle-host", host_self_test),
+        ("cleanup-proof", host_self_test),
         ("credential", credential),
         ("destructive-or-mutating", destructive_or_mutating),
         ("matching-environment", matching_environment),
@@ -801,7 +834,11 @@ def render_markdown(inventory: dict[str, Any]) -> str:
         "",
         f"- Source revision: `{inventory['source_revision']}`",
         f"- Content fingerprint: `{inventory['content_fingerprint']}`",
-        f"- Pages scanned: **{scope['pages']}** ({', '.join(f'{count} {name}' for name, count in scope['source_pages'].items())})",
+        f"- Primary Host pages scanned: **{scope['source_pages']['authored'] + scope['source_pages']['generated-self-test']}** "
+        f"({scope['source_pages']['authored']} authored, {scope['source_pages']['generated-self-test']} generated Self-Test reference)",
+        f"- Central-reference CLI/SDK support routes scanned: **{scope['source_pages']['generated-cli-sdk']}** "
+        "(support layers, not separate Host workflows)",
+        f"- Total Host route files scanned: **{scope['pages']}**",
         f"- Imported Host snippet dependencies scanned: **{scope['rendered_dependency_files']}**",
         f"- Unique verification targets: **{scope['unique_items']}** across **{scope['occurrences']}** occurrences",
         f"- Structural/local-reference issues: **{summary['structural_or_reference_issues']}**",
@@ -838,6 +875,7 @@ def render_markdown(inventory: dict[str, Any]) -> str:
         "local-safe": "Help/availability and static syntax can be checked locally; placeholders must remain non-production.",
         "account-read-only": "Needs current CLI plus a non-production authenticated account; should not mutate state.",
         "environment-dependent": "Needs matching OS, GPU, Docker, storage, or network conditions.",
+        "host-owned-self-test": "Needs an authenticated Host-owner account, a representative idle Host, and cleanup/return-to-idle proof; it is not a client-paid rental test.",
         "privileged-host": "Needs a disposable supported host and records of before/after state.",
         "credential-bearing": "Needs an approved test credential and redaction/logging review.",
         "destructive-or-mutating": "Needs disposable/non-production state and peer-reviewed execution.",
@@ -854,7 +892,7 @@ def render_markdown(inventory: dict[str, Any]) -> str:
             "",
             "## Command execution access groups",
             "",
-            "The 176 command targets are also grouped by the resources needed for representative execution. These access groups are independent of the safety tier and do **not** authorize paid, root, credential-bearing, destructive, or production actions.",
+            f"The {summary['command_count']} command targets are also grouped by the resources needed for representative execution. These access groups are independent of the safety tier and do **not** authorize paid, root, credential-bearing, destructive, or production actions.",
             "",
             "See [Host Docs command access groups](./HOST-DOCS-COMMAND-ACCESS.md) for every command ID, source line, access group, and additional gate.",
             "",
@@ -1141,7 +1179,8 @@ def main() -> int:
                 print(f"stale: {path.relative_to(ROOT)}", file=sys.stderr)
             return 1
         print(
-            f"Host Docs inventory is current: {inventory['scope']['pages']} pages, "
+            f"Host Docs inventory is current: {inventory['scope']['pages']} route files "
+            f"(40 primary pages + 33 central-reference support layers), "
             f"{inventory['scope']['unique_items']} unique targets; "
             f"{inventory['summary']['command_count']} commands reconcile across "
             f"{len(COMMAND_ACCESS_GROUPS)} execution-access groups."

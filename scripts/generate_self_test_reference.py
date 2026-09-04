@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
 import html
 import os
 import re
@@ -56,9 +57,10 @@ def repo_ref(repo: Path) -> dict[str, str]:
         or run_git(repo, "remote", "get-url", "origin")
         or repo.name
     )
-    if "vast-ai/vast-cli" in remote or "jjziets/vast-python" in remote:
+    remote_name = remote.rstrip("/").removesuffix(".git").rsplit("/", 1)[-1]
+    if "vast-ai/vast-cli" in remote or remote_name in {"vast-cli", "vast-python"}:
         label = "vast-ai/vast-cli"
-    elif "vast-ai/self-test" in remote or "jjziets/self-test" in remote:
+    elif "vast-ai/self-test" in remote or remote_name == "self-test":
         label = "vast-ai/self-test"
     else:
         label = repo.name
@@ -509,7 +511,7 @@ def render_ports_guidance() -> str:
 def render_no_response_guidance() -> str:
     return "\n".join(
         [
-            '<a id="no-response-120s" />',
+            '<span id="no-response-120s" aria-hidden="true" />',
             "### No Response Or Progress Timeout",
             "",
             "A `no response` or progress timeout means the CLI could not get usable progress from the temporary self-test instance after it was created. This is usually a connectivity or startup problem, not a generic verification decision.",
@@ -536,7 +538,7 @@ def render_no_response_guidance() -> str:
 def render_not_rentable_guidance() -> str:
     return "\n".join(
         [
-            '<a id="machine-not-rentable" />',
+            '<span id="machine-not-rentable" aria-hidden="true" />',
             "### Not Found Or Not Rentable",
             "",
             "The old `not found or not rentable` wording hid several different states. The newer CLI tries to disambiguate the state before giving guidance.",
@@ -557,7 +559,7 @@ def render_not_rentable_guidance() -> str:
 def render_vericode_guidance() -> str:
     return "\n".join(
         [
-            '<a id="vericode-8" />',
+            '<span id="vericode-8" aria-hidden="true" />',
             "## vericode=8 And Port Networking Issues",
             "",
             "[Glossary: vericode](/host/glossary#vericode)",
@@ -572,7 +574,7 @@ def render_vericode_guidance() -> str:
 def render_nccl_guidance() -> str:
     return "\n".join(
         [
-            '<a id="nccl-failed" />',
+            '<span id="nccl-failed" aria-hidden="true" />',
             "### `nccl_failed` Deep Dive",
             "",
             "`nccl_failed` means the temporary self-test instance could not initialize and synchronize NCCL workers across the visible GPUs. It is a multi-GPU communication failure, not proof of one specific root cause.",
@@ -747,6 +749,11 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="MDX file to write.",
     )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="fail if the output is not byte-for-byte current; do not write it",
+    )
     return parser.parse_args()
 
 
@@ -762,8 +769,25 @@ def main() -> int:
         raise SystemExit(f"self-test remote.py not found: {self_test}")
 
     page = render_page(vast_cli, self_test)
+    if args.check:
+        if not output.is_file():
+            print(f"FAIL: generated output does not exist: {output}", file=sys.stderr)
+            return 1
+        current = output.read_text(encoding="utf-8")
+        if current != page:
+            expected_digest = hashlib.sha256(page.encode("utf-8")).hexdigest()
+            current_digest = hashlib.sha256(current.encode("utf-8")).hexdigest()
+            print(
+                "FAIL: generated output is stale: "
+                f"{output} (current sha256={current_digest}, expected sha256={expected_digest})",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"PASS: generated output is current: {output}")
+        return 0
+
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(page)
+    output.write_text(page, encoding="utf-8")
     print(f"Wrote {output}")
     return 0
 

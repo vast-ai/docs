@@ -44,7 +44,9 @@ GLOBAL_OPTIONS = {
 }
 
 REGISTRY_SCRIPT = r"""
+import inspect
 import json
+from pathlib import Path
 from vastai.cli.main import parser
 from vastai.cli.commands import (
     instances, offers, machines, teams, keys, endpoints,
@@ -61,10 +63,28 @@ for name, command_parser in parser.subparsers().choices.items():
             options.update(action.option_strings)
         elif action.dest != "help":
             positionals.append(action.dest)
+    handler = command_parser.get_default("func")
+    handler_source = None
+    if callable(handler):
+        source_file = inspect.getsourcefile(handler)
+        if source_file:
+            source_lines, line_start = inspect.getsourcelines(handler)
+            definition_offset = next(
+                (index for index, line in enumerate(source_lines)
+                 if line.lstrip().startswith(("def ", "async def "))),
+                0,
+            )
+            handler_source = {
+                "path": Path(source_file).resolve().relative_to(Path.cwd().resolve()).as_posix(),
+                "symbol": handler.__name__,
+                "line_start": line_start,
+                "line_end": line_start + definition_offset,
+            }
     registry[name] = {
         "options": sorted(options),
         "positionals": positionals,
         "hidden": bool(getattr(command_parser, "hidden", False)),
+        "handler_source": handler_source,
     }
 print(json.dumps(registry, sort_keys=True))
 """
@@ -114,72 +134,105 @@ def finding_id(file: str, line: int, executable: str, signature: str) -> str:
     return "cli-" + hashlib.sha256(raw.encode()).hexdigest()[:10]
 
 
-def extract_invocations(registry: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+def logical_source_lines(text: str) -> list[tuple[int, str]]:
+    """Join shell backslash continuations while retaining their first line."""
+
+    physical = text.splitlines()
+    logical: list[tuple[int, str]] = []
+    index = 0
+    while index < len(physical):
+        start = index + 1
+        value = physical[index]
+        while value.rstrip().endswith("\\") and index + 1 < len(physical):
+            index += 1
+            value += "\n" + physical[index]
+        logical.append((start, value))
+        index += 1
+    return logical
+
+
+def extract_invocations_from_text(
+    relative: str,
+    text: str,
+    registry: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     command_names = set(registry)
+    for line_number, line in logical_source_lines(text):
+        matches = list(INVOCATION_RE.finditer(line))
+        for index, match in enumerate(matches):
+            prefix = line[: match.start()].rstrip().casefold()
+            if prefix.endswith("from"):
+                continue
 
+            executable, first, second = match.groups()
+            if first.isupper():
+                continue
+            candidate_two = f"{first} {second}" if second else ""
+            if candidate_two in command_names:
+                signature = candidate_two
+            elif first in command_names:
+                signature = first
+            else:
+                signature = candidate_two or first
+
+            segment_end = matches[index + 1].start() if index + 1 < len(matches) else len(line)
+            raw_segment = line[match.start() : segment_end]
+            segment = clean_segment(raw_segment)
+            flag_source = re.sub(r"'[^']*'|\"[^\"]*\"", "", raw_segment)
+            flags = sorted(set(OPTION_RE.findall(flag_source)))
+            accepted = set(registry.get(signature, {}).get("options", [])) | GLOBAL_OPTIONS
+            unknown_flags = sorted(flag for flag in flags if flag not in accepted)
+
+            if executable != "vastai":
+                status = "wrong-executable"
+                detail = "Use `vastai`; the current packaged console script does not register `vast`."
+            elif signature not in command_names:
+                if any(name.startswith(first + " ") for name in command_names):
+                    status = "command-family-reference"
+                    detail = "This names a registered command family, not a runnable leaf command."
+                elif "..." in raw_segment or first in {"command", "commands"}:
+                    status = "incomplete-placeholder"
+                    detail = "This is a placeholder reference, not a runnable command line."
+                else:
+                    status = "unknown-command"
+                    detail = f"`{signature}` is not registered by the selected Vast CLI source."
+            elif unknown_flags:
+                status = "unknown-option"
+                detail = "Not registered for this command or globally: " + ", ".join(unknown_flags)
+            else:
+                status = "pass"
+                detail = "Executable, command signature, and documented options exist in the selected CLI registry."
+
+            records.append(
+                {
+                    "id": finding_id(relative, line_number, executable, signature),
+                    "file": relative,
+                    "line": line_number,
+                    "invocation": segment,
+                    "executable": executable,
+                    "signature": signature,
+                    "flags": flags,
+                    "unknown_flags": unknown_flags,
+                    "status": status,
+                    "detail": detail,
+                    "handler_source": registry.get(signature, {}).get("handler_source"),
+                }
+            )
+    return records
+
+
+def extract_invocations(registry: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
     for path in source_paths():
         relative = path.relative_to(ROOT).as_posix()
-        for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
-            matches = list(INVOCATION_RE.finditer(line))
-            for index, match in enumerate(matches):
-                prefix = line[: match.start()].rstrip().casefold()
-                if prefix.endswith("from"):
-                    continue
-
-                executable, first, second = match.groups()
-                if first.isupper():
-                    continue
-                candidate_two = f"{first} {second}" if second else ""
-                if candidate_two in command_names:
-                    signature = candidate_two
-                elif first in command_names:
-                    signature = first
-                else:
-                    signature = candidate_two or first
-
-                segment_end = matches[index + 1].start() if index + 1 < len(matches) else len(line)
-                raw_segment = line[match.start() : segment_end]
-                segment = clean_segment(raw_segment)
-                flag_source = re.sub(r"'[^']*'|\"[^\"]*\"", "", raw_segment)
-                flags = sorted(set(OPTION_RE.findall(flag_source)))
-                accepted = set(registry.get(signature, {}).get("options", [])) | GLOBAL_OPTIONS
-                unknown_flags = sorted(flag for flag in flags if flag not in accepted)
-
-                if executable != "vastai":
-                    status = "wrong-executable"
-                    detail = "Use `vastai`; the current packaged console script does not register `vast`."
-                elif signature not in command_names:
-                    if any(name.startswith(first + " ") for name in command_names):
-                        status = "command-family-reference"
-                        detail = "This names a registered command family, not a runnable leaf command."
-                    elif "..." in raw_segment or first in {"command", "commands"}:
-                        status = "incomplete-placeholder"
-                        detail = "This is a placeholder reference, not a runnable command line."
-                    else:
-                        status = "unknown-command"
-                        detail = f"`{signature}` is not registered by the selected Vast CLI source."
-                elif unknown_flags:
-                    status = "unknown-option"
-                    detail = "Not registered for this command or globally: " + ", ".join(unknown_flags)
-                else:
-                    status = "pass"
-                    detail = "Executable, command signature, and documented options exist in the selected CLI registry."
-
-                records.append(
-                    {
-                        "id": finding_id(relative, line_number, executable, signature),
-                        "file": relative,
-                        "line": line_number,
-                        "invocation": segment,
-                        "executable": executable,
-                        "signature": signature,
-                        "flags": flags,
-                        "unknown_flags": unknown_flags,
-                        "status": status,
-                        "detail": detail,
-                    }
-                )
+        records.extend(
+            extract_invocations_from_text(
+                relative,
+                path.read_text(encoding="utf-8"),
+                registry,
+            )
+        )
     return records
 
 
@@ -194,7 +247,7 @@ def build_result(vast_cli: Path) -> dict[str, Any]:
     source_branch = git_value(vast_cli, "branch", "--show-current") or "detached"
     source_status = git_value(vast_cli, "status", "--porcelain")
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "vast_cli_source": {
             "revision": source_revision,
             "branch": source_branch,
@@ -261,6 +314,7 @@ def render_markdown(result: dict[str, Any]) -> str:
         "```",
         "",
         "The selected checkout should be a clean, explicitly recorded Vast CLI revision. The verifier imports argparse metadata only; it does not authenticate, call the Vast API, or execute a documented operation.",
+        "A PASS below proves only that the executable, command signature, and documented options are registered in the pinned source. Runtime behavior requires separate retained execution evidence.",
         "",
         "## Actionable findings",
         "",
@@ -293,16 +347,29 @@ def render_markdown(result: dict[str, Any]) -> str:
             "",
             "## All documented invocation occurrences",
             "",
-            "| Location | Signature | Options | Status |",
-            "|---|---|---|---|",
+            "| Location | Signature | Options | Canonical handler | Status |",
+            "|---|---|---|---|---|",
         ]
     )
     for record in result["records"]:
         location = f"[{record['file']}:{record['line']}](./{record['file']}#L{record['line']})"
         options = ", ".join(f"`{flag}`" for flag in record["flags"]) or "—"
+        handler = record["handler_source"]
+        if handler:
+            source_url = (
+                "https://github.com/vast-ai/vast-cli/blob/"
+                f"{source['revision']}/{handler['path']}"
+                f"#L{handler['line_start']}-L{handler['line_end']}"
+            )
+            handler_label = (
+                f"{handler['path']}:{handler['line_start']}-{handler['line_end']}"
+            )
+            handler_cell = f"[{handler_label}]({source_url}) · `{handler['symbol']}`"
+        else:
+            handler_cell = "—"
         lines.append(
             f"| {location} | `{record['executable']} {markdown_escape(record['signature'])}` | "
-            f"{options} | {record['status']} |"
+            f"{options} | {handler_cell} | {record['status']} |"
         )
     lines.append("")
     return "\n".join(lines)
