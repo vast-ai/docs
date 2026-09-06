@@ -15,6 +15,7 @@ let targetOrigin;
 let reviewOrigin;
 let feedbackDir;
 let reviewOutput = '';
+let reviewSourceSha256AtStartup;
 
 function listen(server, port = 0) {
   return new Promise((resolve, reject) => {
@@ -55,6 +56,46 @@ async function contextFor(pathname) {
   const response = await fetch(`${reviewOrigin}/__review__/api/context?path=${encodeURIComponent(pathname)}`);
   assert.equal(response.status, 200);
   return response.json();
+}
+
+const SOURCE_PASSAGE_KEYS = [
+  'end', 'occurrence', 'occurrences', 'redacted', 'section', 'start', 'text',
+];
+
+async function sourceLinesFor(claim) {
+  return (await fs.readFile(path.join(ROOT, claim.sourceLocation.file), 'utf8')).split(/\r?\n/);
+}
+
+function sourceLiteral(lines, { start, end }) {
+  return lines.slice(start - 1, end).join('\n').trim();
+}
+
+function assertSourcePassageContract(claim, sourceLines) {
+  assert.ok(claim.sourcePassages.length > 0, `${claim.id} has no source passages`);
+  for (const passage of claim.sourcePassages) {
+    assert.deepEqual(Object.keys(passage).sort(), SOURCE_PASSAGE_KEYS);
+    assert.ok(Number.isInteger(passage.start) && Number.isInteger(passage.end));
+    assert.ok(passage.start > 0 && passage.end >= passage.start);
+    assert.equal(typeof passage.text, 'string');
+    assert.ok(passage.text.length > 0);
+    assert.equal(typeof passage.section, 'string');
+    assert.ok(claim.checkedContent.sections.includes(passage.section));
+    assert.equal(typeof passage.redacted, 'boolean');
+    assert.ok(Number.isInteger(passage.occurrence) && Number.isInteger(passage.occurrences));
+    assert.ok(passage.occurrences > 0);
+    assert.ok(passage.occurrence >= 0 && passage.occurrence < passage.occurrences);
+    assert.ok(claim.sourceLocation.spans.some((span) =>
+      passage.start >= span.start && passage.end <= span.end),
+    `${claim.id} passage ${passage.start}-${passage.end} is outside its declared source spans`);
+    if (!passage.redacted) assert.equal(passage.text, sourceLiteral(sourceLines, passage));
+  }
+}
+
+function assertCurrentClaimState(claim, { status, evidenceIds, dispositionEvidenceIds }) {
+  assert.equal(claim.current.status, status);
+  assert.deepEqual(claim.current.evidenceIds, evidenceIds);
+  assert.deepEqual(claim.current.evidence.map((item) => item.id), evidenceIds);
+  assert.deepEqual(claim.current.dispositionEvidenceIds, dispositionEvidenceIds);
 }
 
 async function postJson(pathname, payload) {
@@ -523,6 +564,8 @@ before(async () => {
   targetOrigin = `http://127.0.0.1:${targetPort}`;
   reviewOrigin = `http://127.0.0.1:${reviewPort}`;
   feedbackDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vast-review-context-'));
+  reviewSourceSha256AtStartup = crypto.createHash('sha256')
+    .update(await fs.readFile(path.join(ROOT, 'review-server.mjs'))).digest('hex');
   reviewProcess = spawn(process.execPath, [
     'review-server.mjs', '--port', String(reviewPort), '--target', targetOrigin, '--dir', feedbackDir,
   ], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -545,6 +588,15 @@ test('Review server rejects non-loopback bind addresses', async () => {
   assert.notEqual(result.code, 0);
   assert.equal(result.signal, null);
   assert.match(result.output, /--host must be loopback-only/);
+});
+
+test('Context responses identify the exact review-server source loaded at startup', async () => {
+  const response = await fetch(`${reviewOrigin}/__review__/api/context?path=%2Fhost%2Fhost-teams`);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('x-vast-review-source-sha256'), reviewSourceSha256AtStartup);
+  const currentSourceSha256 = crypto.createHash('sha256')
+    .update(await fs.readFile(path.join(ROOT, 'review-server.mjs'))).digest('hex');
+  assert.equal(response.headers.get('x-vast-review-source-sha256'), currentSourceSha256);
 });
 
 test('Host Teams shows its Jira sources and only its page blockers', async () => {
@@ -952,6 +1004,258 @@ test('Canonical material-claim, citation, and page dispositions remain fully acc
   assert.deepEqual(countBy(contexts, (context) => context.verification.materialDisposition.status), {
     FAIL: 26, BLOCKED: 3, UNVALIDATED: 11,
   });
+});
+
+test('Material claims expose exact documentation source locations without promoting status', async () => {
+  const context = await contextFor('/host/verification-stages');
+  const claim = context.verification.materialClaims.find((item) =>
+    item.id === 'MCL-f9f3ebb712a5588d');
+
+  assert.ok(claim);
+  assert.deepEqual(claim.checkedContent, {
+    route: '/host/verification-stages', pageTitle: 'Verification Stages', sections: ['Introduction'],
+  });
+  assert.equal(claim.claim.text,
+    'Verification is automated. There is no manual review step for ordinary host verification.');
+  assert.deepEqual(claim.sourceLocation, {
+    file: 'host/verification-stages.mdx',
+    spans: [{ start: 16, end: 16 }],
+    textSha256: '73d7d624e9122cb81d36075a6962e3540c84d466943d1b102682a22564577298',
+  });
+
+  const sourceLines = (await fs.readFile(path.join(ROOT, claim.sourceLocation.file), 'utf8')).split(/\r?\n/);
+  const boundText = claim.sourceLocation.spans.flatMap(({ start, end }) =>
+    sourceLines.slice(start - 1, end)).join('\n');
+  assert.equal(boundText, claim.claim.text);
+  assert.equal(crypto.createHash('sha256').update(boundText).digest('hex'),
+    claim.sourceLocation.textSha256);
+
+  assert.equal(claim.current.status, 'UNVALIDATED');
+  assert.deepEqual(claim.current.evidenceIds, []);
+  assert.deepEqual(claim.current.evidence, []);
+  assert.deepEqual(claim.current.dispositionEvidenceIds,
+    ['EV-HOST-MATERIAL-CLAIM-DISPOSITIONS-01']);
+  assert.equal(claim.current.dispositionEvidence[0].binding, claim.id);
+});
+
+test('Material claim source passages expose the exact bound block without changing disposition', async () => {
+  const context = await contextFor('/host/verification-stages');
+  const claim = context.verification.materialClaims.find((item) =>
+    item.id === 'MCL-f9f3ebb712a5588d');
+
+  assert.ok(claim);
+  const sourceLines = await sourceLinesFor(claim);
+  assertSourcePassageContract(claim, sourceLines);
+  assert.deepEqual(claim.sourcePassages, [{
+    text: 'Verification is automated. There is no manual review step for ordinary host verification.',
+    section: 'Introduction', start: 16, end: 16, redacted: false, occurrence: 0, occurrences: 1,
+  }]);
+  assertCurrentClaimState(claim, {
+    status: 'UNVALIDATED', evidenceIds: [],
+    dispositionEvidenceIds: ['EV-HOST-MATERIAL-CLAIM-DISPOSITIONS-01'],
+  });
+});
+
+test('Volume source passages preserve every declared multi-span section and disposition', async () => {
+  const context = await contextFor('/host/volume-offers');
+  const claims = new Map(context.verification.materialClaims.map((claim) => [claim.id, claim]));
+  const expected = new Map([
+    ['VOL-C06', {
+      spans: [{ start: 21, end: 21 }, { start: 36, end: 36 }],
+      sections: ['Introduction', 'Identifiers And Values'], status: 'PASS', passageCount: 2,
+    }],
+    ['VOL-C07', {
+      spans: [{ start: 24, end: 24 }, { start: 101, end: 109 }],
+      sections: ['Introduction', 'Command Map'], status: 'PASS', passageCount: 10,
+    }],
+    ['VOL-C13', {
+      spans: [{ start: 41, end: 41 }, { start: 77, end: 77 }],
+      sections: ['Volume Lifecycle', 'Shared Disk Capacity'], status: 'BLOCKED', passageCount: 2,
+    }],
+  ]);
+
+  for (const [id, contract] of expected) {
+    const claim = claims.get(id);
+    assert.ok(claim, id);
+    assert.deepEqual(claim.sourceLocation.spans, contract.spans);
+    assert.deepEqual(claim.checkedContent.sections, contract.sections);
+    assert.equal(claim.sourcePassages.length, contract.passageCount);
+    assert.deepEqual([...new Set(claim.sourcePassages.map((passage) => passage.section))],
+      contract.sections);
+    const sourceLines = await sourceLinesFor(claim);
+    assertSourcePassageContract(claim, sourceLines);
+    const boundText = claim.sourceLocation.spans.flatMap(({ start, end }) =>
+      sourceLines.slice(start - 1, end)).join('\n');
+    assert.equal(crypto.createHash('sha256').update(boundText).digest('hex'),
+      claim.sourceLocation.textSha256);
+    assertCurrentClaimState(claim, {
+      status: contract.status,
+      evidenceIds: ['EV-HOST-VOLUME-OFFERS-STATIC-SOURCE-01'],
+      dispositionEvidenceIds: ['EV-HOST-MATERIAL-CLAIM-DISPOSITIONS-01'],
+    });
+  }
+
+  assert.deepEqual(claims.get('VOL-C07').sourcePassages.map(({ start, end }) => ({ start, end })), [
+    { start: 24, end: 24 },
+    ...Array.from({ length: 9 }, (_, index) => ({ start: 101 + index, end: 101 + index })),
+  ]);
+});
+
+test('Source passages split spans containing prose and fenced commands into contained blocks', async () => {
+  const context = await contextFor('/host/volume-offers');
+  const claims = new Map(context.verification.materialClaims.map((claim) => [claim.id, claim]));
+  const contracts = new Map([
+    ['VOL-C21', {
+      span: { start: 51, end: 60 },
+      passages: [{ start: 51, end: 51 }, { start: 53, end: 58 }, { start: 60, end: 60 }],
+    }],
+    ['VOL-C22', {
+      span: { start: 62, end: 69 },
+      passages: [{ start: 62, end: 62 }, { start: 64, end: 69 }],
+    }],
+  ]);
+
+  for (const [id, contract] of contracts) {
+    const claim = claims.get(id);
+    assert.ok(claim, id);
+    assert.deepEqual(claim.sourceLocation.spans, [contract.span]);
+    assert.deepEqual(claim.sourcePassages.map(({ start, end }) => ({ start, end })), contract.passages);
+    const sourceLines = await sourceLinesFor(claim);
+    assertSourcePassageContract(claim, sourceLines);
+    assert.ok(claim.sourcePassages.some((passage) => passage.text.startsWith('```bash\n')));
+    assert.ok(claim.sourcePassages.some((passage) => !passage.text.startsWith('```')));
+    assertCurrentClaimState(claim, {
+      status: 'PASS', evidenceIds: ['EV-HOST-VOLUME-OFFERS-STATIC-SOURCE-01'],
+      dispositionEvidenceIds: ['EV-HOST-MATERIAL-CLAIM-DISPOSITIONS-01'],
+    });
+  }
+});
+
+test('Repeated identical source passages expose stable source occurrence ordinals', async () => {
+  const context = await contextFor('/host/network-ports');
+  const claims = ['MCL-11c443771c46d426', 'MCL-1cbdc60b57d73107'].map((id) => {
+    const claim = context.verification.materialClaims.find((item) => item.id === id);
+    assert.ok(claim, id);
+    return claim;
+  });
+
+  const expectedStarts = [79, 100];
+  for (const [index, claim] of claims.entries()) {
+    const sourceLines = await sourceLinesFor(claim);
+    assertSourcePassageContract(claim, sourceLines);
+    assert.deepEqual(claim.sourcePassages, [{
+      text: 'From Windows PowerShell outside the LAN:',
+      section: 'Test Ports From Outside The LAN', start: expectedStarts[index], end: expectedStarts[index],
+      redacted: false, occurrence: index, occurrences: 2,
+    }]);
+    assertCurrentClaimState(claim, {
+      status: 'UNVALIDATED', evidenceIds: [],
+      dispositionEvidenceIds: ['EV-HOST-MATERIAL-CLAIM-DISPOSITIONS-01'],
+    });
+  }
+  assert.equal(claims[0].sourcePassages[0].text, claims[1].sourcePassages[0].text);
+});
+
+test('Source passage projection keeps numeric and scoped-identifier sanitizers active', async () => {
+  const cases = [
+    {
+      route: '/host/maintenance-windows', id: 'MCL-5789114e2e680769',
+      raw: '1782950400', replacement: '[identifier]',
+      expected: '```bash\nvastai schedule maint 8207 --sdate [identifier] --duration 2 --maintenance_category power\n```',
+      dispositionEvidenceIds: [
+        'EV-HOST-MATERIAL-CLAIM-DISPOSITIONS-01', 'EV-HOST-EXACT-COMMAND-CLAIM-BINDINGS-01',
+      ],
+    },
+    {
+      route: '/host/notifications', id: 'MCL-d858cb9cf7cb85ca',
+      raw: 'host:machine_offline', replacement: 'host=[identifier]',
+      expected: 'Notification types are identified by a `key` with a context prefix. Host events use the `host:` prefix, such as `host=[identifier]`.',
+      dispositionEvidenceIds: ['EV-HOST-MATERIAL-CLAIM-DISPOSITIONS-01'],
+    },
+  ];
+
+  for (const contract of cases) {
+    const context = await contextFor(contract.route);
+    const claim = context.verification.materialClaims.find((item) => item.id === contract.id);
+    assert.ok(claim, contract.id);
+    const sourceLines = await sourceLinesFor(claim);
+    assertSourcePassageContract(claim, sourceLines);
+    assert.equal(claim.sourcePassages.length, 1);
+    const passage = claim.sourcePassages[0];
+    assert.equal(passage.redacted, true);
+    assert.match(sourceLiteral(sourceLines, passage), new RegExp(contract.raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.doesNotMatch(passage.text, new RegExp(contract.raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.match(passage.text, new RegExp(contract.replacement.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.equal(passage.text, contract.expected);
+    assertCurrentClaimState(claim, {
+      status: 'UNVALIDATED', evidenceIds: [],
+      dispositionEvidenceIds: contract.dispositionEvidenceIds,
+    });
+  }
+});
+
+test('Frame-caption source passages retain wrapper markup for the reader projection', async () => {
+  const context = await contextFor('/host/account-hosting-agreement');
+  const claim = context.verification.materialClaims.find((item) =>
+    item.id === 'MCL-e7e229ef151582f6');
+  assert.ok(claim);
+  const sourceLines = await sourceLinesFor(claim);
+  assertSourcePassageContract(claim, sourceLines);
+  assert.deepEqual(claim.sourcePassages, [{
+    text: '<Frame caption="Host-enabled console navigation showing the Machines link under Hosting.">',
+    section: 'How to accept the hosting agreement', start: 28, end: 28,
+    redacted: false, occurrence: 0, occurrences: 1,
+  }]);
+  assert.equal(claim.claim.text,
+    'Host-enabled console navigation showing the Machines link under Hosting.');
+  assertCurrentClaimState(claim, {
+    status: 'UNVALIDATED', evidenceIds: [],
+    dispositionEvidenceIds: ['EV-HOST-MATERIAL-CLAIM-DISPOSITIONS-01'],
+  });
+
+  const overlay = await (await fetch(`${reviewOrigin}/__review__/overlay.js`)).text();
+  assert.match(overlay, /\(claim\.sourcePassages \|\| \[\]\)\.map\(passageWording\)/);
+  assert.match(overlay, /var caption = text\.match\(\/\^<Frame/);
+});
+
+test('Material-claim evidence links accept only evidence attached to that wording', async () => {
+  const context = await contextFor('/host/how-to-self-test');
+  const claim = context.verification.materialClaims.find((item) =>
+    item.id === 'MCL-9ad33b25fd88c5cb');
+
+  assert.ok(claim);
+  assert.equal(claim.current.status, 'UNVALIDATED');
+  assert.equal(claim.current.dispositionEvidenceRole, 'PARTIAL_EVIDENCE_BOUND_STATUS_UNCHANGED');
+  assert.deepEqual(claim.current.evidenceIds, ['EV-CLI-SET-API-KEY-PERMISSIONS-01']);
+  assert.deepEqual(claim.current.evidence.map((item) => item.id),
+    ['EV-CLI-SET-API-KEY-PERMISSIONS-01']);
+
+  const evidenceRef = claim.current.evidence[0].evidenceRef;
+  const allowed = await fetch(`${reviewOrigin}/__review__/evidence?ref=${
+    encodeURIComponent(evidenceRef)}&binding=${encodeURIComponent(claim.id)}`);
+  assert.equal(allowed.status, 200);
+  assert.match(allowed.headers.get('content-type'), /^text\/html/);
+  const html = await allowed.text();
+  assert.match(html, /^Supporting evidence attached to this wording$/m);
+  assert.match(html, /^Page: \/host\/how-to-self-test$/m);
+  assert.match(html, /^Heading: Before You Run It$/m);
+  assert.match(html, /^Wording: \[bash\] vastai set api-key &lt;API_KEY&gt;$/m);
+  assert.match(html, /^Current claim status: UNVALIDATED$/m);
+  assert.match(html, /^Tracking ID: MCL-9ad33b25fd88c5cb$/m);
+  assert.match(html,
+    /An attached result may provide only partial support\. The current claim status is unchanged\./);
+  assert.match(html, /id="review-page-link" href="\/host\/how-to-self-test"/);
+  assert.match(html,
+    /id="review-heading-link" href="\/host\/how-to-self-test#before-you-run-it"/);
+
+  const unrelated = await fetch(`${reviewOrigin}/__review__/evidence?ref=${
+    encodeURIComponent(evidenceRef)}&binding=${encodeURIComponent('MCL-f9f3ebb712a5588d')}`);
+  assert.equal(unrelated.status, 404);
+  assert.equal(await unrelated.text(), 'Evidence binding not found.');
+
+  const refreshed = await contextFor('/host/how-to-self-test');
+  assert.equal(refreshed.verification.materialClaims.find((item) => item.id === claim.id).current.status,
+    'UNVALIDATED');
 });
 
 test('Blocker causes and access-derived evidence hints stay separate and conservative', async () => {

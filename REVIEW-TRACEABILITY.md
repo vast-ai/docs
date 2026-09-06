@@ -110,6 +110,64 @@ owner for each evidence class.
 
 ## Validation evidence
 
+### Review wording directly on the page (2026-09-05)
+
+The local review panel now opens with **Wording & proof**. Select a section,
+read the customer-visible statement, and use **Show on page** to highlight
+its exact wording. Opening a section URL selects that section's statements;
+**All sections** shows the full page inventory. The review IDs and complete
+evidence history remain under **Audit details** and **Technical V&V details
+and history**.
+
+For example, `MCL-f9f3ebb712a5588d` is the opening statement on Verification
+Stages: “Verification is automated. There is no manual review step for
+ordinary host verification.” It belongs to **Page introduction**, not to
+Verification Requirements. Its **Needs evidence** label means the existing
+`UNVALIDATED` status: the Self-Test and Verification source owner still needs
+to supply the canonical implementation supporting that statement.
+
+Cards distinguish proof from links in the wording and review tracking records.
+Source definitions for commands are labeled as syntax support; command test
+results keep their separate status. A successful highlight proves only that
+the reviewer can locate the wording. Ambiguous, missing, and masked passages
+show an explicit fallback instead of choosing a passage silently. Combined
+passages now highlight each bound excerpt, as verified in the follow-up below. Customer
+pages served without the local review proxy are unchanged.
+
+The correction, observed failures, retests, and limits are retained in
+`verification/evidence/2026-09-05-host-reviewer-reading-attempt-01/result.md`.
+
+### All Host pages: readable wording and proof (2026-09-05 follow-up)
+
+The same view covers all **40 primary Host pages**, including Volume Offers and
+the generated Self-Test Reference. The **18 CLI and 15 SDK wrappers** instead
+show a readable link to the central reference, with the explicit limitation
+that a reference check is not command-execution proof.
+
+Cards quote the bound page passages, separately label a summarized assertion,
+and link every declared section. Multi-section filters, multi-passage highlights,
+literal shell pipelines, repeated source occurrences, and rendered prose
+typography are covered. Audit IDs and historical records remain collapsed.
+
+The final browser sweep accounted for all **1,687 statements**: **1,680 located**
+and **7 explicitly masked section fallbacks**. All section filters and review
+section links passed; all existing claim statuses were preserved. The 33 support
+routes and 33 review-context regression tests passed. These are interface results,
+not new validation of the Host claims or commands. The runner rejects stale
+servers using the source identity returned by the running process.
+
+The panel also exposes inherited issues rather than hiding them: `VOL-C35`'s
+binding covers Related Pages but omits Command Map; two unbackticked Self-Test
+options render with typographic dashes. Those canonical documentation/binding
+repairs remain maintainer follow-ups. Masked passages are not presented as exact
+quotations. Source-span navigation may omit table scaffolding; it is not proof
+of a whole claim's scope or rendered CLI-token correctness.
+
+[All-page results, original failures, corrections, retests, screenshots and limits](verification/evidence/2026-09-05-host-reviewer-all-pages-attempt-01/result.md)
+are retained separately from the earlier single-page attempt. Neither the
+runtime/operator nor Product/Finance/Legal/source-owner workstream is completed
+by this presentation change; no human acceptance is recorded.
+
 ### How command proof is presented
 
 The review panel now keeps two evidence lanes separate for every exact command:

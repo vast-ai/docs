@@ -32,6 +32,11 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 
+// The audit runner uses this runtime identity to reject a stale review-server
+// process whose injected overlay does not match the file being assessed.
+const REVIEW_SOURCE_SHA256 = crypto.createHash('sha256')
+  .update(fs.readFileSync(new URL(import.meta.url))).digest('hex');
+
 // ------------------------------------------------------------------ config
 const argv = process.argv.slice(2);
 function argValue(name, dflt) {
@@ -1646,6 +1651,7 @@ function loadClaimAndSupportContracts(sets, canonical, allEvidenceIds, evidenceR
       }));
   };
   const materialClaims = [];
+  const passageBlocksByIndex = new Map();
   const materialClaimsById = new Map();
   const materialClaimsByPage = new Map([...canonical.pageById.keys()].map((pageId) => [pageId, []]));
   const materialStatusCounts = new Map([...VV_TARGET_STATUSES].map((status) => [status, 0]));
@@ -1944,8 +1950,33 @@ function loadClaimAndSupportContracts(sets, canonical, allEvidenceIds, evidenceR
     vvRequiredText(value.current.rationale);
     const nextAction = value.next_action == null ? null : vvRequiredText(value.next_action);
     if (status !== 'PASS' && !nextAction) throw new Error('missing material V&V claim next action');
+    // Navigation is bound to literal, hash-checked documentation spans. Some
+    // material claims summarize a passage rather than quote it (e.g. volumes).
+    if (!passageBlocksByIndex.has(claimSourceIndex)) {
+      passageBlocksByIndex.set(claimSourceIndex, vvGenericMaterialClaims({
+        sourceIndex: claimSourceIndex, sourceFile: '', route: pageMeta.route,
+      }));
+    }
+    const passageSpans = spans.flatMap((span) => {
+      const contained = passageBlocksByIndex.get(claimSourceIndex).filter((block) =>
+        block.start >= span.start && block.end <= span.end);
+      return contained.length ? contained.map((block) => ({ start: block.start, end: block.end })) : [span];
+    });
+    const sourcePassages = passageSpans.map((span) => {
+      const literal = claimSourceIndex.lines.slice(span.start - 1, span.end).join('\n').trim();
+      const section = vvSectionAtLine(claimSourceIndex, span.start);
+      const repeats = [];
+      for (let start = 1; start <= claimSourceIndex.lines.length - (span.end - span.start); start++) {
+        if (vvSectionAtLine(claimSourceIndex, start) === section &&
+            claimSourceIndex.lines.slice(start - 1, start + span.end - span.start).join('\n').trim() === literal) repeats.push(start);
+      }
+      return { text: vvText(literal), section, start: span.start, end: span.end,
+        redacted: vvText(literal) !== literal, occurrence: repeats.indexOf(span.start), occurrences: repeats.length };
+    });
     const normalized = {
       id: claimId, pageId, checkedContent: { route: pageMeta.route, pageTitle: pageMeta.title, sections: headings },
+      sourceLocation: { file: sourceFile, spans, textSha256: scope.source_text_sha256 },
+      sourcePassages,
       renderedDependency: renderedVia ? { component: vvText(renderedVia.component) } : null,
       claim, requiredEvidenceTypes, citationRequired: value.evidence_requirement.citation_required,
       citation: { required: citation.required, state: citationState,
@@ -4927,6 +4958,7 @@ const OVERLAY_JS = String.raw`
   // document-level styles (::highlight can't live in shadow DOM)
   var docStyle = document.createElement('style');
   docStyle.textContent = '::highlight(vast-review){background:rgba(255,200,50,.45);}' +
+    '::highlight(vast-review-claim){background:#ffe082;color:#172033;text-decoration:underline;}' +
     '::highlight(vast-review-flash){background:rgba(74,92,240,.35);}';
   document.head.appendChild(docStyle);
 
@@ -4956,7 +4988,7 @@ const OVERLAY_JS = String.raw`
     '.filters .primary{background:#4a5cf0;border-color:#4a5cf0;color:#fff;font-weight:600}' +
     '.context-count{background:#fff1b8;color:#6b4f00;border-radius:999px;padding:1px 7px;font-size:11px;font-weight:800}' +
     '#jiraContext{padding:10px 14px;border-bottom:1px solid #e7eaf1;background:#f8f9fc;color:#384056;' +
-      'max-height:60vh;min-height:0;overflow-y:auto;flex:0 1 auto}' +
+      'min-height:140px;overflow-y:auto;flex:1 1 auto}' +
     '#jiraContext[hidden]{display:none}' +
     '.jira-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px}' +
     '.jira-title b{color:#1a1a2e;font-size:12px}' +
@@ -5005,6 +5037,21 @@ const OVERLAY_JS = String.raw`
     '.vv-subject a:focus-visible,.vv-evidence-link:focus-visible{outline:2px solid #4a5cf0;outline-offset:2px;border-radius:2px}' +
     '.vv-evidence-link{color:#4a5cf0;text-decoration:underline;text-underline-offset:2px}' +
     '.vv-history{margin:4px 0 6px}.vv-history summary{font-size:10px!important;font-weight:650!important;color:#687188!important}' +
+    '.vv-reading{color:#273248;font-size:13px;line-height:1.5}' +
+    '.vv-reading h3{margin:4px 0;font-size:17px;color:#172033}.vv-reading p{margin:8px 0}' +
+    '.vv-reading-counts{font-size:12px;color:#525e73}.vv-section-label{display:block;font-weight:700;margin-top:12px}' +
+    '#vv-section-filter{width:100%;font-size:13px;padding:8px;color:#172033;border:1px solid #aeb8cf;border-radius:6px;background:#fff}' +
+    '#vv-location-notice{font-size:12px;color:#38476a}#vv-location-notice:empty{display:none}' +
+    '.vv-reading-card{margin:12px 0;padding:12px;border:1px solid #d5dce9;border-radius:9px;background:#fff;overflow-wrap:anywhere}' +
+    '.vv-reading-card[hidden]{display:none}.vv-reading-card.vv-selected-claim{border-color:#6b5500;box-shadow:0 0 0 2px #ffe082}' +
+    '.vv-reading-card .vv-code-quote{white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12px;max-height:230px;overflow:auto}.vv-checking{font-size:13px}' +
+    '.vv-reading-location{font-size:12px;color:#5c677d}.vv-reading-card blockquote{margin:8px 0 10px;padding:0 0 0 9px;border-left:3px solid #a4b0d2;color:#172033;font-weight:600;font-size:14px;line-height:1.5}' +
+    '.vv-reading-status{display:inline-block;background:#fff3cb;color:#694b00;border-radius:5px;padding:2px 7px;font-size:12px;font-weight:700}' +
+    '.vv-reading-status[data-status="PASS"]{background:#e4f4eb;color:#175637}.vv-reading-status[data-status="FAIL"]{background:#ffe9e5;color:#982d20}' +
+    '.vv-reading-actions{display:flex;align-items:center;gap:12px;margin:10px 0}.vv-reading-actions button{background:#3548c5;color:#fff;border:0;border-radius:6px;padding:7px 10px;cursor:pointer;font-size:12px;font-weight:700}' +
+    '.vv-reading a{color:#3045bd;text-decoration:underline;text-underline-offset:2px}.vv-reading button:focus-visible,.vv-reading a:focus-visible,.vv-reading select:focus-visible,.vv-reading summary:focus-visible{outline:2px solid #3045bd;outline-offset:3px}' +
+    '.vv-reading-audit,.vv-reading-links{font-size:12px;margin-top:10px}.vv-reading-audit>summary,.vv-reading-links>summary{cursor:pointer;color:#4a5872;font-weight:600}' +
+    '.vv-reading-audit .vv-claims{margin-top:8px}.vv-technical{margin-top:16px}' +
     '#selectionTools{padding:10px 14px;border-bottom:1px solid #e7eaf1;background:#f7f8ff}' +
     '#selectionTools .selection-empty{color:#5c677d;line-height:1.45}' +
     '#selectionTools .selection-ready-body{display:none;gap:8px;flex-direction:column}' +
@@ -5017,7 +5064,8 @@ const OVERLAY_JS = String.raw`
       'font-style:italic;max-height:72px;overflow:auto;white-space:pre-wrap}' +
     '#commentSelection{align-self:flex-start;border:0;border-radius:7px;padding:7px 11px;background:#4a5cf0;color:#fff;' +
       'font-size:12px;font-weight:700;cursor:pointer}' +
-    '#list{flex:1;overflow-y:auto;padding:10px 14px}' +
+    '#list{flex:0 1 auto;max-height:25vh;overflow-y:auto;padding:10px 14px}#list:has(.empty){display:none}' +
+    '#panel footer summary{cursor:pointer;color:#44516d;font-size:12px;font-weight:600}' +
     '.pagegroup{margin:14px 0 6px;font-weight:700;font-size:12px;color:#5c677d;text-transform:uppercase;letter-spacing:.4px}' +
     '.card{border:1px solid #e0e4ee;border-radius:10px;padding:10px 12px;margin-bottom:10px;background:#fbfcfe}' +
     '.card.resolved{opacity:.55}' +
@@ -5071,7 +5119,7 @@ const OVERLAY_JS = String.raw`
       '<header><b id="reviewPanelTitle">Docs review &mdash; PR 185</b><button id="closePanel" type="button" title="Close" aria-label="Close docs review panel">&times;</button></header>' +
       '<div class="meta">Reviewer: <b id="who">&mdash;</b> <button id="editWho">change</button></div>' +
       '<div class="filters">' +
-        '<label><input type="checkbox" id="allPages"> all pages</label>' +
+        '<label><input type="checkbox" id="allPages"> Notes from all pages</label>' +
         '<button id="addPageNote" class="primary">+ Page note</button>' +
       '</div>' +
       '<section id="jiraContext" hidden aria-live="polite"></section>' +
@@ -5085,6 +5133,7 @@ const OVERLAY_JS = String.raw`
       '</div>' +
       '<div id="list"></div>' +
       '<footer>' +
+        '<details><summary>Review tools &amp; exports</summary>' +
         '<div class="exports" style="border-bottom:1px solid #e7eaf1;padding-bottom:8px">' +
           '<a href="/review-questions" style="background:#4a5cf0;color:#fff;border-color:#4a5cf0">All reviewer inputs and Jira gates</a>' +
           '<a href="${TRACEABILITY_URL}" target="_blank" rel="noopener noreferrer">Traceability audit</a>' +
@@ -5098,6 +5147,7 @@ const OVERLAY_JS = String.raw`
           '<a href="/__review__/export/feedback.md">Markdown</a>' +
           '<a href="/__review__/" target="_blank">Status</a>' +
         '</div>' +
+        '</details>' +
         '<div id="saveStatus"></div>' +
       '</footer>' +
     '</aside>' +
@@ -5119,7 +5169,7 @@ const OVERLAY_JS = String.raw`
       '<div class="btnrow"><button id="nameCancel" type="button">Cancel</button>' +
         '<button id="nameSave" class="primary" type="button">Start reviewing</button></div>' +
     '</div>' +
-    '<div id="toast"></div>';
+    '<div id="toast" role="status" aria-live="polite"></div>';
   shadow.appendChild(wrap);
   document.body.appendChild(host);
 
@@ -5234,6 +5284,210 @@ const OVERLAY_JS = String.raw`
   function normalizedHeadingText(value) {
     return String(value || '').replace(/\x60/g, '').replace(/[\u200B-\u200D\uFEFF]/g, '')
       .replace(/\s+/g, ' ').trim();
+  }
+  function readableStatus(status) {
+    return { PASS: 'Supported by evidence', UNVALIDATED: 'Needs evidence',
+      FAIL: 'Correction needed', BLOCKED: 'Waiting on a prerequisite',
+      STALE: 'Needs a fresh check', NOT_APPLICABLE: 'Not applicable' }[status] || 'Needs evidence';
+  }
+  function claimWording(value) {
+    // Remove inventory/Markdown notation, retaining the words the customer sees.
+    var text = String(value || '');
+    if (/^\[[A-Za-z0-9_-]+\]\s/.test(text)) return text.replace(/^\[[A-Za-z0-9_-]+\]\s*/, '');
+    var inline = [];
+    text = text.replace(/\x60([^\x60]+)\x60/g, function (_, literal) {
+      inline.push(literal); return '\u0001CODE' + (inline.length - 1) + '\u0001';
+    });
+    return decodeReviewEntities(text)
+      .replace(/!?\[([^\]]+)\]\([^\s]+(?:\s+"[^"]*")?\)/g, '$1')
+      .replace(/\x60+/g, '').replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\s+\|\s+/g, ' · ')
+      .replace(/\u0001CODE(\d+)\u0001/g, function (_, index) { return inline[Number(index)]; });
+  }
+  function decodeReviewEntities(text) {
+    return String(text).replace(/&(#x[\da-f]+|#\d+|amp|lt|gt|quot|apos|nbsp);/gi, function (whole, entity) {
+      if (entity[0] !== '#') return { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' }[entity.toLowerCase()];
+      var value = entity[1].toLowerCase() === 'x' ? parseInt(entity.slice(2), 16) : Number(entity.slice(1));
+      return value > 0 && value <= 0x10ffff ? String.fromCodePoint(value) : whole;
+    });
+  }
+  function passageWording(passage) {
+    var text = passage.text;
+    var fence = text.match(/^\s*(\x60{3,}|~{3,})[^\n]*\n([\s\S]*?)\n\s*(?:\x60{3,}|~{3,})\s*$/);
+    if (fence) return { text: fence[2], code: true, comparison: comparableWording(fence[2], false) };
+    var caption = text.match(/^<Frame\b[^>]*\bcaption=(['"])(.*?)\1[^>]*>$/);
+    if (caption) text = caption[2];
+    // Preserve inline-code bytes while normalizing typography in the prose
+    // around them. MDX smart punctuation can turn a bare prose double hyphen into an
+    // em dash, but command options and identifiers must remain literal.
+    var inline = [];
+    text = text.replace(/\x60([^\x60]+)\x60/g, function (_, literal) {
+      inline.push(decodeReviewEntities(literal));
+      return '\uE000INLINE' + (inline.length - 1) + '\uE001';
+    });
+    text = text.replace(/^[ \t]*#{1,6} .*$/gm, '')
+      .replace(/^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/gm, '')
+      .replace(/^\s*\|(.+)\|\s*$/gm, '$1')
+      .replace(/^[ \t]*(?:[-*+] |\d+[.)] )/gm, '')
+      .replace(/<\/?(?:Note|Warning|Info|Tip|Check|Steps|Step|AccordionGroup|Accordion|Tabs|Tab|Frame|span|div|br|p|strong|em)\b[^>]*>/g, '');
+    var cleaned = claimWording(text).trim();
+    var restoreInline = function (value) {
+      return value.replace(/\uE000INLINE(\d+)\uE001/g, function (_, index) { return inline[Number(index)]; });
+    };
+    var comparable = '', last = 0, marker;
+    var comparableText = cleaned.replace(/ · /g, '');
+    var markerPattern = /\uE000INLINE(\d+)\uE001/g;
+    while ((marker = markerPattern.exec(comparableText))) {
+      comparable += comparableWording(comparableText.slice(last, marker.index), true);
+      comparable += comparableWording(inline[Number(marker[1])], false);
+      last = marker.index + marker[0].length;
+    }
+    comparable += comparableWording(comparableText.slice(last), true);
+    return { text: restoreInline(cleaned), code: false, comparison: comparable };
+  }
+  function comparableChar(c, foldTypography) {
+    if (!foldTypography) return c;
+    return /[\u2018\u2019]/.test(c) ? "'" : /[\u201C\u201D]/.test(c) ? '"' :
+      c === '\u2013' ? '--' : c === '\u2014' ? '--' : c === '\u2026' ? '...' : c;
+  }
+  function comparableWording(text, foldTypography) {
+    var fold = foldTypography !== false;
+    return Array.from(text).map(function (c) { return comparableChar(c, fold); }).join('')
+      .replace(/\s|[\u200B-\u200D\uFEFF]/g, '');
+  }
+  function articleRoot() {
+    return document.querySelector('.mdx-content') || document.querySelector('article') || document.querySelector('main');
+  }
+  function sectionHeading(section) {
+    var root = articleRoot();
+    if (!root || section === 'Introduction') return null;
+    var matches = Array.from(root.querySelectorAll('h1,h2,h3,h4,h5,h6')).filter(function (heading) {
+      return normalizedHeadingText(heading.textContent) === normalizedHeadingText(section);
+    });
+    return matches.length === 1 ? matches[0] : null;
+  }
+  function claimTextMatch(row) {
+    var root = articleRoot();
+    if (!root || row.checkedContent.route !== location.pathname) return { reason: 'Page text is not available yet.' };
+    var passages = row.sourcePassages || [{ text: row.claim ? row.claim.text : row.text,
+      section: row.checkedContent.sections[0] || 'Introduction', occurrence: 0, occurrences: 1 }];
+    var ranges = [], index = buildTextIndex();
+    for (var passage of passages) {
+      if (passage.redacted) return { reason: 'This passage contains an example masked in review data. Use its section link to inspect the original wording.' };
+      var wording = row.sourcePassages ? passageWording(passage) : { text: claimWording(passage.text), code: /^\[[A-Za-z0-9_-]+\]\s/.test(passage.text) };
+      var match = matchSourcePassage(root, index, passage, wording);
+      if (!match.ranges) return match;
+      ranges.push.apply(ranges, match.ranges);
+    }
+    return { ranges: ranges, range: ranges[0] };
+  }
+  function matchSourcePassage(root, index, passage, wording) {
+    var section = passage.section;
+    var heading = sectionHeading(section);
+    if (section !== 'Introduction' && !heading) return { reason: 'The section could not be identified uniquely.' };
+    var headings = Array.from(root.querySelectorAll('h1,h2,h3,h4,h5,h6'));
+    var endHeading = headings.find(function (candidate) {
+      return heading ? (heading.compareDocumentPosition(candidate) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+        Number(candidate.tagName.slice(1)) <= Number(heading.tagName.slice(1)) : candidate.tagName !== 'H1';
+    });
+    var codeClaim = wording.code;
+    var chars = '', offsets = [];
+    index.nodes.forEach(function (entry) {
+      var el = entry.node.parentElement;
+      if (!root.contains(entry.node) || el.closest('h1,h2,h3,h4,h5,h6,button,[aria-hidden="true"]')) return;
+      if (heading && !(heading.compareDocumentPosition(entry.node) & Node.DOCUMENT_POSITION_FOLLOWING)) return;
+      if (endHeading && !(endHeading.compareDocumentPosition(entry.node) & Node.DOCUMENT_POSITION_PRECEDING)) return;
+      for (var i = 0; i < entry.node.data.length; i++) {
+        var c = entry.node.data[i];
+        if (/\s|[\u200B-\u200D\uFEFF]/.test(c)) continue;
+        // Smart punctuation is a prose-rendering transform. Keep fenced and
+        // inline code literal so an em dash can never stand in for two option
+        // hyphens inside a command or identifier.
+        var mapped = comparableChar(c, !codeClaim && !el.closest('pre,code'));
+        chars += mapped;
+        for (var j = 0; j < mapped.length; j++) offsets.push({ node: entry.node, offset: i });
+      }
+    });
+    // Inventory table-cell separators are presentation notation, not page text.
+    // Source passages carry a segment-aware comparison so inline code stays
+    // byte-for-byte strict while adjacent prose can follow MDX typography.
+    var needle = typeof wording.comparison === 'string' ? wording.comparison :
+      comparableWording(codeClaim ? wording.text : wording.text.replace(/ · /g, ''), !codeClaim);
+    var hits = [], at = -1;
+    while (needle && (at = chars.indexOf(needle, at + 1)) !== -1) {
+      var range = document.createRange(), start = offsets[at], end = offsets[at + needle.length - 1];
+      range.setStart(start.node, start.offset);
+      range.setEnd(end.node, end.offset + 1);
+      if (codeClaim) {
+        // A short command also appears as the prefix of commands with options.
+        // Only an entire rendered code block is the same command occurrence.
+        var block = range.startContainer.parentElement.closest('pre');
+        if (!block || comparableWording(block.textContent, false) !== needle) continue;
+      }
+      hits.push(range);
+    }
+    if (!hits.length) return { reason: 'Exact wording was not found in this section. Use the section link and audit details.' };
+    if (!codeClaim && hits.length > 1) {
+      var wholeBlocks = hits.filter(function (range) {
+        var block = range.startContainer.parentElement.closest('li,[data-as="p"],p,tr');
+        return block && comparableWording(block.textContent) === needle;
+      });
+      if (wholeBlocks.length) hits = wholeBlocks;
+    }
+    if (hits.length !== passage.occurrences || passage.occurrence < 0 || !hits[passage.occurrence]) {
+      return { reason: 'This wording could not be matched to its source occurrence uniquely. Use the section link to review it.' };
+    }
+    return { ranges: [hits[passage.occurrence]], heading: heading };
+  }
+  var claimSectionFilter = null;
+  var focusedReviewClaim = null;
+  function clearClaimFocus() {
+    focusedReviewClaim = null;
+    if (CSS.highlights) CSS.highlights.delete('vast-review-claim');
+    shadow.querySelectorAll('.vv-selected-claim').forEach(function (card) { card.classList.remove('vv-selected-claim'); });
+  }
+  function sectionFromHash(claims) {
+    var id;
+    try { id = decodeURIComponent(location.hash.slice(1)); } catch (e) { return ''; }
+    var anchor = id && document.getElementById(id), root = articleRoot();
+    if (!anchor || !root || !root.contains(anchor)) return '';
+    var heading = /^H[1-6]$/.test(anchor.tagName) ? anchor : null;
+    if (!heading) {
+      // Historical alias anchors sit just before the renamed heading.
+      heading = Array.from(root.querySelectorAll('h1,h2,h3,h4,h5,h6')).find(function (item) {
+        return !!(anchor.compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING);
+      });
+    }
+    var text = heading && normalizedHeadingText(heading.textContent);
+    return (claims || []).some(function (claim) { return claim.checkedContent.sections.indexOf(text) !== -1; }) ? text : '';
+  }
+  function showReviewWording(row, button) {
+    var match = claimTextMatch(row);
+    var notice = $('vv-location-notice');
+    clearClaimFocus();
+    if (!match.range) {
+      if (notice) notice.textContent = match.reason;
+      toast(match.reason);
+      return;
+    }
+    focusedReviewClaim = row.id;
+    var canHighlight = typeof Highlight !== 'undefined' && CSS.highlights;
+    if (canHighlight) CSS.highlights.set('vast-review-claim', new Highlight(...match.ranges));
+    var element = match.range.startContainer.parentElement;
+    if (window.innerWidth < 1000) closePanel();
+    element.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
+    var href = checkedContentLink(row.checkedContent, row.checkedContent.sections[0]).href;
+    // Avoid the SPA hook: this is locating wording, not loading a new page.
+    if (href) origReplace.call(history, history.state, '', href);
+    shadow.querySelectorAll('[data-review-claim]').forEach(function (card) {
+      card.classList.toggle('vv-selected-claim', card.getAttribute('data-review-claim') === row.id);
+    });
+    if (notice) notice.textContent = (canHighlight ? 'Highlighted ' : 'Located (highlighting unavailable): ') +
+      match.ranges.length + (match.ranges.length === 1 ? ' passage' : ' passages') + ' for this statement on the page.';
+    if (window.innerWidth < 1000) toast((canHighlight ? 'Highlighted' : 'Located') +
+      ' in ' + (row.checkedContent.sections[0] === 'Introduction' ? 'Page introduction' : row.checkedContent.sections[0]) +
+      '. Open Review to return to the proof.');
+    if (button && panel.classList.contains('open')) button.focus({ preventScroll: true });
   }
   function checkedContentLink(checkedContent, section) {
     var route = checkedContent && typeof checkedContent.route === 'string' &&
@@ -5490,6 +5744,178 @@ const OVERLAY_JS = String.raw`
             (claim.nextAction ? '<br><b>Exact next action:</b> ' + esc(claim.nextAction) : '') + '</li>';
         }).join('') + '</ol></details>';
     }
+    function readingEvidenceLinks(records, label, binding) {
+      return (records || []).filter(function (record) { return record.evidenceRef; }).map(function (record, index) {
+        var href = '/__review__/evidence?ref=' + encodeURIComponent(record.evidenceRef) +
+          '&binding=' + encodeURIComponent(binding);
+        return '<a class="vv-evidence-link" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer"' +
+          ' title="' + esc(record.id) + '">' + esc(label) + (records.length > 1 ? ' ' + (index + 1) : '') + '</a>';
+      }).join(' · ');
+    }
+    function readingNextAction(claim) {
+      if (claim.current.status === 'PASS') return '';
+      var requirements = (claim.authority.unresolvedEvidenceRequirements || []).filter(function (item) {
+        return item.currentStatus !== 'PASS';
+      });
+      var actions = requirements.map(function (item) {
+        var task = {
+          CANONICAL_IMPLEMENTATION_SOURCE: 'provide the official code or API source and its version, then check it against this wording.',
+          RUNTIME_OR_UI_OBSERVATION: 'provide an authorized test result showing what happened for this instruction.',
+          ACCOUNTABLE_OWNER_CONFIRMATION: 'confirm this wording using the approved product, finance, legal, or account source.',
+          AUTHORITATIVE_DOCUMENTATION_CITATION: 'add the required citation to the approved source for this wording.'
+        }[item.evidenceType];
+        return task ? esc(item.responsibleRole || claim.authority.unresolvedOwnerRole || 'Source owner') + ': ' + task : '';
+      }).filter(Boolean);
+      if (claim.citation.required && claim.citation.state === 'ABSENT' &&
+          !requirements.some(function (item) { return item.evidenceType === 'AUTHORITATIVE_DOCUMENTATION_CITATION'; })) {
+        actions.push('Add the required citation to an authoritative source.');
+      }
+      if (!actions.length && claim.nextAction) actions.push(esc(claim.nextAction.replace(/MCL-[a-f0-9]+/g, 'this wording')));
+      return actions.length ? '<p><b>Next:</b> ' + Array.from(new Set(actions)).join('<br>') + '</p>' : '';
+    }
+    function readingProof(claim) {
+      var current = claim.current, sources = claim.authority.sourceRefs || [];
+      var links = sources.map(function (source) {
+        if (!source || typeof source !== 'object') return '';
+        if (/^vast-ai\/(?:vast-cli|self-test)$/.test(source.repository || '') &&
+            /^[a-f0-9]{40}$/.test(source.revision || '') && /^[A-Za-z0-9._/-]+$/.test(source.path || '') &&
+            source.path.split('/').every(function (part) { return part && part !== '..'; })) {
+          return '<a href="https://github.com/' + esc(source.repository) + '/blob/' + esc(source.revision) + '/' +
+            esc(source.path) + '" target="_blank" rel="noopener noreferrer">Official source: ' + esc(source.path) + '</a>';
+        }
+        return '';
+      }).filter(Boolean);
+      var evidence = readingEvidenceLinks(current.evidence, 'Read the recorded check', claim.id);
+      if (evidence) links.push(evidence);
+      var summary;
+      if (current.status === 'PASS') {
+        summary = claim.claim.kind === 'NAVIGATION_CONTRACT' || sources.some(function (source) { return source.sourceKind === 'ROUTE_DESTINATION_SOURCE'; })
+          ? 'The link destination was checked. This supports navigation only.'
+          : 'Supporting evidence is recorded for this wording; check its scope and limitations below.';
+      } else if (!current.evidenceIds.length) {
+        summary = current.status === 'FAIL' ? 'A required citation or source binding is missing or incorrect.' :
+          'No supporting proof is attached to this wording yet.';
+      } else {
+        summary = 'Some evidence is attached, but it does not fully support this wording.';
+      }
+      var result = '<p><b>Proof:</b> ' + summary + (links.length ? '<br>' + links.join('<br>') : '') + '</p>';
+      if (current.status === 'PASS' && current.limitations.length) result += '<p><b>Scope of proof:</b> ' +
+        esc(current.limitations.join('; ')) + '</p>';
+      var commands = (vv.testSets || []).flatMap(function (set) { return set.branches.flatMap(function (branch) {
+        return branch.steps.flatMap(function (step) { return step.commands; });
+      }); });
+      var matchingCommands = commands.filter(function (command) {
+        return command.checkedContent.sections[0] === claim.checkedContent.sections[0] &&
+          claimWording(claim.claim.text).replace(/\s+/g, '') === command.text.replace(/\s+/g, '');
+      });
+      if (matchingCommands.length === 1 && matchingCommands[0].sourceSignature && matchingCommands[0].sourceSignature.handlerSource) {
+        var signature = matchingCommands[0].sourceSignature;
+        result += '<p><b>Command definition:</b> <a href="' + esc(signature.handlerSource.href) +
+          '" target="_blank" rel="noopener noreferrer">See the official CLI code</a>. ' +
+          'This checks the command and its options; it does not show that the command ran successfully.</p>';
+      }
+      if (matchingCommands.length === 1) {
+        var command = matchingCommands[0];
+        var commandReason = command.currentStatus === 'UNVALIDATED'
+          ? 'No conclusive test result supports this command yet.'
+          : (command.currentRationale || 'No result is recorded.').replace(
+            /^(?:CONFIRMED_DEFECT(?:\s+CLM-[a-f0-9]+)?|UNAVAILABLE_PREREQUISITE(?:\s+[A-Z_]+)?):\s*/, '');
+        result += '<p><b>Command test:</b> ' + esc(readableStatus(command.currentStatus)) + '. ' +
+          esc(commandReason) + '</p>';
+        var records = (command.evidence || []).filter(function (item) {
+          return item.evidenceRef && !item.supersededBy && !/ACCOUNTING|RECONCILIATION|TOPOLOGY/i.test(item.method || '');
+        }).map(function (item) { return { id: item.ref, evidenceRef: item.evidenceRef }; });
+        if (records.length) result += '<p>' + readingEvidenceLinks(records, 'Read the command result', command.id) + '</p>';
+      }
+      if (current.unavailablePrerequisite) result += '<p><b>Waiting for:</b> ' + esc(current.unavailablePrerequisite.description) + '</p>';
+      if (claim.citation.required) result += '<p><b>Citation:</b> ' +
+        (claim.citation.state === 'ABSENT' ? 'Required source citation is missing.' : 'Required; see the citation assessment in audit details.') + '</p>';
+      // Existing documentation links may be navigation only. Never label them as proof.
+      if (claim.citation.refs.length) result += '<details class="vv-reading-links"><summary>Links in this wording</summary>' +
+        citationHtml(claim.citation) + '</details>';
+      return result;
+    }
+    function readingClaimsHtml(claims) {
+      if (!claims || !claims.length) return '';
+      var sections = Array.from(new Set(claims.flatMap(function (claim) { return claim.checkedContent.sections; })));
+      var selected = claimSectionFilter === null ? sectionFromHash(claims) : claimSectionFilter;
+      var counts = vv.materialDisposition && vv.materialDisposition.counts || {};
+      var summary = Object.keys(counts).filter(function (status) { return counts[status]; }).map(function (status) {
+        return counts[status] + ' ' + ({ PASS: 'with support', UNVALIDATED: 'awaiting evidence',
+          FAIL: 'needing correction', BLOCKED: 'waiting on a prerequisite' }[status] || readableStatus(status).toLowerCase());
+      }).join(' · ');
+      var result = '<section class="vv-reading" aria-label="Wording and proof"><h3>Wording &amp; proof</h3>' +
+        '<p>Read the statement, then check its support. <b>Show on page</b> highlights the customer-visible text.</p>' +
+        '<p class="vv-reading-counts">Whole page: ' + claims.length + ' statements · ' + esc(summary) + '</p>' +
+        '<label class="vv-section-label" for="vv-section-filter">Review section</label>' +
+        '<select id="vv-section-filter"><option value=""' + (!selected ? ' selected' : '') + '>All sections (' + claims.length + ')</option>' +
+        sections.map(function (section) {
+          var count = claims.filter(function (claim) { return claim.checkedContent.sections.indexOf(section) !== -1; }).length;
+          return '<option value="' + esc(section) + '"' + (selected === section ? ' selected' : '') + '>' +
+            esc(section === 'Introduction' ? 'Page introduction' : section) + ' (' + count + ')</option>';
+        }).join('') + '</select><p id="vv-location-notice" role="status" aria-live="polite"></p><div id="vv-reading-cards">';
+      claims.forEach(function (claim) {
+        var section = claim.checkedContent.sections[0] || 'Introduction';
+        var href = checkedContentLink(claim.checkedContent, section).href;
+        var redactedPassage = (claim.sourcePassages || []).some(function (passage) { return passage.redacted; });
+        var passages = redactedPassage ? [] : (claim.sourcePassages || []).map(passageWording);
+        var quoteHtml = redactedPassage
+          ? '<p class="vv-checking"><b>Exact page wording is hidden in this review copy.</b> ' +
+            'It contains a masked example. The review claim below is a summary, not a quote.</p>' +
+            '<p class="vv-checking"><b>Review claim:</b> ' + esc(claimWording(claim.claim.text)) + '</p>'
+          : passages.length ? passages.map(function (passage) {
+          return '<blockquote' + (passage.code ? ' class="vv-code-quote"' : '') + '>' + esc(passage.text) + '</blockquote>';
+        }).join('') : '<blockquote>' + esc(claimWording(claim.claim.text)) + '</blockquote>';
+        var quoteDiffers = !redactedPassage && comparableWording(passages.map(function (item) { return item.text; }).join(' ')) !==
+          comparableWording(claimWording(claim.claim.text));
+        var inheritedBindingNotice = claim.id === 'VOL-C35' && claim.checkedContent.route === '/host/volume-offers' &&
+          claim.checkedContent.sections.indexOf('Command Map') === -1
+          ? '<p class="vv-checking"><b>Source-location note:</b> This link check also covers ' +
+            '<a href="/host/volume-offers#command-map">Command Map</a>. Its retained source location currently lists Related Pages only.</p>'
+          : '';
+        var inheritedFormattingOption = claim.checkedContent.route === '/host/self-test-reference'
+          ? { 'MCL-c99f9ecb5ea4e15a': '--ignore-requirements',
+              'MCL-22a1a520d989a59f': '--debugging' }[claim.id]
+          : null;
+        var hasBareFormattingSource = inheritedFormattingOption && (claim.sourcePassages || []).some(function (passage) {
+          // Once the option is marked as inline code in the bound source, this
+          // inherited-defect warning removes itself.
+          var proseOnly = String(passage.text || '').replace(/\x60[^\x60]*\x60/g, '');
+          return proseOnly.indexOf(inheritedFormattingOption) !== -1;
+        });
+        var inheritedFormattingNotice = hasBareFormattingSource
+          ? '<p class="vv-checking"><b>Page formatting issue:</b> This page renders the documented option with a typographic dash. ' +
+            'The correct literal option is <code>' + esc(inheritedFormattingOption) + '</code>. ' +
+            'Locating the page text is not proof that the option spelling works. ' +
+            '<b>Maintainer follow-up:</b> mark the option as inline code and regenerate its source binding.</p>'
+          : '';
+        result += '<article class="vv-reading-card" data-review-claim="' + esc(claim.id) + '" data-review-section="' + esc(section) + '"' +
+          ' data-review-sections="' + esc(JSON.stringify(claim.checkedContent.sections)) + '"' +
+          (selected && claim.checkedContent.sections.indexOf(selected) === -1 ? ' hidden' : '') + '>' +
+          '<div class="vv-reading-location">' + esc(claim.checkedContent.sections.map(function (item) {
+            return item === 'Introduction' ? 'Page introduction' : item;
+          }).join(' / ')) + '</div>' +
+          (quoteDiffers ? '<p class="vv-checking"><b>Checking:</b> ' + esc(claimWording(claim.claim.text)) + '</p>' : '') + quoteHtml +
+          inheritedBindingNotice + inheritedFormattingNotice +
+          '<span class="vv-reading-status" data-status="' + esc(claim.current.status) + '" title="' + esc(claim.current.status) + '">' +
+            esc(readableStatus(claim.current.status)) + '</span>' +
+          '<div class="vv-reading-actions"><button type="button" data-show-claim="' + esc(claim.id) + '">Show on page</button>' +
+          claim.checkedContent.sections.map(function (item) {
+            return '<a href="' + esc(checkedContentLink(claim.checkedContent, item).href) + '">' +
+              (item === 'Introduction' ? 'Open introduction' : claim.checkedContent.sections.length > 1 ? esc(item) : 'Open section') + '</a>';
+          }).join(' ') + '</div>' + readingProof(claim) + readingNextAction(claim) +
+          '<details class="vv-reading-audit"><summary>Audit details</summary>' +
+            '<p>Tracking ID: <code>' + esc(claim.id) + '</code> · ' + esc(claim.current.status) + '</p>' +
+            (claim.sourceLocation ? '<p>Documentation location: <code>' + esc(claim.sourceLocation.file) + '</code><br>Source lines: ' +
+              esc(claim.sourceLocation.spans.map(function (span) { return span.start + '–' + span.end; }).join(', ')) + '</p>' : '') +
+            '<p>' + esc(claim.current.rationale) + '</p>' +
+            '<p><b>Limits:</b> ' + esc(claim.current.limitations.join('; ')) + '</p>' +
+            '<p><b>Status record only:</b> ' + readingEvidenceLinks(claim.current.dispositionEvidence, 'Why this status was recorded', claim.id) +
+              '. This record tracks the review; it does not prove the statement.</p>' +
+            materialClaimsHtml([claim]) + '</details></article>';
+      });
+      return result + '</div></section>';
+    }
     function retiredMaterialClaimsHtml(claims) {
       if (!claims || !claims.length) return '';
       return '<details class="vv-history vv-claims"><summary>' + countLabel(claims.length,
@@ -5507,6 +5933,12 @@ const OVERLAY_JS = String.raw`
         }).join('') + '</ol></details>';
     }
     if (vv.supportLayer) {
+      var supportReading = '<section class="vv-reading vv-support-reading" aria-label="Central reference"><h3>Central reference</h3>' +
+        '<p>This Host shortcut points to the shared ' + esc(vv.centralReference.label) + '.</p>' +
+        '<p><a class="vv-central-reference" href="' + esc(vv.centralReference.route) + '">Open the ' +
+          esc(vv.centralReference.label) + '</a></p>' +
+        '<p><b>Reference check:</b> ' + (vv.currentStatus === 'PASS' ? 'The shortcut and destination match.' : esc(readableStatus(vv.currentStatus))) +
+          ' This does not prove command execution.</p><p>' + readingEvidenceLinks(vv.currentEvidence, 'Read the reference check', vv.supportId) + '</p></section>';
       html += ' · central-reference support · current ' + esc(vv.currentStatus) + '</summary>' +
         checkedContentHtml(vv) +
         '<div class="vv-help"><b>This route is a support layer, not a separate Host workflow.</b> ' +
@@ -5522,7 +5954,7 @@ const OVERLAY_JS = String.raw`
           '<br><b>Evidence limitations:</b> ' + esc(vv.evidenceLimitations) +
           '<br><b>Retained evidence:</b> ' + retainedEvidenceHtml(vv.currentEvidence, vv.currentEvidenceIds) +
         '</div></details>';
-      return html;
+      return supportReading + html;
     }
     function currentEvidenceHtml(row) {
       if (!row.currentEvidenceIds || !row.currentEvidenceIds.length) return '';
@@ -5715,6 +6147,9 @@ const OVERLAY_JS = String.raw`
       if (treatments.some(function (treatment) { return treatment === 'SOURCE_DEFECT_BLOCKED'; })) return 'mixed executable and source-defect command check';
       return 'executable command check';
     }
+    // Reader view is the entry point. Preserve the complete technical view underneath.
+    var readerHtml = readingClaimsHtml(vv.materialClaims);
+    html = '<details class="vv-context vv-technical"><summary>Technical V&amp;V details and history';
     html += ' <span class="vv-meta">' + countLabel(vv.totals.testSets, 'set') + ' · ' + checkSummary(vv.totals) + '</span></summary>';
     html += checkedContentHtml(vv) + '<div class="vv-help"><b>How to read this V&amp;V:</b> Declared-scope links open the page or section each record says it evaluates. A scope link is not evidence; retained-evidence links open the supporting proof or status record. The retained-evidence total counts records, not independently proved claims. <code>BLOCKED</code> means required verification could not be completed; it is not a page-load result.</div>';
     html += commandProofHtml(vv);
@@ -5822,7 +6257,7 @@ const OVERLAY_JS = String.raw`
       });
       html += '</details>';
     });
-    return html + '</details>';
+    return readerHtml + html + '</details>';
   }
   function renderPageContext() {
     var box = $('jiraContext');
@@ -5839,7 +6274,8 @@ const OVERLAY_JS = String.raw`
       box.innerHTML = '';
       return;
     }
-    var html = '<div class="jira-title"><b>Jira context for this page</b><span><a href="/review-questions">review inputs</a> &middot; <a href="${TRACEABILITY_URL}" target="_blank" rel="noopener noreferrer">traceability</a></span></div>';
+    var html = verificationHtml(verification);
+    html += '<details class="vv-history"><summary>Jira context for this page</summary><div class="jira-title"><span><a href="/review-questions">review inputs</a> &middot; <a href="${TRACEABILITY_URL}" target="_blank" rel="noopener noreferrer">traceability</a></span></div>';
     html += '<div class="jira-links">';
     epics.forEach(function (issue) { html += jiraLinkHtml(issue, true); });
     issues.forEach(function (issue) { html += jiraLinkHtml(issue, false); });
@@ -5860,10 +6296,27 @@ const OVERLAY_JS = String.raw`
     } else {
       html += '<div class="jira-clear">No page-specific blocker is recorded; use the linked Jira source for scope.</div>';
     }
-    html += verificationHtml(verification);
+    html += '</details>';
     box.innerHTML = html;
     box.hidden = false;
   }
+  $('jiraContext').addEventListener('change', function (event) {
+    if (event.target.id !== 'vv-section-filter') return;
+    claimSectionFilter = event.target.value;
+    clearClaimFocus();
+    shadow.querySelectorAll('[data-review-section]').forEach(function (card) {
+      var sections = JSON.parse(card.getAttribute('data-review-sections'));
+      card.hidden = !!claimSectionFilter && sections.indexOf(claimSectionFilter) === -1;
+    });
+    if ($('vv-location-notice')) $('vv-location-notice').textContent = '';
+  });
+  $('jiraContext').addEventListener('click', function (event) {
+    var button = event.target.closest('[data-show-claim]');
+    if (!button) return;
+    var claims = pageContext && pageContext.verification && pageContext.verification.materialClaims || [];
+    var row = claims.find(function (claim) { return claim.id === button.getAttribute('data-show-claim'); });
+    if (row) showReviewWording(row, button);
+  });
   function loadPageContext() {
     var requestedPath = location.pathname;
     var requestId = ++contextRequest;
@@ -6142,6 +6595,8 @@ const OVERLAY_JS = String.raw`
 
   // SPA navigation: re-anchor highlights when the route or DOM changes
   function onNavigate() {
+    claimSectionFilter = null;
+    clearClaimFocus();
     clearSelectionDraft();
     pageContext = { epics: [], issues: [], blockers: [] };
     renderPageContext();
@@ -6154,6 +6609,11 @@ const OVERLAY_JS = String.raw`
   var origReplace = history.replaceState;
   history.replaceState = function () { origReplace.apply(this, arguments); onNavigate(); };
   window.addEventListener('popstate', onNavigate);
+  window.addEventListener('hashchange', function () {
+    claimSectionFilter = null;
+    clearClaimFocus();
+    renderPageContext();
+  });
   new MutationObserver(function (muts) {
     for (var i = 0; i < muts.length; i++) {
       if (muts[i].target === host || host.contains(muts[i].target)) continue;
@@ -6310,6 +6770,7 @@ async function handleReviewRoute(req, res, url) {
     return;
   }
   if (p === '/__review__/api/context' && req.method === 'GET') {
+    res.setHeader('x-vast-review-source-sha256', REVIEW_SOURCE_SHA256);
     sendJson(res, 200, reviewContextForPath(url.searchParams.get('path') || '/'));
     return;
   }
@@ -6389,6 +6850,22 @@ async function handleReviewRoute(req, res, url) {
           `Partially supported evidence lanes: ${claim.current.partiallySupportedEvidenceTypes.join('; ') || 'none'}`,
           `Claim: ${claim.claim.text}`,
           `Limitations: ${claim.current.dispositionLimitations.join('; ')}`,
+          '', 'The retained artifact begins below. This generated header is not proof.', '',
+        ].map(vvText).join('\n');
+      } else if (claim && claim.current.evidenceIds.some((id) =>
+        VERIFICATION_EVIDENCE.evidenceRefById.get(id) === safeRef)) {
+        bindingNavigation = { route: claim.checkedContent.route,
+          heading: claim.checkedContent.sections[0] || 'Introduction' };
+        bindingHeader = [
+          'Reviewer navigation context (generated; not retained evidence)',
+          'Supporting evidence attached to this wording',
+          `Page: ${claim.checkedContent.route}`,
+          `Heading: ${claim.checkedContent.sections.join(' / ')}`,
+          `Wording: ${claim.claim.text}`,
+          `Current claim status: ${claim.current.status}`,
+          `Tracking ID: ${claim.id}`,
+          `Scope and limitations: ${claim.current.limitations.join('; ')}`,
+          'An attached result may provide only partial support. The current claim status is unchanged.',
           '', 'The retained artifact begins below. This generated header is not proof.', '',
         ].map(vvText).join('\n');
       } else if (support && support.evidenceIds.some((id) =>

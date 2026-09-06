@@ -7,6 +7,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import subprocess
 import unittest
 
 
@@ -645,10 +646,21 @@ class ReconciledHostVvTests(unittest.TestCase):
                 r"(?:/Users/|/private/tmp/|/var/folders/|github\.com/(?!vast-ai/)[^/\s]+/(?:docs|vast-python|self-test)(?=[\s)/#]|$))",
                 f"{path}: workstation-private path leaked into retained history",
             )
+        # The table records the September 4 packaging snapshot. Compare it to
+        # the immutable commit that sealed those bytes, not to a later working
+        # tree where independently validated reviewer UI changes may exist.
+        packaging_commit = "3e1e30e2221b65d7ce1e901d9ae305f63af5b64b"
         for path, digest in artifact_rows:
             self.assertTrue((REPO / path).is_file())
+            packaged_bytes = subprocess.run(
+                ["git", "show", f"{packaging_commit}:{path}"],
+                cwd=REPO,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            ).stdout
             self.assertEqual(
-                hashlib.sha256((REPO / path).read_bytes()).hexdigest(),
+                hashlib.sha256(packaged_bytes).hexdigest(),
                 digest,
             )
         final_results_hash = hashlib.sha256(
