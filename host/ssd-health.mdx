@@ -17,10 +17,11 @@ The steps are the same on Ubuntu Server 22.04 and 24.04 except in step 6.
 7.4.
 
 <Note>
-Steps 2 to 5 and step 7 are read-only. They report on the drive without
-changing anything and are safe on a machine with instances running. Step 1
-installs a package and starts a service, step 6 competes with client I/O, and
-step 8 takes the machine down. Plan those three.
+Steps 2 to 5 and step 7 report on the drive without changing it and are safe
+on a machine with instances running. The one exception is an optional counter
+reset in step 5, flagged where it appears. Step 1 installs a package and starts
+a service, step 6 competes with client I/O, and step 8 takes the machine down.
+Plan those three.
 </Note>
 
 ## 1. Install smartmontools
@@ -152,10 +153,17 @@ sudo smartctl -d test /dev/nvme0
 /dev/nvme0: Device of type 'nvme' [NVMe] opened
 ```
 
-A directly attached drive names its own type, as above. A controller's virtual
-disk opens as a plain `scsi` device, and the per-drive SMART data is not behind
-it. If `-d test` says `scsi` on something you know is an SSD, you are looking
-at the array, not the drive.
+A directly attached NVMe or SATA drive names its own type, as above. A
+controller's virtual disk opens as a plain `scsi` device, and the per-drive
+SMART data is not behind it.
+
+`scsi` on its own is not proof of an array. A directly attached SAS drive is a
+real SCSI device and reports `scsi` too, with SCSI-format SMART data of its own
+that the rest of this page still applies to. Read the answer against what
+`lspci` found: `scsi` on a machine with a RAID controller and no SAS drives is
+the array. Where both are possible, the controller's own tool (`storcli`,
+`ssacli`, `arcconf`) settles it by listing the physical drives behind the
+virtual disk.
 
 To reach the physical drives, name the controller type and the drive number:
 
@@ -165,19 +173,25 @@ To reach the physical drives, name the controller type and the drive number:
 | Adaptec | `aacraid,H,L,ID` | `smartctl -x -d aacraid,0,0,2 /dev/sda` |
 | HP Smart Array, cciss driver | `cciss,N` | `smartctl -x -d cciss,0 /dev/cciss/c0d0` |
 | HP Smart Array, hpsa or hpahcisr | `cciss,N` | `smartctl -x -d cciss,0 /dev/sg2` |
-| Areca | `areca,N` | `smartctl -x -d areca,2 /dev/sg2` |
+| Areca, SATA controller | `areca,N` | `smartctl -x -d areca,2 /dev/sg2` |
+| Areca, SAS controller | `areca,N/E` | `smartctl -x -d areca,2/1 /dev/sg2` |
 | 3ware | `3ware,N` | `smartctl -x -d 3ware,1 /dev/twl0` |
 
 `N` is the drive's number on the controller: 0 to 127 for MegaRAID and 3ware,
-0 to 15 for cciss, and 1 to 24 for Areca. Once the device type is right, steps
-3 through 6 work as written, one drive at a time.
+0 to 15 for cciss, and 1 to 24 on an Areca SATA controller. An Areca SAS
+controller is addressed by slot and enclosure instead, where `N` is the channel
+(1 to 128) and `E` the enclosure (1 to 8), and it needs controller firmware
+1.51 or later. Once the device type is right, steps 3 through 6 work as
+written, one drive at a time.
 
 <Warning>
-Address the controller, not the array. smartmontools is explicit that you use
-the device nodes corresponding to the RAID controllers, not the nodes
-corresponding to logical drives. Areca controllers are reached through a SCSI
-generic node such as `/dev/sg2`, which is deliberately not the node the array
-reads and writes through.
+On Areca and HP Smart Array controllers, address the controller, not the array.
+smartmontools is explicit that for these you use the device nodes corresponding
+to the RAID controllers, not the nodes corresponding to logical drives: an
+Areca controller is reached through a SCSI generic node such as `/dev/sg2`,
+which is deliberately not the node the array reads and writes through. MegaRAID
+and 3ware are not addressed this way. They take the disk node (`/dev/sda`) or
+the 3ware node (`/dev/twl0`) as in the table above.
 </Warning>
 
 To work out which generic node belongs to which device:
@@ -418,7 +432,8 @@ A non-zero `199 UDMA_CRC_Error_Count`, or non-zero ICRC errors under
 the drive. Reseat both ends before condemning a disk. Attribute 199 is a
 lifetime count, so what matters is whether it grows between maintenance
 windows. The Phy counters can be cleared with `-l sataphy,reset` if you want a
-clean baseline before a soak test.
+clean baseline before a soak test. That resets the counters on the drive, so it
+is the one command in this step that writes.
 </Tip>
 
 <Note>
@@ -460,10 +475,19 @@ sudo smartctl -l selftest /dev/sda
 ```
 
 While a test is running the log reports `Self-test routine in progress` with a
-percentage remaining. When it finishes, the result appears under
-`SMART Extended Self-test Log`. `Completed without error` is what you want; a
-read failure naming a block the drive could not read is a replacement, not a
-repair.
+percentage remaining. When it finishes, the result appears in the table under
+`SMART Self-test log structure revision number 1`. `Completed without error` is
+what you want; a read failure naming a block the drive could not read is a
+replacement, not a repair.
+
+<Note>
+On SATA, `-l selftest` reads the standard self-test log, which keeps the last
+21 results and reports the LBA of an error in 28 bits. The extended log keeps
+more results and reports a full 48-bit LBA, which is what you need to name a
+bad block on a large drive. Read it with `smartctl -l xselftest /dev/sda`, or
+take it from the `SMART Extended Self-test Log` section of `-x`. SAS drives
+have no extended log, so `-l selftest` is the one to read there.
+</Note>
 
 ### NVMe
 
