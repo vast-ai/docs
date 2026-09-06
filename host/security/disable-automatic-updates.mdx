@@ -1,0 +1,85 @@
+---
+title: "Disable Automatic Updates"
+description: "Turn off unattended upgrades on a host machine so package and kernel updates only ever land in a maintenance window you chose."
+---
+
+A stock Ubuntu Server install downloads and applies updates on a timer. On a
+host machine, an update that runs during a rental can restart a service or
+replace a driver under a running instance, which interrupts the client and
+counts against the machine. Updates on a host machine must be applied in a
+maintenance window instead.
+
+## Confirm automatic updates are off
+
+Two APT settings and a timer control this. Check all three together. Query APT
+for the resolved value rather than reading a config file, because more than one
+file in `/etc/apt/apt.conf.d/` sets these and the highest-numbered filename
+takes precedence:
+
+```bash
+apt-config dump APT::Periodic::Update-Package-Lists APT::Periodic::Unattended-Upgrade
+systemctl is-enabled apt-daily-upgrade.timer unattended-upgrades.service
+```
+
+A stock Ubuntu Server install returns the following, and every value is the
+opposite of what a host machine requires:
+
+```
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+enabled
+enabled
+```
+
+Both settings should read `"0"` and both units should report `disabled`.
+
+<Note>
+`cat /etc/apt/apt.conf.d/20auto-upgrades` is not a sufficient check on its own.
+`update-notifier-common` ships `10periodic`, which also sets
+`APT::Periodic::Update-Package-Lists`, so deleting `20auto-upgrades` leaves the
+machine refreshing package lists on a timer. `apt-config dump` reports the
+merged result of every file.
+
+A setting that no file sets prints no line. This is equivalent to `"0"`,
+because APT defaults both settings to off.
+</Note>
+
+<Note>
+`systemctl is-enabled unattended-upgrades` on its own is also not a sufficient
+check. That unit is the shutdown-time helper. The daily run is driven by
+`apt-daily-upgrade.timer` and gated on the APT settings above.
+</Note>
+
+## Turn them off
+
+`20auto-upgrades` sorts after `10periodic`, so writing both settings there
+takes precedence over any lower-numbered file:
+
+```bash
+sudo tee /etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
+APT::Periodic::Update-Package-Lists "0";
+APT::Periodic::Unattended-Upgrade "0";
+EOF
+sudo systemctl disable --now apt-daily-upgrade.timer unattended-upgrades.service
+```
+
+`tee` echoes the file back, and `systemctl` reports the symlinks it removed.
+Run the check from the section above again to confirm the result.
+
+<Note>
+This stops the machine installing updates on its own. It does not affect `apt`
+itself, or any upgrade you run manually.
+</Note>
+
+## Updates still have to be applied
+
+The machine no longer patches itself. Keeping the kernel at the latest security
+patch level for your Ubuntu release is a
+[verification requirement](/host/verification-stages), and a kernel update does
+not take effect until a reboot.
+
+When an update is available, schedule a window with
+[`vastai schedule maintenance`](/host/cli/schedule-maint) so clients are
+notified, then follow [Upgrade the Kernel](/host/upgrade-kernel), which covers
+checking what is available, both upgrade paths, and the NVIDIA driver steps
+required afterwards.

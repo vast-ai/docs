@@ -1,10 +1,11 @@
 ---
 title: "Accounts and Sudo"
-description: "Audit the accounts that can log in to a host machine, check who can become root, and remove accounts left from the machine's previous life."
+description: "Audit the accounts that can log in to a host machine, check who can become root, and remove accounts left from the machine's previous configuration."
 ---
 
-Key-only SSH does not help if the machine has five accounts and you can only
-account for two of them.
+Key-only SSH restricts how users authenticate. It does not limit which accounts
+exist. A machine dedicated to hosting should have one account per
+administrator and no others.
 
 ## Find every account that can log in
 
@@ -18,9 +19,8 @@ ubuntu 1001 /bin/bash
 oldadmin 1002 /bin/bash
 ```
 
-On a machine dedicated to hosting there should be one account per person who
-administers it, and nothing else. `ubuntu` from a cloud image and `oldadmin`
-from the machine's previous life are what to look for.
+`ubuntu` from a cloud image and `oldadmin` from the machine's previous
+configuration are the accounts to look for.
 
 ## Check for accounts with no password set
 
@@ -44,7 +44,7 @@ getent group sudo
 sudo:x:27:youruser
 ```
 
-Then check for anyone who can `sudo` without being prompted:
+Then check for accounts that can `sudo` without a password prompt:
 
 ```bash
 sudo grep -rE 'NOPASSWD' /etc/sudoers /etc/sudoers.d/ 2>/dev/null
@@ -54,14 +54,14 @@ sudo grep -rE 'NOPASSWD' /etc/sudoers /etc/sudoers.d/ 2>/dev/null
 (no output)
 ```
 
-A `NOPASSWD` line is not automatically wrong — some monitoring agents need one
-— but every line should be scoped to specific commands and be one you put there
-deliberately.
+A `NOPASSWD` line is not necessarily wrong, because some monitoring agents
+require one. Each line should be scoped to specific commands and should be one
+you added deliberately.
 
-## Remove what is no longer needed
+## Remove accounts that are no longer needed
 
-Lock an account first rather than deleting it. Locking is reversible, and it
-tells you quickly whether anything depended on that account:
+Lock an account before deleting it. Locking is reversible and confirms whether
+anything on the machine depended on the account:
 
 ```bash
 sudo usermod -L -e 1 oldadmin
@@ -69,21 +69,21 @@ sudo usermod -L -e 1 oldadmin
 
 <Warning>
 Never run this against your own account. Your current session and `sudo` keep
-working, so nothing looks wrong until the next time you try to log in.
+working, so the effect is not visible until your next login attempt.
 </Warning>
 
-To undo it, you need both halves. `usermod -U` unlocks the password but leaves
-the expiry date in place, and the account still refuses logins with
+Unlocking requires both flags. `usermod -U` unlocks the password but leaves the
+expiry date, and the account still refuses logins with
 `Your account has expired`:
 
 ```bash
 sudo usermod -U -e '' oldadmin
 ```
 
-Before deleting anything, see what the account owns. `-xdev` keeps `find` on
-the root filesystem instead of descending into container storage and network
-mounts, which on a host machine can take a very long time and compete with
-client I/O:
+Before deleting an account, check what it owns and whether it is running
+anything. `-xdev` keeps `find` on the root filesystem rather than descending
+into container storage and network mounts, which on a host machine can take a
+long time and compete with client I/O:
 
 ```bash
 sudo find / -xdev -user oldadmin 2>/dev/null | head
@@ -92,14 +92,15 @@ ps -u oldadmin
 
 <Note>
 Container filesystems store raw numeric UIDs, so files created inside an
-instance can appear to belong to a host account that happens to share the
-number. Files under Docker's storage directory are not evidence that a host
-account is in use. Note also that once you delete an account its UID is free,
-and the next account created can inherit ownership of those files.
+instance can appear to belong to a host account with the same UID. Files under
+Docker's storage directory are not evidence that a host account is in use.
+
+Deleting an account frees its UID, and the next account created can inherit
+ownership of those files.
 </Note>
 
-Once you are sure nothing depended on it, remove it along with its home
-directory and its keys:
+Once nothing depends on the account, remove it with its home directory and
+keys:
 
 ```bash
 sudo deluser --remove-home oldadmin

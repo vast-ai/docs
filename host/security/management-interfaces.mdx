@@ -3,15 +3,14 @@ title: "Management Interfaces"
 description: "Change BMC, IPMI, iDRAC, and iLO credentials, keep the interface off the public internet, and verify it from outside the network."
 ---
 
-A BMC — IPMI, iDRAC, or iLO — is a small computer inside the server with power
-control, a virtual console, and virtual media. It has complete control of the
-machine independently of the operating system, so it deserves the same care as
-Ubuntu itself. It is also the interface most often left on factory settings,
-because it works fine that way and is easy to forget.
+A BMC — IPMI, iDRAC, or iLO — is a separate controller inside the server
+providing power control, a virtual console, and virtual media. It controls the
+machine independently of the operating system, and requires the same
+configuration care as Ubuntu itself.
 
 ## Change the credentials
 
-Every vendor ships something predictable:
+Each vendor ships a documented default:
 
 | Vendor | Default account | Default password |
 | --- | --- | --- |
@@ -19,13 +18,15 @@ Every vendor ships something predictable:
 | Supermicro | `ADMIN` | `ADMIN` before November 2019, unique pre-programmed password after |
 | HPE iLO | `Administrator` | Random 8-character string on the pull tab at the front of the server |
 
-Change it to something long and unique per machine and store it wherever you
-keep the rest of your infrastructure credentials. Dell recommends eight
-characters or more mixing cases, digits, and symbols; treat that as a floor.
+Change it to a long, unique password per machine and store it with your other
+infrastructure credentials. Dell recommends a minimum of eight characters
+mixing cases, digits, and symbols.
 
-To see which accounts exist and confirm the default is gone, from the host:
+To list the accounts that exist and confirm the default is gone, run this on
+the host:
 
 ```bash
+sudo apt-get update
 sudo apt-get install -y ipmitool
 sudo ipmitool user list 1
 ```
@@ -37,14 +38,24 @@ ID  Name       Callin  Link Auth  IPMI Msg   Channel Priv Limit
 
 An account still named `ADMIN` or `root` is the one to change.
 
+<Note>
+`ipmitool` reaches the BMC through a device node on the machine itself, so
+every `ipmitool` command on this page requires the machine to have a BMC. On a
+consumer or workstation board without one, `ipmitool` reports that it cannot
+open the device, and there is nothing on this page to configure.
+
+On a machine that does have a BMC, the same error means the IPMI kernel modules
+are not loaded. `/dev/ipmi0` is created by `ipmi_devintf`.
+</Note>
+
 ## Keep it off the public internet
 
-Every vendor says the same thing. Dell states the iDRAC "is not designed nor
+Vendor guidance is consistent. Dell states the iDRAC "is not designed nor
 intended to be placed on, nor connected directly to the Internet." Supermicro
 recommends a dedicated LAN interface so the BMC "is not exposed to the
-internet," and blocking UDP 623 on any network outside your control.
+internet," and recommends blocking UDP 623 on any network outside your control.
 
-In practice:
+To apply this:
 
 - Use the dedicated BMC NIC rather than the shared LOM port.
 - Do not forward any router port to the BMC.
@@ -65,14 +76,14 @@ Default Gateway IP      : 10.20.0.1
 802.1q VLAN ID          : 40
 ```
 
-Write that address down. You need it for the next step, and a BMC whose address
-you cannot name is the first thing to sort out.
+Record that address. It is required for the next step.
 
 ## Verify from outside, not from the machine
 
-Checking from the machine proves nothing — you are inside the network. Run this
-from your own computer, off that network, against **the BMC's address** from
-the step above. If the BMC shares the host's public address, scan that instead:
+Checking from the machine does not test external reachability, because the
+machine is inside the network. Run this from your own computer, off that
+network, against **the BMC's address** from the step above. If the BMC shares
+the host's public address, scan that instead:
 
 ```bash
 nmap -Pn -p 623,443,80,5900 --open 10.20.0.15
@@ -106,17 +117,16 @@ Nmap done: 1 IP address (1 host up) scanned in 2.09 seconds
 ```
 
 <Note>
-`open|filtered` is the good result here. A UDP probe that gets no reply cannot
-be told apart from one that was dropped, so nmap reports both the same way. A
-plain `open` means the BMC answered you from outside the network, and that is
-the one to act on.
+`open|filtered` is the correct result. A UDP probe that receives no reply
+cannot be distinguished from one that was dropped, so nmap reports both the
+same way. A plain `open` means the BMC answered from outside the network, which
+requires action.
 </Note>
 
 ## Keep the firmware current
 
 BMC firmware does not update with the operating system. Check the running
-version against your vendor's current release when you do your other
-maintenance:
+version against your vendor's current release:
 
 ```bash
 sudo ipmitool mc info | grep -E 'Firmware Revision|Manufacturer Name'
@@ -127,11 +137,11 @@ Firmware Revision         : 1.74
 Manufacturer Name         : Supermicro
 ```
 
-Apply BMC updates in the same maintenance window as a kernel upgrade, since
+Apply BMC updates in the same maintenance window as a kernel upgrade, because
 some require a reboot.
 
 ## Confirm you can still get in
 
-You may have just changed the credentials and moved the interface. Before you
-rely on this as your fallback, log in to the console once over your management
-network and confirm it works.
+Changing the credentials and moving the interface can both break your access.
+Before relying on the BMC as your fallback, log in to the console once over
+your management network and confirm it works.
