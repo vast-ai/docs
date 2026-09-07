@@ -25,44 +25,145 @@ Unverified -> Verified -> Deverified -> Unverified
 
 Automation evaluates reliability, performance, hardware, network, and current marketplace demand.
 
+<Note>
+Top-tier AI GPUs are prioritized for verification because demand for them is
+highest. This includes datacenter GPUs such as B300, B200, H200, and H100,
+and dense premium builds such as RTX PRO 6000 (Server/WS/Max-Q),
+8x RTX 5090, and 8x RTX 4090.
+</Note>
+
 ## Listing Minimums
 
-To be listed, a machine should meet these baselines:
-
-```text
-- Ubuntu 24.04 LTS preferred; Ubuntu 22.04 LTS also works
-- Dedicated machine while rented
-- Fast, reliable internet: at least 10 Mbps per machine
-- Supported same-type GPUs
-- At least 1 physical CPU core per GPU
-- AVX-capable CPU
-- At least 4 GB system RAM per GPU
-- Fast SSD storage with at least 128 GB per GPU
-- Sufficient PCIe bandwidth
-- Open port range mapped to the machine
-```
-
-For hardware detail, see [Supported Hardware](/host/supported-hardware).
+Start with [Supported Hardware](/host/supported-hardware) when planning a machine. Listing a machine and passing Self-Test do not guarantee verification; review the verification requirements below before preparing hardware.
 
 <span id="additional-requirements-for-verification" aria-hidden="true" />
+<span id="minimum-requirements-for-verification" aria-hidden="true" />
 ## Verification Requirements
 
-To enter the verification pool, the machine must also meet current self-test and platform gates:
+Your machine must meet all of the following.
 
-```text
-- CUDA version >= 11.8
-- Reliability > 0.9
-- At least 3 direct ports per GPU, forwarded for both TCP and UDP
-- PCIe bandwidth > 2.85 GB/s
-- Download and upload bandwidth scale with total VRAM
-- GPU RAM > 7 GB per GPU
-- System RAM at least 95% of total GPU VRAM, capped around 2 TB for very high-VRAM machines
-- Passing self-test
-```
+### GPU
 
-Bandwidth thresholds scale at about 2.6 Mbps per GiB of total VRAM, with a 100 Mbps floor and 500 Mbps ceiling.
+| Requirement | Minimum |
+| --- | --- |
+| GPU | NVIDIA, Maxwell or newer |
+| VRAM per GPU | More than 7 GB |
+| CUDA version | 11.8 or newer |
+| GPU models | All identical, do not mix models in one machine |
+| PCIe bandwidth | More than 2.85 GiB/s per GPU |
 
-Reliability greater than 0.9 is the verification gate. Higher reliability improves confidence and can improve verification likelihood. See [Reliability & Uptime](/host/reliability-uptime#reliability-threshold).
+### CPU
+
+| Requirement | Minimum |
+| --- | --- |
+| CPU architecture | x86_64 or ARM64 |
+| Instruction set | AVX |
+| Physical CPU cores | 2 per GPU |
+
+<Note>
+**On ARM64 (aarch64), CUDA 12.6 or newer is required.** The CUDA 11.8
+Self-Test image is built for x86_64 only, so Maxwell and Pascal GPUs cannot
+be verified on ARM64.
+</Note>
+
+### Memory
+
+| Requirement | Minimum |
+| --- | --- |
+| System RAM | At least 95% of total GPU VRAM |
+
+<Note>
+**Formula:** system RAM >= 0.95 x VRAM per GPU x number of GPUs
+
+**Example:** 8 x RTX PRO 6000 (96 GB) means the min system RAM >= 0.95 x
+96 GB x 8 = 730 GB
+</Note>
+
+### Network
+
+| Requirement | Minimum |
+| --- | --- |
+| Download speed | 500 Mbps |
+| Upload speed | 500 Mbps |
+| Connection type | Wired Ethernet, fiber recommended |
+| Public IP | Public IPv4 address |
+| Forwarded ports | 5 ports per GPU, 100 ports per GPU recommended |
+
+<Warning>
+Renters connect directly to the machine over the WAN, so it needs a public
+IPv4 address with the port range forwarded to it. Machines behind CGNAT or a
+shared ISP IP cannot be used for hosting.
+</Warning>
+
+### Operating System
+
+| Requirement | Minimum |
+| --- | --- |
+| Operating system | Ubuntu Server 22.04 LTS, 24.04 LTS recommended |
+| Kernel | Latest security patch level for your Ubuntu release |
+| NVIDIA driver | A currently supported release for your GPU |
+| SSH login | SSH keys only, password authentication disabled |
+| SSH access keys | A unique key pair per machine, never shared or reused |
+| Secure Boot | Disabled |
+
+<Note>
+Use a server edition. Desktop editions are not supported.
+</Note>
+
+<Note>
+Keeping the kernel patched is the host's responsibility. "Latest security patch
+level" means the newest patch for the LTS release you are on, not a release
+upgrade. Machines running a kernel with a known exploited vulnerability are
+restricted on the marketplace and can lose verification. See
+[Upgrade the Kernel](/host/upgrade-kernel).
+</Note>
+
+<Warning>
+SSH password login must be disabled for security. SSH password login enabled
+will fail verification. See
+[Disable SSH Password Login](/host/disable-ssh-password-login).
+</Warning>
+
+<Warning>
+Use a separate SSH key pair for each machine you operate. One key reused across
+your fleet means a single compromise exposes every machine you host.
+</Warning>
+
+### Storage
+
+| Requirement | Minimum |
+| --- | --- |
+| Storage type | SSD |
+| Dedicated drive for Docker container storage | 200 GB |
+| Root partition free space | 20 GB |
+
+### Reliability
+
+| Requirement | Minimum |
+| --- | --- |
+| Reliability score | Over 90% |
+
+<Note>
+Reliability starts low on a new machine and grows the longer the machine
+stays online. A stable machine typically reaches 90% within a few days.
+</Note>
+
+### Self-Test
+
+You can check whether your machine is ready for verification by running a
+Self-Test. See [How to Self-Test](/host/how-to-self-test).
+
+<Warning>
+**Dedicated machines only.** Any personal workload, such as mining, gaming,
+running your own jobs, or using the machine as a desktop, will automatically
+fail verification.
+</Warning>
+
+<Tip>
+Meeting these minimum requirements makes your machine eligible for verification, but does not automatically guarantee verification. [Read more about verification](/host/understanding-verification).
+</Tip>
+
+The [generated Self-Test Reference](/host/self-test-reference) describes the checks in its pinned CLI and test-image revisions. Those checks are not a substitute for the platform requirements on this page.
 
 <Note>
 Meeting requirements makes the machine eligible. It does not guarantee immediate verification, search placement, or rentals.

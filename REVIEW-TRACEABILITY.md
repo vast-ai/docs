@@ -2,7 +2,10 @@
 
 Jira status snapshot: 2026-07-13 (not re-verified by this repository review)
 
-Repository V&V reconciliation: 2026-09-03
+Retained 40-page repository V&V reconciliation: 2026-09-03
+
+Current upstream integration: 2026-09-07 (44 primary Host pages; freshness and
+new-page review coverage are separate from the retained 40-page proof).
 
 Review PR: [vast-ai/docs#185](https://github.com/vast-ai/docs/pull/185)
 
@@ -134,8 +137,8 @@ show an explicit fallback instead of choosing a passage silently. Combined
 passages now highlight each bound excerpt, as verified in the follow-up below. Customer
 pages served without the local review proxy are unchanged.
 
-The correction, observed failures, retests, and limits are retained in
-`verification/evidence/2026-09-05-host-reviewer-reading-attempt-01/result.md`.
+The correction, observed failures, retests, and limits are retained in the
+[reader presentation attempt](https://github.com/vast-ai/docs/blob/7d42a0d439f91e4dc2877104db807ec6fb975ce4/verification/evidence/2026-09-05-host-reviewer-reading-attempt-01/result.md).
 
 ### All Host pages: readable wording and proof (2026-09-05 follow-up)
 
@@ -163,12 +166,38 @@ repairs remain maintainer follow-ups. Masked passages are not presented as exact
 quotations. Source-span navigation may omit table scaffolding; it is not proof
 of a whole claim's scope or rendered CLI-token correctness.
 
-[All-page results, original failures, corrections, retests, screenshots and limits](verification/evidence/2026-09-05-host-reviewer-all-pages-attempt-01/result.md)
+[All-page results, original failures, corrections, retests, screenshots and limits](https://github.com/vast-ai/docs/blob/7d42a0d439f91e4dc2877104db807ec6fb975ce4/verification/evidence/2026-09-05-host-reviewer-all-pages-attempt-01/result.md)
 are retained separately from the earlier single-page attempt. Neither the
 runtime/operator nor Product/Finance/Legal/source-owner workstream is completed
 by this presentation change; no human acceptance is recorded.
 
 ### How command proof is presented
+
+#### Upstream integration freshness (2026-09-07)
+
+PR #153's head is already an ancestor of PR #185; it is not a separate merge
+dependency. The number **153 citation failures** elsewhere in this report is
+a count of findings, not a pull-request reference.
+
+The upstream integration adds Machine Metrics, Machine Offline, Upgrade the
+Kernel, and Disable SSH Password Login to the Host lifecycle navigation. It
+also changes existing source text and central references. The September 5
+evidence applies to its exact tested commit, `7d42a0d`, not automatically to
+these additions or changes. A changed page is **STALE** until its wording,
+source bindings, procedures, and proof are re-reviewed; a new page is
+**UNVALIDATED** until inventoried and checked. Neither label implies a confirmed
+external blocker. Old failures and runtime/owner limitations remain visible as
+history and must not be promoted by the merge.
+
+The integration plan, initial failures, corrections, and retests are retained
+in `verification/evidence/2026-09-07-host-main-integration-attempt-01/result.md`.
+The current static inventory covers 44 primary pages and 33 support routes.
+Reviewer source coverage is 36 unchanged primary pages, four changed pages,
+four new pages, and six changed support routes. "Unchanged" preserves the
+previous bounded status; it does not mean PASS. Renewing the changed/new
+claim and procedure contracts remains repository work, not an external blocker.
+
+#### Retained command evidence
 
 The review panel now keeps two evidence lanes separate for every exact command:
 

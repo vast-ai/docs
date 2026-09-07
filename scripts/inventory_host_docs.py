@@ -1178,9 +1178,16 @@ def main() -> int:
             for path in stale:
                 print(f"stale: {path.relative_to(ROOT)}", file=sys.stderr)
             return 1
+        source_pages = inventory["scope"]["source_pages"]
+        primary_pages = sum(
+            count
+            for source, count in source_pages.items()
+            if source in {"authored", "generated-self-test"}
+        )
+        support_layers = source_pages.get("generated-cli-sdk", 0)
         print(
             f"Host Docs inventory is current: {inventory['scope']['pages']} route files "
-            f"(40 primary pages + 33 central-reference support layers), "
+            f"({primary_pages} primary pages + {support_layers} central-reference support layers), "
             f"{inventory['scope']['unique_items']} unique targets; "
             f"{inventory['summary']['command_count']} commands reconcile across "
             f"{len(COMMAND_ACCESS_GROUPS)} execution-access groups."

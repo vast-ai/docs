@@ -323,6 +323,85 @@ function vvSourceSpan(value, sourceIndex, message = 'invalid V&V source span') {
 }
 const VV_REPOSITORY_ROOT = fs.realpathSync(new URL('./', import.meta.url));
 const VV_EXTERNAL_SOURCE_CACHE = new Map();
+// The V&V package describes the source that was actually reviewed.  Its
+// `sets.source.revision` is intentionally an older topology origin, not the
+// final reviewed source snapshot.  Keep this value explicit: silently using
+// HEAD (or a package supplied revision) would turn historical proof into a
+// claim about later wording.
+const VV_REVIEWED_SOURCE_REVISION = '7d42a0d439f91e4dc2877104db807ec6fb975ce4';
+const VV_REVIEWED_PACKAGE_IDENTITY = Object.freeze({
+  repository: 'vast-ai/docs', branch: 'CON-1584-host-cli-api-sdk',
+  // These are package declarations, not a fallback mechanism.  They make the
+  // archived-source mode opt-in only for this reviewed package family.
+  primarySha256: '75780f6b7e23af67c02b7470aee98138f2e02f567353560b20b4cff51676f429',
+  renderedSha256: 'ebe85adc57f8a8626d8a83e93e4d3905aab9c69e126feff3ddbbb190967e83e2',
+  classificationSha256: '72dd1bc0ecf51ccf462b72500dfca035c1a6cc975a0a41699f9a32cd7207d639',
+});
+const VV_HISTORICAL_SOURCE_PATHS = Object.freeze([
+  /^docs\.json$/,
+  /^host\/[A-Za-z0-9._/-]+\.mdx$/,
+  /^snippets\/[A-Za-z0-9._/-]+\.mdx$/,
+  /^api-reference\/[A-Za-z0-9._/-]+\.mdx$/,
+  /^cli\/reference\/[A-Za-z0-9._/-]+\.mdx$/,
+  /^cli\/[A-Za-z0-9._/-]+\.mdx$/,
+  /^guides\/[A-Za-z0-9._/-]+\.mdx$/,
+  /^sdk\/python\/reference\/[A-Za-z0-9._/-]+\.mdx$/,
+  /^sdk\/python\/[A-Za-z0-9._/-]+\.mdx$/,
+  /^api-reference\/openapi\/yaml\/[A-Za-z0-9._/-]+\.yaml$/,
+  /^scripts\/generate_self_test_reference\.py$/,
+  /^host-docs-(?:verification-inventory|command-access)\.json$/,
+]);
+const VV_MAX_HISTORICAL_SOURCE_BYTES = 16 * 1024 * 1024;
+let vvReviewedSourceCommitChecked = false;
+const VV_HISTORICAL_SOURCE_CACHE = new Map();
+function vvSafeRepositoryPath(relativePath, message) {
+  if (typeof relativePath !== 'string' || relativePath.length > 500 ||
+    !/^[A-Za-z0-9._/-]+$/.test(relativePath) || relativePath.includes('\\') ||
+    relativePath.split('/').some((segment) => !segment || segment === '.' || segment === '..')) {
+    throw new Error(message);
+  }
+  return relativePath;
+}
+function vvHistoricalSourceFile(relativePath, message = 'invalid historical V&V source file') {
+  const safePath = vvSafeRepositoryPath(relativePath, message);
+  if (!VV_HISTORICAL_SOURCE_PATHS.some((pattern) => pattern.test(safePath))) throw new Error(message);
+  if (VV_HISTORICAL_SOURCE_CACHE.has(safePath)) return VV_HISTORICAL_SOURCE_CACHE.get(safePath);
+  try {
+    if (!vvReviewedSourceCommitChecked) {
+      execFileSync('git', ['-C', VV_REPOSITORY_ROOT, 'cat-file', '-e',
+        `${VV_REVIEWED_SOURCE_REVISION}^{commit}`], { stdio: ['ignore', 'ignore', 'ignore'] });
+      // Resolve the tree once as a separate type check.  A path lookup alone
+      // would not make the pinned snapshot boundary obvious to a reviewer.
+      const tree = execFileSync('git', ['-C', VV_REPOSITORY_ROOT, 'rev-parse',
+        `${VV_REVIEWED_SOURCE_REVISION}^{tree}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      if (!/^[a-f0-9]{40}$/.test(tree)) throw new Error(message);
+      vvReviewedSourceCommitChecked = true;
+    }
+    // All arguments are independent argv values.  In particular, source paths
+    // are never interpolated into a shell command.
+    const type = execFileSync('git', ['-C', VV_REPOSITORY_ROOT, 'cat-file', '-t',
+      `${VV_REVIEWED_SOURCE_REVISION}:${safePath}`], {
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    if (type !== 'blob') throw new Error(message);
+    const bytes = execFileSync('git', ['-C', VV_REPOSITORY_ROOT, 'cat-file', 'blob',
+      `${VV_REVIEWED_SOURCE_REVISION}:${safePath}`], {
+      encoding: 'buffer', maxBuffer: VV_MAX_HISTORICAL_SOURCE_BYTES,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    if (!bytes.length || bytes.length > VV_MAX_HISTORICAL_SOURCE_BYTES || bytes.includes(0)) {
+      throw new Error(message);
+    }
+    // Reject invalid UTF-8 rather than allowing replacement characters to
+    // change line and hash contracts beneath the validation code.
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    const source = { bytes, text, sourceRevision: VV_REVIEWED_SOURCE_REVISION };
+    VV_HISTORICAL_SOURCE_CACHE.set(safePath, source);
+    return source;
+  } catch {
+    throw new Error(message);
+  }
+}
 function vvPinnedExternalSource(repository, revision, sourcePath) {
   const repositoryDirectory = {
     'vast-ai/vast-cli': 'vast-cli',
@@ -418,7 +497,7 @@ function vvValidateCitationHref(href, pageMeta) {
       (!segment || segment === '.' || segment === '..'))) {
       throw new Error('invalid local V&V citation route');
     }
-    const targetText = vvRepositoryFile(`${match[1].slice(1)}.mdx`,
+    const targetText = vvHistoricalSourceFile(`${match[1].slice(1)}.mdx`,
       'unresolved local V&V citation route').bytes.toString('utf8');
     const targetFragments = match[1] === pageMeta.route
       ? vvRenderedPageFragmentIds(pageMeta) : vvSourceFragmentIds(targetText);
@@ -854,7 +933,7 @@ function canonicalStatusTargets(pages, declaredCounts) {
     if (typeof page.source_sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(page.source_sha256)) {
       throw new Error('invalid canonical V&V source hash');
     }
-    const sourceBytes = vvRepositoryFile(sourceFile, 'invalid canonical V&V source file').bytes;
+    const sourceBytes = vvHistoricalSourceFile(sourceFile, 'invalid canonical V&V source file').bytes;
     if (crypto.createHash('sha256').update(sourceBytes).digest('hex') !== page.source_sha256) {
       throw new Error('stale canonical V&V page source');
     }
@@ -888,7 +967,7 @@ function canonicalStatusTargets(pages, declaredCounts) {
       const identity = `${component}\0${dependencyFile}`;
       if (dependencyIdentities.has(identity)) throw new Error('duplicate rendered V&V dependency');
       dependencyIdentities.add(identity);
-      const dependencyBytes = vvRepositoryFile(dependencyFile, 'invalid rendered V&V dependency file').bytes;
+      const dependencyBytes = vvHistoricalSourceFile(dependencyFile, 'invalid rendered V&V dependency file').bytes;
       if (crypto.createHash('sha256').update(dependencyBytes).digest('hex') !== dependencyHash) {
         throw new Error('stale rendered V&V dependency source');
       }
@@ -1112,7 +1191,8 @@ function validateVvSourceProvenance(sets, pages) {
       'safe_classification_sha256', 'reconciled_identity_method',
       'reconciled_primary_source_sha256', 'reconciled_rendered_source_sha256', 'working_tree_state_ref'],
     'invalid V&V source provenance');
-  if (source.repository !== 'vast-ai/docs' || source.branch !== 'CON-1584-host-cli-api-sdk' ||
+  if (source.repository !== VV_REVIEWED_PACKAGE_IDENTITY.repository ||
+    source.branch !== VV_REVIEWED_PACKAGE_IDENTITY.branch ||
     !/^[a-f0-9]{40}$/.test(source.revision) || !/^[a-f0-9]{40}$/.test(source.tree) ||
     source.reconciled_identity_method !==
       'PRIMARY_AND_RENDERED_SOURCE_SHA256_PLUS_FINAL_GIT_TREE') {
@@ -1122,6 +1202,11 @@ function validateVvSourceProvenance(sets, pages) {
   vvSha256(source.safe_classification_sha256, 'invalid V&V classification snapshot');
   vvSha256(source.reconciled_primary_source_sha256, 'invalid V&V primary-source snapshot');
   vvSha256(source.reconciled_rendered_source_sha256, 'invalid V&V rendered-source snapshot');
+  if (source.reconciled_primary_source_sha256 !== VV_REVIEWED_PACKAGE_IDENTITY.primarySha256 ||
+    source.reconciled_rendered_source_sha256 !== VV_REVIEWED_PACKAGE_IDENTITY.renderedSha256 ||
+    source.safe_classification_sha256 !== VV_REVIEWED_PACKAGE_IDENTITY.classificationSha256) {
+    throw new Error('unrecognized V&V reviewed-package identity');
+  }
   const git = (...args) => execFileSync('git', args, {
     cwd: VV_REPOSITORY_ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
   }).trim();
@@ -1140,7 +1225,7 @@ function validateVvSourceProvenance(sets, pages) {
   const renderedSnapshot = crypto.createHash('sha256').update(pages
     .map((page) => `${page.route}\0${page.rendered_source_sha256}\n`).join('')).digest('hex');
   const classificationHash = crypto.createHash('sha256')
-    .update(vvRepositoryFile('host-docs-command-access.json', 'missing V&V classification source').bytes)
+    .update(vvHistoricalSourceFile('host-docs-command-access.json', 'missing V&V classification source').bytes)
     .digest('hex');
   if (primarySnapshot !== source.reconciled_primary_source_sha256 ||
     renderedSnapshot !== source.reconciled_rendered_source_sha256 ||
@@ -1177,7 +1262,7 @@ function validateVvSourceProvenance(sets, pages) {
   };
 }
 function canonicalHostNavigationInventory() {
-  const docs = vvObject(JSON.parse(vvRepositoryFile('docs.json', 'invalid canonical Host navigation file')
+  const docs = vvObject(JSON.parse(vvHistoricalSourceFile('docs.json', 'invalid canonical Host navigation file')
     .bytes.toString('utf8')));
   const tabs = vvArray(vvObject(docs.navigation).tabs);
   const hostTabs = tabs.filter((tab) => vvObject(tab).tab === 'Host');
@@ -1196,6 +1281,100 @@ function canonicalHostNavigationInventory() {
     throw new Error('invalid canonical top-level Host route count');
   }
   return entries;
+}
+function vvCurrentSourceFile(relativePath, message = 'invalid current V&V source file') {
+  const file = vvRepositoryFile(vvSafeRepositoryPath(relativePath, message), message);
+  if (!file.bytes.length || file.bytes.length > VV_MAX_HISTORICAL_SOURCE_BYTES || file.bytes.includes(0)) {
+    throw new Error(message);
+  }
+  try { new TextDecoder('utf-8', { fatal: true }).decode(file.bytes); } catch { throw new Error(message); }
+  return file;
+}
+function currentHostNavigationInventory() {
+  const docs = vvObject(JSON.parse(vvCurrentSourceFile('docs.json', 'invalid current Host navigation file')
+    .bytes.toString('utf8')));
+  const tabs = vvArray(vvObject(docs.navigation).tabs);
+  const hostTabs = tabs.filter((tab) => vvObject(tab).tab === 'Host');
+  if (hostTabs.length !== 1) throw new Error('invalid current Host navigation');
+  const entries = [];
+  const routes = new Set();
+  const visitPages = (pages, depth = 0) => {
+    if (depth > 16) throw new Error('invalid current Host navigation nesting');
+    for (const item of vvArray(pages)) {
+      if (typeof item === 'string') {
+        if (!/^host\/[A-Za-z0-9._/-]+$/.test(item) || item.split('/').some((part) =>
+          !part || part === '.' || part === '..')) throw new Error('invalid current Host route');
+        const route = `/${item}`;
+        if (routes.has(route)) throw new Error('duplicate current Host route');
+        routes.add(route);
+        entries.push({ route, sourceFile: `${item}.mdx` });
+        continue;
+      }
+      const group = vvObject(item);
+      // Mintlify groups may nest.  Do not silently treat arbitrary objects as
+      // routes: a group must have a non-empty label and an explicit pages array.
+      if (!Object.prototype.hasOwnProperty.call(group, 'pages') || !Array.isArray(group.pages) ||
+        typeof group.group !== 'string' || !group.group.trim()) {
+        throw new Error('invalid current Host navigation group');
+      }
+      visitPages(group.pages, depth + 1);
+    }
+  };
+  const host = vvObject(hostTabs[0]);
+  if (!Array.isArray(host.groups)) throw new Error('invalid current Host navigation groups');
+  for (const group of host.groups) {
+    const normalized = vvObject(group);
+    if (typeof normalized.group !== 'string' || !normalized.group.trim() || !Array.isArray(normalized.pages)) {
+      throw new Error('invalid current Host navigation group');
+    }
+    visitPages(normalized.pages);
+  }
+  if (!entries.length || entries.length > 500) throw new Error('invalid current Host navigation count');
+  return entries;
+}
+function vvHash(bytes) {
+  return crypto.createHash('sha256').update(bytes).digest('hex');
+}
+function currentSourceFreshness(canonical, supportLayers) {
+  const currentNavigation = currentHostNavigationInventory();
+  const baselineRoutes = new Set(canonical.pageByRoute.keys());
+  const currentRoutes = new Set(currentNavigation.map((entry) => entry.route));
+  const byRoute = new Map();
+  for (const entry of currentNavigation) {
+    const page = canonical.pageByRoute.get(entry.route);
+    // A route cannot be declared without a safe regular MDX source, including
+    // new routes that have no historical package entry yet.
+    const primary = vvCurrentSourceFile(entry.sourceFile, 'invalid current Host page source').bytes;
+    if (!page) {
+      byRoute.set(entry.route, { state: 'UNVALIDATED', reason: 'new-current-route', sourceFile: entry.sourceFile });
+      continue;
+    }
+    let changed = vvHash(primary) !== page.sourceSha256;
+    for (const dependency of page.renderedDependencies) {
+      const current = vvCurrentSourceFile(dependency.sourceFile,
+        'invalid current rendered V&V dependency source').bytes;
+      if (vvHash(current) !== dependency.sourceSha256) changed = true;
+    }
+    byRoute.set(entry.route, { state: changed ? 'STALE' : 'CURRENT',
+      reason: changed ? 'historical-primary-or-rendered-dependency-changed' : 'matches-reviewed-snapshot',
+      sourceFile: entry.sourceFile });
+  }
+  for (const route of baselineRoutes) {
+    if (!currentRoutes.has(route)) byRoute.set(route, { state: 'HISTORICAL_ONLY', reason: 'route-removed-from-current-host-navigation' });
+  }
+  const supportByRoute = new Map();
+  for (const support of supportLayers) {
+    const current = [
+      [support.sourceFile, support.sourceSha256], [support.fragmentFile, support.fragmentSha256],
+      [support.centralReferenceFile, support.centralReferenceSha256],
+    ];
+    const changed = current.some(([file, hash]) => vvHash(vvCurrentSourceFile(file,
+      'invalid current V&V support source').bytes) !== hash);
+    supportByRoute.set(support.route, { state: changed ? 'STALE' : 'CURRENT',
+      reason: changed ? 'historical-wrapper-snippet-or-central-reference-changed' : 'matches-reviewed-snapshot' });
+  }
+  return { currentNavigation, byRoute, supportByRoute,
+    baselineHostRouteCount: baselineRoutes.size, currentHostRouteCount: currentNavigation.length };
 }
 function projectionTargetKey(record, canonicalTargets) {
   const level = vvIdentifier(record.level);
@@ -1321,7 +1500,7 @@ function vvSourceRef(value, subjectSourceFile) {
     throw new Error('documentation under review cannot be its own V&V authority');
   }
   if (source.repository === 'vast-ai/docs') {
-    const sourceBytes = vvRepositoryFile(source.path, 'invalid V&V authority source file').bytes;
+    const sourceBytes = vvHistoricalSourceFile(source.path, 'invalid V&V authority source file').bytes;
     const actualRevision = `sha256:${crypto.createHash('sha256').update(sourceBytes).digest('hex')}`;
     if (source.revision !== actualRevision) throw new Error('stale V&V authority source');
     const sourceText = sourceBytes.toString('utf8');
@@ -2246,7 +2425,7 @@ function loadClaimAndSupportContracts(sets, canonical, allEvidenceIds, evidenceR
       throw new Error('invalid V&V support layer path');
     }
     const readAndHash = (file, declaredHash) => {
-      const bytes = vvRepositoryFile(file, 'invalid V&V support layer source file').bytes;
+      const bytes = vvHistoricalSourceFile(file, 'invalid V&V support layer source file').bytes;
       if (vvSha256(declaredHash, 'invalid V&V support layer hash') !==
         crypto.createHash('sha256').update(bytes).digest('hex')) throw new Error('stale V&V support layer source');
       return bytes.toString('utf8');
@@ -2273,8 +2452,10 @@ function loadClaimAndSupportContracts(sets, canonical, allEvidenceIds, evidenceR
       binding.centralReferenceSha256 !== value.central_reference_sha256) {
       throw new Error('mismatched V&V support-layer binding');
     }
-    const normalized = { id, layer, route, sourceFile, fragmentFile, centralReferenceFile: centralFile,
+    const normalized = { id, layer, route, sourceFile, sourceSha256: value.source_sha256,
+      fragmentFile, fragmentSha256: value.fragment_sha256, centralReferenceFile: centralFile,
       centralReferenceRoute: centralRoute, classification: value.classification, workflow: false, status: 'PASS',
+      centralReferenceSha256: value.central_reference_sha256,
       evidenceIds: evidenceIds.map(vvText), evidenceRole: binding.evidenceRole,
       evidenceLimitations: bindingManifests.supportEnvelope.limitations,
       claimLimit: vvRequiredText(value.claim_limit) };
@@ -2349,11 +2530,11 @@ function loadClaimAndSupportContracts(sets, canonical, allEvidenceIds, evidenceR
     ['static_inventory_unique_commands', 'procedure_command_carriers',
       'added_authored_fenced_occurrences', 'support_rule'],
     'invalid V&V command-occurrence reconciliation');
-  const inventory = vvExactKeys(JSON.parse(vvRepositoryFile('host-docs-verification-inventory.json',
+  const inventory = vvExactKeys(JSON.parse(vvHistoricalSourceFile('host-docs-verification-inventory.json',
     'missing canonical V&V command inventory').bytes.toString('utf8')),
   ['schema_version', 'source_revision', 'scope', 'safety', 'known_source_owner_gates', 'items',
     'summary', 'issues', 'content_fingerprint'], 'invalid canonical V&V command inventory structure');
-  const commandAccess = vvExactKeys(JSON.parse(vvRepositoryFile('host-docs-command-access.json',
+  const commandAccess = vvExactKeys(JSON.parse(vvHistoricalSourceFile('host-docs-command-access.json',
     'missing hash-bound V&V command classification').bytes.toString('utf8')),
   ['schema_version', 'source_revision', 'content_fingerprint', 'command_count', 'group_counts',
     'dimension_counts', 'commands'], 'invalid hash-bound V&V command classification structure');
@@ -3067,7 +3248,19 @@ function loadCliSignatureChecks(canonical) {
 }
 function loadVerificationEvidence() {
   try {
-    const bytes = VV_FILES.map((file) => fs.readFileSync(new URL(file, import.meta.url)));
+    // The three canonical package files are current evidence, not historical
+    // source input.  Keep them on the live regular-file path so a corrupt or
+    // substituted package cannot be accepted merely because the Git snapshot
+    // remains readable.
+    const bytes = VV_FILES.map((file) => {
+      const safe = file.replace(/^\.\//, '');
+      try { return vvRepositoryFile(safe, 'invalid canonical V&V package file').bytes; } catch (error) {
+        // Preserve the established sanitized ENOENT failure for an absent
+        // package, while keeping malformed/symlinked existing files rejected.
+        try { fs.lstatSync(new URL(file, import.meta.url)); } catch { return fs.readFileSync(new URL(file, import.meta.url)); }
+        throw error;
+      }
+    });
     const [sets, results, scores] = bytes.map((value) => JSON.parse(value.toString('utf8')));
     vvExactKeys(sets,
       ['schema_version', 'record_type', 'created_at', 'reconciled_at', 'state', 'source', 'method',
@@ -3618,6 +3811,9 @@ function loadVerificationEvidence() {
     const contracts = loadClaimAndSupportContracts(
       sets, canonical, evidenceIds, evidenceRefById, procedureEvidence, commandEvidenceById, bindingManifests,
     );
+    // This is deliberately after all historical/package validation.  Current
+    // sources are a freshness comparison, never replacement evidence.
+    const sourceFreshness = currentSourceFreshness(canonical, contracts.supportLayers);
     const currentStatusByTarget = loadCurrentStatusProjection(
       results, canonical, attemptsById, procedureEvidence, commandEvidenceById, snapshot, contracts, evidenceIds,
     );
@@ -3716,7 +3912,8 @@ function loadVerificationEvidence() {
       materialPageDispositionByPage: contracts.materialPageDispositionByPage,
       retiredMaterialClaims: contracts.retiredMaterialClaims,
       retiredMaterialClaimsByPage: contracts.retiredMaterialClaimsByPage,
-      supportLayers: contracts.supportLayers, supportByRoute: contracts.supportByRoute };
+      supportLayers: contracts.supportLayers, supportByRoute: contracts.supportByRoute,
+      sourceFreshness, reviewedSourceRevision: VV_REVIEWED_SOURCE_REVISION };
   } catch (error) {
     const unavailableReason = vvText(String(error?.message || 'package-integrity-failure'));
     if (process.env.VAST_REVIEW_DEBUG === '1') console.error(`V&V evidence unavailable: ${unavailableReason}`);
@@ -3731,7 +3928,8 @@ function loadVerificationEvidence() {
       materialClaims: [], materialClaimsByPage: new Map(), retiredMaterialClaims: [],
       materialPageDispositions: [], materialPageDispositionByPage: new Map(),
       retiredMaterialClaimsByPage: new Map(),
-      supportLayers: [], supportByRoute: new Map(), unavailableReason };
+      supportLayers: [], supportByRoute: new Map(), sourceFreshness: null,
+      reviewedSourceRevision: VV_REVIEWED_SOURCE_REVISION, unavailableReason };
   }
 }
 const VERIFICATION_EVIDENCE = loadVerificationEvidence();
@@ -3802,6 +4000,46 @@ function vvEvidenceLaneHints(accessClasses) {
   }
   return VV_EVIDENCE_LANES.filter((item) => codes.has(item.code));
 }
+function vvFreshnessContext(pathname, freshness, { supportLayer = false, page = null, baselineSourceFile = null } = {}) {
+  const currentPageHref = pathname;
+  const baselineFile = page?.source_file || page?.sourceFile || baselineSourceFile;
+  const baselinePageHref = baselineFile
+    ? `https://github.com/vast-ai/docs/blob/${VV_REVIEWED_SOURCE_REVISION}/${baselineFile}` : null;
+  const state = freshness?.state || 'UNVALIDATED';
+  const action = state === 'STALE' && supportLayer
+    ? 'Review the current wrapper, snippet, and central reference, then create and retain a new support-layer V&V result for this exact current source.'
+    : state === 'STALE'
+    ? 'Review the current wording and rendered dependencies, then create and retain a new V&V result for this exact current source.'
+    : state === 'HISTORICAL_ONLY'
+      ? 'Restore this route to the current Host navigation or create a new current-route V&V package before presenting validation.'
+      : 'Create and retain a V&V result for this new current route before presenting validation.';
+  const explanation = state === 'STALE' && supportLayer
+    ? 'The current support wrapper, snippet, or central reference differs from the reviewed source snapshot. Historical support results are not current validation.'
+    : state === 'STALE'
+    ? 'The current page or one of its rendered dependencies differs from the reviewed source snapshot. Historical results are not current validation.'
+    : state === 'HISTORICAL_ONLY'
+      ? 'This route is retained in the reviewed snapshot but is absent from the current Host navigation. It is historical only.'
+      : 'This route is present in the current Host navigation but was not in the reviewed snapshot. It is unvalidated.';
+  return {
+    available: true, supportLayer, workflow: !supportLayer,
+    currentStatus: state === 'HISTORICAL_ONLY' ? 'UNVALIDATED' : state,
+    sourceFreshness: {
+      state, reason: freshness?.reason || 'current-source-not-covered-by-reviewed-snapshot', explanation,
+      nextAction: action, currentPageHref, baselinePageHref,
+      reviewedSourceRevision: VV_REVIEWED_SOURCE_REVISION,
+      currentHostRouteCount: VERIFICATION_EVIDENCE.sourceFreshness.currentHostRouteCount,
+      baselineHostRouteCount: VERIFICATION_EVIDENCE.sourceFreshness.baselineHostRouteCount,
+    },
+    // Do not project historical PASS/score/cards into current status.  The
+    // immutable source link is intentionally the only history exposed here.
+    historical: { label: 'Reviewed historical snapshot (not current validation)', baselinePageHref,
+      reviewedSourceRevision: VV_REVIEWED_SOURCE_REVISION },
+    materialClaims: [], retiredMaterialClaims: [], retiredCommandWithdrawals: [], testSets: [],
+    totals: { testSets: 0, branches: 0, steps: 0, commands: 0, nonCommandSteps: 0,
+      displayOnlyCommands: 0, executableIntentCommands: 0, retainedEvidenceRecords: 0, observations: 0,
+      scored: 0, executableIntentScored: 0, displayOnlyScored: 0, notApplicableAssessments: 0 },
+  };
+}
 function verificationForPath(pathname) {
   if (!VERIFICATION_EVIDENCE.available) {
     return { available: false,
@@ -3822,10 +4060,18 @@ function verificationForPath(pathname) {
     }));
     const support = VERIFICATION_EVIDENCE.supportByRoute.get(pathname);
     if (support) {
+      const freshness = VERIFICATION_EVIDENCE.sourceFreshness.supportByRoute.get(pathname);
+      if (freshness?.state !== 'CURRENT') {
+        return vvFreshnessContext(pathname, freshness, { supportLayer: true, baselineSourceFile: support.sourceFile });
+      }
       const pageTitle = `${support.layer} central-reference support: ${pathname.split('/').at(-1)}`;
       return {
         available: true, supportLayer: true, supportId: support.id,
         workflow: false, classification: support.classification,
+        sourceFreshness: { state: 'CURRENT', reason: freshness?.reason || 'matches-reviewed-snapshot',
+          reviewedSourceRevision: VV_REVIEWED_SOURCE_REVISION,
+          currentHostRouteCount: VERIFICATION_EVIDENCE.sourceFreshness.currentHostRouteCount,
+          baselineHostRouteCount: VERIFICATION_EVIDENCE.sourceFreshness.baselineHostRouteCount },
         checkedContent: { route: support.route, pageTitle, sections: [] },
         repositoryFiles: { wrapper: support.sourceFile, fragment: support.fragmentFile,
           centralReference: support.centralReferenceFile },
@@ -3842,6 +4088,10 @@ function verificationForPath(pathname) {
       };
     }
     const page = VERIFICATION_EVIDENCE.pages.find((row) => row.route === pathname);
+    const freshness = VERIFICATION_EVIDENCE.sourceFreshness.byRoute.get(pathname);
+    if (freshness && freshness.state !== 'CURRENT') {
+      return vvFreshnessContext(pathname, freshness, { page });
+    }
     if (!page) return { available: false, unavailableReason: 'page-not-in-inventory' };
     const pageRoute = vvCanonicalRoute(page.route);
     const pageTitle = vvRequiredText(page.title);
@@ -4032,6 +4282,10 @@ function verificationForPath(pathname) {
       .map((claim) => ({ ...claim, retestEvidence: evidenceLinksFor([claim.retestEvidenceId]) }));
     const materialDisposition = VERIFICATION_EVIDENCE.materialPageDispositionByPage.get(page.page_id);
     return { available: true, supportLayer: false, workflow: true,
+      sourceFreshness: { state: 'CURRENT', reason: freshness?.reason || 'matches-reviewed-snapshot',
+        reviewedSourceRevision: VV_REVIEWED_SOURCE_REVISION,
+        currentHostRouteCount: VERIFICATION_EVIDENCE.sourceFreshness.currentHostRouteCount,
+        baselineHostRouteCount: VERIFICATION_EVIDENCE.sourceFreshness.baselineHostRouteCount },
       executionStatus: vvStatus(page.execution_status),
       checkedContent: checkedContentFor(), ...pageFields,
       procedureStatusSemantics: 'PROCEDURE_EXECUTION_AND_REQUIRED_CHILDREN_ONLY',
@@ -4424,7 +4678,7 @@ function statusPage() {
     .filter((status) => counts?.[status])
     .map((status) => `${esc(status)}=${counts[status]}`).join(' · ');
   const vvSummary = vv.available
-    ? `<p><b>V&amp;V evidence:</b> ${vv.totals.pages} primary Host pages · ${vv.totals.materialClaims} material claims · ${vv.totals.testSets} test sets · ${vv.totals.branches} branches · ${vv.totals.steps} checks · ${vv.totals.nonCommandSteps} non-command checks · ${vv.totals.executableIntentCommands} executable command targets · ${vv.totals.displayOnlyCommands} display-only command references · ${vv.totals.retainedEvidenceRecords} retained evidence records · ${vv.totals.scored} numeric semantic scores (${vv.totals.executableIntentScored} executable-intent scores, ${vv.totals.displayOnlyScored} display-only semantic scores) · ${vv.totals.notApplicableAssessments} approved display-only N/A · ${vv.totals.cliSupportLayers} CLI and ${vv.totals.sdkSupportLayers} SDK central-reference support layers (not Host workflows).</p>
+    ? `<p><b>V&amp;V evidence:</b> ${vv.sourceFreshness.currentHostRouteCount} current primary Host routes · ${vv.sourceFreshness.baselineHostRouteCount} retained reviewed baseline routes · ${vv.totals.materialClaims} historical material claims · ${vv.totals.testSets} historical test sets · ${vv.totals.branches} historical branches · ${vv.totals.steps} historical checks · ${vv.totals.nonCommandSteps} historical non-command checks · ${vv.totals.executableIntentCommands} historical executable command targets · ${vv.totals.displayOnlyCommands} historical display-only command references · ${vv.totals.retainedEvidenceRecords} retained evidence records · ${vv.totals.scored} historical numeric semantic scores (${vv.totals.executableIntentScored} executable-intent scores, ${vv.totals.displayOnlyScored} display-only semantic scores) · ${vv.totals.notApplicableAssessments} historical approved display-only N/A · ${vv.totals.cliSupportLayers} CLI and ${vv.totals.sdkSupportLayers} SDK central-reference support layers (not Host workflows). Current freshness is evaluated separately from this retained history.</p>
       <p><b>Material-claim disposition:</b> ${statusCountsText(vv.materialClaimStatusCounts)}.<br>
       <b>Page semantic disposition:</b> ${statusCountsText(vv.materialPageDispositionStatusCounts)}. This is the page-level claim rollup. Procedure projection is reported separately and does not override these claim dispositions.</p>`
     : `<p><b>V&amp;V evidence:</b> fail-closed because this prerequisite failed: <code>${esc(vv.unavailableReason || 'package unavailable')}</code>. No validation claim is made until it is repaired and retested.</p>`;
@@ -5544,6 +5798,20 @@ const OVERLAY_JS = String.raw`
           esc(vv && vv.unavailableReason ? vv.unavailableReason : 'package unavailable') +
           '</code>. No validation or command-scoring claim is made until the package is repaired and retested.';
       return html + '</summary><div class="vv-meta">' + unavailable + '</div></details>';
+    }
+    if (vv.sourceFreshness && vv.sourceFreshness.state !== 'CURRENT') {
+      var freshness = vv.sourceFreshness;
+      var currentLink = freshness.currentPageHref
+        ? '<a href="' + esc(freshness.currentPageHref) + '">Open current page</a>' : 'Current page link unavailable';
+      var baselineLink = freshness.baselinePageHref
+        ? '<a href="' + esc(freshness.baselinePageHref) + '" target="_blank" rel="noopener noreferrer">Open reviewed pinned source</a>'
+        : 'No reviewed source exists for this new route';
+      return html + ' · current source ' + esc(freshness.state) + '</summary>' +
+        '<div class="vv-blocker-help"><b>Current validation: <code>' + esc(vv.currentStatus) + '</code></b><br>' +
+        esc(freshness.explanation) + '<br><b>Exact next action:</b> ' + esc(freshness.nextAction) +
+        '<br>' + currentLink + ' · ' + baselineLink +
+        '<br><b>Historical record:</b> ' + esc(vv.historical && vv.historical.label ||
+          'Reviewed historical snapshot (not current validation)') + '</div></details>';
     }
     function isAccountingStatus(row) {
       return /RECONCILIATION|ACCOUNTING|STATUS_BASIS_REBASE|LOCAL_STATUS_REBASE|TOPOLOGY_CORRECTION/i

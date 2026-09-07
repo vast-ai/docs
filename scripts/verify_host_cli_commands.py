@@ -151,6 +151,66 @@ def logical_source_lines(text: str) -> list[tuple[int, str]]:
     return logical
 
 
+def command_substitution_ranges(value: str) -> list[tuple[int, int]]:
+    """Return balanced ``$(...)`` ranges, ignoring substitutions inside single quotes.
+
+    This is deliberately a small static scanner, not a shell parser. It supports
+    nested command substitutions and quote state scoped to each substitution so
+    option ownership can be checked for documented ``$(vastai ...)`` examples.
+    Unbalanced substitutions, heredocs, and shell constructs other than
+    ``$(...)`` retain the extractor's existing best-effort behavior.
+    """
+
+    ranges: list[tuple[int, int]] = []
+    starts: list[int] = []
+    # The root is a quoting context too. Each ``$(`` starts a fresh shell
+    # context, while its parent context remains intact until the matching ``)``.
+    quote_states = [[False, False]]  # [single_quoted, double_quoted]
+    index = 0
+    while index < len(value):
+        character = value[index]
+        single_quoted, double_quoted = quote_states[-1]
+        if character == "\\" and not single_quoted:
+            index += 2
+            continue
+        if character == "'" and not double_quoted:
+            quote_states[-1][0] = not single_quoted
+        elif character == '"' and not single_quoted:
+            quote_states[-1][1] = not double_quoted
+        elif not single_quoted and value.startswith("$(", index):
+            starts.append(index)
+            quote_states.append([False, False])
+            index += 2
+            continue
+        elif not single_quoted and not double_quoted and character == ")" and starts:
+            ranges.append((starts.pop(), index + 1))
+            quote_states.pop()
+        index += 1
+    return ranges
+
+
+def innermost_command_substitution(
+    offset: int,
+    ranges: list[tuple[int, int]],
+) -> tuple[int, int] | None:
+    containing = [item for item in ranges if item[0] < offset < item[1]]
+    return min(containing, key=lambda item: item[1] - item[0]) if containing else None
+
+
+def without_command_substitutions(value: str) -> str:
+    """Replace complete command substitutions with whitespace before flag scanning."""
+
+    pieces: list[str] = []
+    previous_end = 0
+    for start, end in sorted(command_substitution_ranges(value)):
+        if start < previous_end:
+            continue
+        pieces.extend((value[previous_end:start], " "))
+        previous_end = end
+    pieces.append(value[previous_end:])
+    return "".join(pieces)
+
+
 def extract_invocations_from_text(
     relative: str,
     text: str,
@@ -160,6 +220,13 @@ def extract_invocations_from_text(
     command_names = set(registry)
     for line_number, line in logical_source_lines(text):
         matches = list(INVOCATION_RE.finditer(line))
+        substitution_ranges = command_substitution_ranges(line)
+        match_contexts = {
+            match.start(): innermost_command_substitution(
+                match.start(), substitution_ranges
+            )
+            for match in matches
+        }
         for index, match in enumerate(matches):
             prefix = line[: match.start()].rstrip().casefold()
             if prefix.endswith("from"):
@@ -176,10 +243,20 @@ def extract_invocations_from_text(
             else:
                 signature = candidate_two or first
 
-            segment_end = matches[index + 1].start() if index + 1 < len(matches) else len(line)
+            context = match_contexts[match.start()]
+            context_end = context[1] - 1 if context else len(line)
+            segment_end = context_end
+            for following in matches[index + 1:]:
+                if match_contexts[following.start()] == context:
+                    segment_end = following.start()
+                    break
             raw_segment = line[match.start() : segment_end]
             segment = clean_segment(raw_segment)
-            flag_source = re.sub(r"'[^']*'|\"[^\"]*\"", "", raw_segment)
+            flag_source = re.sub(
+                r"'[^']*'|\"[^\"]*\"",
+                "",
+                without_command_substitutions(raw_segment),
+            )
             flags = sorted(set(OPTION_RE.findall(flag_source)))
             accepted = set(registry.get(signature, {}).get("options", [])) | GLOBAL_OPTIONS
             unknown_flags = sorted(flag for flag in flags if flag not in accepted)

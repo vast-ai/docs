@@ -1,25 +1,95 @@
 #!/usr/bin/env python3
-"""Repository-local regressions for the active 40-page Host V&V package."""
+"""Repository-local integrity regressions for the historical 40-page Host V&V package."""
 
 from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path
+from functools import lru_cache
+from pathlib import Path, PurePosixPath
 import re
 import subprocess
 import unittest
+from unittest import mock
 
 
 REPO = Path(__file__).resolve().parents[1]
 SETS = json.loads((REPO / "verification/host-docs-test-sets.json").read_text())
 RESULTS = json.loads((REPO / "verification/host-docs-test-results.json").read_text())
+HISTORICAL_VV_SNAPSHOT_COMMIT = "7d42a0d439f91e4dc2877104db807ec6fb975ce4"
+
+
+@lru_cache(maxsize=1)
+def historical_vv_snapshot_commit() -> str:
+    """Return the sealed Git commit used by the retained 40-page proof package."""
+    completed = subprocess.run(
+        ["git", "rev-parse", "--verify", f"{HISTORICAL_VV_SNAPSHOT_COMMIT}^{{commit}}"],
+        cwd=REPO,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    resolved = completed.stdout.strip()
+    if resolved != HISTORICAL_VV_SNAPSHOT_COMMIT:
+        raise RuntimeError(
+            "historical Host V&V snapshot did not resolve to its exact sealed commit"
+        )
+    return resolved
+
+
+@lru_cache(maxsize=None)
+def historical_vv_source_bytes(source_file: str) -> bytes:
+    """Read one regular source file from the sealed proof snapshot, never HEAD."""
+    path = PurePosixPath(source_file)
+    if (
+        not source_file
+        or path.is_absolute()
+        or source_file != path.as_posix()
+        or any(part in {"", ".", ".."} for part in path.parts)
+    ):
+        raise ValueError(f"invalid historical Host V&V source path: {source_file!r}")
+
+    commit = historical_vv_snapshot_commit()
+    entry = subprocess.run(
+        ["git", "ls-tree", "-z", commit, "--", source_file],
+        cwd=REPO,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ).stdout
+    if not entry:
+        raise FileNotFoundError(
+            f"historical Host V&V source is absent from {commit}: {source_file}"
+        )
+    metadata, entry_path = entry.rstrip(b"\0").split(b"\t", 1)
+    mode, object_type, _object_id = metadata.decode().split()
+    if (
+        entry_path.decode() != source_file
+        or object_type != "blob"
+        or mode not in {"100644", "100755"}
+    ):
+        raise RuntimeError(
+            f"historical Host V&V source is not a regular file in {commit}: {source_file}"
+        )
+
+    return subprocess.run(
+        ["git", "show", f"{commit}:{source_file}"],
+        cwd=REPO,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ).stdout
+
+
+def historical_vv_source_text(source_file: str) -> str:
+    return historical_vv_source_bytes(source_file).decode()
 
 
 class ReconciledHostVvTests(unittest.TestCase):
     @staticmethod
     def _claim_source_text(claim: dict) -> str:
-        lines = (REPO / claim["scope"]["source_file"]).read_text().splitlines()
+        lines = historical_vv_source_text(claim["scope"]["source_file"]).splitlines()
         return "\n".join(
             "\n".join(lines[span["start"] - 1:span["end"]])
             for span in claim["scope"]["source_spans"]
@@ -677,7 +747,9 @@ class ReconciledHostVvTests(unittest.TestCase):
         for claim in SETS["material_claims"]:
             if not claim["claim_id"].startswith("MCL-"):
                 continue
-            source = (REPO / claim["scope"]["source_file"]).read_text().splitlines()
+            source = historical_vv_source_text(
+                claim["scope"]["source_file"]
+            ).splitlines()
             spans = claim["scope"]["source_spans"]
             raw = "\n".join(
                 "\n".join(source[span["start"] - 1:span["end"]])
@@ -697,6 +769,30 @@ class ReconciledHostVvTests(unittest.TestCase):
                 hashlib.sha256(literal.encode()).hexdigest(),
                 claim["claim_id"],
             )
+
+    def test_historical_source_proof_ignores_current_files_and_rejects_corruption(self) -> None:
+        claim = next(
+            row for row in SETS["material_claims"]
+            if row["claim_id"].startswith("MCL-")
+        )
+        baseline_literal = self._claim_source_text(claim)
+
+        # A simulated current worktree edit must not affect retained historical proof.
+        with mock.patch.object(
+            Path,
+            "read_text",
+            return_value="CURRENT WORKTREE EDIT THAT MUST NOT ALTER RETAINED PROOF\n",
+        ):
+            self.assertEqual(self._claim_source_text(claim), baseline_literal)
+
+        # The actual integrity loop must still reject a corrupt retained claim hash.
+        corrupted = {
+            **claim,
+            "scope": {**claim["scope"], "source_text_sha256": "0" * 64},
+        }
+        with mock.patch.dict(SETS, {"material_claims": [corrupted]}):
+            with self.assertRaises(AssertionError):
+                self.test_every_material_claim_hashes_its_literal_declared_source_spans()
 
     def test_fragment_only_references_are_local(self) -> None:
         fragment_refs = [
@@ -828,7 +924,9 @@ class ReconciledHostVvTests(unittest.TestCase):
         self.assertEqual(dependency["insertion_line"], 35)
         self.assertEqual(
             dependency["source_sha256"],
-            hashlib.sha256((REPO / dependency["source_file"]).read_bytes()).hexdigest(),
+            hashlib.sha256(
+                historical_vv_source_bytes(dependency["source_file"])
+            ).hexdigest(),
         )
         dependency_claims = [
             claim for claim in SETS["material_claims"]

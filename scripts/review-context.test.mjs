@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import http from 'node:http';
@@ -9,6 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const REVIEWED_SOURCE_REVISION = '7d42a0d439f91e4dc2877104db807ec6fb975ce4';
 let targetServer;
 let reviewProcess;
 let targetOrigin;
@@ -16,6 +17,11 @@ let reviewOrigin;
 let feedbackDir;
 let reviewOutput = '';
 let reviewSourceSha256AtStartup;
+let reviewedSourceFiles;
+let historicalFixtureRoot;
+let historicalReviewProcess;
+let historicalReviewOrigin;
+let historicalReviewOutput = '';
 
 function listen(server, port = 0) {
   return new Promise((resolve, reject) => {
@@ -52,8 +58,14 @@ async function waitForReviewServer() {
   throw new Error(`review server did not become ready: ${lastError}\n${reviewOutput}`);
 }
 
-async function contextFor(pathname) {
+async function currentContextFor(pathname) {
   const response = await fetch(`${reviewOrigin}/__review__/api/context?path=${encodeURIComponent(pathname)}`);
+  assert.equal(response.status, 200);
+  return response.json();
+}
+
+async function contextFor(pathname) {
+  const response = await fetch(`${historicalReviewOrigin}/__review__/api/context?path=${encodeURIComponent(pathname)}`);
   assert.equal(response.status, 200);
   return response.json();
 }
@@ -63,7 +75,25 @@ const SOURCE_PASSAGE_KEYS = [
 ];
 
 async function sourceLinesFor(claim) {
-  return (await fs.readFile(path.join(ROOT, claim.sourceLocation.file), 'utf8')).split(/\r?\n/);
+  return execFileSync('git', ['-C', ROOT, 'show',
+    `${REVIEWED_SOURCE_REVISION}:${claim.sourceLocation.file}`], { encoding: 'utf8' }).split(/\r?\n/);
+}
+
+async function materializeReviewedSourceFixture(fixtureRoot) {
+  if (!reviewedSourceFiles) {
+    const paths = ['docs.json', 'api-reference', 'cli', 'guides', 'host', 'scripts', 'sdk', 'snippets'];
+    const files = execFileSync('git', ['-C', ROOT, 'ls-tree', '-r', '--name-only',
+      REVIEWED_SOURCE_REVISION, '--', ...paths], { encoding: 'utf8' })
+      .split('\n').filter(Boolean);
+    reviewedSourceFiles = new Map(files.map((file) => [file,
+      execFileSync('git', ['-C', ROOT, 'show', `${REVIEWED_SOURCE_REVISION}:${file}`])
+    ]));
+  }
+  for (const [file, bytes] of reviewedSourceFiles) {
+    const destination = path.join(fixtureRoot, file);
+    await fs.mkdir(path.dirname(destination), { recursive: true });
+    await fs.writeFile(destination, bytes);
+  }
 }
 
 function sourceLiteral(lines, { start, end }) {
@@ -140,15 +170,15 @@ async function isolatedVerificationContext(mode, pathname = '/host/network-ports
     const verificationDir = path.join(fixtureRoot, 'verification');
     await fs.mkdir(verificationDir);
     await fs.copyFile(path.join(ROOT, '.git'), path.join(fixtureRoot, '.git'));
-    for (const directory of ['api-reference', 'cli', 'guides', 'host', 'scripts', 'sdk', 'snippets']) {
-      await fs.cp(path.join(ROOT, directory), path.join(fixtureRoot, directory), { recursive: true });
-    }
     for (const name of [
       'docs.json', 'host-docs-cli-command-check.json', 'host-docs-command-access.json',
       'host-docs-verification-inventory.json',
     ]) {
       await fs.copyFile(path.join(ROOT, name), path.join(fixtureRoot, name));
     }
+    // Fixture drift must be applied to the exact reviewed source, not to
+    // whichever merged working tree happens to run the suite.
+    await materializeReviewedSourceFixture(fixtureRoot);
     await fs.cp(path.join(ROOT, 'verification', 'evidence'), path.join(verificationDir, 'evidence'), { recursive: true });
     for (const name of ['host-docs-test-sets.json', 'host-docs-test-results.json', 'host-docs-command-scores.json']) {
       await fs.copyFile(path.join(ROOT, 'verification', name), path.join(verificationDir, name));
@@ -452,6 +482,47 @@ async function isolatedVerificationContext(mode, pathname = '/host/network-ports
       source.find((command) => command.command_id === commands[1].commandId).command_id = commands[0].commandId;
     } else if (mode === 'stale-page-source') {
       await fs.appendFile(path.join(fixtureRoot, 'host', 'market-metrics.mdx'), '\n<!-- stale fixture -->\n');
+    } else if (mode === 'stale-rendered-dependency') {
+      await fs.appendFile(path.join(fixtureRoot, 'snippets', 'notifications', 'channels.mdx'), '\n<!-- stale fixture -->\n');
+    } else if (mode === 'stale-support-wrapper') {
+      await fs.appendFile(path.join(fixtureRoot, 'host', 'cli', 'cancel-maint.mdx'), '\n<!-- stale fixture -->\n');
+    } else if (mode === 'merged-current-host-nav') {
+      const docsFile = path.join(fixtureRoot, 'docs.json');
+      const docs = JSON.parse(await fs.readFile(docsFile, 'utf8'));
+      const host = docs.navigation.tabs.find((tab) => tab.tab === 'Host');
+      const added = ['machine-metrics', 'upgrade-kernel', 'disable-ssh-password-login', 'machine-offline'];
+      for (const slug of added) {
+        await fs.copyFile(path.join(fixtureRoot, 'host', 'market-metrics.mdx'), path.join(fixtureRoot, 'host', `${slug}.mdx`));
+        host.groups[4].pages.push(`host/${slug}`);
+      }
+      await fs.writeFile(docsFile, JSON.stringify(docs, null, 2) + '\n');
+    } else if (mode === 'removed-current-nav-route') {
+      const docsFile = path.join(fixtureRoot, 'docs.json');
+      const docs = JSON.parse(await fs.readFile(docsFile, 'utf8'));
+      const host = docs.navigation.tabs.find((tab) => tab.tab === 'Host');
+      const removeRoute = (pages) => pages.filter((item) => item !== 'host/network-ports')
+        .map((item) => typeof item === 'string' ? item : { ...item, pages: removeRoute(item.pages) });
+      for (const group of host.groups) group.pages = removeRoute(group.pages);
+      assert.ok(!JSON.stringify(host).includes('host/network-ports'), 'removed-route fixture must actually remove the route');
+      await fs.writeFile(docsFile, JSON.stringify(docs, null, 2) + '\n');
+    } else if (mode === 'nested-current-nav') {
+      const docsFile = path.join(fixtureRoot, 'docs.json');
+      const docs = JSON.parse(await fs.readFile(docsFile, 'utf8'));
+      const host = docs.navigation.tabs.find((tab) => tab.tab === 'Host');
+      host.groups[0].pages = [{ group: 'Nested', pages: host.groups[0].pages }];
+      await fs.writeFile(docsFile, JSON.stringify(docs, null, 2) + '\n');
+    } else if (mode === 'duplicate-current-nav-route') {
+      const docsFile = path.join(fixtureRoot, 'docs.json');
+      const docs = JSON.parse(await fs.readFile(docsFile, 'utf8'));
+      const host = docs.navigation.tabs.find((tab) => tab.tab === 'Host');
+      host.groups[0].pages.push('host/hosting-overview');
+      await fs.writeFile(docsFile, JSON.stringify(docs, null, 2) + '\n');
+    } else if (mode === 'traversal-current-nav-route') {
+      const docsFile = path.join(fixtureRoot, 'docs.json');
+      const docs = JSON.parse(await fs.readFile(docsFile, 'utf8'));
+      const host = docs.navigation.tabs.find((tab) => tab.tab === 'Host');
+      host.groups[0].pages.push('host/../review-questions');
+      await fs.writeFile(docsFile, JSON.stringify(docs, null, 2) + '\n');
     } else if (mode === 'invalid-canonical-route') {
       testSets.pages[0].route = '/host/../review-questions';
     } else if (mode === 'invalid-step-source-span') {
@@ -536,7 +607,9 @@ async function isolatedVerificationContext(mode, pathname = '/host/network-ports
     env: debugFixture ? { ...process.env, VAST_REVIEW_DEBUG: '1' } : process.env,
   });
   try {
-    for (let i = 0; i < 80; i += 1) {
+    // Pinned Git-blob integrity validation takes longer than live-file reads.
+    // Keep a bounded startup deadline without weakening any integrity check.
+    for (let i = 0; i < 400; i += 1) {
       try {
         const response = await fetch(`http://127.0.0.1:${port}/__review__/api/context?path=${encodeURIComponent(pathname)}`);
         // Consume the response body before the `finally` block terminates the
@@ -552,6 +625,47 @@ async function isolatedVerificationContext(mode, pathname = '/host/network-ports
     await new Promise((resolve) => child.exitCode == null ? child.once('exit', resolve) : resolve());
     await fs.rm(fixtureRoot, { recursive: true, force: true });
   }
+}
+
+async function startHistoricalReviewServer() {
+  historicalFixtureRoot = await fs.mkdtemp(path.join(path.dirname(ROOT), '.vast-review-history-'));
+  await fs.copyFile(path.join(ROOT, 'review-server.mjs'), path.join(historicalFixtureRoot, 'review-server.mjs'));
+  const gitSource = path.join(ROOT, '.git');
+  const gitStat = await fs.lstat(gitSource);
+  if (gitStat.isDirectory()) await fs.cp(gitSource, path.join(historicalFixtureRoot, '.git'), { recursive: true });
+  else await fs.copyFile(gitSource, path.join(historicalFixtureRoot, '.git'));
+  await materializeReviewedSourceFixture(historicalFixtureRoot);
+  await fs.mkdir(path.join(historicalFixtureRoot, 'verification'));
+  for (const name of [
+    'docs.json', 'host-docs-cli-command-check.json', 'host-docs-command-access.json',
+    'host-docs-verification-inventory.json',
+  ]) {
+    if (name !== 'docs.json') await fs.copyFile(path.join(ROOT, name), path.join(historicalFixtureRoot, name));
+  }
+  await fs.cp(path.join(ROOT, 'verification', 'evidence'), path.join(historicalFixtureRoot, 'verification', 'evidence'),
+    { recursive: true });
+  for (const name of ['host-docs-test-sets.json', 'host-docs-test-results.json', 'host-docs-command-scores.json']) {
+    await fs.copyFile(path.join(ROOT, 'verification', name), path.join(historicalFixtureRoot, 'verification', name));
+  }
+  const port = await freePort();
+  historicalReviewOrigin = `http://127.0.0.1:${port}`;
+  historicalReviewProcess = spawn(process.execPath, ['review-server.mjs', '--port', String(port), '--target', targetOrigin,
+    '--dir', path.join(historicalFixtureRoot, 'feedback')], {
+    cwd: historicalFixtureRoot, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  historicalReviewProcess.stdout.on('data', (chunk) => { historicalReviewOutput += chunk; });
+  historicalReviewProcess.stderr.on('data', (chunk) => { historicalReviewOutput += chunk; });
+  for (let i = 0; i < 160; i += 1) {
+    if (historicalReviewProcess.exitCode != null) {
+      throw new Error(`historical review server exited early (${historicalReviewProcess.exitCode})\n${historicalReviewOutput}`);
+    }
+    try {
+      const response = await fetch(`${historicalReviewOrigin}/__review__/api/context?path=%2Fhost%2Fverification-stages`);
+      if (response.ok) { await response.arrayBuffer(); return; }
+    } catch { /* wait for startup */ }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(`historical review server did not start\n${historicalReviewOutput}`);
 }
 
 before(async () => {
@@ -572,6 +686,7 @@ before(async () => {
   reviewProcess.stdout.on('data', (chunk) => { reviewOutput += chunk; });
   reviewProcess.stderr.on('data', (chunk) => { reviewOutput += chunk; });
   await waitForReviewServer();
+  await startHistoricalReviewServer();
 });
 
 after(async () => {
@@ -579,6 +694,11 @@ after(async () => {
     reviewProcess.kill('SIGTERM');
     await new Promise((resolve) => reviewProcess.once('exit', resolve));
   }
+  if (historicalReviewProcess && historicalReviewProcess.exitCode == null) {
+    historicalReviewProcess.kill('SIGTERM');
+    await new Promise((resolve) => historicalReviewProcess.once('exit', resolve));
+  }
+  if (historicalFixtureRoot) await fs.rm(historicalFixtureRoot, { recursive: true, force: true });
   if (targetServer) await new Promise((resolve) => targetServer.close(resolve));
   if (feedbackDir) await fs.rm(feedbackDir, { recursive: true, force: true });
 });
@@ -1023,7 +1143,7 @@ test('Material claims expose exact documentation source locations without promot
     textSha256: '73d7d624e9122cb81d36075a6962e3540c84d466943d1b102682a22564577298',
   });
 
-  const sourceLines = (await fs.readFile(path.join(ROOT, claim.sourceLocation.file), 'utf8')).split(/\r?\n/);
+  const sourceLines = await sourceLinesFor(claim);
   const boundText = claim.sourceLocation.spans.flatMap(({ start, end }) =>
     sourceLines.slice(start - 1, end)).join('\n');
   assert.equal(boundText, claim.claim.text);
@@ -1321,7 +1441,7 @@ test('Missing or malformed verification input fails closed', async () => {
   const failureReasons = new Set();
   for (const mode of [
     'malformed', 'snapshot-mismatch', 'schema-mismatch', 'record-type-mismatch',
-    'inventory-count-mismatch', 'invalid-baseline-status', 'duplicate-canonical-command', 'stale-page-source',
+    'inventory-count-mismatch', 'invalid-baseline-status', 'duplicate-canonical-command',
     'invalid-canonical-route',
     'invalid-step-source-span', 'invalid-step-source-section', 'invalid-command-source-span',
     'invalid-command-source-section',
@@ -1350,6 +1470,76 @@ test('Missing or malformed verification input fails closed', async () => {
   }
   assert.ok(failureReasons.size >= 20,
     `expected distinct fail-closed integrity gates, observed ${failureReasons.size}`);
+});
+
+test('Historical proof stays bounded when current Host sources or navigation drift', async () => {
+  const stalePage = (await isolatedVerificationContext('stale-page-source', '/host/market-metrics')).verification;
+  assert.equal(stalePage.available, true);
+  assert.equal(stalePage.currentStatus, 'STALE');
+  assert.equal(stalePage.sourceFreshness.state, 'STALE');
+  assert.match(stalePage.sourceFreshness.explanation, /differs from the reviewed source snapshot/);
+  assert.match(stalePage.sourceFreshness.nextAction, /new V&V result/);
+  assert.match(stalePage.sourceFreshness.baselinePageHref, /7d42a0d439f91e4dc2877104db807ec6fb975ce4\/host\/market-metrics\.mdx$/);
+  assert.deepEqual(stalePage.materialClaims, []);
+  assert.deepEqual(stalePage.testSets, []);
+
+  const staleDependency = (await isolatedVerificationContext('stale-rendered-dependency', '/host/notifications')).verification;
+  assert.equal(staleDependency.available, true);
+  assert.equal(staleDependency.sourceFreshness.state, 'STALE');
+  assert.deepEqual(staleDependency.testSets, []);
+
+  const staleSupport = (await isolatedVerificationContext('stale-support-wrapper', '/host/cli/cancel-maint')).verification;
+  assert.equal(staleSupport.available, true);
+  assert.equal(staleSupport.currentStatus, 'STALE');
+  assert.equal(staleSupport.supportLayer, true);
+  assert.match(staleSupport.sourceFreshness.baselinePageHref,
+    /7d42a0d439f91e4dc2877104db807ec6fb975ce4\/host\/cli\/cancel-maint\.mdx$/);
+  assert.match(staleSupport.sourceFreshness.explanation, /support wrapper, snippet, or central reference/);
+
+  const merged = (await isolatedVerificationContext('merged-current-host-nav', '/host/machine-metrics')).verification;
+  assert.equal(merged.available, true);
+  assert.equal(merged.currentStatus, 'UNVALIDATED');
+  assert.equal(merged.sourceFreshness.state, 'UNVALIDATED');
+  assert.equal(merged.sourceFreshness.currentHostRouteCount, 44);
+  assert.equal(merged.sourceFreshness.baselineHostRouteCount, 40);
+  assert.equal(merged.sourceFreshness.baselinePageHref, null);
+
+  const removed = (await isolatedVerificationContext('removed-current-nav-route', '/host/network-ports')).verification;
+  assert.equal(removed.available, true);
+  assert.equal(removed.sourceFreshness.state, 'HISTORICAL_ONLY');
+  assert.equal(removed.currentStatus, 'UNVALIDATED');
+
+  const nested = (await isolatedVerificationContext('nested-current-nav', '/host/network-ports')).verification;
+  assert.equal(nested.available, true);
+  assert.equal(nested.sourceFreshness.state, 'CURRENT');
+  for (const mode of ['duplicate-current-nav-route', 'traversal-current-nav-route']) {
+    const invalid = (await isolatedVerificationContext(mode)).verification;
+    assert.equal(invalid.available, false, mode);
+    assert.match(invalid.unavailableReason, /current Host route|current Host navigation/);
+  }
+});
+
+test('Actual merged sources expose freshness separately from retained proof', async (t) => {
+  const changed = await currentContextFor('/host/verification-stages');
+  assert.equal(changed.verification.available, true, changed.verification.unavailableReason);
+  if (changed.verification.sourceFreshness?.currentHostRouteCount !== 44) {
+    t.skip('requires the merged 44-route Host navigation fixture');
+    return;
+  }
+  assert.equal(changed.verification.available, true);
+  assert.equal(changed.verification.currentStatus, 'STALE');
+  assert.equal(changed.verification.sourceFreshness.state, 'STALE');
+  assert.deepEqual(changed.verification.testSets, []);
+  assert.match(changed.verification.sourceFreshness.baselinePageHref,
+    /7d42a0d439f91e4dc2877104db807ec6fb975ce4\/host\/verification-stages\.mdx$/);
+
+  const added = await currentContextFor('/host/machine-metrics');
+  assert.equal(added.verification.available, true);
+  assert.equal(added.verification.currentStatus, 'UNVALIDATED');
+  assert.equal(added.verification.sourceFreshness.state, 'UNVALIDATED');
+  assert.equal(added.verification.sourceFreshness.currentHostRouteCount, 44);
+  assert.equal(added.verification.sourceFreshness.baselineHostRouteCount, 40);
+  assert.equal(added.verification.sourceFreshness.baselinePageHref, null);
 });
 
 test('Current status projection preserves frozen execution status and supports procedure evidence', async () => {
@@ -1622,7 +1812,7 @@ test('JSON import restores multiple reviewers and keeps newer server items', asy
   assert.match(statusHtml, /Save JSON/);
   assert.match(statusHtml, /Import JSON/);
   assert.match(statusHtml, /restorable backup for every page and reviewer/);
-  assert.match(statusHtml, /V&amp;V evidence:<\/b> 40 primary Host pages · 1687 material claims · 101 test sets · 207 branches · 477 checks · 356 non-command checks · 126 executable command targets · 53 display-only command references · 96 retained evidence records · 152 numeric semantic scores \(126 executable-intent scores, 26 display-only semantic scores\) · 27 approved display-only N\/A · 18 CLI and 15 SDK central-reference support layers \(not Host workflows\)/);
+  assert.match(statusHtml, /V&amp;V evidence:<\/b> 44 current primary Host routes · 40 retained reviewed baseline routes · 1687 historical material claims · 101 historical test sets · 207 historical branches · 477 historical checks/);
   assert.match(statusHtml,
     /Material-claim disposition:<\/b> PASS=167 · FAIL=153 · BLOCKED=23 · UNVALIDATED=1344/);
   assert.match(statusHtml, /Page semantic disposition:<\/b> FAIL=26 · BLOCKED=3 · UNVALIDATED=11/);

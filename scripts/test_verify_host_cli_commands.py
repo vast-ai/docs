@@ -71,6 +71,60 @@ vastai list volume <machine-id> \\
         self.assertEqual(records[0]["status"], "unknown-option")
         self.assertEqual(records[0]["unknown_flags"], ["--unsupported"])
 
+    def test_nested_command_substitution_keeps_flags_with_their_own_command(self) -> None:
+        registry = {
+            "list machines": {"options": ["-e", "--retry"], "positionals": ["ids"]},
+            "show machines": {"options": ["-q"], "positionals": []},
+        }
+        text = (
+            "vastai list machines $(vastai show machines -q) "
+            "-e 12/31/2024 `--retry` 6\n"
+        )
+
+        records = VERIFIER.extract_invocations_from_text("host/example.mdx", text, registry)
+        by_signature = {record["signature"]: record for record in records}
+
+        self.assertEqual(by_signature["show machines"]["flags"], ["-q"])
+        self.assertEqual(by_signature["show machines"]["status"], "pass")
+        self.assertEqual(by_signature["list machines"]["flags"], ["--retry", "-e"])
+        self.assertEqual(by_signature["list machines"]["status"], "pass")
+
+    def test_nested_substitution_ignores_quoted_closing_parenthesis(self) -> None:
+        registry = {
+            "list machines": {"options": ["-e", "--retry"], "positionals": ["ids"]},
+            "show machines": {"options": ["-q"], "positionals": []},
+        }
+        text = (
+            '"$(vastai list machines $(vastai show machines -q "literal )") '
+            '-e 12/31/2024 --retry 6)"\n'
+        )
+
+        records = VERIFIER.extract_invocations_from_text("host/example.mdx", text, registry)
+        by_signature = {record["signature"]: record for record in records}
+
+        self.assertEqual(by_signature["show machines"]["flags"], ["-q"])
+        self.assertEqual(by_signature["show machines"]["status"], "pass")
+        self.assertEqual(by_signature["list machines"]["flags"], ["--retry", "-e"])
+        self.assertEqual(by_signature["list machines"]["status"], "pass")
+
+    def test_unknown_nested_outer_and_inner_flags_fail_closed(self) -> None:
+        registry = {
+            "list machines": {"options": ["-e"], "positionals": ["ids"]},
+            "show machines": {"options": ["-q"], "positionals": []},
+        }
+        text = (
+            "vastai list machines $(vastai show machines --unknown-inner) "
+            "-e 12/31/2024 --unknown-outer\n"
+        )
+
+        records = VERIFIER.extract_invocations_from_text("host/example.mdx", text, registry)
+        by_signature = {record["signature"]: record for record in records}
+
+        self.assertEqual(by_signature["show machines"]["unknown_flags"], ["--unknown-inner"])
+        self.assertEqual(by_signature["show machines"]["status"], "unknown-option")
+        self.assertEqual(by_signature["list machines"]["unknown_flags"], ["--unknown-outer"])
+        self.assertEqual(by_signature["list machines"]["status"], "unknown-option")
+
 
 class CliRegistryTests(unittest.TestCase):
     def test_load_registry_records_handler_path_symbol_and_definition_lines(self) -> None:

@@ -7,21 +7,21 @@ This inventory answers two separate questions: whether documented examples are s
 ## Coverage and current result
 
 - Source revision: `709b088419c900d031660993c57146acebd15abe`
-- Content fingerprint: `sha256:b7aadf26fcbef4a5092e27777ab2655d22904600a996dad52e59a5902d9738f2`
-- Primary Host pages scanned: **40** (39 authored, 1 generated Self-Test reference)
+- Content fingerprint: `sha256:0722ea2a33ee19b19fed37056d16d43b2e6a834a40ca9221b9cbe5d44e148894`
+- Primary Host pages scanned: **44** (43 authored, 1 generated Self-Test reference)
 - Central-reference CLI/SDK support routes scanned: **33** (support layers, not separate Host workflows)
-- Total Host route files scanned: **73**
+- Total Host route files scanned: **77**
 - Imported Host snippet dependencies scanned: **33**
-- Unique verification targets: **501** across **565** occurrences
+- Unique verification targets: **593** across **679** occurrences
 - Structural/local-reference issues: **0**
 - Documented commands executed: **0** (intentional safety boundary)
 
 | Kind | Unique items |
 |---|---:|
-| behavior-claim | 213 |
-| command | 193 |
-| error | 77 |
-| threshold | 18 |
+| behavior-claim | 258 |
+| command | 228 |
+| error | 84 |
+| threshold | 23 |
 
 ## Reproduce the audit
 
@@ -40,20 +40,20 @@ The first command regenerates this Markdown report plus JSON and CSV. `--check` 
 | Tier | Count | Meaning |
 |---|---:|---|
 | account-read-only | 36 | Needs current CLI plus a non-production authenticated account; should not mutate state. |
-| credential-bearing | 4 | Needs an approved test credential and redaction/logging review. |
-| destructive-or-mutating | 70 | Needs disposable/non-production state and peer-reviewed execution. |
-| environment-dependent | 11 | Needs matching OS, GPU, Docker, storage, or network conditions. |
+| credential-bearing | 7 | Needs an approved test credential and redaction/logging review. |
+| destructive-or-mutating | 75 | Needs disposable/non-production state and peer-reviewed execution. |
+| environment-dependent | 14 | Needs matching OS, GPU, Docker, storage, or network conditions. |
 | generated-source | 62 | Must be regenerated from the exact upstream source revision. |
 | host-owned-self-test | 6 | Needs an authenticated Host-owner account, a representative idle Host, and cleanup/return-to-idle proof; it is not a client-paid rental test. |
-| local-safe | 23 | Help/availability and static syntax can be checked locally; placeholders must remain non-production. |
+| local-safe | 35 | Help/availability and static syntax can be checked locally; placeholders must remain non-production. |
 | paid-live | 2 | Can create billable resources; requires explicit budget/target approval and exact evidence metadata. |
-| privileged-host | 41 | Needs a disposable supported host and records of before/after state. |
-| source-or-fixture | 48 | Needs a code source and/or captured redacted runtime fixture. |
-| source-owner | 198 | Needs the owning code, policy, or stakeholder confirmation. |
+| privileged-host | 53 | Needs a disposable supported host and records of before/after state. |
+| source-or-fixture | 55 | Needs a code source and/or captured redacted runtime fixture. |
+| source-owner | 248 | Needs the owning code, policy, or stakeholder confirmation. |
 
 ## Command execution access groups
 
-The 193 command targets are also grouped by the resources needed for representative execution. These access groups are independent of the safety tier and do **not** authorize paid, root, credential-bearing, destructive, or production actions.
+The 228 command targets are also grouped by the resources needed for representative execution. These access groups are independent of the safety tier and do **not** authorize paid, root, credential-bearing, destructive, or production actions.
 
 See [Host Docs command access groups](./HOST-DOCS-COMMAND-ACCESS.md) for every command ID, source line, access group, and additional gate.
 
@@ -61,9 +61,9 @@ See [Host Docs command access groups](./HOST-DOCS-COMMAND-ACCESS.md) for every c
 |---|---:|---|
 | Paid and Host root | 0 | Needs both approved spend and root on a disposable Host machine. |
 | Paid resource, no Host root | 2 | Creates or uses a billable resource; the documented command itself does not require Host root. |
-| Host root/privileged access, no paid resource | 54 | Conservatively requires root or privileged Host access and does not itself create a paid resource. |
-| Host machine, no root in command | 22 | Needs a representative Host or Host artifact, but the documented command does not itself use root. |
-| No paid resource or Host root | 115 | Can be checked without paid spend or Host root; account, credential, mutation, environment, or external-client gates may still apply. |
+| Host root/privileged access, no paid resource | 73 | Conservatively requires root or privileged Host access and does not itself create a paid resource. |
+| Host machine, no root in command | 31 | Needs a representative Host or Host artifact, but the documented command does not itself use root. |
+| No paid resource or Host root | 122 | Can be checked without paid spend or Host root; account, credential, mutation, environment, or external-client gates may still apply. |
 
 ## Issues found by the generator
 
@@ -87,19 +87,29 @@ These remain open even if every local test passes.
 |---|---|---|---|---|
 | com-71fd03b28a | [host/common-errors-diagnostics.mdx:31](./host/common-errors-diagnostics.mdx#L31) | cat vast_host_install.log | local-safe | static-syntax-passed-not-executed |
 | com-4c96f697d8 | [host/common-errors-diagnostics.mdx:37](./host/common-errors-diagnostics.mdx#L37) | tar -xzvf vastai_install_logs.tar.gz cat vast_host_install.log | local-safe | static-syntax-passed-not-executed |
-| com-5c5f0ecb04 | [host/common-errors-diagnostics.mdx:44](./host/common-errors-diagnostics.mdx#L44), [host/workload-policy.mdx:55](./host/workload-policy.mdx#L55) | sudo tail -n 100 /var/lib/vastai_kaalia/kaalia.log | privileged-host | static-syntax-passed-not-executed |
+| com-5c5f0ecb04 | [host/common-errors-diagnostics.mdx:44](./host/common-errors-diagnostics.mdx#L44), [host/machine-offline.mdx:171](./host/machine-offline.mdx#L171), [host/workload-policy.mdx:55](./host/workload-policy.mdx#L55) | sudo tail -n 100 /var/lib/vastai_kaalia/kaalia.log | privileged-host | static-syntax-passed-not-executed |
 | com-506c929678 | [host/common-errors-diagnostics.mdx:50](./host/common-errors-diagnostics.mdx#L50), [host/how-to-self-test.mdx:79](./host/how-to-self-test.mdx#L79) | vastai self-test machine &lt;machine_id&gt; | host-owned-self-test | static-syntax-passed-not-executed |
 | com-162fe82f61 | [host/common-errors-diagnostics.mdx:62](./host/common-errors-diagnostics.mdx#L62), [host/how-to-self-test.mdx:85](./host/how-to-self-test.mdx#L85) | vastai self-test machine &lt;machine_id&gt; \ --support-bundle-dir /path/to/output | host-owned-self-test | static-syntax-passed-not-executed |
 | com-2384e2069c | [host/common-errors-diagnostics.mdx:79](./host/common-errors-diagnostics.mdx#L79) | vastai dump-logs &lt;machine_id&gt; | local-safe | static-syntax-passed-not-executed |
 | com-022b4a74b6 | [host/common-errors-diagnostics.mdx:85](./host/common-errors-diagnostics.mdx#L85) | vastai dump-logs &lt;machine_id&gt; --include-local-host-artifacts | local-safe | static-syntax-passed-not-executed |
 | com-c80bebc3e2 | [host/common-errors-diagnostics.mdx:96](./host/common-errors-diagnostics.mdx#L96) | systemctl is-active vastai.service vast_metrics.service docker nvidia-persistenced.service sudo journalctl -u vastai.service -n 80 --no-pager sudo journalctl -u vast_metrics.service -n 80 --no-pager sudo tail -n 100 /va… | privileged-host | static-syntax-passed-not-executed |
-| com-78e9ae3e71 | [host/common-errors-diagnostics.mdx:121](./host/common-errors-diagnostics.mdx#L121), [host/common-errors-diagnostics.mdx:183](./host/common-errors-diagnostics.mdx#L183), [host/hardware-prep.mdx:58](./host/hardware-prep.mdx#L58) (+8 more in JSON/CSV) | nvidia-smi | environment-dependent | inventoried-not-executed |
+| com-78e9ae3e71 | [host/common-errors-diagnostics.mdx:121](./host/common-errors-diagnostics.mdx#L121), [host/common-errors-diagnostics.mdx:183](./host/common-errors-diagnostics.mdx#L183), [host/hardware-prep.mdx:58](./host/hardware-prep.mdx#L58) (+16 more in JSON/CSV) | nvidia-smi | environment-dependent | inventoried-not-executed |
 | com-d9cdba8b45 | [host/common-errors-diagnostics.mdx:131](./host/common-errors-diagnostics.mdx#L131) | sudo journalctl -k -b --no-pager \| grep -Ei 'NVRM\|Xid\|AER\|PCIe\|fallen\|GPU has fallen' sudo dmesg -T \| grep -Ei 'NVRM\|Xid\|AER\|PCIe\|fallen\|GPU has fallen' | privileged-host | static-syntax-passed-not-executed |
 | com-ffe2351a20 | [host/common-errors-diagnostics.mdx:138](./host/common-errors-diagnostics.mdx#L138) | sudo journalctl -k -b --no-pager \| grep -Ei 'AER\|PCIe Bus Error\|pcieport\|NVRM\|Xid' sudo journalctl -k -b -1 --no-pager \| grep -Ei 'AER\|PCIe Bus Error\|pcieport\|NVRM\|Xid' sudo dmesg -T \| grep -Ei 'AER\|PCIe Bus Error\|pciep… | privileged-host | static-syntax-passed-not-executed |
 | com-84ff05e985 | [host/common-errors-diagnostics.mdx:148](./host/common-errors-diagnostics.mdx#L148) | sudo journalctl -kf \| grep --line-buffered -Ei 'AER\|PCIe Bus Error\|pcieport\|NVRM\|Xid' | privileged-host | static-syntax-passed-not-executed |
 | com-2a6c421cdd | [host/common-errors-diagnostics.mdx:154](./host/common-errors-diagnostics.mdx#L154), [host/machine-errors.mdx:114](./host/machine-errors.mdx#L114) | nvidia-smi -L sudo docker run --rm --runtime=nvidia nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi -L | destructive-or-mutating | static-syntax-passed-not-executed |
 | com-5e61b8e95e | [host/common-errors-diagnostics.mdx:163](./host/common-errors-diagnostics.mdx#L163) | sudo docker run --rm --runtime=nvidia oguzpastirmaci/gpu-burn 60 | destructive-or-mutating | static-syntax-passed-not-executed |
 | com-53cebfb71d | [host/common-errors-diagnostics.mdx:191](./host/common-errors-diagnostics.mdx#L191) | sudo cat /var/lib/vastai_kaalia/host_port_range df -h /var/lib/docker sudo docker system df findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS | privileged-host | static-syntax-passed-not-executed |
+| com-49d7666a53 | [host/disable-ssh-password-login.mdx:30](./host/disable-ssh-password-login.mdx#L30), [host/disable-ssh-password-login.mdx:138](./host/disable-ssh-password-login.mdx#L138) | sudo sshd -T \| grep passwordauthentication | credential-bearing | static-syntax-passed-not-executed |
+| com-5482bdd8ca | [host/disable-ssh-password-login.mdx:50](./host/disable-ssh-password-login.mdx#L50) | ssh-copy-id youruser@1.2.3.4 | local-safe | static-syntax-passed-not-executed |
+| com-f1c72ecf32 | [host/disable-ssh-password-login.mdx:61](./host/disable-ssh-password-login.mdx#L61) | ssh -o PreferredAuthentications=publickey youruser@1.2.3.4 | local-safe | static-syntax-passed-not-executed |
+| com-ce86d1e774 | [host/disable-ssh-password-login.mdx:79](./host/disable-ssh-password-login.mdx#L79) | cp -n | local-safe | inventoried-not-executed |
+| com-b431f433b8 | [host/disable-ssh-password-login.mdx:83](./host/disable-ssh-password-login.mdx#L83) | sudo cp -n /etc/ssh/sshd_config /etc/ssh/sshd_config.orig sudo sh -c 'for f in /etc/ssh/sshd_config.d/*.conf; do cp -n "$f" "$f.orig"; done' | privileged-host | static-syntax-passed-not-executed |
+| com-1de1acdfbd | [host/disable-ssh-password-login.mdx:91](./host/disable-ssh-password-login.mdx#L91) | sudo sed -i -E 's/^[[:space:]]*#?[[:space:]]*(PasswordAuthentication)[[:space:]]+.*/\1 no/I' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2&gt;/dev/null | credential-bearing | static-syntax-passed-not-executed |
+| com-b068c15b9e | [host/disable-ssh-password-login.mdx:112](./host/disable-ssh-password-login.mdx#L112) | sudo grep -r -i passwordauthentication /etc/ssh/sshd_config.d/ 2&gt;/dev/null | credential-bearing | static-syntax-passed-not-executed |
+| com-d856dcc6b8 | [host/disable-ssh-password-login.mdx:130](./host/disable-ssh-password-login.mdx#L130) | sudo sshd -t &amp;&amp; sudo systemctl restart ssh.service | destructive-or-mutating | static-syntax-passed-not-executed |
+| com-84cdd61bea | [host/disable-ssh-password-login.mdx:152](./host/disable-ssh-password-login.mdx#L152) | echo "PasswordAuthentication no" \| sudo tee -a /etc/ssh/sshd_config sudo sshd -t &amp;&amp; sudo systemctl restart ssh.service sudo sshd -T \| grep passwordauthentication | destructive-or-mutating | static-syntax-passed-not-executed |
+| com-7499f747c9 | [host/disable-ssh-password-login.mdx:169](./host/disable-ssh-password-login.mdx#L169) | sudo sh -c 'for f in /etc/ssh/sshd_config.orig /etc/ssh/sshd_config.d/*.orig; do [ -e "$f" ] &amp;&amp; cp "$f" "$&#123;f%.orig&#125;"; done' sudo sshd -t &amp;&amp; sudo systemctl restart ssh.service | destructive-or-mutating | static-syntax-passed-not-executed |
 | com-348b4a5efd | [host/first-24-hours.mdx:29](./host/first-24-hours.mdx#L29) | systemctl is-active vastai.service vast_metrics.service docker nvidia-persistenced.service systemctl --no-pager --full status vastai.service vast_metrics.service docker nvidia-persistenced.service sudo journalctl -u vas… | privileged-host | static-syntax-passed-not-executed |
 | com-7c8b33bd93 | [host/fleet-operations.mdx:22](./host/fleet-operations.mdx#L22), [host/fleet-operations.mdx:76](./host/fleet-operations.mdx#L76) | vastai show machines --raw | account-read-only | static-syntax-passed-not-executed |
 | com-9441748e81 | [host/fleet-operations.mdx:32](./host/fleet-operations.mdx#L32) | vastai list machines &lt;selected-machines&gt; -e 12/31/2026 --retry 6 | destructive-or-mutating | static-syntax-passed-not-executed |
@@ -115,7 +125,7 @@ These remain open even if every local test passes.
 | com-12a15290e5 | [host/headless-install.mdx:31](./host/headless-install.mdx#L31) | apt-get | local-safe | inventoried-not-executed |
 | com-383857bc9c | [host/headless-install.mdx:34](./host/headless-install.mdx#L34) | sudo apt-get update APT_OPTS="-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold" sudo DEBIAN_FRONTEND=noninteractive apt-get $APT_OPTS upgrade -y sudo DEBIAN_FRONTEND=noninteractive apt-get $APT_OPTS… | privileged-host | static-syntax-passed-not-executed |
 | com-a8171f44c3 | [host/headless-install.mdx:46](./host/headless-install.mdx#L46) | APT_OPTS="-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold" sudo DEBIAN_FRONTEND=noninteractive apt-get $APT_OPTS install --install-recommends linux-generic-hwe-24.04 -y | privileged-host | static-syntax-passed-not-executed |
-| com-cfe34cebde | [host/headless-install.mdx:53](./host/headless-install.mdx#L53), [host/headless-install.mdx:80](./host/headless-install.mdx#L80), [host/headless-install.mdx:280](./host/headless-install.mdx#L280) | sudo reboot | destructive-or-mutating | static-syntax-passed-not-executed |
+| com-cfe34cebde | [host/headless-install.mdx:53](./host/headless-install.mdx#L53), [host/headless-install.mdx:80](./host/headless-install.mdx#L80), [host/headless-install.mdx:280](./host/headless-install.mdx#L280) (+2 more in JSON/CSV) | sudo reboot | destructive-or-mutating | static-syntax-passed-not-executed |
 | com-6c22cc7f5a | [host/headless-install.mdx:59](./host/headless-install.mdx#L59) | APT_OPTS="-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold" sudo DEBIAN_FRONTEND=noninteractive apt-get $APT_OPTS install -y build-essential ubuntu-drivers-common sudo apt-get update | privileged-host | static-syntax-passed-not-executed |
 | com-1bec33cec9 | [host/headless-install.mdx:67](./host/headless-install.mdx#L67) | ubuntu-drivers devices | local-safe | static-syntax-passed-not-executed |
 | com-a01d031ad6 | [host/headless-install.mdx:73](./host/headless-install.mdx#L73) | APT_OPTS="-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold" sudo DEBIAN_FRONTEND=noninteractive apt-get $APT_OPTS install -y nvidia-driver-595-open | privileged-host | static-syntax-passed-not-executed |
@@ -135,7 +145,7 @@ These remain open even if every local test passes.
 | com-392fd1e954 | [host/headless-install.mdx:223](./host/headless-install.mdx#L223) | python3 install | local-safe | inventoried-not-executed |
 | com-0e5a326c26 | [host/headless-install.mdx:223](./host/headless-install.mdx#L223) | wget | local-safe | inventoried-not-executed |
 | com-d6fe4990c9 | [host/headless-install.mdx:228](./host/headless-install.mdx#L228) | read -rsp "Paste fresh Vast host setup key: " VAST_HOST_KEY echo sudo python3 ./install "$VAST_HOST_KEY" \ --no-driver \ --docker-partition /dev/mapper/vg1-lv--1 \ --ports 40000 40799 unset VAST_HOST_KEY | credential-bearing | static-syntax-passed-not-executed |
-| com-10c8e6f115 | [host/headless-install.mdx:256](./host/headless-install.mdx#L256) | sudo update-grub | privileged-host | static-syntax-passed-not-executed |
+| com-10c8e6f115 | [host/headless-install.mdx:256](./host/headless-install.mdx#L256), [host/upgrade-kernel.mdx:394](./host/upgrade-kernel.mdx#L394) | sudo update-grub | privileged-host | static-syntax-passed-not-executed |
 | com-6f689dccec | [host/headless-install.mdx:264](./host/headless-install.mdx#L264), [host/network-ports.mdx:46](./host/network-ports.mdx#L46) | echo -n "40000-40799" \| sudo tee /var/lib/vastai_kaalia/host_port_range sudo systemctl restart vastai.service sudo tail -n 50 /var/lib/vastai_kaalia/kaalia.log \| grep host_port_range | destructive-or-mutating | static-syntax-passed-not-executed |
 | com-831ca2ea65 | [host/headless-install.mdx:269](./host/headless-install.mdx#L269) | echo -n | local-safe | inventoried-not-executed |
 | com-f11717dcec | [host/headless-install.mdx:271](./host/headless-install.mdx#L271) | sudo nc -l -p PORT | privileged-host | inventoried-not-executed |
@@ -159,7 +169,7 @@ These remain open even if every local test passes.
 | com-c92d595bcc | [host/host-teams.mdx:145](./host/host-teams.mdx#L145) | vastai show machine | account-read-only | inventoried-not-executed |
 | com-e257182447 | [host/host-teams.mdx:146](./host/host-teams.mdx#L146) | vastai cancel maint | destructive-or-mutating | inventoried-not-executed |
 | com-2a33ef71c6 | [host/host-teams.mdx:146](./host/host-teams.mdx#L146) | vastai list machines | destructive-or-mutating | inventoried-not-executed |
-| com-4a77a9892e | [host/host-teams.mdx:146](./host/host-teams.mdx#L146) | vastai schedule maint | destructive-or-mutating | inventoried-not-executed |
+| com-4a77a9892e | [host/host-teams.mdx:146](./host/host-teams.mdx#L146), [host/upgrade-kernel.mdx:38](./host/upgrade-kernel.mdx#L38) | vastai schedule maint | destructive-or-mutating | inventoried-not-executed |
 | com-8558d4cd62 | [host/host-teams.mdx:146](./host/host-teams.mdx#L146) | vastai set min-bid | destructive-or-mutating | inventoried-not-executed |
 | com-d9213a3c67 | [host/host-teams.mdx:146](./host/host-teams.mdx#L146) | vastai unlist machine | destructive-or-mutating | inventoried-not-executed |
 | com-4a4e012fd3 | [host/host-teams.mdx:147](./host/host-teams.mdx#L147) | vastai cleanup machine | destructive-or-mutating | inventoried-not-executed |
@@ -190,6 +200,18 @@ These remain open even if every local test passes.
 | com-ad7d6b4e74 | [host/machine-errors.mdx:225](./host/machine-errors.mdx#L225), [host/self-test-reference.mdx:231](./host/self-test-reference.mdx#L231) | systemctl status nvidia-fabricmanager journalctl -u nvidia-fabricmanager --since "-24h" nvidia-smi -q \| grep -i -A 2 Fabric nvidia-smi topo -m | environment-dependent | static-syntax-passed-not-executed |
 | com-b328c66905 | [host/machine-errors.mdx:250](./host/machine-errors.mdx#L250) | df -h /var/lib/docker sudo docker system df findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS | privileged-host | static-syntax-passed-not-executed |
 | com-211f355106 | [host/machine-errors.mdx:332](./host/machine-errors.mdx#L332) | nvidia-smi -L | environment-dependent | inventoried-not-executed |
+| com-0bed0a853e | [host/machine-offline.mdx:27](./host/machine-offline.mdx#L27) | ping -c 4 1.1.1.1 | local-safe | static-syntax-passed-not-executed |
+| com-2c712d76f1 | [host/machine-offline.mdx:51](./host/machine-offline.mdx#L51) | nslookup vast.ai | local-safe | static-syntax-passed-not-executed |
+| com-93bcf2ed71 | [host/machine-offline.mdx:72](./host/machine-offline.mdx#L72) | curl -4 ifconfig.me | local-safe | static-syntax-passed-not-executed |
+| com-74a2f2fa2a | [host/machine-offline.mdx:90](./host/machine-offline.mdx#L90), [host/machine-offline.mdx:165](./host/machine-offline.mdx#L165), [host/machine-offline.mdx:216](./host/machine-offline.mdx#L216) (+1 more in JSON/CSV) | sudo systemctl status vastai | privileged-host | static-syntax-passed-not-executed |
+| com-fd1f11eb05 | [host/machine-offline.mdx:112](./host/machine-offline.mdx#L112) | systemctl status vastai | environment-dependent | inventoried-not-executed |
+| com-11b0a312f6 | [host/machine-offline.mdx:147](./host/machine-offline.mdx#L147), [host/upgrade-kernel.mdx:440](./host/upgrade-kernel.mdx#L440) | NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver | environment-dependent | inventoried-not-executed |
+| com-c8737ab5cc | [host/machine-offline.mdx:159](./host/machine-offline.mdx#L159) | sudo systemctl start vastai | privileged-host | static-syntax-passed-not-executed |
+| com-10b04e1db3 | [host/machine-offline.mdx:177](./host/machine-offline.mdx#L177) | nvidia-smi -q | environment-dependent | static-syntax-passed-not-executed |
+| com-b0da891b36 | [host/machine-offline.mdx:183](./host/machine-offline.mdx#L183) | sudo dmesg -T \| grep -iE 'nvrm\|nvidia\|xid\|pcie\|aer' | privileged-host | static-syntax-passed-not-executed |
+| com-5f6cbd64ae | [host/machine-offline.mdx:186](./host/machine-offline.mdx#L186), [host/self-test-reference.mdx:250](./host/self-test-reference.mdx#L250) | dmesg | environment-dependent | inventoried-not-executed |
+| com-0cd028c720 | [host/machine-offline.mdx:189](./host/machine-offline.mdx#L189) | sudo journalctl -k -b \| grep -iE 'nvrm\|nvidia\|xid\|pcie\|aer' | privileged-host | static-syntax-passed-not-executed |
+| com-d76376826e | [host/machine-offline.mdx:203](./host/machine-offline.mdx#L203) | sudo systemctl stop vastai.service &amp;&amp; \ sudo rm -rf /var/lib/vastai_kaalia/data/last_try_get_controller &amp;&amp; \ sudo rm -rf /var/lib/vastai_kaalia/data/get_controller_delay &amp;&amp; \ sudo rm -rf /var/lib/vastai_kaalia/controlle… | destructive-or-mutating | static-syntax-passed-not-executed |
 | com-1a004d614a | [host/maintenance-windows.mdx:23](./host/maintenance-windows.mdx#L23) | vastai show machines vastai show machine &lt;machine-id&gt; | account-read-only | static-syntax-passed-not-executed |
 | com-c1fb38fd20 | [host/maintenance-windows.mdx:37](./host/maintenance-windows.mdx#L37) | vastai list machine &lt;machine-id&gt; --end_date MM/DD/YYYY | destructive-or-mutating | static-syntax-passed-not-executed |
 | com-edd32128a9 | [host/maintenance-windows.mdx:43](./host/maintenance-windows.mdx#L43) | vastai list machines &lt;machine-id-1&gt; &lt;machine-id-2&gt; --end_date MM/DD/YYYY --retry 6 | destructive-or-mutating | static-syntax-passed-not-executed |
@@ -199,7 +221,7 @@ These remain open even if every local test passes.
 | com-077d9becdf | [host/maintenance-windows.mdx:85](./host/maintenance-windows.mdx#L85) | vastai show maints --ids &lt;machine-id&gt; vastai show maints --ids &lt;machine-id-1&gt;,&lt;machine-id-2&gt; | account-read-only | static-syntax-passed-not-executed |
 | com-10a9556388 | [host/maintenance-windows.mdx:92](./host/maintenance-windows.mdx#L92) | vastai cancel maint &lt;machine-id&gt; | destructive-or-mutating | static-syntax-passed-not-executed |
 | com-2ba8c55d18 | [host/market-metrics.mdx:21](./host/market-metrics.mdx#L21) | vastai metrics ... | account-read-only | inventoried-not-executed |
-| com-1f3b02c8d7 | [host/market-metrics.mdx:72](./host/market-metrics.mdx#L72) | pip install --upgrade vastai | local-safe | static-syntax-passed-not-executed |
+| com-78f1fbb2d9 | [host/market-metrics.mdx:72](./host/market-metrics.mdx#L72) | curl -fsSL https://vast.ai/install.sh \| bash | privileged-host | static-syntax-passed-not-executed |
 | com-db9acb426d | [host/market-metrics.mdx:78](./host/market-metrics.mdx#L78) | vastai metrics gpu vastai metrics gpu --verified true --datacenter true vastai metrics gpu --raw | account-read-only | static-syntax-passed-not-executed |
 | com-5f305e9e73 | [host/market-metrics.mdx:86](./host/market-metrics.mdx#L86) | vastai metrics gpu-trends vastai metrics gpu-trends "RTX 4090" vastai metrics gpu-trends "RTX 4090, H100_SXM" vastai metrics gpu-trends all vastai metrics gpu-trends "RTX 4090" --full vastai metrics gpu-trends "RTX 4090… | account-read-only | static-syntax-passed-not-executed |
 | com-2c9483179e | [host/market-metrics.mdx:98](./host/market-metrics.mdx#L98) | vastai metrics gpu-locations vastai metrics gpu-locations --verified true --datacenter true vastai metrics gpu-locations --gpu "RTX 4090, H100_SXM" vastai metrics gpu-locations --rented false vastai metrics gpu-location… | account-read-only | static-syntax-passed-not-executed |
@@ -220,13 +242,26 @@ These remain open even if every local test passes.
 | com-28abf8b7db | [host/self-test-reference.mdx:22](./host/self-test-reference.mdx#L22) | vastai self-test machine &lt;machine&gt; | host-owned-self-test | inventoried-not-executed |
 | com-9a996bbff5 | [host/self-test-reference.mdx:244](./host/self-test-reference.mdx#L244) | vastai dump-logs &lt;machine&gt; | local-safe | inventoried-not-executed |
 | com-476ff797ac | [host/self-test-reference.mdx:245](./host/self-test-reference.mdx#L245) | vastai dump-logs &lt;machine&gt; --include-local-host-artifacts | local-safe | inventoried-not-executed |
-| com-5f6cbd64ae | [host/self-test-reference.mdx:250](./host/self-test-reference.mdx#L250) | dmesg | environment-dependent | inventoried-not-executed |
 | com-f57c6df68d | [host/self-test-reference.mdx:250](./host/self-test-reference.mdx#L250) | journalctl | environment-dependent | inventoried-not-executed |
 | com-3a2193d968 | [host/storage-setup.mdx:32](./host/storage-setup.mdx#L32) | lsblk -f findmnt / findmnt /data0 \|\| true findmnt /var/lib/docker \|\| true df -h / | privileged-host | static-syntax-passed-not-executed |
 | com-69b4f38623 | [host/storage-setup.mdx:42](./host/storage-setup.mdx#L42) | sudo cp /etc/fstab /etc/fstab.pre-vast-docker.$(date -u +%Y%m%d%H%M%S) | privileged-host | static-syntax-passed-not-executed |
 | com-4a0c0f98d3 | [host/storage-setup.mdx:59](./host/storage-setup.mdx#L59), [host/storage-setup.mdx:88](./host/storage-setup.mdx#L88), [host/storage-setup.mdx:107](./host/storage-setup.mdx#L107) | sudo mount -a findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS sudo xfs_quota -x -c "state" /var/lib/docker | privileged-host | static-syntax-passed-not-executed |
 | com-c713443f59 | [host/storage-setup.mdx:74](./host/storage-setup.mdx#L74) | export VAST_DOCKER_DEVICE=/dev/mapper/vg1-lv--1 lsblk -f "$VAST_DOCKER_DEVICE" findmnt -S "$VAST_DOCKER_DEVICE" \|\| true if findmnt -S "$VAST_DOCKER_DEVICE" &gt;/dev/null; then sudo umount "$VAST_DOCKER_DEVICE" fi sudo mkfs… | destructive-or-mutating | static-syntax-passed-not-executed |
 | com-e9e5f3e438 | [host/storage-setup.mdx:135](./host/storage-setup.mdx#L135) | sudo python3 ./install "$VAST_HOST_KEY" \ --no-driver \ --docker-partition /dev/mapper/vg1-lv--1 \ --ports 40000 40799 | privileged-host | static-syntax-passed-not-executed |
+| com-13321a5f40 | [host/upgrade-kernel.mdx:50](./host/upgrade-kernel.mdx#L50) | sudo apt-get update sudo apt-get upgrade --with-new-pkgs sudo reboot | destructive-or-mutating | static-syntax-passed-not-executed |
+| com-022cb1d927 | [host/upgrade-kernel.mdx:71](./host/upgrade-kernel.mdx#L71) | apt-get upgrade | privileged-host | inventoried-not-executed |
+| com-6557ebe3d8 | [host/upgrade-kernel.mdx:87](./host/upgrade-kernel.mdx#L87), [host/upgrade-kernel.mdx:211](./host/upgrade-kernel.mdx#L211), [host/upgrade-kernel.mdx:275](./host/upgrade-kernel.mdx#L275) | uname -r; ls -1 /boot/vmlinuz-* \| sed 's\|.*/vmlinuz-\|\|' \| sort -V \| tail -1 | local-safe | static-syntax-passed-not-executed |
+| com-77a6b4eea3 | [host/upgrade-kernel.mdx:115](./host/upgrade-kernel.mdx#L115) | KERNEL_METAPACKAGES=$(dpkg-query -W -f='$&#123;db:Status-Abbrev&#125; $&#123;Package&#125;\n' 'linux-generic*' 2&gt;/dev/null \| awk '$1 == "ii" &#123; print $2 &#125;' \| sort -V); echo "$KERNEL_METAPACKAGES" | local-safe | static-syntax-passed-not-executed |
+| com-e0ed97c612 | [host/upgrade-kernel.mdx:130](./host/upgrade-kernel.mdx#L130) | echo | local-safe | inventoried-not-executed |
+| com-2745e9e584 | [host/upgrade-kernel.mdx:178](./host/upgrade-kernel.mdx#L178) | sudo apt update | privileged-host | static-syntax-passed-not-executed |
+| com-06a2520f53 | [host/upgrade-kernel.mdx:184](./host/upgrade-kernel.mdx#L184) | apt-cache policy $KERNEL_METAPACKAGES | local-safe | static-syntax-passed-not-executed |
+| com-24f91611ca | [host/upgrade-kernel.mdx:225](./host/upgrade-kernel.mdx#L225) | sudo apt install --only-upgrade $KERNEL_METAPACKAGES | privileged-host | static-syntax-passed-not-executed |
+| com-d96affc872 | [host/upgrade-kernel.mdx:293](./host/upgrade-kernel.mdx#L293) | KERNEL_METAPACKAGES=$(dpkg-query -W -f='$&#123;db:Status-Abbrev&#125; $&#123;Package&#125;\n' 'linux-generic*' 2&gt;/dev/null \| awk '$1 == "ii" &#123; print $2 &#125;' \| sort -V); apt-cache policy $KERNEL_METAPACKAGES | local-safe | static-syntax-passed-not-executed |
+| com-01a610ba2b | [host/upgrade-kernel.mdx:317](./host/upgrade-kernel.mdx#L317) | apt-cache policy | local-safe | inventoried-not-executed |
+| com-4e539ad82a | [host/upgrade-kernel.mdx:342](./host/upgrade-kernel.mdx#L342) | bash -c '. /etc/default/grub; shopt -s nullglob; for f in /etc/default/grub.d/*.cfg; do . "$f"; done; echo "GRUB_DEFAULT=$GRUB_DEFAULT"; echo "GRUB_SAVEDEFAULT=$GRUB_SAVEDEFAULT"' | privileged-host | static-syntax-passed-not-executed |
+| com-818d2c2b19 | [host/upgrade-kernel.mdx:369](./host/upgrade-kernel.mdx#L369) | grep -rE '^GRUB_DEFAULT=' /etc/default/grub /etc/default/grub.d/ | privileged-host | static-syntax-passed-not-executed |
+| com-d1b8b2e525 | [host/upgrade-kernel.mdx:375](./host/upgrade-kernel.mdx#L375) | [ -f /etc/default/grub.bak ] \|\| sudo cp /etc/default/grub /etc/default/grub.bak; sudo sed -i 's/^GRUB_DEFAULT=.*/GRUB_DEFAULT=0/' /etc/default/grub &amp;&amp; grep '^GRUB_DEFAULT=' /etc/default/grub | privileged-host | static-syntax-passed-not-executed |
+| com-8ebb7b45d4 | [host/upgrade-kernel.mdx:408](./host/upgrade-kernel.mdx#L408) | update-grub | local-safe | inventoried-not-executed |
 | com-302ca0fd12 | [host/vms.mdx:40](./host/vms.mdx#L40) | python3 /var/lib/vastai_kaalia/enable_vms.py check | environment-dependent | static-syntax-passed-not-executed |
 | com-1dc2b87b9a | [host/vms.mdx:60](./host/vms.mdx#L60) | sudo python3 /var/lib/vastai_kaalia/enable_vms.py off | privileged-host | static-syntax-passed-not-executed |
 | com-81ab748278 | [host/vms.mdx:92](./host/vms.mdx#L92) | sudo update-grub sudo reboot | destructive-or-mutating | static-syntax-passed-not-executed |
@@ -297,6 +332,7 @@ These remain open even if every local test passes.
 | err-fc97a14e80 | [host/common-errors-diagnostics.mdx:184](./host/common-errors-diagnostics.mdx#L184) | Full client storage, no space left on device, or missing expected disk space | source-or-fixture | source-confirmation-required |
 | err-1a1f302163 | [host/common-errors-diagnostics.mdx:184](./host/common-errors-diagnostics.mdx#L184), [host/machine-errors.mdx:58](./host/machine-errors.mdx#L58), [host/machine-errors.mdx:245](./host/machine-errors.mdx#L245) | no space left on device | source-or-fixture | source-confirmation-required |
 | err-ebaeded3ed | [host/common-errors-diagnostics.mdx:228](./host/common-errors-diagnostics.mdx#L228) | Machine error strings | source-or-fixture | source-confirmation-required |
+| err-64fa12bb9b | [host/disable-ssh-password-login.mdx:67](./host/disable-ssh-password-login.mdx#L67) | Permission denied (publickey) | source-or-fixture | source-confirmation-required |
 | err-54ea18668b | [host/how-to-self-test.mdx:61](./host/how-to-self-test.mdx#L61), [host/machine-errors.mdx:56](./host/machine-errors.mdx#L56), [host/machine-errors.mdx:218](./host/machine-errors.mdx#L218) (+3 more in JSON/CSV) | nccl_failed | source-or-fixture | source-confirmation-required |
 | err-ec431f7e6b | [host/machine-errors.mdx:43](./host/machine-errors.mdx#L43) | Port issue, port networking issues, Port Networking Issues | source-or-fixture | source-confirmation-required |
 | err-84cd7ca64d | [host/machine-errors.mdx:46](./host/machine-errors.mdx#L46), [host/machine-errors.mdx:92](./host/machine-errors.mdx#L92) | nvidia-container-cli: device error: | source-or-fixture | source-confirmation-required |
@@ -327,9 +363,15 @@ These remain open even if every local test passes.
 | err-33b1fdbb2c | [host/machine-errors.mdx:317](./host/machine-errors.mdx#L317) | Secrets fetch failed: server error (HTTP ) | source-or-fixture | source-confirmation-required |
 | err-8a9102cdf9 | [host/machine-errors.mdx:318](./host/machine-errors.mdx#L318) | Secrets fetch failed: unexpected HTTP | source-or-fixture | source-confirmation-required |
 | err-520bbb7a21 | [host/machine-errors.mdx:319](./host/machine-errors.mdx#L319) | Secrets fetch JSON parse error | source-or-fixture | source-confirmation-required |
-| err-63f21218e4 | [host/notifications.mdx:54](./host/notifications.mdx#L54) | machine_offline | source-or-fixture | source-confirmation-required |
-| err-8b79be9bf7 | [host/notifications.mdx:55](./host/notifications.mdx#L55) | machine_error | source-or-fixture | source-confirmation-required |
-| err-bd2d931003 | [host/notifications.mdx:62](./host/notifications.mdx#L62) | host:machine_offline | source-or-fixture | source-confirmation-required |
+| err-f51b9e3adb | [host/machine-offline.mdx:44](./host/machine-offline.mdx#L44) | Network is unreachable | source-or-fixture | source-confirmation-required |
+| err-2f8641ad1c | [host/machine-offline.mdx:65](./host/machine-offline.mdx#L65) | ;; connection timed out; no servers could be reached | source-or-fixture | source-confirmation-required |
+| err-671c96b467 | [host/machine-offline.mdx:110](./host/machine-offline.mdx#L110) | failed | source-or-fixture | source-confirmation-required |
+| err-f8e4d0a1f5 | [host/machine-offline.mdx:112](./host/machine-offline.mdx#L112) | Restart=on-failure | source-or-fixture | source-confirmation-required |
+| err-cfefd8adba | [host/machine-offline.mdx:147](./host/machine-offline.mdx#L147), [host/upgrade-kernel.mdx:440](./host/upgrade-kernel.mdx#L440) | NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver | source-or-fixture | source-confirmation-required |
+| err-a05679043a | [host/machine-offline.mdx:149](./host/machine-offline.mdx#L149) | Unknown Error | source-or-fixture | source-confirmation-required |
+| err-63f21218e4 | [host/notifications.mdx:56](./host/notifications.mdx#L56) | machine_offline | source-or-fixture | source-confirmation-required |
+| err-8b79be9bf7 | [host/notifications.mdx:57](./host/notifications.mdx#L57) | machine_error | source-or-fixture | source-confirmation-required |
+| err-bd2d931003 | [host/notifications.mdx:64](./host/notifications.mdx#L64) | host:machine_offline | source-or-fixture | source-confirmation-required |
 | err-c389b957de | [host/self-test-reference.mdx:39](./host/self-test-reference.mdx#L39) | Normal preflight failure | generated-source | generator-check-required |
 | err-7d8786c16d | [host/self-test-reference.mdx:40](./host/self-test-reference.mdx#L40) | Runtime failure | generated-source | generator-check-required |
 | err-52991ed2e1 | [host/self-test-reference.mdx:138](./host/self-test-reference.mdx#L138) | not found or not rentable | generated-source | generator-check-required |
@@ -369,6 +411,7 @@ These remain open even if every local test passes.
 | thr-e1b8643916 | [host/how-to-self-test.mdx:43](./host/how-to-self-test.mdx#L43) | - Direct ports are at least 3 ports per listed GPU. | source-owner | source-confirmation-required |
 | thr-f56389fcd5 | [host/market-metrics.mdx:144](./host/market-metrics.mdx#L144) | Market metrics update every 5 minutes. Location data can be cached for up to 2 hours. Each endpoint allows up to 5 requests per second per user. | source-owner | source-confirmation-required |
 | thr-b0ac625fb9 | [host/network-ports.mdx:18](./host/network-ports.mdx#L18) | Self-test requires at least 3 direct ports per listed GPU. For production hosting, plan for about 100 direct ports per listed GPU. One instance can map up to 64 ports, and a larger range gives headroom while old mapping… | source-owner | source-confirmation-required |
+| thr-872dfe9462 | [host/notifications.mdx:85](./host/notifications.mdx#L85) | Machine listing ending soon \| A machine's marketplace listing is within 7 days of its end date. Renew it to keep the machine rentable. | source-owner | source-confirmation-required |
 | thr-2ad71df8a0 | [host/self-test-reference.mdx:56](./host/self-test-reference.mdx#L56) | pcie.bandwidth PCIe bandwidth \| Required: PCIe bandwidth &gt; 2.85 GB/s \| Low PCIe bandwidth can make GPU stress and transfer checks fail or time out. \| Check BIOS PCIe generation/lane settings and confirm GPUs are seated… | generated-source | generator-check-required |
 | thr-96f00fbda9 | [host/self-test-reference.mdx:59](./host/self-test-reference.mdx#L59) | gpu.ram GPU RAM \| Required: Per-GPU VRAM &gt; 7 GiB \| The verification workload requires more than 7 GB of VRAM per GPU. \| Use a GPU with more VRAM for this self-test. | generated-source | generator-check-required |
 | thr-1b41cde275 | [host/self-test-reference.mdx:60](./host/self-test-reference.mdx#L60) | system.ram System RAM \| Required: System RAM &gt;= min(0.95 * total GPU VRAM, 2,000,000 MiB) \| System RAM must be close to total VRAM so CPU-side staging does not starve the tests. For very large GPU hosts, this requiremen… | generated-source | generator-check-required |
@@ -383,6 +426,10 @@ These remain open even if every local test passes.
 | thr-2b08bd6059 | [host/supported-hardware.mdx:51](./host/supported-hardware.mdx#L51) | System RAM \| At least 4 GB per GPU as a listing baseline; high-VRAM GPUs may need more. | source-owner | source-confirmation-required |
 | thr-7b94887cfe | [host/supported-hardware.mdx:52](./host/supported-hardware.mdx#L52) | Storage \| Fast SSD/NVMe, at least 128 GB per GPU. | source-owner | source-confirmation-required |
 | thr-9d10684939 | [host/supported-hardware.mdx:77](./host/supported-hardware.mdx#L77) | Low-VRAM or very old GPUs \| Self-test requires more than 7 GiB VRAM; demand may also be weak. | source-owner | source-confirmation-required |
+| thr-082f031da7 | [host/verification-stages.mdx:50](./host/verification-stages.mdx#L50) | VRAM per GPU \| More than 7 GB | source-owner | source-confirmation-required |
+| thr-794f4e2832 | [host/verification-stages.mdx:53](./host/verification-stages.mdx#L53) | PCIe bandwidth \| More than 2.85 GiB/s per GPU | source-owner | source-confirmation-required |
+| thr-a050392337 | [host/verification-stages.mdx:78](./host/verification-stages.mdx#L78) | Example: 8 x RTX PRO 6000 (96 GB) means the min system RAM &gt;= 0.95 x | source-owner | source-confirmation-required |
+| thr-a3f3fc2e90 | [host/verification-stages.mdx:90](./host/verification-stages.mdx#L90) | Forwarded ports \| 5 ports per GPU, 100 ports per GPU recommended | source-owner | source-confirmation-required |
 
 ## Behavior-claim candidates
 
@@ -402,6 +449,13 @@ These remain open even if every local test passes.
 | beh-a3497228f2 | [host/common-host-questions.mdx:17](./host/common-host-questions.mdx#L17) | If your machine is listed but renters cannot find it in marketplace search, start with Why Isn't My Machine in Search?. | source-owner | source-confirmation-required |
 | beh-2e6751490d | [host/community.mdx:18](./host/community.mdx#L18) | Vast does not provide hands-on machine setup support. Your OS, drivers, BIOS, storage, power, thermals, and router are host responsibilities. See Is Vast for Me?. | source-owner | source-confirmation-required |
 | beh-a2a641e55e | [host/community.mdx:35](./host/community.mdx#L35) | Review logs and bundles before posting, and never share API keys, install commands, sensitive account details, account-specific token material, or renter data in public channels. | source-owner | source-confirmation-required |
+| beh-d241cfff16 | [host/disable-ssh-password-login.mdx:19](./host/disable-ssh-password-login.mdx#L19) | Do not turn off password login until you have confirmed your key works. Step 2 | source-owner | source-confirmation-required |
+| beh-a88806e5b4 | [host/disable-ssh-password-login.mdx:75](./host/disable-ssh-password-login.mdx#L75) | Do not run this until step 2 worked. If your key is not accepted yet, this locks | source-owner | source-confirmation-required |
+| beh-1397e04c6c | [host/disable-ssh-password-login.mdx:79](./host/disable-ssh-password-login.mdx#L79) | First save a copy of the config you have now. cp -n never overwrites, so it is | source-owner | source-confirmation-required |
+| beh-b589fdf643 | [host/disable-ssh-password-login.mdx:119](./host/disable-ssh-password-login.mdx#L119) | Removing the # is not enough. The value must be no. A line reading | source-owner | source-confirmation-required |
+| beh-9df061fc17 | [host/disable-ssh-password-login.mdx:126](./host/disable-ssh-password-login.mdx#L126) | that check passes, so a broken config cannot take SSH down. Editing the config | source-owner | source-confirmation-required |
+| beh-141e5628f9 | [host/disable-ssh-password-login.mdx:159](./host/disable-ssh-password-login.mdx#L159) | was flagged for password login, the error clears within about two hours. | source-owner | source-confirmation-required |
+| beh-07da38ae68 | [host/disable-ssh-password-login.mdx:164](./host/disable-ssh-password-login.mdx#L164) | You need access that does not go through SSH. Use the machine's IPMI, iDRAC, iLO, | source-owner | source-confirmation-required |
 | beh-268e26a176 | [host/earning.mdx:57](./host/earning.mdx#L57) | This compute-only shortcut does not include storage, bandwidth, or volume revenue. It is also gross revenue before power, cooling, colocation, internet, hardware depreciation, repairs, taxes, and payment/accounting cost… | source-owner | source-confirmation-required |
 | beh-ab2e66c478 | [host/earning.mdx:69](./host/earning.mdx#L69) | Use P90 only when your machine has a real advantage: strong reliability, better network, fast storage, better location, datacenter status, or scarce GPU supply. Then add realistic storage, bandwidth, and volume assumpti… | source-owner | source-confirmation-required |
 | beh-dd1aa99e09 | [host/earning.mdx:83](./host/earning.mdx#L83) | If actual earnings are lower than the estimate, check utilization first, then compare storage, bandwidth, and volume settings. A higher price does not help if renters choose cheaper or healthier machines. | source-owner | source-confirmation-required |
@@ -507,6 +561,19 @@ These remain open even if every local test passes.
 | beh-429aa09a73 | [host/machine-errors.mdx:294](./host/machine-errors.mdx#L294) | Secrets fetch failed: machine authentication denied (HTTP 401) \| Machine credentials were rejected while fetching instance secrets. \| Collect logs and escalate if it repeats; do not use machine-ID reset workflows. | source-owner | source-confirmation-required |
 | beh-f45021fc04 | [host/machine-errors.mdx:302](./host/machine-errors.mdx#L302) | Some messages are logged against a specific rental attempt and do not change the machine's verification or listing by themselves. They can still explain why a specific rental failed. | source-owner | source-confirmation-required |
 | beh-7f4cde0f9a | [host/machine-errors.mdx:308](./host/machine-errors.mdx#L308) | Error: Requested volume does not exist: \| The requested storage volume was deleted or never existed. | source-owner | source-confirmation-required |
+| beh-feab015d29 | [host/machine-metrics.mdx:39](./host/machine-metrics.mdx#L39) | There is nothing to install or enable. The Vast daemon collects and uploads this data automatically, so a machine that is listed and up to date will appear on its own. | source-owner | source-confirmation-required |
+| beh-7674f42e9b | [host/machine-metrics.mdx:54](./host/machine-metrics.mdx#L54) | This is not a real-time tool. The page loads the window ending at the moment you opened it and does not advance while the tab stays open, and the most recent data can be hours behind. Reload the page to pull in whatever… | source-owner | source-confirmation-required |
+| beh-cb7020d79f | [host/machine-metrics.mdx:79](./host/machine-metrics.mdx#L79) | Cached \| File contents the kernel is keeping in RAM to avoid re-reading them from disk. Reclaimed automatically when something needs the memory | source-owner | source-confirmation-required |
+| beh-c10bff3aab | [host/machine-metrics.mdx:118](./host/machine-metrics.mdx#L118) | - All off clears the chart. All on turns on the CPU, memory, and summary metrics, but leaves per-device series off so the chart does not fill with one line per GPU | source-owner | source-confirmation-required |
+| beh-3e4414d1c7 | [host/machine-metrics.mdx:154](./host/machine-metrics.mdx#L154) | The chart stops short of right now \| Expected. The page does not follow the clock. Reload it | source-owner | source-confirmation-required |
+| beh-0376cff20d | [host/machine-offline.mdx:16](./host/machine-offline.mdx#L16) | &gt; Important: Do not reboot the machine, stop customer containers, force-stop VMs, or delete instance data while there are active rentals, unless instructed by Vast.ai Support. These actions may interrupt customer worklo… | source-owner | source-confirmation-required |
+| beh-5e23fe1295 | [host/machine-offline.mdx:48](./host/machine-offline.mdx#L48) | This command asks your DNS server to translate the domain name vast.ai into an IP address. The host daemon connects to Vast.ai servers by domain name, so even with a working internet connection, the machine cannot reach… | source-owner | source-confirmation-required |
+| beh-b484ac4161 | [host/machine-offline.mdx:116](./host/machine-offline.mdx#L116) | This command shows the NVIDIA driver status and every GPU the operating system currently sees, including temperature, power, and memory usage. The Vastai service requires all GPUs to be visible at this level — if the dr… | source-owner | source-confirmation-required |
+| beh-264111af1a | [host/machine-offline.mdx:168](./host/machine-offline.mdx#L168) | Show the last 100 lines of the Vastai daemon log. This is where the actual error text is written — look for messages logged right before the service exited or crashed: | source-owner | source-confirmation-required |
+| beh-2df944930d | [host/machine-offline.mdx:194](./host/machine-offline.mdx#L194) | &gt; Note: Do not restart or modify NVIDIA drivers while active customer instances are running unless instructed by Support. | source-owner | source-confirmation-required |
+| beh-53cb38f689 | [host/machine-offline.mdx:200](./host/machine-offline.mdx#L200) | If the Vastai service is running and GPUs are detected correctly, but the machine remains Offline, reset the controller connection state and resend machine information. | source-owner | source-confirmation-required |
+| beh-e9bc64ecd6 | [host/machine-offline.mdx:213](./host/machine-offline.mdx#L213) | Confirm the service remains active: | source-owner | source-confirmation-required |
+| beh-58db0743bb | [host/machine-offline.mdx:221](./host/machine-offline.mdx#L221) | If the machine remains Offline after completing the steps above, contact Vast.ai Support and provide the following information: | source-owner | source-confirmation-required |
 | beh-444ce3394f | [host/maintenance-windows.mdx:18](./host/maintenance-windows.mdx#L18) | Wait until active rental contracts have ended, or until the machine has no running instances, before planned maintenance. Unlisting prevents new rental contracts, but it does not end existing contracts. | source-owner | source-confirmation-required |
 | beh-130ddbc25a | [host/maintenance-windows.mdx:28](./host/maintenance-windows.mdx#L28) | A single machine can have multiple active rental contracts from different clients. Do not take the machine offline until every active rental contract has ended. | source-owner | source-confirmation-required |
 | beh-11a3a22f83 | [host/maintenance-windows.mdx:34](./host/maintenance-windows.mdx#L34) | For planned work, set the offer end date to the maintenance date so new rentals do not run past your planned downtime. Existing contracts keep their accepted end date, so choose a date that still honors the latest activ… | source-owner | source-confirmation-required |
@@ -519,7 +586,7 @@ These remain open even if every local test passes.
 | beh-1b10195114 | [host/network-ports.mdx:65](./host/network-ports.mdx#L65) | Use two SSH sessions on the host; do not paste the following lines into one shell. In the first session, start the temporary TCP listener and leave it running. While it is still running, use the second session to confir… | source-owner | source-confirmation-required |
 | beh-08cff3606c | [host/not-in-search.mdx:15](./host/not-in-search.mdx#L15) | Use this page when a machine is listed but does not appear where you expect in marketplace search. | source-owner | source-confirmation-required |
 | beh-9f50b32bdd | [host/notifications.mdx:27](./host/notifications.mdx#L27) | Open Account Settings and go to Notification Settings. Host events appear only when you provide machines on Vast.ai. | source-owner | source-confirmation-required |
-| beh-32e4e40ebb | [host/notifications.mdx:42](./host/notifications.mdx#L42) | 4. Turn off email for any optional event you do not want in your inbox. | source-owner | source-confirmation-required |
+| beh-32e4e40ebb | [host/notifications.mdx:44](./host/notifications.mdx#L44) | 4. Turn off email for any optional event you do not want in your inbox. | source-owner | source-confirmation-required |
 | beh-62d8bf58c7 | [host/optimization-guide.mdx:20](./host/optimization-guide.mdx#L20) | Renters commonly filter by verification state, rental duration, and disk space. If your listing does not pass those filters, price alone will not make it visible to the renters you want. | source-owner | source-confirmation-required |
 | beh-806f17b4a7 | [host/optimization-guide.mdx:51](./host/optimization-guide.mdx#L51) | Machine is always rented \| Testing a modest price increase | source-owner | source-confirmation-required |
 | beh-a8c0cad233 | [host/optimization-guide.mdx:61](./host/optimization-guide.mdx#L61) | If the floor is too high, GPUs may sit idle. If it is too low, interruptible work may not cover operating cost. Do not set the floor close to the on-demand price just because that is the price you hope to receive. | source-owner | source-confirmation-required |
@@ -568,11 +635,36 @@ These remain open even if every local test passes.
 | beh-6dfccc4d46 | [host/supported-hardware.mdx:62](./host/supported-hardware.mdx#L62) | Avoid reducing GPU count, RAM, disk, or other capacity after the machine is created; reductions can trigger deverification. | source-owner | source-confirmation-required |
 | beh-3e92b603eb | [host/understanding-verification.mdx:22](./host/understanding-verification.mdx#L22) | Eligibility does not guarantee immediate verification, search placement, or rentals. | source-owner | source-confirmation-required |
 | beh-a7fa49d1f9 | [host/understanding-verification.mdx:49](./host/understanding-verification.mdx#L49) | - Enable VM support only when the machine supports it cleanly. | source-owner | source-confirmation-required |
-| beh-4b5de216d1 | [host/verification-stages.mdx:50](./host/verification-stages.mdx#L50) | To enter the verification pool, the machine must also meet current self-test and platform gates: | source-owner | source-confirmation-required |
-| beh-cd9b22bfe3 | [host/verification-stages.mdx:68](./host/verification-stages.mdx#L68) | Meeting requirements makes the machine eligible. It does not guarantee immediate verification, search placement, or rentals. | source-owner | source-confirmation-required |
-| beh-272e95d5d4 | [host/verification-stages.mdx:92](./host/verification-stages.mdx#L92) | - Avoiding hardware reductions after the machine is created. | source-owner | source-confirmation-required |
-| beh-eead66d7ee | [host/verification-stages.mdx:97](./host/verification-stages.mdx#L97) | Deverified means a previously verified machine no longer meets requirements. It appears as Unverified until the issue clears. | source-owner | source-confirmation-required |
-| beh-1920b6eaf1 | [host/verification-stages.mdx:107](./host/verification-stages.mdx#L107) | Fix the underlying issue and wait for automation to refresh state. Most machine error states clear only after the platform sees sustained healthy behavior. | source-owner | source-confirmation-required |
+| beh-80b63757a9 | [host/upgrade-kernel.mdx:26](./host/upgrade-kernel.mdx#L26) | An up-to-date kernel is one requirement out of several. On its own it does not | source-owner | source-confirmation-required |
+| beh-8dacdfa463 | [host/upgrade-kernel.mdx:33](./host/upgrade-kernel.mdx#L33) | A kernel upgrade only takes effect after a reboot, and a reboot stops every | source-owner | source-confirmation-required |
+| beh-609b978a7d | [host/upgrade-kernel.mdx:35](./host/upgrade-kernel.mdx#L35) | inside them are interrupted. Do not start until you have a maintenance | source-owner | source-confirmation-required |
+| beh-d638354fd3 | [host/upgrade-kernel.mdx:81](./host/upgrade-kernel.mdx#L81) | --with-new-pkgs allows those additions, and it never removes a package. | source-owner | source-confirmation-required |
+| beh-e881e4a0bf | [host/upgrade-kernel.mdx:94](./host/upgrade-kernel.mdx#L94) | nvidia-smi does not substitute for that check. When GRUB boots the old kernel, | source-owner | source-confirmation-required |
+| beh-aad75d4abe | [host/upgrade-kernel.mdx:96](./host/upgrade-kernel.mdx#L96) | lists every GPU on a machine that never took the patch. Comparing the running | source-owner | source-confirmation-required |
+| beh-0cfc400650 | [host/upgrade-kernel.mdx:175](./host/upgrade-kernel.mdx#L175) | Refresh the package lists first, or you will be comparing against stale data. | source-owner | source-confirmation-required |
+| beh-7ea6e8e10b | [host/upgrade-kernel.mdx:207](./host/upgrade-kernel.mdx#L207) | newest one installed, since an earlier upgrade may be installed but never | source-owner | source-confirmation-required |
+| beh-9a7d326729 | [host/upgrade-kernel.mdx:254](./host/upgrade-kernel.mdx#L254) | and is what you fall back to if the new one does not work. | source-owner | source-confirmation-required |
+| beh-7837a7458e | [host/upgrade-kernel.mdx:258](./host/upgrade-kernel.mdx#L258) | The kernel you installed in step 3 does not become the running kernel until the | source-owner | source-confirmation-required |
+| beh-6e3a5713db | [host/upgrade-kernel.mdx:278](./host/upgrade-kernel.mdx#L278) | The running kernel and the newest one installed must now be the same: | source-owner | source-confirmation-required |
+| beh-5cb9760bec | [host/upgrade-kernel.mdx:296](./host/upgrade-kernel.mdx#L296) | Installed and Candidate must now be the same value. If Installed is still | source-owner | source-confirmation-required |
+| beh-2986c8e571 | [host/upgrade-kernel.mdx:397](./host/upgrade-kernel.mdx#L397) | The new kernel must appear in the output: | source-owner | source-confirmation-required |
+| beh-cfbcc5141b | [host/upgrade-kernel.mdx:406](./host/upgrade-kernel.mdx#L406) | If the new kernel is absent, stop here and do not reboot. This output is the | source-owner | source-confirmation-required |
+| beh-c108f0f959 | [host/upgrade-kernel.mdx:425](./host/upgrade-kernel.mdx#L425) | ### If the machine does not come back | source-owner | source-confirmation-required |
+| beh-b4f090a0cc | [host/upgrade-kernel.mdx:427](./host/upgrade-kernel.mdx#L427) | You need access that does not go through SSH: the machine's IPMI, iDRAC, iLO, or | source-owner | source-confirmation-required |
+| beh-6fb7322b2f | [host/upgrade-kernel.mdx:442](./host/upgrade-kernel.mdx#L442) | offline and cannot take rentals. See | source-owner | source-confirmation-required |
+| beh-409db50005 | [host/verification-stages.mdx:37](./host/verification-stages.mdx#L37) | Start with Supported Hardware when planning a machine. Listing a machine and passing Self-Test do not guarantee verification; review the verification requirements below before preparing hardware. | source-owner | source-confirmation-required |
+| beh-baa8cc9e43 | [host/verification-stages.mdx:43](./host/verification-stages.mdx#L43) | Your machine must meet all of the following. | source-owner | source-confirmation-required |
+| beh-d5fc9de05e | [host/verification-stages.mdx:52](./host/verification-stages.mdx#L52) | GPU models \| All identical, do not mix models in one machine | source-owner | source-confirmation-required |
+| beh-9d17b0a135 | [host/verification-stages.mdx:65](./host/verification-stages.mdx#L65) | Self-Test image is built for x86_64 only, so Maxwell and Pascal GPUs cannot | source-owner | source-confirmation-required |
+| beh-83dc024cff | [host/verification-stages.mdx:95](./host/verification-stages.mdx#L95) | shared ISP IP cannot be used for hosting. | source-owner | source-confirmation-required |
+| beh-68d562eba4 | [host/verification-stages.mdx:106](./host/verification-stages.mdx#L106) | SSH access keys \| A unique key pair per machine, never shared or reused | source-owner | source-confirmation-required |
+| beh-ebfe74823f | [host/verification-stages.mdx:122](./host/verification-stages.mdx#L122) | SSH password login must be disabled for security. SSH password login enabled | source-owner | source-confirmation-required |
+| beh-af4a2b24d1 | [host/verification-stages.mdx:158](./host/verification-stages.mdx#L158) | running your own jobs, or using the machine as a desktop, will automatically | source-owner | source-confirmation-required |
+| beh-c47f120a10 | [host/verification-stages.mdx:163](./host/verification-stages.mdx#L163) | Meeting these minimum requirements makes your machine eligible for verification, but does not automatically guarantee verification. Read more about verification. | source-owner | source-confirmation-required |
+| beh-cd9b22bfe3 | [host/verification-stages.mdx:169](./host/verification-stages.mdx#L169) | Meeting requirements makes the machine eligible. It does not guarantee immediate verification, search placement, or rentals. | source-owner | source-confirmation-required |
+| beh-272e95d5d4 | [host/verification-stages.mdx:193](./host/verification-stages.mdx#L193) | - Avoiding hardware reductions after the machine is created. | source-owner | source-confirmation-required |
+| beh-eead66d7ee | [host/verification-stages.mdx:198](./host/verification-stages.mdx#L198) | Deverified means a previously verified machine no longer meets requirements. It appears as Unverified until the issue clears. | source-owner | source-confirmation-required |
+| beh-1920b6eaf1 | [host/verification-stages.mdx:208](./host/verification-stages.mdx#L208) | Fix the underlying issue and wait for automation to refresh state. Most machine error states clear only after the platform sees sustained healthy behavior. | source-owner | source-confirmation-required |
 | beh-21e32db945 | [host/vms.mdx:16](./host/vms.mdx#L16) | VMs interact more directly with hardware than containers. Enable them only when the machine supports IOMMU and remains stable. | source-owner | source-confirmation-required |
 | beh-9a805c8f69 | [host/vms.mdx:47](./host/vms.mdx#L47) | on \| VM support is enabled. | source-owner | source-confirmation-required |
 | beh-8fc8caad84 | [host/vms.mdx:48](./host/vms.mdx#L48) | off \| VM support is disabled or a previous test failed. | source-owner | source-confirmation-required |

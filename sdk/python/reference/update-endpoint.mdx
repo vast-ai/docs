@@ -3,7 +3,7 @@ title: "VastAI.update_endpoint"
 sidebarTitle: "update_endpoint"
 ---
 
-Update an existing serverless endpoint group.
+Update an existing endpoint.
 
 ## Signature
 
@@ -11,47 +11,72 @@ Update an existing serverless endpoint group.
 VastAI.update_endpoint(
     id: int,
     min_load: Optional[float] = None,
+    min_cold_load: Optional[float] = None,
+    endpoint_state: Optional[str] = None,
     target_util: Optional[float] = None,
     cold_mult: Optional[float] = None,
     cold_workers: Optional[int] = None,
     max_workers: Optional[int] = None,
-    endpoint_name: Optional[str] = None
-) -> str
+    endpoint_name: Optional[str] = None,
+    max_queue_time: Optional[float] = None,
+    target_queue_time: Optional[float] = None,
+    inactivity_timeout: Optional[int] = None
+) -> dict
 ```
 
 ## Parameters
 
 <ParamField path="id" type="int" required>
-  ID of the endpoint to update.
+  id of endpoint group to update
 </ParamField>
 
 <ParamField path="min_load" type="Optional[float]">
-  Minimum load (requests/sec) below which idle workers are scaled down.
+  minimum floor load in perf units/s  (token/s for LLms)
+</ParamField>
+
+<ParamField path="min_cold_load" type="Optional[float]">
+  minimum floor load in perf units/s  (token/s for LLms), but allow handling with cold workers
+</ParamField>
+
+<ParamField path="endpoint_state" type="Optional[str]">
+  active, suspended, or stopped
 </ParamField>
 
 <ParamField path="target_util" type="Optional[float]">
-  Target worker utilization ratio (0.0-1.0).
+  target capacity utilization (fraction, max 1.0, default 0.9)
 </ParamField>
 
 <ParamField path="cold_mult" type="Optional[float]">
-  Multiplier applied to warm worker count for pre-warming cold workers.
+  cold/stopped instance capacity target as multiple of hot capacity target (default 2.5)
 </ParamField>
 
 <ParamField path="cold_workers" type="Optional[int]">
-  Number of pre-warmed (cold) workers to keep ready.
+  min number of workers to keep 'cold' when you have no load (default 5)
 </ParamField>
 
 <ParamField path="max_workers" type="Optional[int]">
-  Maximum number of workers allowed in this endpoint.
+  max number of workers your endpoint group can have (default 20)
 </ParamField>
 
 <ParamField path="endpoint_name" type="Optional[str]">
-  Human-readable name for the endpoint.
+  deployment endpoint name (allows multiple workergroups to share same deployment endpoint)
+</ParamField>
+
+<ParamField path="max_queue_time" type="Optional[float]">
+  maximum seconds requests may be queued on each worker (default 30.0)
+</ParamField>
+
+<ParamField path="target_queue_time" type="Optional[float]">
+  target seconds for the queue to be cleared (default 10.0)
+</ParamField>
+
+<ParamField path="inactivity_timeout" type="Optional[int]">
+  seconds of no traffic before the endpoint can scale to zero active workers
 </ParamField>
 
 ## Returns
 
-`str`, Result from the API call.
+`dict`
 
 ## Example
 
