@@ -1,0 +1,704 @@
+---
+title: "Upgrade Docker and System Packages"
+sidebarTitle: "Upgrade Docker & Packages"
+description: "Safely upgrade Docker, containerd, the NVIDIA stack, and other system packages on a Vast.ai host without breaking client instances or unlisting the machine."
+---
+
+Upgrade Docker, containerd, the NVIDIA packages, and everything else apt
+manages on your host without disrupting clients. Follow the steps in order;
+each one tells you whether to continue or stop.
+
+The steps are the same on Ubuntu Server 22.04 and 24.04.
+
+<Info>
+**Why upgrade.** Upgrades bring security fixes for the software that runs
+client workloads.
+</Info>
+
+<Info>
+**Vast locks these packages on purpose.** Every hour the Vast daemon puts
+Docker, containerd, the NVIDIA driver and container toolkit, and the
+virtualization packages on `apt-mark hold`, and pins Docker to the 28.x
+family, so that neither automatic updates nor a casual `apt upgrade` can
+restart Docker or break the GPU driver while a client is using the machine.
+This page removes those locks for one maintenance window, upgrades everything,
+reboots, and then lets the daemon lock the new versions again. Do all of steps
+3 to 6 in one sitting, because the daemon re-applies the holds within the hour.
+</Info>
+
+## 1. Check for running rentals
+
+Never upgrade while a client is renting the machine. Restarting Docker stops
+their container, and upgrading the NVIDIA driver breaks every GPU until reboot.
+
+On the host, list every container, including stopped ones. Client instances are
+named `C.<id>`:
+
+```bash
+docker ps -a --format '{{.Names}}\t{{.Status}}'
+```
+
+```
+C.12345678    Up 3 hours
+C.12345679    Exited (0) 2 days ago
+```
+
+Each line is one container. A line starting with `C.` is a client instance:
+`Up` means the client is using it right now, and `Exited` means the client
+stopped it but still rents the disk space and can start it again at any time.
+Both count as a rental. Only an empty output, or output with no `C.` lines at
+all, means the machine is free.
+
+Then confirm it in the console as well. Open the machine's card in the
+[Vast.ai console](https://cloud.vast.ai/host/machines/) and look at the
+**Occ**, **#Running**, and **#Stored** fields. All of them need to read 0 before
+you can be sure there is truly no instance on the machine:
+
+```
+Occ: 0
+#Running: D: 0, I: 0, R: 0
+#Stored: D: 0, I: 0, R: 0
+```
+
+Both checks clear means you can continue at step 2.
+
+<Warning>
+**If anything is rented: unlist the machine, then schedule maintenance.** Do
+not stop or delete client containers yourself.
+
+Unlisting stops new rentals. Existing ones are not affected:
+
+```bash
+vastai unlist machine <machine_id>
+```
+
+Scheduling maintenance sends every current renter a notification with your
+window so they can save their work:
+
+```bash
+vastai schedule maintenance id [--sdate START_DATE --duration DURATION --maintenance_category MAINTENANCE_CATEGORY]
+```
+
+See [`vastai schedule maint`](/host/cli/schedule-maint) for the options.
+
+When the window starts, run both checks above again. Continue only when
+`docker ps -a` shows no `C.` container at all and the console shows 0 for
+**Occ**, **#Running**, and **#Stored**.
+</Warning>
+
+## 2. See what Vast has locked
+
+Refresh the package index so every version check below sees the latest
+releases:
+
+```bash
+sudo apt update
+```
+
+If `download.docker.com` does not appear in its output, see the Note at the end
+of this step.
+
+List the packages on hold. A held package is skipped by every upgrade until the
+hold is removed:
+
+```bash
+apt-mark showhold
+```
+
+```
+cloud-utils
+containerd.io
+docker-ce
+docker-ce-cli
+docker-ce-rootless-extras
+libvirt-daemon-system
+libvirt-dev
+nvidia-container-toolkit
+nvidia-container-toolkit-base
+nvidia-driver-595-open
+qemu-system-x86
+xfsprogs
+```
+
+This is the normal state of a Vast host. Every package in this list is one the
+daemon locked, and every one of them is upgraded on this page. Your list may be
+shorter (for example no `qemu`/`libvirt` on a host without VMs, or no
+`nvidia-docker2`). That is fine.
+
+Docker and containerd are also **pinned** to their current major version
+(`5:28.*` and `1.*`) by `/etc/apt/preferences.d/vast-packages`. A pin survives
+`apt-mark unhold`, and the daemon rewrites that file every hour, so do not edit
+it. Step 4 tells apt to ignore it for one command instead.
+
+<Note>
+If `apt-mark showhold` prints nothing and `apt-cache policy docker-ce` prints
+`Installed: (none)`, Docker on this host came from Ubuntu's `docker.io`
+package rather than Docker's repository. Skip step 4 and let step 5 upgrade
+`docker.io` and `containerd` with everything else.
+</Note>
+
+## 3. Remove the holds, keep the kernel
+
+Remove every hold at once. `$(apt-mark showhold)` expands to exactly the list
+you saw in step 2, so nothing else is touched:
+
+```bash
+sudo apt-mark unhold $(apt-mark showhold)
+```
+
+```
+Canceled hold on cloud-utils.
+Canceled hold on containerd.io.
+Canceled hold on docker-ce.
+Canceled hold on docker-ce-cli.
+Canceled hold on docker-ce-rootless-extras.
+Canceled hold on libvirt-daemon-system.
+Canceled hold on libvirt-dev.
+Canceled hold on nvidia-container-toolkit.
+Canceled hold on nvidia-container-toolkit-base.
+Canceled hold on nvidia-driver-595-open.
+Canceled hold on qemu-system-x86.
+Canceled hold on xfsprogs.
+```
+
+One `Canceled hold on` line per package from step 2. If the command prints
+nothing, the list was already empty. Go back to step 2 and make sure you are
+on the right host.
+
+Now put the kernel on hold so nothing on this page installs a new kernel:
+
+```bash
+sudo apt-mark hold linux-generic linux-image-generic linux-headers-generic
+```
+
+```
+linux-generic set on hold.
+linux-image-generic set on hold.
+linux-headers-generic set on hold.
+```
+
+Each `set on hold` line means that package will be skipped. This hold is yours,
+not the daemon's, so it stays until you remove it. When you are ready to upgrade
+the kernel, release it with
+`sudo apt-mark unhold linux-generic linux-image-generic linux-headers-generic`
+and follow the [Upgrade the Kernel](/host/upgrade-kernel) page.
+
+## 4. Upgrade the pinned packages to the newest version
+
+Docker and containerd are pinned, so a plain `apt upgrade` would leave them
+where they are. The option `-o Dir::Etc::PreferencesParts=/dev/null` tells apt
+to ignore the pin directory **for this one command only**. Nothing on disk
+changes, and the daemon's pin file stays untouched.
+
+First see what apt would install without the pins:
+
+```bash
+apt-cache -o Dir::Etc::PreferencesParts=/dev/null policy docker-ce containerd.io | grep -E '^[a-z]|Installed|Candidate'
+```
+
+```
+docker-ce:
+  Installed: 5:28.5.2-1~ubuntu.24.04~noble
+  Candidate: 5:29.7.2-1~ubuntu.24.04~noble
+containerd.io:
+  Installed: 1.7.29-1~ubuntu.24.04~noble
+  Candidate: 2.2.3-1~ubuntu.24.04~noble
+```
+
+`Candidate` is now the newest release in Docker's repository, not the pinned
+one. If `Candidate` equals `Installed` for both, Docker and containerd are
+already current: skip to step 5.
+
+Then upgrade them with the same option:
+
+```bash
+sudo apt -o Dir::Etc::PreferencesParts=/dev/null install --only-upgrade docker-ce docker-ce-cli docker-ce-rootless-extras containerd.io
+```
+
+```
+The following packages will be upgraded:
+  containerd.io docker-ce docker-ce-cli docker-ce-rootless-extras
+4 upgraded, 0 newly installed, 0 to remove and 23 not upgraded.
+Do you want to continue? [Y/n] y
+...
+Setting up containerd.io (2.2.3-1~ubuntu.24.04~noble) ...
+Setting up docker-ce (5:29.7.2-1~ubuntu.24.04~noble) ...
+```
+
+Answer `y`. `--only-upgrade` means a package that is not installed (for example
+`docker-ce-rootless-extras` on some hosts) is skipped rather than added. The
+`Setting up containerd.io` and `Setting up docker-ce` lines are where each
+service restarts; Docker is down for roughly 10–30 seconds. The
+`23 not upgraded` are everything else, handled in step 5.
+
+<Danger>
+**Every running container stops when Docker restarts unless live restore is
+enabled**, and even then only between patch releases (28.3.2 to 28.3.3), never
+from 28 to 29 or a containerd major version. Check with:
+
+```bash
+docker info --format 'LiveRestore={{.LiveRestoreEnabled}} StorageDriver={{.Driver}}'
+```
+
+```
+LiveRestore=false StorageDriver=overlay2
+```
+
+`LiveRestore=false` means a Docker restart kills every container. Treat this
+whole page as container downtime regardless of the answer. That is why step 1
+requires zero running rentals.
+</Danger>
+
+<Warning>
+**Docker 28 to 29 keeps your storage.** A host installed with Docker 28 uses the
+`overlay2` storage driver, and an in-place upgrade to 29 keeps using it, so all
+images and containers stay visible. Do **not** add
+`"features": {"containerd-snapshotter": true}` to `/etc/docker/daemon.json`
+during the upgrade. That switches Docker to a different image store and every
+existing image and container disappears from `docker images` / `docker ps`
+(they are not deleted, but the Vast daemon can no longer see them). After the
+upgrade, `StorageDriver=overlay2` above is the correct answer.
+</Warning>
+
+Check that both services came back:
+
+```bash
+sudo systemctl is-active containerd docker
+```
+
+```
+active
+active
+```
+
+The first line is `containerd`, the second is `docker`. Both must say `active`.
+Anything else (`inactive`, `failed`, `activating`) means a service did not
+start. Jump to [Docker will not start](#docker-will-not-start) below before
+going any further.
+
+Check that the version actually changed:
+
+```bash
+docker version --format 'Client {{.Client.Version}} / Server {{.Server.Version}}'
+```
+
+```
+Client 29.7.2 / Server 29.7.2
+```
+
+Both numbers must match the version you installed. A `failed to connect to the
+docker API` error means the daemon is not running. See
+[Docker will not start](#docker-will-not-start).
+
+<Note>
+If `nvidia-docker2` was in your step 2 list, it is pinned to `2.13.*` the same
+way. Add `nvidia-docker2` to the end of the install command above. Most hosts
+no longer have this package; the container toolkit replaced it.
+</Note>
+
+## 5. Upgrade everything else
+
+This upgrades the NVIDIA driver and container toolkit, the virtualization
+packages, and every normal Ubuntu package, all to their newest available
+version. `NEEDRESTART_MODE=l` makes Ubuntu **list** the services that need a
+restart instead of restarting them:
+
+```bash
+sudo NEEDRESTART_MODE=l apt upgrade
+```
+
+```
+The following packages have been kept back:
+  linux-generic linux-headers-generic linux-image-generic
+The following packages will be upgraded:
+  cloud-utils libnvidia-cfg1-595 libnvidia-compute-595 libnvidia-decode-595
+  libvirt-daemon-system libvirt-dev linux-modules-nvidia-595-open-7.0.0-31-generic
+  linux-modules-nvidia-595-open-generic-hwe-24.04 nvidia-container-toolkit
+  nvidia-container-toolkit-base nvidia-driver-595-open nvidia-kernel-common-595
+  qemu-system-x86 xfsprogs bsdutils ca-certificates coreutils libc6 ...
+187 upgraded, 0 newly installed, 0 to remove and 3 not upgraded.
+Do you want to continue? [Y/n] y
+```
+
+Answer `y`. The three `kept back` packages are the kernel you held in step 3.
+That is expected, and so is `3 not upgraded`. The `nvidia-*`, `libnvidia-*` and
+`linux-modules-nvidia-*` lines are the driver upgrade. On Ubuntu the kernel
+module ships prebuilt in `linux-modules-nvidia-<driver>-<kernel>`, matched to
+your running kernel, so nothing is compiled here. Your driver branch may differ
+(`595`, `595-open`, `580`, ...), and the package names change with it.
+
+<Danger>
+**From this point until the reboot in step 6, the GPUs are unusable.** The
+new driver files are on disk but the old driver is still loaded in the kernel,
+so `nvidia-smi` prints `Failed to initialize NVML: Driver/library version
+mismatch` and the Vast daemon may restart itself repeatedly. Both are expected
+and both are fixed by the reboot. Do not try to fix them any other way, and do
+not relist the machine before step 7.
+</Danger>
+
+<Warning>
+Do not run `sudo needrestart -r a` or accept "restart all services" prompts.
+Do not run `apt autoremove` here either: it removes old kernels, which the
+kernel page handles. Go straight to the reboot.
+</Warning>
+
+## 6. Reboot
+
+Reboot now. It loads the new NVIDIA driver, restarts Docker and containerd on
+the new versions cleanly, and proves the machine comes back on its own. The
+machine has no rentals (step 1), so this is safe:
+
+```bash
+sudo reboot
+```
+
+Your SSH session drops immediately; that is expected. Wait about 5 minutes,
+log back in and continue at step 7.
+
+## 7. Verify, re-lock and relist
+
+Everything below must pass before you list the machine again.
+
+Check the three services the machine depends on:
+
+```bash
+sudo systemctl is-active containerd docker vastai
+```
+
+```
+active
+active
+active
+```
+
+One line per service, in the order given. All three must say `active`. If
+`vastai` is anything else, see
+[Host shows Offline](#host-shows-offline-or-unlisted-after-the-restart) below.
+
+`active` alone does not prove the Vast daemon is stable. A daemon that crashes
+and restarts every few seconds also reads `active` most of the time. Check how
+long it has been up:
+
+```bash
+sudo systemctl status vastai --no-pager
+```
+
+```
+● vastai.service - Vast.ai Host Daemon
+     Loaded: loaded (/etc/systemd/system/vastai.service; enabled)
+     Active: active (running) since Mon 2026-09-07 14:08:52 +07; 16min ago
+   Main PID: 2966 (launch_kaalia.s)
+```
+
+Read the end of the `Active:` line. `16min ago` here means the daemon has run
+without interruption since the reboot, which is what you want. Run the command again after a
+minute: the `ago` value must keep growing and `Main PID` must not change. If
+the time keeps resetting to a few seconds, or the PID changes between runs,
+the daemon is in a restart loop. See
+[Host shows Offline](#host-shows-offline-or-unlisted-after-the-restart) below
+before doing anything else.
+
+Check that the new driver is loaded and sees every GPU:
+
+```bash
+nvidia-smi --query-gpu=name,driver_version --format=csv,noheader
+```
+
+```
+NVIDIA GeForce RTX 4090, 595.98
+NVIDIA GeForce RTX 4090, 595.98
+```
+
+One line per GPU, and the driver version is the new one from step 5. The count
+must equal the number of GPUs installed. `Driver/library version mismatch`
+after a reboot means the driver did not load. See
+[Driver did not load](#driver-did-not-load-after-reboot) below.
+
+Check that containers can still see the GPUs:
+
+```bash
+docker run --rm --gpus all ubuntu:22.04 nvidia-smi -L
+```
+
+```
+GPU 0: NVIDIA GeForce RTX 4090 (UUID: GPU-3f2a...)
+GPU 1: NVIDIA GeForce RTX 4090 (UUID: GPU-91c0...)
+```
+
+The same number of GPUs as the previous command. If it fails with
+`could not select device driver "" with capabilities: [[gpu]]`, the upgraded
+container toolkit lost its Docker hook. Re-register it:
+
+```bash
+sudo nvidia-ctk runtime configure --runtime=docker
+```
+
+```
+INFO[0000] Loading config from /etc/docker/daemon.json
+INFO[0000] Wrote updated config to /etc/docker/daemon.json
+INFO[0000] It is recommended that docker daemon be restarted.
+```
+
+Then restart Docker so it picks up the runtime (no rentals are running, so this
+is safe):
+
+```bash
+sudo systemctl restart docker
+```
+
+No output means the restart succeeded. Rerun the `docker run` check above.
+
+Run the self-test so the upgrade is verified end to end:
+
+```bash
+vastai self-test machine <machine_id>
+```
+
+```
+Test completed successfully.
+```
+
+Anything other than this line is a failure; the output names the failing check.
+Fix it before continuing.
+
+Put the locks back on the new versions. The daemon does this on its own within
+the hour, but running its hourly script now means the machine is never relisted
+unprotected:
+
+```bash
+sudo python3 /var/lib/vastai_kaalia/send_mach_info.py
+```
+
+```
+...
+containerd.io set on hold.
+docker-ce set on hold.
+docker-ce-cli set on hold.
+docker-ce-rootless-extras set on hold.
+nvidia-container-toolkit set on hold.
+nvidia-driver-595-open set on hold.
+...
+Data sent successfully.
+```
+
+The `set on hold` lines confirm the packages are locked again at their new
+versions, and `Data sent successfully.` confirms the machine reported its new
+Docker version to Vast. The script prints a lot of other diagnostics; those are
+what to look for.
+
+<Note>
+After this, `apt-cache policy docker-ce` shows a `Candidate` in the 28.x family
+below your installed 29.x. That is the pin file talking; apt never downgrades a
+package on its own, so the new version stays. The daemon also keeps
+`nvidia-container-toolkit` at or above its own minimum, so a newer version is
+left alone.
+</Note>
+
+Then relist and confirm the machine is visible to clients. Relist from the
+[Machines page](https://cloud.vast.ai/host/machines/) or with the same
+[`vastai list machine`](/host/cli/list-machine) command you used originally.
+Wait 2–3 minutes, then:
+
+```bash
+vastai search offers 'machine_id=<machine_id> verified=any'
+```
+
+```
+ID       CUDA  N  Model     PCIE  cpu_ghz  vCPUs  RAM   Disk  $/hr   DLP  ...
+9876543  13.2  2x RTX_4090  16.0  3.5      32.0   128   950   0.40   68.1 ...
+```
+
+A result row means the machine is listed. No row means it is not. Check that
+the machine is listed in the console and that `vastai` is `active`.
+
+<Note>
+Vast rechecks machines about once an hour. If the machine was already flagged
+before the upgrade, the flag can take a couple of checks to clear.
+</Note>
+
+## If something breaks
+
+### apt refuses to run
+
+```
+E: Could not get lock /var/lib/dpkg/lock-frontend. It is held by process 61230 (apt-get)
+```
+
+The daemon's hourly script is running its own `apt` at that moment. Wait one
+minute and rerun the same command. If it still fails after several minutes,
+find the process with `ps -p <pid> -o args=` and let it finish; never kill a
+running `dpkg`.
+
+### Docker will not start
+
+Read the service state first:
+
+```bash
+sudo systemctl status docker --no-pager
+```
+
+```
+× docker.service - Docker Application Container Engine
+     Loaded: loaded (/usr/lib/systemd/system/docker.service; enabled)
+     Active: failed (Result: exit-code) since Wed 2026-09-02 10:14:03 +07; 2min ago
+    Process: 51234 ExecStart=/usr/bin/dockerd -H fd:// ... (code=exited, status=1/FAILURE)
+```
+
+`Active: failed` confirms the daemon died. `activating (auto-restart)` means it
+is crash-looping. Either way, the reason is in the log:
+
+```bash
+sudo journalctl -u docker -n 50 --no-pager
+```
+
+```
+Sep 02 10:14:03 host dockerd[51234]: unable to configure the Docker daemon with file /etc/docker/daemon.json: invalid character '}' looking for beginning of object key string
+Sep 02 10:14:03 host systemd[1]: docker.service: Main process exited, code=exited, status=1/FAILURE
+```
+
+Look at the last `dockerd[...]` line before `Main process exited`. That is the
+error. Match it against this table:
+
+| Error contains | Fix |
+| --- | --- |
+| `unable to configure the Docker daemon with file /etc/docker/daemon.json` | The config has a typo or an option Docker 29 no longer accepts. Run `sudo dockerd --validate`; it prints the exact line. Fix it, then `sudo systemctl restart docker` |
+| `failed to start containerd` / `containerd.sock: connect: no such file` | Run `sudo systemctl restart containerd`, then `sudo systemctl restart docker`. If containerd itself fails, run `sudo journalctl -u containerd -n 30 --no-pager`; a config error names the line in `/etc/containerd/config.toml` |
+| `dpkg was interrupted` / `half-configured` | The upgrade was cut short. Run `sudo dpkg --configure -a`, then `sudo apt install -f`, then repeat step 4 |
+| `error initializing graphdriver` / `driver not supported` | The storage driver in `daemon.json` does not match the data on disk. Remove any `storage-driver` or `containerd-snapshotter` line you added, then `sudo systemctl restart docker` |
+
+If none of these apply, roll Docker and containerd back to the versions that
+were installed before (the `Installed:` values you can still see with
+`apt-cache policy docker-ce containerd.io`). Because those versions are inside
+the pinned families, apt accepts them directly:
+
+```bash
+sudo apt install --allow-downgrades docker-ce=5:28.5.2-1~ubuntu.24.04~noble docker-ce-cli=5:28.5.2-1~ubuntu.24.04~noble docker-ce-rootless-extras=5:28.5.2-1~ubuntu.24.04~noble containerd.io=1.7.29-1~ubuntu.24.04~noble
+```
+
+```
+The following packages will be DOWNGRADED:
+  containerd.io docker-ce docker-ce-cli docker-ce-rootless-extras
+0 upgraded, 0 newly installed, 4 downgraded, 0 to remove and 0 not upgraded.
+Do you want to continue? [Y/n] y
+```
+
+`4 downgraded` confirms the packages are going back. Docker restarts as part of
+this. Then continue with step 5 onward as normal; the daemon script in step 7
+puts the holds back.
+
+<Danger>
+Only downgrade to the exact version you came from. Downgrading further, or
+across storage drivers, can make the data under `/var/lib/docker` unreadable.
+Do not delete `/var/lib/docker` to "fix" a start failure either: it holds every
+cached image, and clients would have to pull them again from scratch.
+</Danger>
+
+### Driver did not load after reboot
+
+`nvidia-smi` still prints `Driver/library version mismatch` or
+`couldn't communicate with the NVIDIA driver` after the reboot. On Ubuntu the
+kernel module comes from a prebuilt package named after the running kernel, so
+check that package is installed:
+
+```bash
+dpkg -l | grep "linux-modules-nvidia.*$(uname -r)"
+```
+
+```
+ii  linux-modules-nvidia-595-open-7.0.0-31-generic  7.0.0-31.31~24.04.1  amd64  Linux kernel nvidia modules for version 7.0.0-31
+```
+
+The line must start with `ii` (installed) and name your running kernel. Lines
+starting with `rc` are leftovers from old kernels and can be ignored. No `ii`
+line means the module package for this kernel is missing. Install it, using
+your driver branch from step 5 in place of `595-open`:
+
+```bash
+sudo apt install linux-modules-nvidia-595-open-$(uname -r)
+```
+
+```
+The following NEW packages will be installed:
+  linux-modules-nvidia-595-open-7.0.0-31-generic
+...
+Setting up linux-modules-nvidia-595-open-7.0.0-31-generic (7.0.0-31.31~24.04.1) ...
+```
+
+Then reboot again (step 6) and rerun the checks in step 7.
+
+If the `ii` line is present but the driver still does not load, read the
+kernel's own error:
+
+```bash
+sudo dmesg | grep -i nvrm | tail -n 5
+```
+
+```
+[   12.418] NVRM: API mismatch: the client has the version 595.98, but
+NVRM: this kernel module has the version 595.84.
+```
+
+An `API mismatch` like this means the module package and the driver package
+are on different versions. Run `sudo apt install --only-upgrade
+linux-modules-nvidia-595-open-generic-hwe-24.04` (your meta package from the
+step 5 list) and reboot. Any other `NVRM` error: roll the driver back with
+`sudo apt install --allow-downgrades nvidia-driver-595-open=<previous version>`
+(the previous version is in `/var/log/apt/history.log`), reboot, and contact
+Vast.ai Support with the `dmesg` output.
+
+<Note>
+If your host has `nvidia-dkms-*` installed instead of `linux-modules-nvidia-*`
+(check with `dpkg -l | grep nvidia-dkms`), the module is built locally rather
+than prebuilt: run `sudo dkms autoinstall`, then reboot.
+</Note>
+
+### Host shows Offline or unlisted after the restart
+
+The daemon reconnects on its own after a reboot; give it 5 minutes. If it is
+still offline, check the service:
+
+```bash
+sudo systemctl status vastai --no-pager
+```
+
+```
+● vastai.service - Vast.ai Host Daemon
+     Loaded: loaded (/etc/systemd/system/vastai.service; enabled)
+     Active: active (running) since Wed 2026-09-02 10:31:12 +07; 8s ago
+   Main PID: 61230 (launch_kaalia.s)
+```
+
+`active (running)` with a `since` time of only a few seconds that keeps
+resetting each time you run this means the daemon is crash-looping. Check why:
+
+```bash
+sudo tail -n 100 /var/lib/vastai_kaalia/kaalia.log
+```
+
+The most common cause is the NVIDIA driver: the log shows NVML errors and
+`nvidia-smi` prints `Driver/library version mismatch`. Before the reboot that
+is expected (step 5); after the reboot it means the driver did not load. See
+[Driver did not load](#driver-did-not-load-after-reboot).
+
+If `nvidia-smi` is healthy but the daemon stays offline, restart it:
+
+```bash
+sudo systemctl restart vastai
+```
+
+No output means the restart succeeded. Wait 30 seconds, then resend the machine
+info to Vast:
+
+```bash
+sudo python3 /var/lib/vastai_kaalia/send_mach_info.py
+```
+
+```
+...
+Data sent successfully.
+```
+
+Then rerun the checks in step 7. If the machine is still offline after this,
+follow the [Offline Machine](/host/machine-offline) troubleshooting page and
+contact Support with the machine ID, the time of the upgrade, and the output of
+`systemctl status vastai` and `nvidia-smi`.
