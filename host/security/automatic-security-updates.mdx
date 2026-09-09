@@ -1,18 +1,17 @@
 ---
 title: "Automatic Security Updates"
-description: "Let a host machine install Ubuntu security updates on its own, and hold the kernel and NVIDIA driver back for a maintenance window."
+description: "Keep Ubuntu security updates installing on their own on a host machine, and keep the reboot a kernel update needs inside a maintenance window."
 ---
 
 A host machine has a public address and serves clients continuously, so a
 security fix that waits for the next maintenance window stays unapplied for as
 long as it waits. Ubuntu installs those fixes on a timer through
 `unattended-upgrades`, which a stock Ubuntu Server install has installed and
-enabled.
+enabled. Leave it that way.
 
-The kernel and the NVIDIA driver are the exception. Replacing a driver under a
-running instance interrupts the client and counts against the machine, and a
-kernel update does not take effect until a reboot. Hold those back and leave
-the rest of the archive on the timer.
+The kernel is the one that needs planning. A kernel update does not take effect
+until a reboot, and a reboot stops every running instance, so the reboot
+belongs in a maintenance window.
 
 ## Check what the machine does now
 
@@ -35,7 +34,8 @@ enabled
 That is the stock Ubuntu Server result, and it is what a host machine wants.
 `"1"` is a daily interval in days: the machine refreshes package lists and runs
 the upgrade once a day. `apt-daily.timer` does the refresh and download,
-`apt-daily-upgrade.timer` runs the upgrade itself.
+`apt-daily-upgrade.timer` runs the upgrade itself. What the last run installed
+is recorded in `/var/log/unattended-upgrades/unattended-upgrades.log`.
 
 <Note>
 `cat /etc/apt/apt.conf.d/20auto-upgrades` is not a sufficient check on its own.
@@ -82,51 +82,6 @@ Third-party repositories are a separate origin, so nothing from NVIDIA's CUDA
 repository or Docker's repository is upgraded automatically regardless of the
 settings on this page.
 
-## Hold back the kernel and the NVIDIA driver
-
-Put the two exceptions in their own file:
-
-```bash
-sudo tee /etc/apt/apt.conf.d/52unattended-upgrades-local <<'EOF'
-Unattended-Upgrade::Package-Blacklist {
-    "linux-";
-    "(lib)?nvidia";
-};
-Unattended-Upgrade::Automatic-Reboot "false";
-EOF
-```
-
-Blacklist entries are Python regular expressions anchored at the start of the
-package name. `linux-` covers `linux-image-*`, `linux-headers-*`, and the
-`linux-generic` metapackage. `(lib)?nvidia` covers `nvidia-driver-*`,
-`nvidia-dkms-*`, the `libnvidia-*` libraries an instance loads, and
-`nvidia-container-toolkit`.
-
-`Automatic-Reboot` is already `false` by default. Setting it here states it, so
-a later change to the packaged defaults cannot give the machine permission to
-reboot itself out from under a rental.
-
-The `52` prefix puts this file after `50unattended-upgrades` in filename order,
-so its `Automatic-Reboot` value is the one that applies. Keeping it separate
-also leaves `50unattended-upgrades` unmodified, so upgrading the package never
-prompts about your changes.
-
-Confirm the result:
-
-```bash
-apt-config dump Unattended-Upgrade::Package-Blacklist Unattended-Upgrade::Automatic-Reboot
-```
-
-```
-Unattended-Upgrade::Package-Blacklist "";
-Unattended-Upgrade::Package-Blacklist:: "linux-";
-Unattended-Upgrade::Package-Blacklist:: "(lib)?nvidia";
-Unattended-Upgrade::Automatic-Reboot "false";
-```
-
-Blacklist entries from every file add to one list rather than replacing it, so
-any extra line here came from another file and is also in effect.
-
 ## Turn them on if they are off
 
 If the checks above report `"0"`, `disabled`, or no line at all:
@@ -144,28 +99,36 @@ sudo systemctl enable --now apt-daily.timer apt-daily-upgrade.timer
 `20auto-upgrades` is read after `10periodic`, so writing both settings there
 takes precedence. Run the check from the first section again to confirm.
 
-## See what it would do
+## The kernel takes effect at the next reboot
 
-A dry run resolves the origins, walks the candidate packages, and reports which
-ones the blacklist held back and which ones it would install. It installs
-nothing:
+None of this changes the kernel the machine is running, and the machine never
+reboots itself: `Unattended-Upgrade::Automatic-Reboot` defaults to `false`.
+
+Keeping the kernel at the latest security patch level for your Ubuntu release
+is a [verification requirement](/host/verification-stages), and
+[Upgrade the Kernel](/host/upgrade-kernel) covers checking what is available,
+both upgrade paths, and the NVIDIA driver steps required afterwards.
+
+## Knowing when a reboot is pending
+
+An update that needs a reboot leaves a flag behind:
 
 ```bash
-sudo unattended-upgrade --dry-run --debug
+cat /var/run/reboot-required /var/run/reboot-required.pkgs 2>/dev/null
 ```
 
-What it did on its last real run is in
-`/var/log/unattended-upgrades/unattended-upgrades.log`.
+```
+*** System restart required ***
+linux-base
+```
 
-## The kernel and the driver still have to be applied
+`update-notifier-common` writes the first file when a package that requires a
+reboot is installed and appends the package name to the second. A kernel
+update is recorded as `linux-base`, not as the `linux-image` package that was
+installed, so do not go looking for that name. No output means nothing is
+waiting on a reboot.
 
-Nothing on this page patches the kernel. Keeping it at the latest security
-patch level for your Ubuntu release is a
-[verification requirement](/host/verification-stages), and a kernel update does
-not take effect until a reboot.
-
-When one is available, schedule a window with
+`/var/run` is a symlink to `/run`, a tmpfs, so the flag clears on reboot
+without anything having to remove it. When it appears, schedule a window with
 [`vastai schedule maintenance`](/host/cli/schedule-maint) so clients are
-notified, then follow [Upgrade the Kernel](/host/upgrade-kernel), which covers
-checking what is available, both upgrade paths, and the NVIDIA driver steps
-required afterwards.
+notified, and reboot then.
