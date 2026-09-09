@@ -8,43 +8,75 @@ Display user's current instances
 ## Usage
 
 ```bash
-vastai show instances [OPTIONS] [--api-key API_KEY] [--raw]
+vastai show instances [OPTIONS]
 ```
 
 ## Options
 
-<ParamField path="-q" type="boolean">
-  only display numeric ids (alias: `--quiet`)
+<ParamField path="--quiet" type="boolean">
+  only display numeric ids
+</ParamField>
+
+<ParamField path="--verbose" type="boolean">
+  show additional columns (SSH, location, template, etc.)
+</ParamField>
+
+<ParamField path="--all" type="boolean">
+  force fetching every page before printing, even with --limit/--next-token (fetching everything is already the default otherwise)
+</ParamField>
+
+<ParamField path="--status" type="string">
+  filter by container status: running loading exited
+</ParamField>
+
+<ParamField path="--label" type="string">
+  filter by instance label; pass empty string '' for unlabeled
+</ParamField>
+
+<ParamField path="--gpu-name" type="string">
+  filter by GPU model name
+</ParamField>
+
+<ParamField path="--verification" type="string">
+  filter by verification status
+  Allowed values: verified, unverified, deverified
+</ParamField>
+
+<ParamField path="--limit" type="integer">
+  max instances per page (1-25); passing this switches to single-page mode instead of fetching everything
+</ParamField>
+
+<ParamField path="--next-token" type="string">
+  resume from a pagination token (implies single-page mode)
+</ParamField>
+
+<ParamField path="--order-by" type="string">
+  sort by column; repeat for multiple keys
+</ParamField>
+
+<ParamField path="--cols" type="string">
+  override displayed columns (available: id,status,label,gpu,disk,volumes,dph,image,age,verified,machine,net,location,template,ssh,msg)
 </ParamField>
 
 ## Description
 
-Returns a list of instance objects. Key status fields per instance:
-
-**actual_status**, current container state:
-
-| Value | Meaning |
-|-------|---------|
-| `null` | Instance is being provisioned |
-| `loading` | Docker image is downloading or container is starting up |
-| `running` | Container is actively executing. GPU charges apply. |
-| `stopped` | Container is halted. Disk charges continue; no GPU charges. |
-| `frozen` | Container is paused with memory preserved. GPU charges apply. |
-| `exited` | Container process exited unexpectedly |
-| `rebooting` | Container is restarting (transient) |
-| `unknown` | No recent heartbeat from the host |
-| `offline` | Host machine disconnected from Vast servers (computed, not stored in DB) |
-
-**intended_status**, user's desired target state: `running`, `stopped`, or `frozen`.
-
-**cur_state**, machine contract / hardware allocation state: `running`, `stopped`, or `unloaded` (released on destroy).
-
-**status_msg**, human-readable detail on the current status.
+Shows the instances the user is currently renting. By default this fetches
+every page and prints one combined result, which is safe for scripts and
+cron jobs. Passing --limit or --next-token switches to single-page mode for
+manual pagination (add --all to still fetch every page in that mode).
 
 ## Examples
 
 ```bash
 vastai show instances
+    vastai show instances --raw
+    vastai show instances -q
+    vastai show instances -v
+    vastai show instances --status running loading
+    vastai show instances --gpu-name 'RTX A5000' 'GTX 1070'
+    vastai show instances --label training --order-by start_date desc
+    vastai show instances --cols id,status,gpu,dph
+    vastai show instances --next-token eyJ2YWx1ZXMi...
 ```
 
 ## Global Options
