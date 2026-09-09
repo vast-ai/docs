@@ -1,0 +1,122 @@
+{
+  "id": "HIST-LISTING-BASIS-01",
+  "recorded_at": "2026-09-08T18:54:33.610Z",
+  "method": "Static local CLI source inspection; no CLI import, Host/API request or listing execution",
+  "user_authorization": {
+    "target": "NEW_H100X4_HOST",
+    "price_gpu_usd_per_hour": 3,
+    "price_min_bid_usd_per_gpu_hour": 0.3,
+    "price_disk_usd_per_gb_month": 0.5,
+    "offer_end_no_later_than": "2026-09-15",
+    "reboots": false
+  },
+  "intended_expiration": {
+    "iso": "2026-09-15T00:00:00+02:00",
+    "epoch_seconds": 1789423200,
+    "rationale": "A fixed midnight Africa/Johannesburg bound on the confirmed date; shorter than seven days from authorization. Do not use rolling duration."
+  },
+  "source": {
+    "repository": "vast-ai/vast-cli",
+    "revision": "18c4f2ccd6da587d5352f8741c71805a9a18e1ae",
+    "path": "vast.py",
+    "sha256": "afd18bb3f406993b27e855ad041d037166e67c3afcd37b41ba57979994b53fcd",
+    "matches_committed_file": true,
+    "excerpts": [
+      {
+        "start": 286,
+        "end": 296,
+        "url": "https://github.com/vast-ai/vast-cli/blob/18c4f2ccd6da587d5352f8741c71805a9a18e1ae/vast.py#L286-L296",
+        "lines": [
+          "def string_to_unix_epoch(date_string):",
+          "    if date_string is None:",
+          "        return None",
+          "    try:",
+          "        # Check if the input is a float or integer representing Unix time",
+          "        return float(date_string)",
+          "    except ValueError:",
+          "        # If not, parse it as a date string",
+          "        date_object = datetime.strptime(date_string, \"%m/%d/%Y\")",
+          "        return time.mktime(date_object.timetuple())",
+          ""
+        ]
+      },
+      {
+        "start": 8099,
+        "end": 8117,
+        "url": "https://github.com/vast-ai/vast-cli/blob/18c4f2ccd6da587d5352f8741c71805a9a18e1ae/vast.py#L8099-L8117",
+        "lines": [
+          "def list_machine(args, id):",
+          "    req_url = apiurl(args, \"/machines/create_asks/\")",
+          "",
+          "    json_blob = {",
+          "        'machine': id,",
+          "        'price_gpu': args.price_gpu,",
+          "        'price_disk': args.price_disk,",
+          "        'price_inetu': args.price_inetu,",
+          "        'price_inetd': args.price_inetd,",
+          "        'price_min_bid': args.price_min_bid,",
+          "        'min_chunk': args.min_chunk,",
+          "        'end_date': string_to_unix_epoch(args.end_date),",
+          "        'credit_discount_max': args.discount_rate,",
+          "        'duration': args.duration,",
+          "        'vol_size': args.vol_size,",
+          "        'vol_price': args.vol_price",
+          "    }",
+          "    if (args.explain):",
+          "        print(\"request json: \")"
+        ]
+      },
+      {
+        "start": 8150,
+        "end": 8172,
+        "url": "https://github.com/vast-ai/vast-cli/blob/18c4f2ccd6da587d5352f8741c71805a9a18e1ae/vast.py#L8150-L8172",
+        "lines": [
+          "@parser.command(",
+          "    argument(\"id\", help=\"id of machine to list\", type=int),",
+          "    argument(\"-g\", \"--price_gpu\", help=\"per gpu rental price in $/hour  (price for active instances)\", type=float),",
+          "    argument(\"-s\", \"--price_disk\",",
+          "             help=\"storage price in $/GB/month (price for inactive instances), default: $0.10/GB/month\", type=float),",
+          "    argument(\"-u\", \"--price_inetu\", help=\"price for internet upload bandwidth in $/GB\", type=float),",
+          "    argument(\"-d\", \"--price_inetd\", help=\"price for internet download bandwidth in $/GB\", type=float),",
+          "    argument(\"-b\", \"--price_min_bid\", help=\"per gpu minimum bid price floor in $/hour\", type=float),",
+          "    argument(\"-r\", \"--discount_rate\", help=\"Max long term prepay discount rate fraction, default: 0.4 \", type=float),",
+          "    argument(\"-m\", \"--min_chunk\", help=\"minimum amount of gpus\", type=int),",
+          "    argument(\"-e\", \"--end_date\", help=\"contract offer expiration - the available until date (optional, in unix float timestamp or MM/DD/YYYY format)\", type=str),",
+          "    argument(\"-l\", \"--duration\", help=\"Updates end_date daily to be duration from current date. Cannot be combined with end_date. Format is: `n days`, `n weeks`, `n months`, `n years`, or total intended duration in seconds.\"),",
+          "    argument(\"-v\", \"--vol_size\", help=\"Size for volume contract offer. Defaults to half of available disk. Set 0 to not create a volume contract offer.\", type=int),",
+          "    argument(\"-z\", \"--vol_price\", help=\"Price for disk on volume contract offer. Defaults to price_disk. Invalid if vol_size is 0.\", type=float),",
+          "    usage=\"vastai list machine ID [options]\",",
+          "    help=\"[Host] list a machine for rent\",",
+          "    epilog=deindent(\"\"\"",
+          "        Performs the same action as pressing the \"LIST\" button on the site https://cloud.vast.ai/host/machines.",
+          "        On the end date the listing will expire and your machine will unlist. However any existing client jobs will still remain until ended by their owners.",
+          "        Once you list your machine and it is rented, it is extremely important that you don't interfere with the machine in any way. ",
+          "        If your machine has an active client job and then goes offline, crashes, or has performance problems, this could permanently lower your reliability rating. ",
+          "        We strongly recommend you test the machine first and only list when ready.",
+          "    \"\"\")"
+        ]
+      }
+    ]
+  },
+  "observations": [
+    "This exact CLI source maps price_gpu, price_min_bid, price_disk and parsed end_date into a PUT create_asks request.",
+    "Its signature describes GPU and minimum bid in dollars per GPU-hour, disk in dollars per GB-month, and numeric end_date as Unix seconds.",
+    "The duration option rolls end_date forward; do not use it for a fixed seven-day maximum.",
+    "CLI help says listing expiration unlists the machine but existing client jobs remain until ended by their owners. This is not independently tested backend or contract behavior.",
+    "The CLI documents volume-offer creation by default; no separate volume offer is authorized here. A future approved payload should explicitly use vol_size=0.",
+    "No machine ID has been registered for the new host by this task. No payload was sent."
+  ],
+  "static_status": "PASS",
+  "execution_status": "BLOCKED",
+  "missing_prerequisites": [
+    "Fresh setup credential delivered securely",
+    "A reviewed install path that enforces the authorized prices and expiry from initial publication and respects no reboot",
+    "Freshly confirmed new-host machine identity and owning account before any listing"
+  ],
+  "limitations": [
+    "This checkout is not asserted to be current released CLI or the executable eventually used. Recheck the actual implementation before execution.",
+    "CLI help and request construction are source evidence, not server enforcement or Product/Finance/Legal authority.",
+    "No automatic rental termination is authorized or proved.",
+    "No listing, registration, rental, customer inspection or host mutation occurred."
+  ]
+}

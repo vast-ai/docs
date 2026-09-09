@@ -1,0 +1,12 @@
+# Remaining source-owner, citation and review work
+
+PR185 / CON-1518. This register is separate from [runtime/operator work](runtime-operator-register.md).
+
+| Workstream | Status / concrete missing input | Responsible role and exact next action |
+| --- | --- | --- |
+| Required authoritative citations in customer-facing Host claims | **149 existing citation FAILs remain open** across 24 pages. The missing citation is a confirmed documentation defect; a successful SSH/rental does not supply Product, Finance or Legal authority. | Each claim's recorded Product/Finance/Legal/account/policy owner supplies the exact authoritative source or explicit accountable-owner confirmation. Bind it to the literal claim and heading, correct any mismatch, and retain a new retest. Use the **Missing authoritative citation** filter in the port4000 panel or shareable HTML. |
+| Unsupported implementation assertions outside this bounded CLI source check | **UNVALIDATED** where suitable code/schema/configuration evidence is simply absent. Use BLOCKED only where a specific required owner, permission, input or environment prevents a suitable check. | Recorded source owner supplies repository, immutable revision, file and symbol/line locator. Do not substitute the reviewed docs or this status register for implementation evidence. |
+| Jupyter certificate instructions / scoped trust method | Browser trust setup was not performed or accepted. The canonical Jupyter service returned authenticated HTTPS responses with a process-scoped published CA. | Client/security owner confirms a suitable trust installation path for the chosen isolated browser. An operator then reruns the actual UI; confirmation alone is not runtime proof. |
+| Host acceptance, PR review and publication | No human acceptance, new commit, push, merge or Jira post is recorded by this attempt. Earlier remote CI applies only to its actual remote revision. | Required reviewers inspect the current customer wording, exact evidence and open registers. Repository owner reviews and commits/publishes through the authorized PR workflow; do not treat the paid test approval as acceptance. |
+
+Working Host/client accounts and a disposable rental can establish observed platform behavior. They cannot establish contract meaning, pricing policy, taxes, payout obligations, account rules, legal rights, or a future product guarantee. These external workstreams are not completed.

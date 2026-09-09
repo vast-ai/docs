@@ -9,6 +9,316 @@ new-page review coverage are separate from the retained 40-page proof).
 
 Review PR: [vast-ai/docs#185](https://github.com/vast-ai/docs/pull/185)
 
+Publication handoff — **2026-09-09**: the user authorizes committing and pushing
+the completed Host Docs progress to the existing PR branch, without merging.
+Start with the [short progress and next-actions guide](verification/HOST-DOCS-PROGRESS.md).
+The [publication plan and checks](verification/evidence/2026-09-09-host-progress-publication-attempt-01/plan.md)
+keep the 149 citation defects and runtime prerequisites open. Publication does
+not rewrite the sealed operational results or record human acceptance.
+
+Approved live follow-up — **2026-09-09**:
+Machine 150296 was idle immediately before the single one-GPU test rental.
+**SSH passed** with actual output. Jupyter returned authenticated HTTPS status
+and page responses with a process-scoped official CA, but **browser completion
+is blocked by missing certificate trust**. No global trust change or warning
+bypass was performed. Instance 50386523 was destroyed within about 8m22s;
+independent absence, zero remaining host jobs/containers and unchanged boot
+confirm cleanup and no reboot. The roughly $0.40 immediate account-wide credit
+delta is not a settled instance bill.
+
+Normal self-test stopped before creation: reliability **85.1%** is below the
+required **>90%**, and advertised upload **221.1 Mb/s** is below **500 Mb/s**.
+The actual failure support bundle was retained privately with a sanitized
+inventory. This proves the preflight/failure-bundle path, not a completed
+diagnostic. No requirements bypass or paid self-test was performed.
+
+See [actual observations and their limits](verification/evidence/2026-09-09-host-ssh-jupyter-selftest-attempt-01/operations-result-01.md),
+[runtime/operator next actions](verification/evidence/2026-09-09-host-ssh-jupyter-selftest-attempt-01/runtime-operator-register.md),
+and [separate source-owner/citation work](verification/evidence/2026-09-09-host-ssh-jupyter-selftest-attempt-01/source-owner-register.md).
+All 2,027 prior evidence artifacts and the pre-existing staged diff are unchanged.
+The 149 required-citation FAILs remain open. Six exact-claim bindings now identify
+the actual page passage, source and retained observation. Two atomic statements
+newly PASS; totals are **194 PASS / 149 FAIL / 23 BLOCKED / 4 N/A / 1,635
+UNVALIDATED**. All 1,999 other claim records and every procedure/support layer
+are unchanged. Three connection taxonomies were explicitly corrected while
+retaining their complete prior records. The extra BLOCKED row names the browser
+certificate prerequisite, not a product failure.
+
+The port4000 and offline checks cover six updated cards, 24 contextual proof
+links, all 44 API contexts and the 149-citation filter. All 88 passage controls
+on the two affected pages were checked separately. See the
+[bounded result, exact final retests and integrity gate](verification/evidence/2026-09-09-host-ssh-jupyter-selftest-attempt-01/result.md)
+and [shareable report](verification/host-docs-review.html). The result distinguishes
+current validation from earlier dated suites; it does not imply a new all-page
+visual audit, full-site accessibility PASS or external acceptance.
+No commit, push, merge, Jira post or human acceptance occurred in this follow-up.
+Earlier dated snapshots below remain historical, including their then-current
+“awaiting approval” statements and totals.
+
+Repository-first follow-up — **2026-09-09, 11:56 UTC**:
+The scoped no-cost fixes are complete: internal review records stay out of the
+customer build; private archives, dependencies and caches stay out of Git;
+generated API links are checked against Mint's actual generator and rendered
+routes; and the dark-background link color now meets 4.5:1 contrast. The offline
+report distinguishes the latest sealed claim result from historical attempts
+and embeds the new link/accessibility reconciliation without changing a verdict.
+
+Current checks: **183 Python tests, 94 JavaScript tests, 85 unique generated API
+targets (99 static findings), all 44 current reviewer contexts**, and retained
+exact-passage browser checks pass. The original link and contrast failures remain
+linked to their retests. The separate **74 missing-alt findings in 19 non-Host
+files remain open**; this is not a blanket repository accessibility PASS.
+All **1,941 pre-existing evidence artifacts**, the staged diff, the exact claim
+model and all 149 citation FAILs remain unchanged. The AST-only navigation graph
+was safely refreshed after rejecting a shrinking candidate; it is not proof.
+
+See the [repository-first result](verification/evidence/2026-09-09-host-repository-live-merge-attempt-01/result.md),
+[runtime/operator prerequisites](verification/evidence/2026-09-09-host-repository-live-merge-attempt-01/runtime-operator-register.md),
+and [source-owner and review gates](verification/evidence/2026-09-09-host-repository-live-merge-attempt-01/source-owner-register.md).
+No new Host/API/SSH, Keychain access, rental, reboot, commit, push, merge or human
+acceptance occurred. New SSH/Jupyter/self-test execution awaits bounded spend
+approval and fresh safety checks. PR185 remains draft and requires review; its
+green remote CI covers bfa926c, not these local changes.
+
+Current bounded documentation/citation-review correction — **2026-09-09**:
+The two non-citation documentation defects are corrected: **First 24 Hours /
+Test Like A Client** now uses renter offer search, and **VMs / Check VM Status**
+includes the unreadable-configuration case for `off`. The original two FAIL
+occurrences and their evidence are preserved in the
+[exact source transition](verification/current-two-defect-transition.json).
+The replacement statements remain **UNVALIDATED**: local CLI parsing is not
+live offer visibility, and an installed VM helper is not upstream VM authority.
+
+Current totals: **192 PASS, 149 FAIL, 22 BLOCKED, 4 N/A, 1,638 UNVALIDATED**
+across 2,005 claim occurrences. The 149 FAIL records are the unchanged required-
+citation defects across 24 pages; they are not failed runtime tests. In the
+localhost:4000 sidebar select **Missing authoritative citation** to see the
+wording, heading, **Show on page**, missing source, responsible role and next
+action. The shareable [HTML report](verification/host-docs-review.html) has the
+same citation filter and retains the two original failures as historical context.
+
+All 2,003 unaffected claim records retain their proof/status bindings; the only
+permitted change on the two edited pages is the explicit source-transition
+history/coverage metadata. The three earlier rental PASSs and one partial
+UNVALIDATED claim remain unchanged. The 107, 35 and 63 artifacts in the three
+prior sealed attempts are byte-identical, and the pre-existing staged diff is
+unchanged. No new SSH, Host/API, rental, reboot, publication or human acceptance
+was performed. See the [bounded result and retests](verification/evidence/2026-09-09-host-two-defects-citation-review-attempt-01/result.md),
+[runtime/operator work](verification/evidence/2026-09-09-host-two-defects-citation-review-attempt-01/runtime-operator-register.md),
+and [citation/source-owner work](verification/evidence/2026-09-09-host-two-defects-citation-review-attempt-01/source-owner-register.md).
+Those external workstreams are still open.
+
+Historical listing and client-rental follow-up — **2026-09-09, 08:56 UTC**:
+Machine **150296** is listed at the user-approved **USD 0.01/GB upload and
+download**. The earlier USD 1/GB and new USD 0.10/GB API rejections remain
+historical failures. [Independent final Host readback](verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/rate-001/host-read-09.json)
+matches USD 3/GPU-hour, USD 0.30/GPU-hour minimum bid, USD 0.50/GB-month storage,
+disabled prepaid discounts and the unchanged fixed expiry (September 15 at
+00:00 South Africa time).
+
+A distinct client account created **50364501**, ran one small H100 CUDA check
+(sum of squares **1240**), and destroyed it. [GPU output](verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/rental-run-03/gpu-result-01.json)
+and [independent cleanup/absence](verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/rental-run-03/cleanup-main.json)
+are retained. The host remains publicly listed; final point-in-time readback
+shows zero running/resident rentals. Later customer arrival is possible.
+
+On **First 24 Hours**, machine/offer visibility, creation, and client-account
+visibility are now separately PASS. The combined destroy/SSH/Jupyter passage
+remains **UNVALIDATED**: cleanup is proved, its troubleshooting clause is not.
+[Exact claim delta](verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/claim-impact-02.json):
+three statuses changed, one partial-proof binding added, and 2,001 other claims
+are unchanged. Then-current totals: **192 PASS, 151 FAIL, 22 BLOCKED, 4 N/A,
+1,636 UNVALIDATED**. API/args-mode execution does not establish the CLI/Jupyter
+command, full self-test, stock installer, reboot persistence or final billing.
+The immediate account-wide credit delta is not a settled instance bill.
+
+See the [bounded result and reviewer retests](verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/result.md),
+[runtime/operator register](verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/runtime-operator-register.md),
+and [source-owner register](verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/source-owner-register.md).
+No push, merge, Jira post or human acceptance is recorded by this follow-up.
+
+Historical listing follow-up — **2026-09-09, 05:27 UTC**:
+The user confirmed USD 1/GB upload/download and disabled prepaid discounts.
+The exact [listing request](verification/evidence/2026-09-09-h100x4-listing-rental-attempt-01/listing-request-01.json)
+was attempted for machine **150296**. The API returned
+[400 price_out_of_bounds](verification/evidence/2026-09-09-h100x4-listing-rental-attempt-01/listing-response-01.json).
+An [independent readback](verification/evidence/2026-09-09-h100x4-listing-rental-attempt-01/listing-readback-verification-01.json)
+confirms the machine remains **unlisted**. No client rental was created and no
+lower-price fallback was attempted. The server-reported bound is not established
+as a permissible host-input rate; revised API-valid prices need user approval.
+Earlier installation observations and all 2,005 claim statuses are unchanged.
+The reviewer and shareable HTML now link these three current findings to the
+existing exact installation passages, without presenting them as rental proof.
+See the [bounded result and retests](verification/evidence/2026-09-09-h100x4-listing-rental-attempt-01/result.md),
+[runtime/operator register](verification/evidence/2026-09-09-h100x4-listing-rental-attempt-01/runtime-operator-register.md),
+and [source-owner register](verification/evidence/2026-09-09-h100x4-listing-rental-attempt-01/source-owner-register.md).
+
+Completed direct-install retest — **2026-09-09 South Africa (September 8 UTC)**:
+[exact installation observations](verification/evidence/2026-09-09-h100x4-direct-install-attempt-02/operations-summary.md).
+The sudo blocker is resolved and the approved modified direct installer completed.
+NVML/NCCL success markers, all four active services, all four visible H100 GPUs,
+XFS/project-quota enforcement and unchanged boot were retained independently.
+The owned-machine API returned the new machine **150296**, unlisted. The later
+[settled snapshot](verification/evidence/2026-09-09-h100x4-direct-install-attempt-02/settled-01.json)
+shows no Docker containers or GPU compute PIDs, all four services enabled/active,
+and an empty package audit. Earlier helper package-lock failures are preserved;
+this is not a claim that every installer subcommand succeeded. No stock TUI,
+reboot, paid rental or separate marketplace self-test is proved. At that attempt's
+handoff, listing awaited the bandwidth-price/prepaid-discount choice (superseded
+by the listing follow-up above); exact runtime claim binding and
+reviewer regression are completed for this bounded attempt. See the
+[final handoff](verification/evidence/2026-09-09-h100x4-direct-install-attempt-02/result.md).
+Four exact runtime-only claims now have selected command-output proof; the other
+2,001 claims are unchanged. Then-current totals were **189 PASS, 151 FAIL, 22 BLOCKED,
+4 N/A and 1,639 UNVALIDATED**. The 158-test Python retest and 72-test reviewer
+retest pass. All 101 affected-page passage/status controls, 69 contextual links
+and four selected runtime outputs pass in the live reviewer and offline report.
+The HTML embeds 152 files with zero network resource requests. Original failures
+and retests remain linked. The optional knowledge-graph refresh refused a
+smaller replacement and remains local maintenance; no force overwrite occurred.
+
+Historical direct-install attempt — **2026-09-08, 21:55 UTC**:
+[exact preflight and dispositions](verification/evidence/2026-09-08-h100x4-direct-install-attempt-01/result.md).
+The user supplied a replacement setup token and approved the direct route.
+SSH, four H100 GPUs, unchanged boot and persistent XFS/quota mount were observed;
+**sudo requires a password**, so installation stopped before invocation. No
+setup token, API, registration, listing, rental or reboot was used/performed.
+The [operator register](verification/evidence/2026-09-08-h100x4-direct-install-attempt-01/runtime-operator-register.md)
+names the missing sudo authentication and exact next action. The
+[source-owner register](verification/evidence/2026-09-08-h100x4-direct-install-attempt-01/source-owner-register.md)
+keeps external authority separate. Prior selected observations and canonical
+claim statuses are preserved. Reviewer integration/retests are recorded in the
+attempt result, not inferred from this summary.
+
+Direct-attempt reviewer retest: all 101 two-page passage/status controls and
+34 contextual links pass; offline HTML embeds 144 files with no network resources.
+The initial suite passed 69/70; its HTML-export ordering failure is retained,
+and all 14 HTML tests passed on the post-export retest. Source/model identities
+are unchanged across that correction. No single green 70-test run is claimed.
+
+Historical local installer preparation — **2026-09-08**:
+[exact-page source and preparation findings](verification/evidence/2026-09-08-h100x4-safe-installer-attempt-01/source-review-summary.json).
+A digest-pinned local variant omits only the inspected automatic listing/self-test
+helper launch; nine local tests pass. It has not been installed or listed. A new
+read-only capture adds the persistent XFS/quota mount entry to the earlier GPU and
+mount observations. The reviewed TUI expects the omitted self-test and would
+report failure; this is not proof of a successful stock TUI or standard install.
+The [runtime/operator register](verification/evidence/2026-09-08-h100x4-safe-installer-attempt-01/runtime-operator-register.md)
+names the fresh setup credential and remaining execution requirements. The
+[source-owner/commercial register](verification/evidence/2026-09-08-h100x4-safe-installer-attempt-01/source-owner-register.md)
+keeps provenance and owner work separate. Prior attempts and all canonical claim
+statuses are preserved. See the [bounded attempt result](verification/evidence/2026-09-08-h100x4-safe-installer-attempt-01/result.md)
+for final reviewer checks and limits.
+
+Preparation handoff retest: 69 regression tests, 101 rendered passage/status
+controls and 29 contextual evidence links pass; the HTML embeds 143 files and
+works offline. The first proxy-startup connection failures are retained beside
+the successful ready-server retests. This closes only the preparation/interface
+package, not installation or unresolved Host Docs claims.
+
+Historical installation evidence intake — **2026-09-08**:
+[new H100×4 and three existing-host review](verification/evidence/2026-09-08-h100x4-install-history-attempt-01/result.md).
+Four strictly pinned read-only SSH captures completed; no host was rebooted or
+changed. The new host exposes four GPUs and XFS/project-quota mount options, but
+Docker and Vast are not installed. Historical installation records remain useful
+for bounded invocation/postcondition evidence; no missing terminal installer exit
+was reconstructed.
+
+The [public helper inspection](verification/evidence/2026-09-08-h100x4-install-history-attempt-01/source-inspection-02.md)
+confirms temporary listing before automatic self-test. Its generated GPU-price
+argument and omitted bid/storage controls do not enforce the newly approved
+$3/GPU-hour, $0.30 minimum bid per GPU-hour and $0.50/GB-month terms. Its three-hour
+expiry is within the seven-day ceiling, not itself a violation. Installation/listing
+is paused for a safe initial-publication route and a fresh securely supplied setup
+key. This is supplemental evidence, not installation proof or a claim-status change.
+The result links exact client-facing headings and separates runtime/operator work
+from source-owner and commercial-authority work. No installation, listing, rental,
+reboot, Host/API/setup credential use or acceptance is recorded by this intake.
+The approved SSH identity was used for the bounded read-only captures.
+
+[Reviewer and shareable HTML integration retest](verification/evidence/2026-09-08-h100x4-install-history-attempt-01/reviewer-result.md):
+five exact installation-page findings, 69 passing regression tests, 101 matching
+passage/status controls and nine working evidence links. Partial findings are
+explicitly distinguished from complete proof; current claim statuses are unchanged.
+Original fixture/export failures and the proxy-startup browser failure remain
+linked to passing retests. Port4000 serves the final source; the offline report
+works without network resources. This does not resolve the earlier intermittent
+fetch issue or any outstanding product/owner work.
+
+Previous additive V&V update: **2026-09-08**, [client/Host unblocking result](verification/evidence/2026-09-08-host-client-unblocking-attempt-01/result.md)
+and [shareable HTML](verification/host-docs-review.html). Then-current totals: **185 bounded
+PASS, 4 editorial N/A, 151 FAIL, 22 BLOCKED and 1,643 UNVALIDATED** (1,816 unresolved).
+The [exact delta](verification/evidence/2026-09-08-host-client-unblocking-attempt-01/current-delta-01.json)
+contains ten newly supported command occurrences, two confirmed documentation
+defects and two refreshed self-test prerequisites. These are not completed
+workflows. The 18 new observations/inspections are separate from the prior 47.
+
+Both Host/client keys authenticate and resolve to distinct accounts. Missing-key
+wording is no longer a current execution gate. Self-test still needs explicit
+workload authority, the necessary create permissions, a controlled runtime window
+and cleanup scope. VM `off` was inconclusive with unreadable configuration; the
+unconditional description and First 24 Hours' Host-inventory command in a client
+discovery sequence are now FAIL with exact retained findings. The isolated
+key-file mode-0644 security failure remains open.
+
+[Current runtime/operator prerequisites](verification/evidence/2026-09-08-host-client-unblocking-attempt-01/runtime-operator-register.md)
+and [current Product/Finance/Legal/source-owner work](verification/evidence/2026-09-08-host-client-unblocking-attempt-01/source-owner-register.md)
+remain separate. The latter explicitly identifies the two remaining repository-local
+wording corrections; not all unresolved work is an external blocker. Current
+adjudications preserve full prior claim objects. All other claims, procedure and
+support-layer states, page text, the staged diff and retained historical artifacts
+are unchanged. No rental/self-test, Host mutation, instance stop/destruction,
+push, merge, Jira/PR post or human acceptance occurred in this follow-up.
+
+Final retests: 142 Python tests, 29 current-review/HTML tests and 11 offline browser
+check groups pass. All 44 pages have retained passage/status observations, but one
+intermittent localhost fetch failure remains unexplained despite three successful
+sequential Self-Test retries; it is not relabeled as a stability PASS.
+
+Reviewer panel follow-up: the [port4000 findings retest](verification/evidence/2026-09-08-reviewer-findings-refresh-attempt-01/result.md)
+confirms the running reviewer serves these current findings. Four representative
+pages passed exact passage/status checks for 145 claims; eight retained proof
+links from four selected findings returned HTTP200. This is interface verification,
+not new product proof or closure of the earlier intermittent transport issue.
+Final handoff must refresh and retest both the localhost panel and shareable HTML
+after any further evidence/content change.
+
+Previous additive result: **2026-09-08**, [47-check live read-only result](verification/evidence/2026-09-08-host-live-readonly-attempt-01/result.md).
+Its totals were 175 bounded
+PASS, 4 editorial N/A, 149 FAIL, 22 BLOCKED and 1,655 UNVALIDATED (1,826 unresolved).
+Three Market Metrics endpoint descriptions have canonical-source plus API proof;
+the Hosting Overview marketplace introduction has separate official product-source
+proof, not a paid rental or renter-workload result. All 15 documented Market Metrics
+CLI examples ran; the [20-occurrence map](verification/evidence/2026-09-08-host-live-readonly-attempt-01/check-to-claim-map.json)
+distinguishes full invocations, partial procedures and related context. Forty-seven
+checks does not mean forty-seven claims closed.
+
+[Runtime/operator prerequisites](verification/evidence/2026-09-08-host-live-readonly-attempt-01/runtime-operator-register.md)
+and [Product/Finance/Legal/source-owner work](verification/evidence/2026-09-08-host-live-readonly-attempt-01/source-owner-register.md)
+remain separate. No paid/privileged/workload-affecting operation, push, Jira post,
+merge or human acceptance is recorded. Prior attempts and the original static
+evidence bytes are preserved; the figures below describe the previous dated pass.
+
+Client-facing claim review baseline (2026-09-07): start with the repository files
+`verification/HOST-DOCS-CLAIMS-TO-RESOLVE.md` and
+`verification/HOST-DOCS-CURRENT-REVIEW-PLAN.md`.
+The dated evidence below remains historical; it must not be read as proof of
+changed or newly merged wording. Repository review does not complete the
+runtime/operator or Product/Finance/Legal/source-owner workstreams.
+
+Previous repository-only V&V result: `verification/evidence/2026-09-07-host-current-vv-attempt-01/result.md`.
+The additive current package covers 44 primary pages and 33 support layers.
+It recorded 2,005 statement occurrences: 171 bounded PASS, 4 editorial
+NOT_APPLICABLE, 149 FAIL, 22 BLOCKED and 1,659 UNVALIDATED. The 1,830 unresolved
+occurrences are listed in `verification/current-host-docs-claim-worklist.md`;
+runtime/operator and source-owner registers are separate. These are not 1,830
+confirmed external blockers or 2,005 newly completed semantic reviews.
+All 44 reviewer pages and 33 support layers passed their final browser checks;
+19 masked examples use explicit section-link fallbacks instead of exact highlights.
+Historical attempts, intermediate failures and correction retests are retained.
+New/changed-page heading checks are inventory, not completed branch-level runtime
+validation. Global non-Host link/alt-text and shared contrast findings remain open.
+
 Jira epics: [CON-1187](https://vastai.atlassian.net/browse/CON-1187) and [CON-1509](https://vastai.atlassian.net/browse/CON-1509)
 
 ## Purpose

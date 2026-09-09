@@ -1,0 +1,101 @@
+{
+  "id": "SAFE-04-SOURCE-REVIEW-SUMMARY-01",
+  "recorded_at": "2026-09-08",
+  "page": "/host/installing-host-software",
+  "summary": "A local modified installer is prepared and locally checked. It omits one automatic listing/self-test launch. Installation, registration, listing and TUI completion have not been demonstrated by this attempt.",
+  "method": "Root review of exact retained source, candidate provenance and nine isolated local tests; separate independent static review retained privately. No full installer was imported or run.",
+  "sources": [
+    {"name": "Retained public installer", "url": "https://console.vast.ai/install", "sha256": "6b00488ccf837ed6b7b5375270b75db284c3906f6aec832ad9c8573f44eaac6c", "limitation": "URL is mutable. Findings refer to retained bytes with this digest, not a future download."},
+    {"name": "Local modified candidate", "sha256": "4d87c48acc12a15eee1c2793d0631e1d936b2f996bdd50de4ad27b5acdf3d519", "limitation": "Not an upstream release. Only the direct helper-launch block changed; file retained locally with mode 0600."},
+    {"name": "Retained self-test helper", "sha256": "b44cfb52802f0fe44535cba8b6d78365a6672418e89574c87d34f05aa197151f", "limitation": "Static source, not a listing or self-test execution."},
+    {"name": "Retained updater script", "sha256": "8b7f973b2f4b62d293c3078ce0d2c108c6e1556149877680ca7c723183c61714", "limitation": "Downstream executable payloads are not all retained or pinned."},
+    {"name": "TUI source checkout", "revision": "2d33c362bd0293f73730b258e77c9bcd1945ee14", "url": "https://github.com/vast-ai/host-installer-wizard/blob/2d33c362bd0293f73730b258e77c9bcd1945ee14/src/host_installer_wizard/workers/self_test_tailer.py#L47", "sha256": "d2c2e52f1c293cdb77aead1ff155e08d6c847544d29196a0b110f16fa003dfa9", "limitation": "Reviewed working file matches the Git object. Correspondence to the downloaded TUI binary is UNVALIDATED."}
+  ],
+  "findings": [
+    {
+      "id": "SAFE-FIND-01",
+      "headings": ["After Install"],
+      "claim_ids": ["MCL-ce118e1ce7bf71bb"],
+      "status": "PASS",
+      "status_scope": "Exact local transformation and isolated helper-launch simulation only",
+      "finding": "Original lines 1961-1969 call start_self_test.sh. The candidate replaces only that block with an omission log at lines 1961-1965. The original extracted block launches the fake helper with a generated GPU price of 24 for four GPUs; the candidate extracted block does not launch it.",
+      "evidence": ["variant-preparation-01.json", "variant-tests-01.json"],
+      "limits": "No installer or helper ran on a host. This does not prove the page's initialization timing, upstream TUI/standard route, daemon behavior or suppression of all possible listing paths.",
+      "next_action": "Retain a separate live installation and publication-control result before promoting an installation or listing claim."
+    },
+    {
+      "id": "SAFE-FIND-02",
+      "headings": ["Host Installer Wizard"],
+      "claim_ids": ["MCL-fd7e8b86c5cfd383", "MCL-009da802cabe1bc9"],
+      "status": "FAIL",
+      "status_scope": "Compatibility expectation for the proposed intentional-skip route against reviewed local TUI source; not a client-page claim adjudication",
+      "finding": "The reviewed TUI expects a fresh self-test banner. Its default wait is five minutes; absent a fresh banner it sets failed and exit code -1. Intentional omission is not represented as a separate completion state in this inspected flow.",
+      "source_locations": ["workers/self_test_tailer.py:47-53", "workers/self_test_tailer.py:102-147", "pages/lesson.py:852-907", "pages/success.py:25-45"],
+      "exact_source_excerpts": ["FILE_WAIT_TIMEOUT_SECS = 5 * 60", "self._exit_code = -1", "self._set_status(\"failed\")"],
+      "evidence": ["tui-source-identity-01.json"],
+      "limits": "Static source finding. The identity check's printed timeout value is a source-read annotation, not a measured runtime timeout. No binary was launched and no five-minute UI run was performed.",
+      "next_action": "Choose a direct modified-installer run and label it as that route, or implement and verify an explicit TUI skip state. Do not mark the stock TUI workflow verified from this variant."
+    },
+    {
+      "id": "SAFE-FIND-03",
+      "headings": ["Headless Fallback"],
+      "claim_ids": ["MCL-ead93c85c2ff4168", "MCL-ec2e1c9a8be1a706"],
+      "status": "PASS",
+      "status_scope": "Read-only observations at the captured timestamp only",
+      "finding": "At 19:34:33 UTC the approved new host reported four H100 PCIe GPUs, an active XFS Docker mount with prjquota, and a persistent XFS Docker mount entry with pquota. Docker and Vast services were not installed.",
+      "evidence": ["readiness-01.json", "readiness-projection-01.json"],
+      "limits": "The new fstab observation resolves the older missing-fstab observation gap. It does not establish quota enforcement, container execution, successful installation, persistent state after reboot or freedom from later storage changes.",
+      "next_action": "Recheck the exact target, current mount and persistent entry immediately before a bounded installation; retain post-install service/container/quota observations separately."
+    },
+    {
+      "id": "SAFE-FIND-04",
+      "headings": ["Headless Fallback"],
+      "claim_ids": ["MCL-ec2e1c9a8be1a706"],
+      "status": "UNVALIDATED",
+      "status_scope": "No-storage-change guarantee for a future installation",
+      "finding": "--no-partitioning alone does not prevent loop-file formatting, fstab updates or Docker-data migration if the reusable mount branch is not taken. The observed active and persistent mount support that branch, but the installer has not executed it.",
+      "source_locations": ["public-install:543-561", "public-install:1096-1168"],
+      "exact_source_excerpts": ["in_fstab = (DOCKER_DIR_NOS in open(\"/etc/fstab\", \"r\").read())", "row = ensure_mount(DOCKER_DIR)", "filename = create_loop(DOCKER_LOOP)"],
+      "limits": "Source plus point-in-time preflight, not a runtime branch observation. No formatting, mount operation or storage mutation was performed.",
+      "next_action": "Freeze non-destructive arguments and guard the reuse conditions; stop if they drift. Do not select a new partition or loopback fallback."
+    },
+    {
+      "id": "SAFE-FIND-05",
+      "headings": ["Host Installer Wizard", "After Install"],
+      "claim_ids": ["MCL-009da802cabe1bc9", "MCL-ce118e1ce7bf71bb"],
+      "status": "UNVALIDATED",
+      "status_scope": "Remaining live installation and no-reboot behavior",
+      "finding": "The candidate retains registration, package/service changes, updater downloads, daemon start, NVML/NCCL container diagnostics and send_mach_info.py --speedtest. Removing the final helper does not remove these effects. The inspected retained files do not contain a direct reboot command, but the full downloaded execution chain is not proven reboot-free.",
+      "source_locations": ["public-install:1567-1662", "public-install:1777-1926", "public-install:1931-1959", "update_scripts.sh:17-39", "update_scripts.sh:98-336"],
+      "limits": "Not an offline or workload-free installer. Unretained downstream executable bytes are an evidence gap, not invented Product/Legal authority and not by themselves a universal BLOCKED status.",
+      "next_action": "Before live execution, freeze the route and arguments, retain resolved dependency identities, and set explicit stop/no-reboot/publication controls for the remaining install and diagnostic effects. Resolve any unavailable code or required risk decision by name."
+    },
+    {
+      "id": "SAFE-FIND-06",
+      "headings": ["Host Installer Wizard"],
+      "claim_ids": ["MCL-009da802cabe1bc9"],
+      "status": "BLOCKED",
+      "status_scope": "Credentialed live installation cannot start",
+      "responsible_role": "Crypto Labs team-host setup-key administrator / authorized operator",
+      "missing_prerequisite": "A fresh one-hour team-host installation setup key, supplied through a specific approved Keychain service and account",
+      "finding": "No fresh setup-key entry/account has been supplied for this attempt. The SSH key, regular Host API key and client API key are not substitutes.",
+      "limits": "No key was fetched or tested. The old key pasted into chat will not be reused or retained in public evidence.",
+      "next_action": "Create and securely save a fresh setup key, then supply only its Keychain service/entry and account."
+    },
+    {
+      "id": "SAFE-FIND-07",
+      "headings": ["After Install"],
+      "claim_ids": ["MCL-ce118e1ce7bf71bb"],
+      "status": "UNVALIDATED",
+      "status_scope": "Eventual offer settings and marketplace publication",
+      "finding": "User-approved future terms are USD 3/GPU-hour on-demand, USD 0.30/GPU-hour minimum bid, USD 0.50/GB-month storage, and expiry no later than September 15, 2026. This patch neither applies nor verifies those settings.",
+      "limits": "The helper's three-hour expiry was within the user's ceiling. Its generated price and omitted bid/storage controls were the observed mismatch; no marketplace listing was changed in this attempt.",
+      "next_action": "After successful bounded installation and a readiness decision, list only the intended machine with all approved fields explicit and retain independent API/UI readback including the absolute expiry."
+    }
+  ],
+  "overall_limits": [
+    "These are supplemental source/preparation observations, not a replacement for the client-facing statement or its existing status.",
+    "No canonical claim status changed. Prior attempts and current runtime/source-owner registers remain authoritative for unresolved claims.",
+    "No Product, Finance, Legal confirmation, human acceptance, live install, listing, paid rental, explicit self-test or reboot was recorded."
+  ]
+}

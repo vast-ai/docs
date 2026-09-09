@@ -1,0 +1,12 @@
+# Publication verification — Host Docs progress
+
+The completed Host Docs/V&V checkpoint is suitable for a normal commit and push to the existing PR185 fork branch, **not for merge or full Host acceptance**. The user explicitly requested publication. [Progress and next actions](../../HOST-DOCS-PROGRESS.md) remain the reviewer entry point.
+
+- [Sealed-input comparison](sealed-input-reuse-01.json):438source/evidence/graph records unchanged; only authorized planning, progress and traceability handoff text differs. All tested code, current model, customer pages, HTML and prior evidence still match the recorded186Python/97reviewer test target.
+- [Current generator](generator-01.json), [HTML determinism](html-01.json), [publication hygiene](publication-hygiene-01.json), [working whitespace](unstaged-whitespace-01.json), [original staged whitespace](staged-whitespace-01.json), and [handoff links](handoff-links-01.json) pass. The disposable harness's [original parser failure and correction](harness-correction-01.md) are retained.
+- [Exact-secret absence](exact-secret-absence-01.json): the named Host/client credentials and task Jupyter token were absent from all1,934then-pending files, including binary bytes. Later added publication records contain only check results, public paths and handoff text. [Independent publication review](independent-publication-review.md) found no blocking scope, size, private-root or suspicious-content issue; its OCR/pattern observations are explicitly limited advisory evidence.
+- The [candidate inventory](candidate-inventory-01.json) pins the exact source/docs/evidence files selected for publication. Its own file is staged alongside those entries. Private original status/index/diffs and the staged-tree receipt remain under the ignored publication working directory.
+
+The publication step must still verify that staged blobs match the inventoried bytes, create a normal commit without bypassing hooks, push only `fork` (`jjziets/docs`) / `CON-1584-host-cli-api-sdk`, and independently read back the remote and PR head. A local post-push receipt records the resulting commit and current CI state without an endless commit-to-record-itself cycle. This pre-commit record does not claim that a future push already succeeded.
+
+No new Host/API/SSH/rental, reboot, listing change, Jira post, review approval or merge was performed for publication verification. Product counts and unresolved runtime/source-owner work stay unchanged.

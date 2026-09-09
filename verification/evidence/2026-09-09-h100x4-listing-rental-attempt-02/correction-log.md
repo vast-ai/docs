@@ -1,0 +1,23 @@
+# Original failures, corrections and distinct retests
+
+No failed live request or historical evidence was rewritten into a success.
+
+| Original finding | Correction | Retest / limit |
+| --- | --- | --- |
+| Earlier USD 1/GB request rejected; this attempt's USD 0.10/GB request also rejected. | User explicitly permitted USD 0.01/GB in both directions. | `rate-001/listing-response-01.json` and independent `rate-001/listing-readback-verification-01.json` pass. Not a universal price-bound rule. |
+| Pre-execution runner armed its watchdog after create acknowledgement and lacked two current guards. | Arm before create; require on-demand offer and freshly distinct Host/client identities. | `rental-safety-review-02.md` and `rental-static-retest-02.json`; unsafe original retained privately and never rented. |
+| First and second runners rejected stale expected offer IDs before creating anything. | Select and pin the sole qualifying offer from the final guarded query, not an earlier response. | `rental-inventory-03.md`, `rental-run03-static-01.json`, and successful `rental-run-03/` execution; earlier errors remain. |
+| Initial adjudication proposed four PASS claims and seven tests passed, but the destroy passage also includes untested SSH/Jupyter troubleshooting. | Keep that compound occurrence UNVALIDATED, retaining cleanup as partial evidence; only three atomic statements can pass. | Original build retained in `overlay-write-01.json`; private rejected model SHA-256 `68e34fbb1dcd4176be9e726a194846562351f652a1a24fbadcc72ae0a56107d0`. Corrected adjudication/build tests are separate records. No whole-paragraph proof is inferred. |
+| Review found portable-fixture and selected-proof substitution gaps before final integration. | Fixture restores pinned prior claims; exact ordered per-claim artifact sets are enforced. | Focused adversarial retest rejects borrowed evidence, drift and non-atomic updates. Earlier six-test handoff is preserved in the worker archive. |
+| First account observation unnecessarily included exact account balances. | Move original byte-for-byte into restricted retention; publish a pointer and minimum-credit projection. | `account-observations-02.json` is explicitly a projection, not another execution. Original restricted SHA-256 `8ebc1abd786abef7ec79a65df9a2ec97779de256189ac3de631746168b4fce00` remains verifiable. |
+| One combined integration-source read exceeded the output limit and failed JSON parsing. | Read and apply each bounded diff separately. | No file changed during the failed parse; all six reviewer files were then integrated. |
+| First package-accounting helper hit Node's default output-buffer limit on the pre-existing staged diff. | Increase only the read buffer; staged content is untouched. | `package-accounting-02.json` retains the failure; `package-accounting-03.json` passes and confirms unchanged staged diff/HEAD and 98 prior sealed artifacts. |
+| New runtime claims were generated, but the reviewer did not yet admit their exact evidence refs/PASS decision. | Add pinned registry/artifact/claim admission, not a broad PASS bypass. | `page-controls-02.json`, `intake-browser-02.json` and `rental-browser-02.json` retain unavailable-package/timeouts. Corrected-source browser and regression retests are separate attempts. This is a repository integration failure, not a Host failure. |
+| `intake-preservation-01.json` returned zero but had no output: the recorder did not forward the heredoc to its child process. | Pass the assertion program as an explicit argument. | Only `intake-preservation-02.json` is suitable preservation-check evidence; the empty first record is not proof. |
+| `rental-browser-03.json` passed all live links but compared the offline cleanup display to unmasked raw text. | Check exact embedded display text, original retained SHA and the explicit masking notice; preserve privacy redaction. | The offline report intentionally masks identifiers and labels that copy as not byte-identical raw evidence. The corrected browser retest is separate; no runtime or UI source was weakened. |
+| Final screenshot inspection found the sidebar still said prepared September 8. | Change only that date label to updated September 9. | `export-03.json`, `html-tests-04.json` and fresh final browser checks retain the correction. Prior screenshots and successful tests remain historical; original artifact content is unchanged. |
+
+The account-wide immediate zero credit delta is not attributable settled billing,
+and is never used to claim a free rental. The USD 5 budget was operational,
+not a platform-enforced cap. This run is direct API/args-mode evidence, not proof
+that the documented CLI/Jupyter command or full self-test was executed.

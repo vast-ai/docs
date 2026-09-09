@@ -1,0 +1,87 @@
+{
+  "attempt_id": "ATTEMPT-2026-09-09-H100X4-DIRECT-INSTALL-02",
+  "method": "Exact short-line projection from independently retained remote installer log tail; not documentation assertions.",
+  "raw_capture_sha256": "f20e9049b83d2608efd8ba7fe6254c6a8bcba5c6ed6f58264f2acc29be56c416",
+  "remote_log_sha256": "dea081c16f4ab93daa0f2ca48f34b569aed53ae60356d983aa8a41abb4cc9014",
+  "remote_log_bytes": 184927,
+  "collector_sha256": "d2c1d3022279126ba6040ac718cb49908203c56d1321f58518076e73ca2a62bd",
+  "records": [
+    {
+      "id": "INSTALL-SUBCOMMAND-FAIL-01",
+      "status": "FAIL",
+      "expectation": "Default pytorch/pytorch image preload completes.",
+      "observed": [
+        {
+          "retained_tail_line": 268,
+          "text": "latest: Pulling from pytorch/pytorch",
+          "sha256": "3544bf23c88f70f01d1771c01e49eb64af4e25094afb49bd7ee321842a2d7cb0"
+        },
+        {
+          "retained_tail_line": 281,
+          "text": "unexpected EOF",
+          "sha256": "ed1e41405b4d976ebe1b0d4f5165cf8fae54ce7d0b0bbba25faab8fbb7106d4e"
+        }
+      ],
+      "impact": "Installer default image was absent from first postcheck image inventory. Explicit CUDA-tagged diagnostic image did run; do not conflate these images.",
+      "next_action": "Retain one bounded image-preload retry and resulting RepoDigests under image-retest-plan.md."
+    },
+    {
+      "id": "INSTALL-SUBCOMMAND-FAIL-02",
+      "status": "FAIL",
+      "expectation": "Installer late helper refresh can overwrite/chmod its target as vastai_kaalia.",
+      "observed": [
+        {
+          "retained_tail_line": 283,
+          "text": "/var/lib/vastai_kaalia/update_scripts.sh: Permission denied",
+          "sha256": "61733d0b11e2dd8867d0e497474854da1b28b3e4aee80a9d6a07812c6ac23d6a"
+        },
+        {
+          "retained_tail_line": 284,
+          "text": "chmod: changing permissions of '/var/lib/vastai_kaalia/update_scripts.sh': Operation not permitted",
+          "sha256": "5342f6a02d3d3f1567ace13cfd1240212546f7241f2d19dc5592bf6bb1dc88ba"
+        },
+        {
+          "retained_tail_line": 431,
+          "text": "/var/lib/vastai_kaalia/update_scripts.sh: line 259: /var/lib/vastai_kaalia/.runc_upgrade.lock: Permission denied",
+          "sha256": "c4027c4240ece4e089c023061cac8de0ada51d407dab4e50d8ec97d5e82dbceb"
+        }
+      ],
+      "impact": "Late refresh write/chmod failed. Existing executable helper still ran, and installed/controlled machine-info helper hashes match. This is not evidence that refresh succeeded.",
+      "next_action": "Host installer/updater source owner reviews ownership/refresh logic and decides the minimal supported fix. No assistant ownership/permission repair or full-installer rerun."
+    },
+    {
+      "id": "INSTALL-SUBCOMMAND-FAIL-03",
+      "status": "FAIL",
+      "expectation": "Downstream package selection does not collide with another package-manager transaction.",
+      "observed": [
+        {
+          "retained_tail_line": 485,
+          "text": "E: Unable to acquire the dpkg frontend lock (/var/lib/dpkg/lock-frontend), is another process using it?",
+          "sha256": "8cdf6f25307537e01ace55658c8f31f981f37317758063e90492e302e1a9e2b0"
+        },
+        {
+          "retained_tail_line": 502,
+          "text": "dpkg: error: dpkg frontend lock was locked by another process with pid 16805",
+          "sha256": "beaff210679ace149855536c3e6f2ed6da6dc3abce7a85ec8c5a35e5c88ce9c7"
+        },
+        {
+          "retained_tail_line": 505,
+          "text": "E: Sub-process dpkg --set-selections returned an error code (2)",
+          "sha256": "3a04a401a1c0312977a88199fb8723a74428880021b4f0861ced7c39210bce4c"
+        },
+        {
+          "retained_tail_line": 506,
+          "text": "E: Executing dpkg failed. Are you root?",
+          "sha256": "f6f359247efd532ada150f5f24a08750584312b07ca6ed71d376f1953cc0fb9d"
+        }
+      ],
+      "impact": "A package-management subcommand failed. Later dpkg audit was empty and required services active; neither retroactively passes the failed subcommand.",
+      "next_action": "Installer/updater source owner checks concurrency/locking and error propagation. Reproduce/fix under a new approved controlled-install attempt; no customer-host package experiment."
+    }
+  ],
+  "limitations": [
+    "Line selectors refer to the retained 120000-character log tail in the private SSH capture, not to a freshly reread or complete line-numbered remote log.",
+    "Private source capture preserves original full log digest and tail. No secret, environment dump, unrelated endpoint or provider metadata is reproduced here.",
+    "This record diagnoses exact observed failures only; causal hypotheses about concurrent helper ownership/locking require source-owner confirmation."
+  ]
+}

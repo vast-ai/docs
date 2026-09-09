@@ -125,6 +125,42 @@ vastai list volume <machine-id> \\
         self.assertEqual(by_signature["list machines"]["unknown_flags"], ["--unknown-outer"])
         self.assertEqual(by_signature["list machines"]["status"], "unknown-option")
 
+    def test_markdown_command_link_stops_before_href_and_following_prose(self) -> None:
+        registry = {"schedule maint": {"options": [], "positionals": []}}
+        text = (
+            "[`vastai schedule maint`](/cli/reference/schedule-maint) so renters are "
+            "notified and can save their work.\n"
+        )
+
+        records = VERIFIER.extract_invocations_from_text("host/upgrade-kernel.mdx", text, registry)
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["invocation"], "vastai schedule maint")
+        self.assertEqual(records[0]["status"], "pass")
+        self.assertNotIn("/cli/reference", records[0]["invocation"])
+        self.assertNotIn("renters", records[0]["invocation"])
+
+    def test_inline_code_command_family_stops_before_adjacent_markdown_prose(self) -> None:
+        registry = {"metrics gpu": {"options": [], "positionals": []}}
+        text = "| CLI | `vastai metrics ...` — install the [Vast CLI](/cli/hello-world) |\n"
+
+        records = VERIFIER.extract_invocations_from_text("host/market-metrics.mdx", text, registry)
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["invocation"], "vastai metrics")
+        self.assertEqual(records[0]["status"], "command-family-reference")
+        self.assertNotIn("install", records[0]["invocation"])
+
+    def test_shell_argument_that_looks_like_a_link_does_not_truncate_flags(self) -> None:
+        registry = {"list machines": {"options": ["--retry"], "positionals": []}}
+        text = '```bash\nvastai list machines "](" --retry 6\n```\n'
+
+        records = VERIFIER.extract_invocations_from_text("host/example.mdx", text, registry)
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["flags"], ["--retry"])
+        self.assertEqual(records[0]["status"], "pass")
+
 
 class CliRegistryTests(unittest.TestCase):
     def test_load_registry_records_handler_path_symbol_and_definition_lines(self) -> None:

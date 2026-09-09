@@ -129,6 +129,27 @@ def clean_segment(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip(" |])}.,")
 
 
+def invocation_segment(
+    value: str,
+    *,
+    inline_code_label: bool,
+    markdown_link_label: bool,
+) -> str:
+    """Keep an invocation inside its visible Markdown label or code span.
+
+    The matcher starts at ``vastai`` and therefore cannot see an opening
+    Markdown ``[`` or backtick.  Without this boundary, a linked command label
+    such as ``[`vastai schedule maint`](/cli/reference/schedule-maint) so ...``
+    includes its URL and surrounding prose in the recorded invocation.  That
+    is neither a shell line nor evidence that the prose is CLI syntax.
+    """
+
+    markdown_link = value.find("](") if markdown_link_label else -1
+    inline_code = value.find("`") if inline_code_label else -1
+    boundaries = [item for item in (markdown_link, inline_code) if item >= 0]
+    return value[: min(boundaries)] if boundaries else value
+
+
 def finding_id(file: str, line: int, executable: str, signature: str) -> str:
     raw = f"{file}\0{line}\0{executable}\0{signature}"
     return "cli-" + hashlib.sha256(raw.encode()).hexdigest()[:10]
@@ -250,7 +271,11 @@ def extract_invocations_from_text(
                 if match_contexts[following.start()] == context:
                     segment_end = following.start()
                     break
-            raw_segment = line[match.start() : segment_end]
+            raw_segment = invocation_segment(
+                line[match.start() : segment_end],
+                inline_code_label=match.start() > 0 and line[match.start() - 1] == "`",
+                markdown_link_label=line[: match.start()].rstrip().endswith("["),
+            )
             segment = clean_segment(raw_segment)
             flag_source = re.sub(
                 r"'[^']*'|\"[^\"]*\"",

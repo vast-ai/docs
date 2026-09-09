@@ -38,6 +38,8 @@ DEFAULT_VAST_CLI = existing_default(
 )
 DEFAULT_SELF_TEST = WORKSPACE_ROOT / "self-test"
 DEFAULT_OUTPUT = DOCS_ROOT / "host" / "self-test-reference.mdx"
+CLI_OPTION_TOKEN = re.compile(r"(?<![\w-])--[A-Za-z0-9][A-Za-z0-9_-]*(?![\w-])")
+BACKTICK_RUN = re.compile(r"`+")
 
 
 def run_git(repo: Path, *args: str) -> str | None:
@@ -136,6 +138,7 @@ def parse_self_test_image_catalog(self_test: Path) -> dict[str, dict[str, str]]:
 def cell(value: Any) -> str:
     text = "" if value is None else str(value)
     text = normalize_text(text)
+    text = format_cli_option_tokens(text)
     text = html.escape(text, quote=False)
     text = text.replace("\n", "<br />")
     text = text.replace("|", "\\|")
@@ -156,6 +159,31 @@ def normalize_text(text: str) -> str:
         "review the machine's listing and offer state in the Console",
     )
     return text.strip()
+
+
+def format_cli_option_tokens(text: str) -> str:
+    """Wrap bare CLI flags while preserving existing Markdown code spans.
+
+    Generated diagnostic strings are generally prose, but source messages can
+    already use inline code or fenced examples. Only prose segments are
+    rewritten so existing backtick delimiters and code-fence contents are left
+    untouched.
+    """
+    rendered: list[str] = []
+    cursor = 0
+
+    while match := BACKTICK_RUN.search(text, cursor):
+        rendered.append(CLI_OPTION_TOKEN.sub(lambda token: code(token.group(0)), text[cursor : match.start()]))
+        delimiter = match.group(0)
+        closing = re.compile(rf"(?<!`)`{{{len(delimiter)}}}(?!`)").search(text, match.end())
+        if closing is None:
+            rendered.append(text[match.start() :])
+            return "".join(rendered)
+        rendered.append(text[match.start() : closing.end()])
+        cursor = closing.end()
+
+    rendered.append(CLI_OPTION_TOKEN.sub(lambda token: code(token.group(0)), text[cursor:]))
+    return "".join(rendered)
 
 
 def bullet_lines(items: list[str]) -> list[str]:

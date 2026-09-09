@@ -31,6 +31,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { INSTALL_INTAKE_PATH, INSTALL_INTAKE_ARTIFACTS, loadInstallEvidenceIntake } from './scripts/current_host_install_evidence_intake.mjs';
 
 // The audit runner uses this runtime identity to reject a stale review-server
 // process whose injected overlay does not match the file being assessed.
@@ -219,6 +220,131 @@ const VV_FILES = [
   './verification/host-docs-test-results.json',
   './verification/host-docs-command-scores.json',
 ];
+const CURRENT_HOST_REVIEW_FILE = 'verification/current-host-docs-review.json';
+const CURRENT_HOST_REVIEW_REVISION = 'bfa926c9421521767fa7411718bd31ea38b38528';
+const CURRENT_HOST_REVIEW_HISTORY_FILES = new Set([
+  'verification/host-docs-test-sets.json',
+  'verification/host-docs-test-results.json',
+  'verification/host-docs-command-scores.json',
+]);
+const CURRENT_HOST_REVIEW_SOURCE_KINDS = new Set([
+  'PRIMARY', 'RENDERED_DEPENDENCY', 'SUPPORT_WRAPPER', 'SUPPORT_FRAGMENT', 'CENTRAL_REFERENCE',
+]);
+const CURRENT_HOST_REVIEW_COVERAGE = new Set(['UNCHANGED_EXACT', 'CHANGED', 'NEW']);
+const TWO_DEFECT_TRANSITION = 'verification/current-two-defect-transition.json';
+// This byte pin is deliberately updated only with the reviewed transition
+// registry. It does not make CHANGED-source carry-forward generic.
+const TWO_DEFECT_TRANSITION_SHA256 = '14b51b3a15dc3f21c7c4fc7a911cb7c5f2964b07924d188e4d0c7e700124aea8';
+const TWO_DEFECT_TRANSITION_BASELINE = 'verification/evidence/2026-09-09-host-two-defects-citation-review-attempt-01/transition-baseline/current-host-docs-review.pre-two-defects.json';
+const TWO_DEFECT_TRANSITION_PREFIX = 'verification/evidence/2026-09-09-host-two-defects-citation-review-attempt-01/';
+const TWO_DEFECT_TRANSITION_SUFFIX = 'Exact unchanged literal and heading were rebound through the two-defect transition; no whole-page PASS transfer occurred.';
+const TWO_DEFECT_LEGACY_ARTIFACTS = new Set([
+  'verification/evidence/2026-09-08-host-client-unblocking-attempt-01/client-discovery-cli-source-01.json',
+  'verification/evidence/2026-09-08-host-client-unblocking-attempt-01/vm-helper-source-retest-02.json',
+  'verification/evidence/2026-09-08-host-client-unblocking-attempt-01/vm-status-01.json',
+]);
+const TWO_DEFECT_REPLACEMENT_DECISION = 'TWO_DEFECT_REPLACEMENT_UNVALIDATED';
+const TWO_DEFECT_LITERAL_DECISION = 'TWO_DEFECT_SOURCE_TRANSITION_EXACT_LITERAL';
+const CURRENT_CONNECTION_ADJUDICATION = 'verification/current-host-connection-adjudications.json';
+const CURRENT_CONNECTION_ADJUDICATION_SHA256 = '0803631c77883dfb397f36fa0a07f531232edcd56616f6af600d733e1c49f63c';
+const CURRENT_CONNECTION_DECISION = 'CURRENT_HOST_CONNECTION_RUNTIME_ADJUDICATION';
+const CURRENT_CONNECTION_EVIDENCE_PREFIX = 'verification/evidence/2026-09-09-host-ssh-jupyter-selftest-attempt-01/';
+const CURRENT_CONNECTION_TARGETS = new Set([
+  'COR-01-MCL-323c8fb8180f5f62-REPLACEMENT', 'MCL-4c49eaf437cfa29e',
+  'MCL-1ebb3e6e2b370757', 'MCL-3fb43d8a410371df', 'MCL-da591d84b7d08317',
+  'MCL-eeaf6da83da9eca7',
+]);
+const CURRENT_HOST_REVIEW_CARRY = new Set([
+  'CARRIED_FORWARD_EXACT_SOURCE', 'NOT_CARRIED_SOURCE_CHANGED', 'NOT_CARRIED_NEW', 'CURRENT_STATIC_RETEST',
+  'NO_HISTORICAL_PASS_TRANSFER', 'CURRENT_LIVE_ENDPOINT_ADJUDICATION',
+  'CURRENT_HOST_READONLY_COMMAND_ADJUDICATION', 'CURRENT_HOST_READONLY_SOURCE_ADJUDICATION',
+  'CURRENT_HOST_READONLY_FAIL_ADJUDICATION', 'CURRENT_H100X4_DIRECT_POSTINSTALL_RUNTIME_ADJUDICATION',
+  'CURRENT_H100X4_LISTING_RENTAL_RUNTIME_ADJUDICATION', 'CURRENT_H100X4_LISTING_RENTAL_RUNTIME_ADJUDICATION_PARTIAL',
+  CURRENT_CONNECTION_DECISION,
+  TWO_DEFECT_REPLACEMENT_DECISION, TWO_DEFECT_LITERAL_DECISION,
+]);
+const CURRENT_HOST_REVIEW_ARTIFACTS = new Set([
+  'verification/host-docs-test-results.json', 'verification/current-host-docs-review.json',
+  'verification/current-host-claim-corrections.json',
+  'verification/current-host-editorial-classifications.json',
+  'verification/evidence/2026-09-07-host-current-vv-attempt-01/current-static-checks.json',
+  'verification/evidence/2026-09-07-host-current-vv-attempt-01/volume-command-map-source-inspection.md',
+  'verification/evidence/2026-09-08-host-ada-readiness-attempt-01/api-01.json',
+  'verification/current-host-readonly-findings.json',
+  'verification/evidence/2026-09-08-host-client-unblocking-attempt-01/vm-helper-source-retest-02.json',
+  'verification/evidence/2026-09-08-host-client-unblocking-attempt-01/vm-status-01.json',
+  'verification/evidence/2026-09-08-host-client-unblocking-attempt-01/client-discovery-cli-source-01.json',
+  INSTALL_INTAKE_PATH,
+  'verification/current-h100x4-direct-postinstall-adjudications.json',
+  'verification/evidence/2026-09-09-h100x4-direct-install-attempt-02/postcheck-02.json',
+  'verification/current-h100x4-rental-adjudications.json',
+  TWO_DEFECT_TRANSITION,
+  'verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/rate-001/listing-request-01.json',
+  'verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/rate-001/listing-response-01.json',
+  'verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/rate-001/host-read-after-01.json',
+  'verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/rate-001/listing-readback-verification-01.json',
+  'verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/offer-search-request-01.json',
+  'verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/offer-search-response-01.json',
+  'verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/rental-run-03/rental-fresh-offer-01.json',
+  'verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/rental-run-03/rental-create-request-01.json',
+  'verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/rental-run-03/rental-create-response-01.json',
+  'verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/rental-run-03/instance-read-03.json',
+  'verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/rental-run-03/cleanup-main.json',
+  ...INSTALL_INTAKE_ARTIFACTS.keys(),
+]);
+const H100_DIRECT_POSTCHECK_ARTIFACT = 'verification/evidence/2026-09-09-h100x4-direct-install-attempt-02/postcheck-02.json';
+const H100_DIRECT_POSTCHECK_SHA256 = 'f30120d55712dbbd5b34af9a62d12690f9ffa1e84aee0f0e515fcce74c39e9c7';
+const H100_DIRECT_POSTINSTALL_ADJUDICATION = 'verification/current-h100x4-direct-postinstall-adjudications.json';
+const H100_DIRECT_POSTINSTALL_ADJUDICATION_SHA256 = '83c8cccdfd99851a906574cd90aab0b7b006c6f1dace25b91726f2bed511415e';
+const H100_DIRECT_POSTCHECK_BY_CLAIM = new Map([
+  ['MCL-ead93c85c2ff4168', { label: 'View GPU visibility result', registryId: 'H100X4-POSTINSTALL-MCL-ead93c85c2ff4168-01', observationId: 'POST-03', predicate: 'GPU_INVENTORY_4_H100', stdoutSha256: 'e347d61e8be8994ca800500a3d3efe773ecd88a06cae5c3011c12ed27de9c273' }],
+  ['MCL-82fa8860fe3ef124', { label: 'View service-status result', registryId: 'H100X4-POSTINSTALL-MCL-82fa8860fe3ef124-01', observationId: 'POST-01', predicate: 'FOUR_SERVICES_ACTIVE', stdoutSha256: 'c60320ff4f955e99b9375240ed251bb17427837b8a3783b3e6cccd553c33cb69' }],
+  ['MCL-2f9f572d80e1e8f9', { label: 'View Docker filesystem result', registryId: 'H100X4-POSTINSTALL-MCL-2f9f572d80e1e8f9-01', observationId: 'POST-05', predicate: 'DOCKER_XFS_PROJECT_QUOTA', stdoutSha256: 'b0822180b94f879385131bb1bcd5ec0151aac6e4c0f1787740a5797a5d0f8c17' }],
+  ['MCL-aa383ba37f55f306', { label: 'View project-quota result', registryId: 'H100X4-POSTINSTALL-MCL-aa383ba37f55f306-01', observationId: 'POST-07', predicate: 'PROJECT_QUOTA_ON', stdoutSha256: 'bdfc02203af317d45811830d72395120f7e6868217e9327e837a5a6cdba470f4' }],
+]);
+const H100_RENTAL_ADJUDICATION = 'verification/current-h100x4-rental-adjudications.json';
+const H100_RENTAL_ADJUDICATION_SHA256 = '5098bd147e59d1b749d35d072be554beca90c0926ed6467f4aaf21c2cb6895d7';
+const H100_RENTAL_LIMIT = 'Exact 2026-09-09 listing-and-client-rental observation only: one-GPU contract 50364501 on machine 150296, created from offer 50363390 and then destroyed. It does not establish the stock/TUI install flow, SSH or Jupyter, broad search/ranking, host stability, full self-test, general workload readiness, other accounts or rentals, or future availability.';
+const H100_RENTAL_ARTIFACTS = new Map([
+  ['LISTING_REQUEST', ['verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/rate-001/listing-request-01.json', 'd04afab6cff838e948d1e730d5dd4525320bf096616a2dfc8a987b5fb6b92efa']],
+  ['LISTING_RESPONSE', ['verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/rate-001/listing-response-01.json', 'c0dfb89456e9207c86157f66e226c05e62a328fc9fd4aa9d891bb27a827ae86d']],
+  ['LISTING_READBACK', ['verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/rate-001/host-read-after-01.json', '0691db52a0d697b8f6e1c9b85dc8af91abc2223c240eefb5a212e257d7092072']],
+  ['LISTING_VERIFICATION', ['verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/rate-001/listing-readback-verification-01.json', '00ea44fc85b0aad6de0d403f8f97d678c2948ee614c9524a0b42e5e273181e3f']],
+  ['OFFER_SEARCH_REQUEST', ['verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/offer-search-request-01.json', '9a2edfc70cc58f36526e7312bda962d27b24de6bf04cab61fc97d49dd453e1bc']],
+  ['OFFER_SEARCH_RESPONSE', ['verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/offer-search-response-01.json', 'b1064140959969158739013e2b9a268b63ccc78966cce8d71ff3b7b45062a3d0']],
+  ['FRESH_OFFER', ['verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/rental-run-03/rental-fresh-offer-01.json', 'c474549c81c3bf7f983c29fec24cd9830fef7ad175bb82ce01ddab8490586279']],
+  ['CREATE_REQUEST', ['verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/rental-run-03/rental-create-request-01.json', 'b037e6ee91bf19ef0c4ccaaee0324ae11686d8dcc315431bf5d053d31cd5b55b']],
+  ['CREATE_RESPONSE', ['verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/rental-run-03/rental-create-response-01.json', '4971e25dc437c24e285049ca4671e46bff08d2bb96348e9130c708c22fc5c695']],
+  ['INSTANCE_READ', ['verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/rental-run-03/instance-read-03.json', 'aceca3a56d203dc5214bedf0d338510ed52f2d209f587b93d10ce350cc910f4f']],
+  ['CLEANUP', ['verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/rental-run-03/cleanup-main.json', 'd26bf6baf80bbbc846d4601e6f7be9d0424c73b1f17198672f61b4cd302b4785']],
+]);
+const H100_RENTAL_BY_CLAIM = new Map([
+  ['MCL-fabfbad844e625b4', { registryId: 'H100X4-RENTAL-MCL-fabfbad844e625b4-01', status: 'PASS', history: 'CURRENT_H100X4_LISTING_RENTAL_RUNTIME_ADJUDICATION', heading: 'Monitor', start: 44, textSha256: '71083d08e9196198473cad4ce3a17e6ad5bc30998a0ffd4285b20adbdd3618fc', literal: '- Machine visibility and active offers.', previousClaimSha256: '361da4db27eb37179786d6f7e7d89a2cb74a113d02b571653bfb892af05ebb71', artifactIds: ['LISTING_REQUEST', 'LISTING_RESPONSE', 'LISTING_READBACK', 'LISTING_VERIFICATION', 'OFFER_SEARCH_REQUEST', 'OFFER_SEARCH_RESPONSE'], currentClaimSha256: '0a6d726bee12daf526592f2b9edf63747b5c5e5e998f1d92bfff01e5ddca03ba' }],
+  ['MCL-7d10fc61bf9a884b', { registryId: 'H100X4-RENTAL-MCL-7d10fc61bf9a884b-01', status: 'PASS', history: 'CURRENT_H100X4_LISTING_RENTAL_RUNTIME_ADJUDICATION', heading: 'Test Like A Client', start: 63, textSha256: '547b61f4089e977cbdd119b3f72bd5f7af0dcb94d8caf9d6fa944136a05295cf', literal: 'Create a test instance from one available offer:', previousClaimSha256: '229232d5c770ab7e389472c112457af36b863102fd0f085264d3104b7d744cbb', artifactIds: ['FRESH_OFFER', 'CREATE_REQUEST', 'CREATE_RESPONSE', 'INSTANCE_READ'], currentClaimSha256: 'f894eef284974522e344acf34e1d978d9e48be01dbcfda8e83f93a42fccef509' }],
+  ['MCL-92edb99129fc96c9', { registryId: 'H100X4-RENTAL-MCL-92edb99129fc96c9-01', status: 'PASS', history: 'CURRENT_H100X4_LISTING_RENTAL_RUNTIME_ADJUDICATION', heading: 'Test Like A Client', start: 71, textSha256: '3a00685b48af1eab41995fa4c1f72e9dcf8dde01a23a8dad0a4dbcdbb5749df4', literal: '- Instance appears in the client account.', previousClaimSha256: '991668a07d5b966e39497b647d896062b2a913e05ee4dcb333d67ad7dfa43491', artifactIds: ['CREATE_RESPONSE', 'INSTANCE_READ'], currentClaimSha256: 'cd6990fae1add13dbedf4c968923b0012bcfb8f0981babd91b2a49c581997def' }],
+  ['MCL-da591d84b7d08317', { registryId: 'H100X4-RENTAL-MCL-da591d84b7d08317-01', status: 'UNVALIDATED', history: 'CURRENT_H100X4_LISTING_RENTAL_RUNTIME_ADJUDICATION_PARTIAL', heading: 'Test Like A Client', start: 76, textSha256: 'd968268e1b6fca627a4f89601ca9d0dc7b6a91d16d30b034567ed7d12b48c1d2', literal: 'Destroy the test instance when done. If SSH or Jupyter is stuck connecting, check [Network & Ports](/host/network-ports#test-ports-outside-lan).', previousClaimSha256: '20e87c5266acf10713ecaeca18cec6be5899d46969e885d0b172a05adb16b1f1', artifactIds: ['CREATE_RESPONSE', 'INSTANCE_READ', 'CLEANUP'], currentClaimSha256: '006162098abc386bc418b64d81a01759e4c715a8e0799c4813d2e3de05f1bde1' }],
+]);
+const CURRENT_HOST_LIVE_ADJUDICATION_INPUT = 'verification/current-host-live-adjudications.json';
+const CURRENT_HOST_READONLY_ADJUDICATION_INPUT = 'verification/current-host-readonly-adjudications.json';
+const CURRENT_HOST_READONLY_ADJUDICATION_SHA256 = '06c00cb9482d3911df398c2b39841f52e998d304054f0016fc27c779763d5073';
+const CURRENT_HOST_READONLY_BLOCKER_RATIONALE = 'CURRENT PREREQUISITE: The present Host-owner key can read the Ada candidate, but explicit self-test workload authorization, create permission, controlled spend/window/runtime bounds, and cleanup authority limited to task-created resources are not recorded.';
+// Independent reviewed pins for ONE publication-only correction. Updating the
+// generator cannot expand this gate without a deliberate reviewer-code change.
+const CURRENT_PRODUCT_CLAIM_ID = 'MCL-e12ac9f6be2ce502';
+const CURRENT_PRODUCT_DECISION = 'CURRENT_PRODUCT_PUBLICATION_ADJUDICATION';
+const CURRENT_PRODUCT_CLAIM_SHA256 = 'd650479165238c24f4582a7176c0d36600728edbcac0853084cdb4530f87c066';
+const CURRENT_PRODUCT_ARTIFACTS = new Map([
+  ['verification/current-host-product-publications.json', 'e85ee279fb2b76aaf485210c177523f325b0631e7c496d0906fc4869f4a74af3'],
+  ['verification/evidence/2026-09-08-host-live-readonly-attempt-01/product-source-capture-02.json', '50402fe4c97a54f9ac89d2f003b1c42329f708162a4691de214a3aa6bd3eac12'],
+]);
+const CURRENT_PRODUCT_SOURCES = new Map([
+  ['https://vast.ai/article/vast-ai-startup-program', 'sha256:81b53a106f778c7067c2a5cc02867c1283f82508cb2e6cdf59547937e98eccb3'],
+  ['https://vast.ai/hosting', 'sha256:ef48fca97aade234030dd6a86170297fb2c775f17a65b43643799eb13c480af7'],
+  ['https://vast.ai/products/gpu-cloud', 'sha256:c2f880ab0b7343001e5c1c84fe7fcfb11f85ed5304edd420cf60ee3948e18340'],
+]);
+const CURRENT_HOST_REVIEW_NODE_KINDS = new Set([
+  'TEST_SET', 'BRANCH', 'STEP', 'COMMAND', 'CURRENT_HEADING_CHECK',
+]);
 function vvArray(value) {
   if (!Array.isArray(value)) throw new Error('invalid V&V data');
   return value;
@@ -271,6 +397,7 @@ function vvSha256(value, message = 'invalid V&V SHA-256') {
 }
 function vvSourceIndex(sourceText) {
   const lines = sourceText.split(/\r?\n/);
+  if (/\r?\n$/.test(sourceText)) lines.pop();
   const headings = [];
   let fence = null;
   for (let index = 0; index < lines.length; index += 1) {
@@ -1334,6 +1461,1045 @@ function currentHostNavigationInventory() {
 }
 function vvHash(bytes) {
   return crypto.createHash('sha256').update(bytes).digest('hex');
+}
+function currentReviewPath(value, message) {
+  const safe = vvSafeRepositoryPath(value, message);
+  if (!/^(?:host\/[A-Za-z0-9._/-]+\.mdx|snippets\/host\/(?:cli|sdk)\/[A-Za-z0-9._/-]+\.mdx|cli\/reference\/[A-Za-z0-9._/-]+\.mdx|sdk\/python\/reference\/[A-Za-z0-9._/-]+\.mdx|snippets\/notifications\/channels\.mdx)$/.test(safe)) {
+    throw new Error(message);
+  }
+  return safe;
+}
+function currentReviewText(value, message) {
+  if (typeof value !== 'string' || value.length > 20000 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value) || !value.trim()) {
+    throw new Error(message);
+  }
+  return value;
+}
+function currentReviewStatus(value, message) {
+  if (typeof value !== 'string' || !VV_TARGET_STATUSES.has(value)) throw new Error(message);
+  return value;
+}
+function currentReviewCoverage(value, message) {
+  if (!CURRENT_HOST_REVIEW_COVERAGE.has(value)) throw new Error(message);
+  return value;
+}
+function currentReviewHash(value, message) {
+  return vvSha256(value, message);
+}
+function currentReviewExactArray(value, message) {
+  if (!Array.isArray(value) || value.length > 10000) throw new Error(message);
+  return value;
+}
+function currentReviewSourceText(sourceFile, message) {
+  return new TextDecoder('utf-8', { fatal: true }).decode(
+    vvCurrentSourceFile(currentReviewPath(sourceFile, message), message).bytes,
+  );
+}
+function currentReviewLines(sourceText) {
+  const lines = sourceText.split(/\r?\n/);
+  if (/\r?\n$/.test(sourceText)) lines.pop();
+  return lines;
+}
+function currentReviewSpan(value, allowedFiles, sourceCache, message) {
+  vvExactKeys(value, ['source_file', 'start', 'end', 'text_sha256'], message);
+  const sourceFile = currentReviewPath(value.source_file, message);
+  if (!allowedFiles.has(sourceFile)) throw new Error(message);
+  const sourceText = sourceCache.get(sourceFile) || currentReviewSourceText(sourceFile, message);
+  sourceCache.set(sourceFile, sourceText);
+  const lines = currentReviewLines(sourceText);
+  if (!Number.isInteger(value.start) || !Number.isInteger(value.end) || value.start < 1 || value.end < value.start || value.end > lines.length) {
+    throw new Error(message);
+  }
+  const textSha256 = currentReviewHash(value.text_sha256, message);
+  if (vvHash(Buffer.from(lines.slice(value.start - 1, value.end).join('\n'), 'utf8')) !== textSha256) {
+    throw new Error(message);
+  }
+  return { sourceFile, start: value.start, end: value.end, textSha256 };
+}
+function currentReviewHeadings(value, sourceIndexes, spans, message, { allowIntroduction = false, allowOutsideHeadings = false } = {}) {
+  const headings = currentReviewExactArray(value, message).map((heading) => currentReviewText(heading, message));
+  if (!headings.length || new Set(headings).size !== headings.length) throw new Error(message);
+  const present = new Set(['Introduction', ...[...sourceIndexes.values()].flatMap((sourceIndex) => sourceIndex.headings.map((heading) => heading.title))]);
+  const headingParts = (heading) => {
+    const normalizedHeading = vvSectionTitle(heading);
+    return present.has(normalizedHeading) ? [normalizedHeading] : normalizedHeading.split(/\s+\/\s+/);
+  };
+  const normalized = new Set(headings.flatMap(headingParts));
+  const spanHeading = (span) => {
+    const sourceIndex = sourceIndexes.get(span.sourceFile);
+    if (!sourceIndex) throw new Error(message);
+    const line = sourceIndex.lines[span.start - 1]?.trim() || '';
+    // An MDX anchor/comment may deliberately precede its heading.  Associate it
+    // with that immediately following heading, but never skip ordinary content.
+    if (!line || /^(?:<span\b[^>]*\/?\s*>|\{\/\*.*\*\/\})$/.test(line)) {
+      const next = sourceIndex.headings.find((heading) => heading.start > span.start &&
+        sourceIndex.lines.slice(span.start, heading.start - 1).every((candidate) =>
+          !candidate.trim() || /^(?:<span\b[^>]*\/?\s*>|\{\/\*.*\*\/\})$/.test(candidate.trim())));
+      if (next) return next.title;
+    }
+    return vvSectionAtLine(sourceIndex, span.start);
+  };
+  if (headings.some((heading) => headingParts(heading).some((part) => !present.has(part))) || (!allowOutsideHeadings && spans.some((span) =>
+    !normalized.has(spanHeading(span)) && !(allowIntroduction && spanHeading(span) === 'Introduction')))) throw new Error(message);
+  return headings;
+}
+function h100RentalCanonical(value) {
+  return Array.isArray(value) ? value.map(h100RentalCanonical) : value && typeof value === 'object'
+    ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, h100RentalCanonical(value[key])])) : value;
+}
+let CURRENT_H100_RENTAL_ADJUDICATIONS;
+function currentH100RentalAdjudications(message) {
+  if (CURRENT_H100_RENTAL_ADJUDICATIONS) return CURRENT_H100_RENTAL_ADJUDICATIONS;
+  const registryBytes = vvRepositoryFile(H100_RENTAL_ADJUDICATION, message).bytes;
+  if (vvHash(registryBytes) !== H100_RENTAL_ADJUDICATION_SHA256) throw new Error(message);
+  const registry = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(registryBytes));
+  vvExactKeys(registry, ['schema_version', 'artifact_type', 'purpose', 'artifacts', 'adjudications'], message);
+  if (registry.schema_version !== 1 || registry.artifact_type !== 'H100X4_LISTING_RENTAL_RUNTIME_ADJUDICATION_INPUT' ||
+    registry.purpose !== 'THREE_PASS_ONE_PARTIAL_FIRST_24_HOURS_RUNTIME_CLAIMS') throw new Error(message);
+  const artifactRows = currentReviewExactArray(registry.artifacts, message);
+  if (artifactRows.length !== H100_RENTAL_ARTIFACTS.size) throw new Error(message);
+  const artifacts = new Map();
+  for (const [index, row] of artifactRows.entries()) {
+    vvExactKeys(row, ['id', 'path', 'sha256'], message);
+    const wanted = [...H100_RENTAL_ARTIFACTS.entries()][index];
+    const artifact = vvSafeRepositoryPath(row.path, message);
+    if (!wanted || row.id !== wanted[0] || artifact !== wanted[1][0] || row.sha256 !== wanted[1][1] ||
+      vvHash(vvRepositoryFile(artifact, message).bytes) !== wanted[1][1]) throw new Error(message);
+    artifacts.set(row.id, { id: row.id, artifactRef: artifact, artifactSha256: wanted[1][1] });
+  }
+  const expected = new Map(H100_RENTAL_BY_CLAIM);
+  const result = new Map();
+  const sourceSha256 = '3ab83e7558387edc07416aa84c4cf8e5721f1312a4c94f3841c1af4ecd8cf970';
+  for (const entry of currentReviewExactArray(registry.adjudications, message)) {
+    vvExactKeys(entry, ['id', 'claim_id', 'route', 'source_file', 'source_sha256', 'headings', 'span', 'literal', 'literal_sha256',
+      'prior_status', 'required_evidence_types', 'outcome_status', 'previous_claim', 'previous_claim_sha256', 'artifact_ids', 'limits'], message);
+    vvExactKeys(entry.span, ['start', 'end', 'text_sha256'], message);
+    const pinned = expected.get(entry.claim_id);
+    if (!pinned || entry.id !== pinned.registryId || entry.route !== '/host/first-24-hours' || entry.source_file !== 'host/first-24-hours.mdx' ||
+      entry.source_sha256 !== sourceSha256 || JSON.stringify(entry.headings) !== JSON.stringify([pinned.heading]) ||
+      entry.span.start !== pinned.start || entry.span.end !== pinned.start || entry.span.text_sha256 !== pinned.textSha256 ||
+      entry.literal !== pinned.literal || entry.literal_sha256 !== pinned.textSha256 ||
+      vvHash(Buffer.from(entry.literal, 'utf8')) !== pinned.textSha256 || entry.prior_status !== 'UNVALIDATED' ||
+      JSON.stringify(entry.required_evidence_types) !== JSON.stringify(['RUNTIME_OR_UI_OBSERVATION']) || entry.outcome_status !== pinned.status ||
+      entry.previous_claim_sha256 !== pinned.previousClaimSha256 || entry.limits !== H100_RENTAL_LIMIT ||
+      JSON.stringify(entry.artifact_ids) !== JSON.stringify(pinned.artifactIds) || !entry.previous_claim || typeof entry.previous_claim !== 'object') throw new Error(message);
+    vvExactKeys(entry.previous_claim, ['id', 'text', 'headings', 'spans', 'status', 'required_evidence_types', 'owner_role', 'rationale', 'next_action', 'evidence_refs', 'source_refs', 'history', 'classification', 'coverage_state'], message);
+    if (vvHash(Buffer.from(JSON.stringify(h100RentalCanonical(entry.previous_claim)), 'utf8')) !== pinned.previousClaimSha256 ||
+      entry.previous_claim.id !== entry.claim_id || entry.previous_claim.text !== pinned.literal || entry.previous_claim.status !== 'UNVALIDATED' ||
+      JSON.stringify(entry.previous_claim.headings) !== JSON.stringify([pinned.heading]) ||
+      JSON.stringify(entry.previous_claim.required_evidence_types) !== JSON.stringify(['RUNTIME_OR_UI_OBSERVATION']) ||
+      entry.previous_claim.history?.carry_decision !== 'CARRIED_FORWARD_EXACT_SOURCE' || entry.previous_claim.classification !== 'RUNTIME_BEHAVIOR' ||
+      entry.previous_claim.coverage_state !== 'UNCHANGED_EXACT') throw new Error(message);
+    const frozen = currentReviewFrozenClaims(message).get(entry.claim_id);
+    if (!frozen || frozen.scope?.route !== entry.route || frozen.scope?.source_file !== entry.source_file ||
+      frozen.scope?.source_text_sha256 !== pinned.textSha256 || frozen.claim?.kind !== 'RUNTIME_BEHAVIOR' || frozen.current?.status !== 'UNVALIDATED') throw new Error(message);
+    const refs = [{ id: pinned.registryId, role: 'CURRENT_H100X4_LISTING_RENTAL_RUNTIME_ADJUDICATION', limit: H100_RENTAL_LIMIT,
+      artifactRef: H100_RENTAL_ADJUDICATION, artifactSha256: H100_RENTAL_ADJUDICATION_SHA256 }];
+    for (const artifactId of pinned.artifactIds) {
+      const artifact = artifacts.get(artifactId);
+      if (!artifact) throw new Error(message);
+      refs.push({ id: artifact.id, role: 'RETAINED_H100X4_LISTING_RENTAL_OBSERVATION', limit: H100_RENTAL_LIMIT, ...artifact });
+    }
+    expected.delete(entry.claim_id);
+    result.set(entry.claim_id, { ...pinned, route: entry.route, sourceFile: entry.source_file, sourceSha256: entry.source_sha256,
+      headings: entry.headings, span: entry.span, literal: entry.literal, refs });
+  }
+  if (expected.size || result.size !== 4) throw new Error(message);
+  CURRENT_H100_RENTAL_ADJUDICATIONS = result;
+  return result;
+}
+function twoDefectCanonical(value) {
+  return Array.isArray(value) ? value.map(twoDefectCanonical) : value && typeof value === 'object'
+    ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, twoDefectCanonical(value[key])])) : value;
+}
+function twoDefectJsonHash(value) {
+  return vvHash(Buffer.from(JSON.stringify(twoDefectCanonical(value)), 'utf8'));
+}
+function twoDefectExpectedReason(previous) {
+  return `${previous.history.reason} ${TWO_DEFECT_TRANSITION_SUFFIX}`;
+}
+let CURRENT_TWO_DEFECT_TRANSITION;
+function currentTwoDefectTransition(message) {
+  if (CURRENT_TWO_DEFECT_TRANSITION) return CURRENT_TWO_DEFECT_TRANSITION;
+  const bytes = vvRepositoryFile(TWO_DEFECT_TRANSITION, message).bytes;
+  if (vvHash(bytes) !== TWO_DEFECT_TRANSITION_SHA256) throw new Error(message);
+  const data = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+  vvExactKeys(data, ['schema_version', 'artifact_type', 'id', 'limits', 'baseline', 'current_pages', 'allowed_changes',
+    'historical_fail_records', 'unmodified_claim_inventory', 'rental_transition_adapter', 'artifacts'], message);
+  if (data.schema_version !== 1 || data.artifact_type !== 'EXACT_TWO_DEFECT_SOURCE_TRANSITION' ||
+    data.id !== 'CURRENT-TWO-DEFECT-TRANSITION-01' ||
+    data.limits !== 'Two documentation corrections only. Static source/counterexample checks do not establish renter visibility, a rental workflow, upstream VM health, owner approval, or acceptance.') throw new Error(message);
+  vvExactKeys(data.baseline, ['model', 'historical_fail_registry'], message);
+  for (const [key, expectedPath, expectedHash] of [
+    ['model', TWO_DEFECT_TRANSITION_BASELINE, '9714a8773317edb5a48ee2e7989f745efad2251b9d21b68308b48948c9789ccf'],
+    ['historical_fail_registry', 'verification/current-host-readonly-findings.json', '48134e3bb58ed35247547c0315089590b58edaac8d679c3ecfebe6af8240622b'],
+  ]) {
+    vvExactKeys(data.baseline[key], ['path', 'sha256'], message);
+    if (data.baseline[key].path !== expectedPath || data.baseline[key].sha256 !== expectedHash ||
+      vvHash(vvRepositoryFile(expectedPath, message).bytes) !== expectedHash) throw new Error(message);
+  }
+  const baseline = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(vvRepositoryFile(TWO_DEFECT_TRANSITION_BASELINE, message).bytes));
+  if (!Array.isArray(baseline.pages)) throw new Error(message);
+  const baselineClaims = new Map(baseline.pages.flatMap((page) => Array.isArray(page.claims) ? page.claims : []).
+    map((claim) => [claim.id, claim]));
+  const routeSpec = new Map([
+    ['/host/first-24-hours', ['host/first-24-hours.mdx', 'd9cc6ad167e90ffb35e2af7f62882a6059bd05b14384a459a5bcb1cfc45f3502', '3ab83e7558387edc07416aa84c4cf8e5721f1312a4c94f3841c1af4ecd8cf970']],
+    ['/host/vms', ['host/vms.mdx', 'e72464044e8404350d1860dc9a57bd12a0576fda0279a860948786b89bb9151a', '3f9cab3e239c3e048af39506adb8d6e83d0c497e82c34d11fad171a85cde822e']],
+  ]);
+  const changedPages = new Map();
+  if (JSON.stringify(Object.keys(data.current_pages).sort()) !== JSON.stringify([...routeSpec.keys()].sort()) ||
+    JSON.stringify(Object.keys(data.allowed_changes).sort()) !== JSON.stringify([...routeSpec.keys()].sort())) throw new Error(message);
+  for (const [route, [sourceFile, currentSha, snapshotSha]] of routeSpec) {
+    const row = data.current_pages[route];
+    vvExactKeys(row, ['source_file', 'sha256', 'snapshot', 'snapshot_sha256', 'allowed_changes'], message);
+    const changes = data.allowed_changes[route];
+    if (row.source_file !== sourceFile || row.sha256 !== currentSha || row.snapshot_sha256 !== snapshotSha ||
+      row.snapshot !== `${TWO_DEFECT_TRANSITION_PREFIX}transition-baseline/${sourceFile.replace(/^host\//, 'host/')}`.replace(/\.mdx$/, '.pre-two-defects.mdx') ||
+      JSON.stringify(row.allowed_changes) !== JSON.stringify(changes) || !Array.isArray(changes) || !changes.length) throw new Error(message);
+    const before = new TextDecoder('utf-8', { fatal: true }).decode(vvRepositoryFile(row.snapshot, message).bytes);
+    const after = new TextDecoder('utf-8', { fatal: true }).decode(vvCurrentSourceFile(sourceFile, message).bytes);
+    if (vvHash(Buffer.from(before, 'utf8')) !== snapshotSha || vvHash(Buffer.from(after, 'utf8')) !== currentSha) throw new Error(message);
+    const beforeLines = currentReviewLines(before); const afterLines = currentReviewLines(after);
+    if (beforeLines.length !== afterLines.length || new Set(changes.map((entry) => entry?.line)).size !== changes.length) throw new Error(message);
+    const byLine = new Map(changes.map((entry) => {
+      vvExactKeys(entry, ['line', 'old', 'new'], message);
+      if (!Number.isInteger(entry.line) || entry.line < 1 || entry.line > beforeLines.length || typeof entry.old !== 'string' || typeof entry.new !== 'string') throw new Error(message);
+      return [entry.line, entry];
+    }));
+    for (let index = 0; index < beforeLines.length; index += 1) {
+      const change = byLine.get(index + 1);
+      if (change ? beforeLines[index] !== change.old || afterLines[index] !== change.new : beforeLines[index] !== afterLines[index]) throw new Error(message);
+    }
+    changedPages.set(route, { sourceFile, sourceSha256: currentSha, snapshot: row.snapshot, snapshotSha256: snapshotSha });
+  }
+  const artifacts = new Map([[TWO_DEFECT_TRANSITION, TWO_DEFECT_TRANSITION_SHA256]]);
+  for (const row of currentReviewExactArray(data.artifacts, message)) {
+    vvExactKeys(row, ['path', 'sha256'], message);
+    const artifact = vvSafeRepositoryPath(row.path, message);
+    if (!(artifact === H100_RENTAL_ADJUDICATION || artifact.startsWith(TWO_DEFECT_TRANSITION_PREFIX) || TWO_DEFECT_LEGACY_ARTIFACTS.has(artifact)) || artifacts.has(artifact) ||
+      vvHash(vvRepositoryFile(artifact, message).bytes) !== currentReviewHash(row.sha256, message)) throw new Error(message);
+    artifacts.set(artifact, row.sha256);
+  }
+  const replacementIds = new Map([
+    ['/host/first-24-hours', ['MCL-323c8fb8180f5f62', 'COR-01-MCL-323c8fb8180f5f62-REPLACEMENT']],
+    ['/host/vms', ['MCL-dfebca7edafe9c59', 'COR-02-MCL-dfebca7edafe9c59-REPLACEMENT']],
+  ]);
+  if (JSON.stringify(Object.keys(data.historical_fail_records).sort()) !== JSON.stringify([...replacementIds.keys()].sort())) throw new Error(message);
+  const replacements = new Map();
+  for (const [route, [oldId, replacementId]] of replacementIds) {
+    const row = data.historical_fail_records[route];
+    vvExactKeys(row, ['old_fail_claim', 'replacement'], message);
+    const oldClaim = row.old_fail_claim; const replacement = row.replacement;
+    if (!oldClaim || !replacement || oldClaim.id !== oldId || replacement.id !== replacementId || oldClaim.status !== 'FAIL' ||
+      replacement.status !== 'UNVALIDATED' || replacement.history?.carry_decision !== TWO_DEFECT_REPLACEMENT_DECISION ||
+      replacement.coverage_state !== 'CHANGED' || twoDefectJsonHash(oldClaim) !== twoDefectJsonHash(baselineClaims.get(oldId))) throw new Error(message);
+    const page = changedPages.get(route);
+    if (!page || replacement.spans?.length !== 1 || replacement.spans[0].source_file !== page.sourceFile ||
+      replacement.spans[0].text_sha256 !== vvHash(Buffer.from(currentReviewLines(new TextDecoder('utf-8', { fatal: true }).decode(vvCurrentSourceFile(page.sourceFile, message).bytes)).slice(replacement.spans[0].start - 1, replacement.spans[0].end).join('\n'), 'utf8'))) throw new Error(message);
+    replacements.set(replacementId, { route, oldClaim, replacement });
+  }
+  if (JSON.stringify(Object.keys(data.unmodified_claim_inventory).sort()) !== JSON.stringify([...routeSpec.keys()].sort())) throw new Error(message);
+  const inventory = new Map();
+  for (const route of routeSpec.keys()) for (const row of currentReviewExactArray(data.unmodified_claim_inventory[route], message)) {
+    vvExactKeys(row, ['id', 'text', 'headings', 'spans', 'historical_status', 'historical_claim_sha256'], message);
+    const previous = baselineClaims.get(row.id);
+    if (!previous || inventory.has(row.id) || previous.text !== row.text || JSON.stringify(previous.headings) !== JSON.stringify(row.headings) ||
+      JSON.stringify(previous.spans) !== JSON.stringify(row.spans) || previous.status !== row.historical_status || twoDefectJsonHash(previous) !== row.historical_claim_sha256) throw new Error(message);
+    inventory.set(row.id, { route, previous });
+  }
+  vvExactKeys(data.rental_transition_adapter, ['registry', 'purpose', 'validated_against', 'claims'], message);
+  const rentalExpected = new Map([...H100_RENTAL_BY_CLAIM].map(([id, row]) => [id, row.status]));
+  if (data.rental_transition_adapter.registry !== H100_RENTAL_ADJUDICATION ||
+    data.rental_transition_adapter.purpose !== 'THREE_PASS_ONE_PARTIAL_FIRST_24_HOURS_RUNTIME_CLAIMS' ||
+    data.rental_transition_adapter.validated_against !== 'immutable pre-two-defects first-24-hours page') throw new Error(message);
+  for (const row of currentReviewExactArray(data.rental_transition_adapter.claims, message)) {
+    vvExactKeys(row, ['claim_id', 'historical_claim_sha256', 'current_status'], message);
+    const previous = baselineClaims.get(row.claim_id);
+    if (!rentalExpected.delete(row.claim_id) || row.current_status !== H100_RENTAL_BY_CLAIM.get(row.claim_id).status ||
+      twoDefectJsonHash(previous) !== row.historical_claim_sha256 || !inventory.has(row.claim_id)) throw new Error(message);
+  }
+  if (rentalExpected.size || inventory.size !== 69) throw new Error(message);
+  CURRENT_TWO_DEFECT_TRANSITION = { changedPages, replacements, inventory, artifacts };
+  return CURRENT_TWO_DEFECT_TRANSITION;
+}
+function currentTwoDefectTransitionClaim(value, page, message) {
+  if (page.coverageState !== 'CHANGED' || !['/host/first-24-hours', '/host/vms'].includes(page.route)) return null;
+  const transition = currentTwoDefectTransition(message);
+  const source = transition.changedPages.get(page.route);
+  if (!source || page.sourceFile !== source.sourceFile || page.sourceSha256 !== source.sourceSha256) throw new Error(message);
+  const replacement = transition.replacements.get(value.id);
+  if (replacement) {
+    if (replacement.route !== page.route || twoDefectJsonHash(value) !== twoDefectJsonHash(replacement.replacement)) throw new Error(message);
+    return replacement;
+  }
+  const inventory = transition.inventory.get(value.id);
+  if (!inventory || inventory.route !== page.route) throw new Error(message);
+  const expected = structuredClone(inventory.previous);
+  expected.coverage_state = 'CHANGED';
+  expected.history = { ...expected.history, carry_decision: TWO_DEFECT_LITERAL_DECISION, reason: twoDefectExpectedReason(inventory.previous) };
+  if (twoDefectJsonHash(value) !== twoDefectJsonHash(expected)) throw new Error(message);
+  return { route: page.route, oldClaim: null, replacement: null };
+}
+let CURRENT_CONNECTION_ADJUDICATIONS;
+function currentHostConnectionAdjudications(message) {
+  if (CURRENT_CONNECTION_ADJUDICATIONS) return CURRENT_CONNECTION_ADJUDICATIONS;
+  const bytes = vvRepositoryFile(CURRENT_CONNECTION_ADJUDICATION, message).bytes;
+  if (vvHash(bytes) !== CURRENT_CONNECTION_ADJUDICATION_SHA256) throw new Error(message);
+  const data = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+  vvExactKeys(data, ['schema_version', 'artifact_type', 'purpose', 'attempt', 'artifacts', 'adjudications'], message);
+  if (data.schema_version !== 1 || data.artifact_type !== 'CURRENT_HOST_CONNECTION_RUNTIME_ADJUDICATION_INPUT' ||
+    data.purpose !== 'SIX_EXACT_CONNECTION_AND_PREFLIGHT_OUTCOMES_ONLY' ||
+    data.attempt !== CURRENT_CONNECTION_EVIDENCE_PREFIX.slice(0, -1)) throw new Error(message);
+  const artifacts = new Map();
+  for (const row of vvArray(data.artifacts)) {
+    vvExactKeys(row, ['id', 'path', 'sha256'], message);
+    const path = vvSafeRepositoryPath(row.path, message);
+    if (!path.startsWith(CURRENT_CONNECTION_EVIDENCE_PREFIX) || artifacts.has(row.id) ||
+      vvHash(vvRepositoryFile(path, message).bytes) !== currentReviewHash(row.sha256, message)) throw new Error(message);
+    artifacts.set(row.id, { path, sha256: row.sha256 });
+  }
+  const expectedOutcomes = new Map([
+    ['COR-01-MCL-323c8fb8180f5f62-REPLACEMENT', 'PASS'], ['MCL-4c49eaf437cfa29e', 'PASS'],
+    ['MCL-1ebb3e6e2b370757', 'BLOCKED'], ['MCL-3fb43d8a410371df', 'UNVALIDATED'],
+    ['MCL-da591d84b7d08317', 'UNVALIDATED'], ['MCL-eeaf6da83da9eca7', 'BLOCKED'],
+  ]);
+  const result = new Map();
+  for (const entry of vvArray(data.adjudications)) {
+    vvExactKeys(entry, ['id', 'claim_id', 'route', 'source_file', 'source_sha256', 'headings', 'span', 'literal', 'literal_sha256',
+      'previous_claim', 'previous_claim_sha256', 'outcome_status', 'taxonomy', 'artifact_ids', 'limits', 'rationale', 'next_action', 'source_refs'], message);
+    if (!CURRENT_CONNECTION_TARGETS.has(entry.claim_id) || result.has(entry.claim_id) || entry.id !== `CONNECTION-${entry.claim_id}-01` ||
+      entry.outcome_status !== expectedOutcomes.get(entry.claim_id) || twoDefectJsonHash(entry.previous_claim) !== entry.previous_claim_sha256 ||
+      entry.previous_claim?.id !== entry.claim_id || entry.previous_claim?.classification !== entry.taxonomy?.prior_classification ||
+      JSON.stringify(entry.previous_claim?.required_evidence_types) !== JSON.stringify(entry.taxonomy?.prior_required_evidence_types)) throw new Error(message);
+    // The new binding is not a substitute for the two-defect transition.  All
+    // first-24-hours priors, including the partial cleanup compound, remain
+    // exactly admissible by that earlier adapter.  The self-test row is an
+    // unchanged exact-source BLOCKED claim with a distinct prior gate.
+    if (['COR-01-MCL-323c8fb8180f5f62-REPLACEMENT', 'MCL-4c49eaf437cfa29e', 'MCL-1ebb3e6e2b370757', 'MCL-3fb43d8a410371df', 'MCL-da591d84b7d08317'].includes(entry.claim_id)) {
+      currentTwoDefectTransitionClaim(entry.previous_claim, { route: entry.route }, message);
+    } else if (entry.previous_claim.status !== 'BLOCKED' || entry.previous_claim.history?.carry_decision !== 'CARRIED_FORWARD_EXACT_SOURCE') throw new Error(message);
+    const source = vvCurrentSourceFile(vvSafeRepositoryPath(entry.source_file, message), message);
+    if (vvHash(source.bytes) !== currentReviewHash(entry.source_sha256, message) || entry.span?.source_file !== entry.source_file ||
+      vvHash(Buffer.from(entry.literal, 'utf8')) !== currentReviewHash(entry.literal_sha256, message) ||
+      entry.literal !== currentReviewLines(source.bytes.toString('utf8')).slice(entry.span.start - 1, entry.span.end).join('\n') ||
+      entry.literal_sha256 !== entry.span.text_sha256 || !Array.isArray(entry.artifact_ids) ||
+      entry.artifact_ids.some((id) => !artifacts.has(id))) throw new Error(message);
+    const corrected = new Set(['MCL-4c49eaf437cfa29e', 'MCL-1ebb3e6e2b370757', 'MCL-3fb43d8a410371df']);
+    if (entry.taxonomy.correction !== corrected.has(entry.claim_id) ||
+      (corrected.has(entry.claim_id) && (entry.taxonomy.outcome_classification !== 'RUNTIME_BEHAVIOR' || JSON.stringify(entry.taxonomy.outcome_required_evidence_types) !== JSON.stringify(['RUNTIME_OR_UI_OBSERVATION'])))) throw new Error(message);
+    if (corrected.has(entry.claim_id) && entry.taxonomy.outcome_owner_role !== 'Authorized client/browser/network operator') throw new Error(message);
+    result.set(entry.claim_id, { ...entry, artifacts });
+  }
+  if (result.size !== 6 || [...expectedOutcomes.keys()].some((id) => !result.has(id))) throw new Error(message);
+  CURRENT_CONNECTION_ADJUDICATIONS = result;
+  return result;
+}
+function currentHostConnectionClaim(value, page, entry, message) {
+  if (page.route !== entry.route || page.sourceFile !== entry.source_file || page.sourceSha256 !== entry.source_sha256 ||
+    value.id !== entry.claim_id || value.text !== entry.literal || JSON.stringify(value.headings) !== JSON.stringify(entry.headings) ||
+    JSON.stringify(value.spans) !== JSON.stringify([entry.span])) throw new Error(message);
+  const expected = structuredClone(entry.previous_claim);
+  expected.status = entry.outcome_status;
+  expected.classification = entry.taxonomy.outcome_classification;
+  expected.required_evidence_types = entry.taxonomy.outcome_required_evidence_types;
+  expected.owner_role = entry.taxonomy.outcome_owner_role || expected.owner_role;
+  expected.rationale = entry.rationale; expected.next_action = entry.next_action; expected.source_refs = entry.source_refs;
+  const newRefs = [{ id: entry.id, role: CURRENT_CONNECTION_DECISION, limit: entry.limits, artifact_ref: CURRENT_CONNECTION_ADJUDICATION },
+    ...entry.artifact_ids.map((id) => ({ id, role: 'RETAINED_CONNECTION_ATTEMPT_OBSERVATION', limit: entry.limits, artifact_ref: entry.artifacts.get(id).path }))];
+  expected.evidence_refs = entry.claim_id === 'COR-01-MCL-323c8fb8180f5f62-REPLACEMENT'
+    ? [...entry.previous_claim.evidence_refs, ...newRefs] : newRefs;
+  expected.history = { ...expected.history, carry_decision: CURRENT_CONNECTION_DECISION,
+    reason: `${entry.previous_claim.history.reason} Exact prior claim is hash-pinned in the connection adjudication registry; this bounded observation does not transfer a broader workflow result.` };
+  if (twoDefectJsonHash(value) !== twoDefectJsonHash(expected)) throw new Error(message);
+  return entry.outcome_status === 'PASS';
+}
+function currentTwoDefectTransitionPage(page, message) {
+  if (page.coverageState !== 'CHANGED' || !['/host/first-24-hours', '/host/vms'].includes(page.route)) return;
+  const transition = currentTwoDefectTransition(message);
+  const expected = new Set([...transition.inventory.entries()].filter(([, row]) => row.route === page.route).map(([id]) => id));
+  for (const [id, row] of transition.replacements) if (row.route === page.route) expected.add(id);
+  const actual = page.claims.map((claim) => claim.id).sort();
+  if (JSON.stringify(actual) !== JSON.stringify([...expected].sort())) throw new Error(message);
+}
+function currentReviewRefs(value, message, claimId) {
+  return currentReviewExactArray(value, message).map((item) => {
+    vvExactKeys(item, ['id', 'role', 'limit', 'artifact_ref'], message);
+    const artifactRef = vvSafeRepositoryPath(item.artifact_ref, message);
+    let artifactBytes;
+    let retainedHistoricalArtifact = false;
+    const liveAdjudicationArtifact = artifactRef === 'verification/evidence/2026-09-08-host-live-readonly-attempt-01/market-api-01.json' &&
+      [...currentLiveEndpointAdjudications(message).values()].some((entry) => entry.artifactRef === artifactRef);
+    const productArtifact = CURRENT_PRODUCT_ARTIFACTS.has(artifactRef);
+    const readonlyArtifact = artifactRef === CURRENT_HOST_READONLY_ADJUDICATION_INPUT;
+    const connection = currentHostConnectionAdjudications(message).get(claimId);
+    const connectionArtifact = Boolean(connection && ([CURRENT_CONNECTION_ADJUDICATION, ...connection.artifact_ids.map((id) => connection.artifacts.get(id).path)].includes(artifactRef)));
+    const rentalArtifact = artifactRef === H100_RENTAL_ADJUDICATION || [...H100_RENTAL_ARTIFACTS.values()].some(([path]) => path === artifactRef);
+    const transitionCandidate = artifactRef === TWO_DEFECT_TRANSITION || artifactRef.startsWith(TWO_DEFECT_TRANSITION_PREFIX);
+    const transitionArtifact = transitionCandidate ? currentTwoDefectTransition(message).artifacts.get(artifactRef) : null;
+    if (transitionCandidate && !transitionArtifact) throw new Error(message);
+    if (rentalArtifact) {
+      const wanted = currentH100RentalAdjudications(message).get(claimId)?.refs.find((ref) => ref.artifactRef === artifactRef);
+      if (!wanted || item.id !== wanted.id || item.role !== wanted.role || item.limit !== wanted.limit) throw new Error(message);
+    }
+    if (productArtifact && claimId !== CURRENT_PRODUCT_CLAIM_ID) throw new Error(message);
+    if (CURRENT_HOST_REVIEW_ARTIFACTS.has(artifactRef) || connectionArtifact || liveAdjudicationArtifact || productArtifact || readonlyArtifact || transitionArtifact) {
+      artifactBytes = vvRepositoryFile(artifactRef, message).bytes;
+      if (productArtifact && vvHash(artifactBytes) !== CURRENT_PRODUCT_ARTIFACTS.get(artifactRef)) throw new Error(message);
+    } else {
+      const results = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(
+        vvRepositoryFile('verification/host-docs-test-results.json', message).bytes,
+      ));
+      const manifestEntry = vvArray(results.evidence_artifact_manifest).find((entry) => {
+        vvExactKeys(entry, ['path', 'sha256', 'role'], message);
+        return entry.path === artifactRef && typeof entry.role === 'string' && /RETAINED/.test(entry.role);
+      });
+      if (manifestEntry) {
+        artifactBytes = vvRepositoryFile(artifactRef, message).bytes;
+        retainedHistoricalArtifact = vvHash(artifactBytes) === currentReviewHash(manifestEntry.sha256, message);
+      }
+    }
+    if (!(CURRENT_HOST_REVIEW_ARTIFACTS.has(artifactRef) || connectionArtifact || liveAdjudicationArtifact || productArtifact || readonlyArtifact || transitionArtifact || retainedHistoricalArtifact) || !artifactBytes?.length) throw new Error(message);
+    if (artifactRef === H100_DIRECT_POSTINSTALL_ADJUDICATION && vvHash(artifactBytes) !== H100_DIRECT_POSTINSTALL_ADJUDICATION_SHA256) throw new Error(message);
+    if (artifactRef === H100_DIRECT_POSTCHECK_ARTIFACT && vvHash(artifactBytes) !== H100_DIRECT_POSTCHECK_SHA256) throw new Error(message);
+    if (artifactRef === H100_RENTAL_ADJUDICATION && vvHash(artifactBytes) !== H100_RENTAL_ADJUDICATION_SHA256) throw new Error(message);
+    const rentalArtifactHash = [...H100_RENTAL_ARTIFACTS.values()].find(([path]) => path === artifactRef)?.[1];
+    if (rentalArtifactHash && vvHash(artifactBytes) !== rentalArtifactHash) throw new Error(message);
+    if (transitionArtifact && vvHash(artifactBytes) !== transitionArtifact) throw new Error(message);
+    return { id: vvIdentifier(item.id), role: vvIdentifier(item.role), limit: currentReviewText(item.limit, message), artifactRef,
+      artifactSha256: vvHash(artifactBytes) };
+  });
+}
+let CURRENT_HOST_READONLY_ADJUDICATIONS;
+function currentHostReadonlyAdjudications(message) {
+  if (CURRENT_HOST_READONLY_ADJUDICATIONS) return CURRENT_HOST_READONLY_ADJUDICATIONS;
+  const inputBytes = vvRepositoryFile(CURRENT_HOST_READONLY_ADJUDICATION_INPUT, message).bytes;
+  if (vvHash(inputBytes) !== CURRENT_HOST_READONLY_ADJUDICATION_SHA256) throw new Error(message);
+  const input = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(inputBytes));
+  vvExactKeys(input, ['schema_version', 'artifact_type', 'purpose', 'canonical_cli_revision', 'artifacts', 'adjudications', 'blocker_refreshes'], message);
+  const revision = '18c4f2ccd6da587d5352f8741c71805a9a18e1ae';
+  if (input.schema_version !== 1 || input.artifact_type !== 'CURRENT_HOST_READONLY_COMMAND_ADJUDICATION_INPUT' || input.canonical_cli_revision !== revision) throw new Error(message);
+  const artifacts = new Map();
+  for (const row of vvArray(input.artifacts)) {
+    vvExactKeys(row, ['kind', 'path', 'sha256'], message);
+    const artifact = vvSafeRepositoryPath(row.path, message);
+    if (!/^verification\/evidence\/2026-09-08-[a-z0-9-]+\/[a-z0-9-]+\.json$/.test(artifact) ||
+      vvHash(vvRepositoryFile(artifact, message).bytes) !== currentReviewHash(row.sha256, message)) throw new Error(message);
+    if (artifacts.has(row.kind)) throw new Error(message);
+    artifacts.set(row.kind, JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(vvRepositoryFile(artifact, message).bytes)));
+  }
+  if (JSON.stringify([...artifacts.keys()].sort()) !== JSON.stringify(['ada_readiness', 'batch_d', 'batch_e', 'new_cli', 'new_provenance', 'new_search', 'provenance'])) throw new Error(message);
+  const d = artifacts.get('batch_d'); const e = artifacts.get('batch_e'); const provenance = artifacts.get('provenance'); const ada = artifacts.get('ada_readiness'); const newCli = artifacts.get('new_cli'); const newSearch = artifacts.get('new_search'); const newProvenance = artifacts.get('new_provenance');
+  if (d.source_revision !== revision || d.runner_platform !== 'macOS' || e.runner_platform !== 'macOS' || e.source_provenance !== 'batch-d-source-provenance.json' || provenance.revision !== revision || provenance.per_path_git_status !== 'clean for every listed file' ||
+    ada.check_id !== 'ADA-01' || ada.method !== 'GET' || ada.http_status !== 200 || ada.status !== 'PASS' || ada.read_only !== true || newProvenance.revision !== revision || newProvenance.entry_point !== 'vastai.cli.main:main' || newCli.source_revision !== revision || newCli.entry_point !== 'vastai.cli.main:main via existing source checkout .venv/bin/python and PYTHONPATH' || newSearch.source_revision !== revision || newSearch.entry_point !== 'vastai.cli.main:main' || newSearch.credential_role !== 'host') throw new Error(message);
+  const sourceFiles = new Map([...vvArray(provenance.files), ...vvArray(newProvenance.files)].map((row) => {
+    if (JSON.stringify(Object.keys(row).sort()) !== JSON.stringify(['path', 'sha256', 'url']) && JSON.stringify(Object.keys(row).sort()) !== JSON.stringify(['matches_git_blob', 'path', 'sha256', 'url'])) throw new Error(message);
+    if (!/^[a-f0-9]{64}$/.test(row.sha256) || row.url !== `https://github.com/vast-ai/vast-cli/blob/${revision}/${row.path}`) throw new Error(message);
+    return [row.path, { path: row.path, sha256: row.sha256, url: row.url }];
+  }));
+  const records = { D: new Map(vvArray(d.records).map((row) => [row.check_id, row])), E: new Map(vvArray(e.records).map((row) => [row.check_id, row])), N: new Map(vvArray(newCli.records).map((row) => [row.check_id, row])), S: new Map(vvArray(newSearch.records).map((row) => [row.check_id, row])) };
+  const expected = new Set(['CUR-142629d88fb18726', 'CUR-705da5057d7f3360', 'CUR-2c04f5e4d6ef0b20', 'MCL-f0b9b724554ce68a', 'MCL-aa735864a1cb734d', 'MCL-96ee15f730e698d8', 'MCL-728ef13be833d21e', 'MCL-a54378e7f20b92e9', 'MCL-e7db8b5148b63289', 'MCL-50f964a1bb6a2e95']);
+  const targets = new Map([
+    ['CUR-142629d88fb18726', ['/host/market-metrics', 'host/market-metrics.mdx', '7df0a055897a5f5a0629127c5ccb36a46e563ddee2c263dee9146e925d5f7d7d', 'CLI', 77, 81]],
+    ['CUR-705da5057d7f3360', ['/host/market-metrics', 'host/market-metrics.mdx', '7df0a055897a5f5a0629127c5ccb36a46e563ddee2c263dee9146e925d5f7d7d', 'CLI', 85, 93]],
+    ['CUR-2c04f5e4d6ef0b20', ['/host/market-metrics', 'host/market-metrics.mdx', '7df0a055897a5f5a0629127c5ccb36a46e563ddee2c263dee9146e925d5f7d7d', 'CLI', 97, 103]],
+    ['MCL-f0b9b724554ce68a', ['/host/fleet-operations', 'host/fleet-operations.mdx', '33412e18772fdf9e2999e71c930f4897cb45083c06784f7aece8a22e8932c6a1', 'Fleet State', 21, 23]],
+    ['MCL-aa735864a1cb734d', ['/host/fleet-operations', 'host/fleet-operations.mdx', '33412e18772fdf9e2999e71c930f4897cb45083c06784f7aece8a22e8932c6a1', 'Monitor', 76, 76]],
+    ['MCL-96ee15f730e698d8', ['/host/not-in-search', 'host/not-in-search.mdx', 'bef28db52291a1cd4e4af75389da836f9125a6619bdf9663e83c8ce25a592570', 'Check the machine directly', 28, 30]],
+    ['MCL-728ef13be833d21e', ['/host/not-in-search', 'host/not-in-search.mdx', 'bef28db52291a1cd4e4af75389da836f9125a6619bdf9663e83c8ce25a592570', 'Check the machine directly', 34, 36]],
+    ['MCL-a54378e7f20b92e9', ['/host/not-in-search', 'host/not-in-search.mdx', 'bef28db52291a1cd4e4af75389da836f9125a6619bdf9663e83c8ce25a592570', 'Check the machine directly', 40, 42]],
+    ['MCL-e7db8b5148b63289', ['/host/not-in-search', 'host/not-in-search.mdx', 'bef28db52291a1cd4e4af75389da836f9125a6619bdf9663e83c8ce25a592570', 'Check the machine directly', 46, 48]],
+    ['MCL-50f964a1bb6a2e95', ['/host/maintenance-windows', 'host/maintenance-windows.mdx', '832534186a6ad55837c3d81b06d486eccc923a5b5b8d36358ffe643b428f5d46', 'Before Maintenance', 22, 25]],
+  ]);
+  const checksByClaim = new Map([
+    ['CUR-142629d88fb18726', [['D', 'D06'], ['D', 'D07'], ['D', 'D08']]],
+    ['CUR-705da5057d7f3360', [['E', 'E01'], ['D', 'D09'], ['E', 'E02'], ['E', 'E03'], ['E', 'E04'], ['D', 'D10'], ['E', 'E05']]],
+    ['CUR-2c04f5e4d6ef0b20', [['E', 'E06'], ['E', 'E07'], ['E', 'E08'], ['E', 'E09'], ['D', 'D12']]],
+    ['MCL-f0b9b724554ce68a', [['D', 'D01']]], ['MCL-aa735864a1cb734d', [['D', 'D01']]],
+    ['MCL-96ee15f730e698d8', [['N', 'HOST-02']]], ['MCL-728ef13be833d21e', [['S', 'HOST-05']]], ['MCL-a54378e7f20b92e9', [['S', 'HOST-06']]], ['MCL-e7db8b5148b63289', [['S', 'HOST-07']]], ['MCL-50f964a1bb6a2e95', [['N', 'HOST-03'], ['N', 'HOST-01']]],
+  ]);
+  const result = new Map();
+  for (const entry of vvArray(input.adjudications)) {
+    vvExactKeys(entry, ['id', 'claim_id', 'route', 'source_file', 'source_sha256', 'headings', 'span', 'literal', 'literal_sha256', 'previous_claim', 'previous_claim_sha256', 'prior_status', 'required_evidence_types', 'checks', 'source_binding', 'limits'], message);
+    vvExactKeys(entry.span, ['start', 'end', 'text_sha256'], message);
+    const sourceOnly = entry.claim_id === 'MCL-aa735864a1cb734d';
+    const lanes = sourceOnly ? ['CANONICAL_IMPLEMENTATION_SOURCE'] : ['CANONICAL_IMPLEMENTATION_SOURCE', 'RUNTIME_OR_UI_OBSERVATION'];
+    const target = targets.get(entry.claim_id);
+    if (!expected.delete(entry.claim_id) || entry.prior_status !== 'UNVALIDATED' || JSON.stringify(entry.required_evidence_types) !== JSON.stringify(lanes) ||
+      vvHash(Buffer.from(entry.literal, 'utf8')) !== currentReviewHash(entry.literal_sha256, message) || entry.literal_sha256 !== entry.span.text_sha256 || !/^[a-f0-9]{64}$/.test(entry.previous_claim_sha256 || '') || !entry.previous_claim || typeof entry.previous_claim !== 'object') throw new Error(message);
+    const canonical = (item) => Array.isArray(item) ? item.map(canonical) : item && typeof item === 'object' ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, canonical(item[key])])) : item;
+    if (vvHash(Buffer.from(JSON.stringify(canonical(entry.previous_claim)), 'utf8')) !== entry.previous_claim_sha256) throw new Error(message);
+    if (!target || entry.route !== target[0] || entry.source_file !== target[1] || entry.source_sha256 !== target[2] || JSON.stringify(entry.headings) !== JSON.stringify([target[3]]) || entry.span.start !== target[4] || entry.span.end !== target[5]) throw new Error(message);
+    if (JSON.stringify(vvArray(entry.checks).map((check) => [check?.batch, check?.check_id])) !== JSON.stringify(checksByClaim.get(entry.claim_id))) throw new Error(message);
+    const bindings = vvArray(entry.source_binding);
+    if (!bindings.length) throw new Error(message);
+    for (const binding of bindings) {
+      vvExactKeys(binding, ['path', 'sha256', 'url'], message);
+      if (JSON.stringify(sourceFiles.get(binding.path)) !== JSON.stringify(binding)) throw new Error(message);
+    }
+    for (const check of vvArray(entry.checks)) {
+      vvExactKeys(check, ['batch', 'check_id', 'argv', 'required_output'], message);
+      if (!check.required_output || typeof check.required_output !== 'object' || Array.isArray(check.required_output) || !Object.keys(check.required_output).length) throw new Error(message);
+      const record = records[check.batch]?.get(check.check_id);
+      if (!record || JSON.stringify(record.argv) !== JSON.stringify(check.argv) || record.exit_code !== 0 || record.observation_status !== 'PASS' || (record.execution_success ?? true) !== true) throw new Error(message);
+      if (check.batch === 'N' && record.credential_role !== 'host') throw new Error(message);
+      for (const [key, wanted] of Object.entries(check.required_output)) {
+        const actual = record[key];
+        if (Array.isArray(wanted) ? !Array.isArray(actual) || !wanted.every((value) => actual.includes(value)) : actual !== wanted) throw new Error(message);
+      }
+    }
+    result.set(entry.claim_id, { id: entry.id, route: entry.route, sourceFile: entry.source_file, sourceSha256: entry.source_sha256,
+      headings: entry.headings, span: entry.span, literal: entry.literal, priorHash: entry.previous_claim_sha256,
+      lanes, limits: entry.limits, sourceOnly, sourceRefs: bindings.map((row) => ({ repository: 'vast-ai/vast-cli', revision, path: row.path, locator: row.url, sourceKind: 'CANONICAL_CLI_SOURCE' })) });
+  }
+  if (expected.size || result.size !== 10) throw new Error(message);
+  const blockers = new Map();
+  for (const entry of vvArray(input.blocker_refreshes)) {
+    vvExactKeys(entry, ['claim_id', 'previous_claim', 'previous_claim_sha256', 'prior_status', 'evidence_ref', 'rationale', 'next_action'], message);
+    if (!['MCL-eeaf6da83da9eca7', 'MCL-3aca6b1f291d4d0c'].includes(entry.claim_id) || entry.prior_status !== 'BLOCKED' || entry.evidence_ref !== 'verification/evidence/2026-09-08-host-ada-readiness-attempt-01/api-01.json' ||
+      entry.rationale !== CURRENT_HOST_READONLY_BLOCKER_RATIONALE || !entry.next_action.includes('create permission') || !entry.next_action.includes('cleanup') || !entry.previous_claim || typeof entry.previous_claim !== 'object' ||
+      vvHash(Buffer.from(JSON.stringify((function canonical(item) { return Array.isArray(item) ? item.map(canonical) : item && typeof item === 'object' ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, canonical(item[key])])) : item; })(entry.previous_claim)), 'utf8')) !== entry.previous_claim_sha256) throw new Error(message);
+    blockers.set(entry.claim_id, entry);
+  }
+  if (blockers.size !== 2) throw new Error(message);
+  CURRENT_HOST_READONLY_ADJUDICATIONS = { result, blockers };
+  return CURRENT_HOST_READONLY_ADJUDICATIONS;
+}
+let CURRENT_LIVE_ENDPOINT_ADJUDICATIONS;
+function currentLiveEndpointAdjudications(message) {
+  if (CURRENT_LIVE_ENDPOINT_ADJUDICATIONS) return CURRENT_LIVE_ENDPOINT_ADJUDICATIONS;
+  const input = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(
+    vvRepositoryFile(CURRENT_HOST_LIVE_ADJUDICATION_INPUT, message).bytes,
+  ));
+  vvExactKeys(input, ['schema_version', 'artifact_type', 'purpose', 'baseline', 'artifact', 'adjudications'], message);
+  if (input.schema_version !== '1.0' || input.artifact_type !== 'CURRENT_HOST_LIVE_ENDPOINT_ADJUDICATION_INPUT') throw new Error(message);
+  vvExactKeys(input.baseline, ['current_package_sha256', 'source_revision'], message);
+  if (input.baseline.source_revision !== CURRENT_HOST_REVIEW_REVISION ||
+    !/^[a-f0-9]{64}$/.test(input.baseline.current_package_sha256 || '')) throw new Error(message);
+  vvExactKeys(input.artifact, ['path', 'sha256'], message);
+  const artifactRef = vvSafeRepositoryPath(input.artifact.path, message);
+  if (!/^verification\/evidence\/2026-09-08-host-live-readonly-attempt-01\/[a-z0-9-]+\.json$/.test(artifactRef)) throw new Error(message);
+  const artifactBytes = vvRepositoryFile(artifactRef, message).bytes;
+  if (vvHash(artifactBytes) !== currentReviewHash(input.artifact.sha256, message)) throw new Error(message);
+  const observation = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(artifactBytes));
+  if (observation.method !== 'Direct API GET, not CLI execution' || !/^[a-f0-9]{40}$/.test(observation.source_revision || '')) throw new Error(message);
+  const clients = new Map(vvArray(observation.source_files).map((row) => [`${row.repository}\0${row.path}`, row]));
+  const schemas = new Map(vvArray(observation.schemas).map((row) => [row.path, row]));
+  const requests = vvArray(observation.requests);
+  const records = new Map();
+  const expected = new Set(['CUR-a5b27de02fca3c9a', 'CUR-6c8062ab1c766957', 'CUR-2de1188bec6c9f72']);
+  for (const entry of vvArray(input.adjudications)) {
+    vvExactKeys(entry, ['id', 'claim_id', 'route', 'source_file', 'span', 'literal', 'literal_sha256', 'prior_status',
+      'required_evidence_types', 'endpoint', 'description', 'source_binding', 'request_index', 'request_query', 'expected_shape', 'limitations'], message);
+    vvExactKeys(entry.span, ['start', 'end', 'text_sha256'], message);
+    vvExactKeys(entry.source_binding, ['client_path', 'client_sha256', 'openapi_path', 'openapi_sha256'], message);
+    vvExactKeys(entry.expected_shape, ['root_fields', 'boolean_field', 'required_sections'], message);
+    if (!expected.delete(entry.claim_id) || !Number.isInteger(entry.request_index) || entry.request_index < 0 || entry.request_index >= requests.length || typeof entry.request_query !== 'string' ||
+      entry.prior_status !== 'UNVALIDATED' || JSON.stringify(entry.required_evidence_types) !== JSON.stringify(['CANONICAL_IMPLEMENTATION_SOURCE', 'RUNTIME_OR_UI_OBSERVATION']) ||
+      !/^\/api\/v0\/metrics\/gpu\/(?:current|history|locations)\/$/.test(entry.endpoint) ||
+      typeof entry.literal !== 'string' || !entry.literal.includes('`GET ' + entry.endpoint + '`') || !entry.literal.includes('| ' + entry.description + ' |') ||
+      vvHash(Buffer.from(entry.literal, 'utf8')) !== currentReviewHash(entry.literal_sha256, message)) throw new Error(message);
+    const client = clients.get(`vast-ai/vast-cli\0${entry.source_binding.client_path}`);
+    const schema = schemas.get(entry.source_binding.openapi_path);
+    if (!client || client.sha256 !== entry.source_binding.client_sha256 || client.path_status !== '' || !schema ||
+      schema.sha256 !== entry.source_binding.openapi_sha256 || entry.source_binding.openapi_path === entry.source_file) throw new Error(message);
+    const schemaBlob = execFileSync('git', ['-C', VV_REPOSITORY_ROOT, 'cat-file', 'blob',
+      `${CURRENT_HOST_REVIEW_REVISION}:${vvSafeRepositoryPath(entry.source_binding.openapi_path, message)}`], { stdio: ['ignore', 'pipe', 'ignore'] });
+    if (vvHash(schemaBlob) !== currentReviewHash(entry.source_binding.openapi_sha256, message)) throw new Error(message);
+    const request = requests[entry.request_index];
+    let url;
+    try { url = new URL(request.url); } catch { throw new Error(message); }
+    if (request.claim_id !== entry.claim_id || request.method !== 'GET' || url.protocol !== 'https:' || url.host !== 'console.vast.ai' ||
+      url.pathname !== entry.endpoint || url.search !== (entry.request_query ? `?${entry.request_query}` : '') || url.hash || request.http_status !== 200 || request.success !== true || request.json_parsed !== true ||
+      request.shape_ok !== true || request.status !== 'PASS' || request.needs_machine !== null ||
+      JSON.stringify(request.root_fields) !== JSON.stringify(entry.expected_shape.root_fields) || request[entry.expected_shape.boolean_field] !== true ||
+      !vvArray(entry.expected_shape.required_sections).every((section) => vvArray(request.sample_sections || []).includes(section))) throw new Error(message);
+    records.set(entry.claim_id, { id: entry.id, claimId: entry.claim_id, route: entry.route, sourceFile: entry.source_file,
+      span: entry.span, literal: entry.literal, artifactRef, limitations: entry.limitations, endpoint: entry.endpoint,
+      clientPath: entry.source_binding.client_path, clientSha256: entry.source_binding.client_sha256,
+      openapiPath: entry.source_binding.openapi_path, openapiSha256: entry.source_binding.openapi_sha256,
+      sourceRevision: observation.source_revision });
+  }
+  if (expected.size || records.size !== 3) throw new Error(message);
+  CURRENT_LIVE_ENDPOINT_ADJUDICATIONS = records;
+  return records;
+}
+function currentReviewSourceRefs(value, message) {
+  return currentReviewExactArray(value, message).map((item) => {
+    vvExactKeys(item, ['repository', 'revision', 'path', 'locator', 'source_kind'], message);
+    const repository = currentReviewText(item.repository, message);
+    if (repository === 'vast-ai/public-website') {
+      if (item.source_kind !== 'PRODUCT_PUBLICATION_SOURCE' ||
+        !CURRENT_PRODUCT_SOURCES.has(item.path) || CURRENT_PRODUCT_SOURCES.get(item.path) !== item.revision) throw new Error(message);
+      return { repository, revision: item.revision, path: item.path,
+        locator: currentReviewText(item.locator, message), sourceKind: item.source_kind };
+    }
+    if (!new Set(['vast-ai/docs', 'vast-ai/vast-cli', 'vast-ai/self-test']).has(repository)) throw new Error(message);
+    const revision = currentReviewText(item.revision, message);
+    // Navigation bindings use the destination file's content hash instead of a
+    // repository revision.  It is still a fixed, display-only reference.
+    if (!/^(?:[a-f0-9]{40}|sha256:[a-f0-9]{64})$/.test(revision)) throw new Error(message);
+    return { repository, revision, path: vvSafeRepositoryPath(item.path, message),
+      locator: currentReviewText(item.locator, message), sourceKind: vvIdentifier(item.source_kind) };
+  });
+}
+function currentReviewHistory(value, coverageState, message, claimId) {
+  vvExactKeys(value, ['baseline_claim_id', 'baseline_source_text_sha256', 'carry_decision', 'reason'], message);
+  if (!CURRENT_HOST_REVIEW_CARRY.has(value.carry_decision) && !(claimId === CURRENT_PRODUCT_CLAIM_ID &&
+    coverageState === 'UNCHANGED_EXACT' && value.carry_decision === CURRENT_PRODUCT_DECISION)) throw new Error(message);
+  if ([TWO_DEFECT_REPLACEMENT_DECISION, TWO_DEFECT_LITERAL_DECISION].includes(value.carry_decision) &&
+    !currentTwoDefectTransition(message).replacements.has(claimId) && !currentTwoDefectTransition(message).inventory.has(claimId)) throw new Error(message);
+  if (coverageState === 'UNCHANGED_EXACT' && value.baseline_claim_id === null) throw new Error(message);
+  if (coverageState === 'NEW' && (value.carry_decision !== 'NOT_CARRIED_NEW' ||
+    (value.baseline_claim_id === null) !== (value.baseline_source_text_sha256 === null))) throw new Error(message);
+  if (coverageState === 'UNCHANGED_EXACT' && value.carry_decision === 'CARRIED_FORWARD_EXACT_SOURCE' &&
+    value.baseline_claim_id !== claimId) throw new Error(message);
+  if (value.baseline_claim_id !== null) vvIdentifier(value.baseline_claim_id);
+  if (value.baseline_source_text_sha256 !== null) currentReviewHash(value.baseline_source_text_sha256, message);
+  return { baselineClaimId: value.baseline_claim_id, baselineSourceTextSha256: value.baseline_source_text_sha256,
+    carryDecision: value.carry_decision, reason: currentReviewText(value.reason, message) };
+}
+let CURRENT_HOST_REVIEW_FROZEN_CLAIMS;
+function currentReviewFrozenClaims(message) {
+  if (CURRENT_HOST_REVIEW_FROZEN_CLAIMS) return CURRENT_HOST_REVIEW_FROZEN_CLAIMS;
+  const source = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(
+    vvRepositoryFile('verification/host-docs-test-sets.json', message).bytes,
+  ));
+  const claims = new Map();
+  for (const claim of vvArray(source.material_claims)) claims.set(claim.claim_id, claim);
+  CURRENT_HOST_REVIEW_FROZEN_CLAIMS = claims;
+  return claims;
+}
+function currentStaticCheckPassed(evidenceId, message) {
+  const source = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(
+    vvRepositoryFile('verification/evidence/2026-09-07-host-current-vv-attempt-01/current-static-checks.json', message).bytes,
+  ));
+  const check = vvArray(source.checks).find((item) => item?.id === evidenceId);
+  return check?.result === 'PASS' && Array.isArray(check.hrefs) && check.hrefs.length > 0 &&
+    check.hrefs.every((row) => row.result === 'PASS' && typeof row.href === 'string' &&
+      (() => {
+        const sourceFile = vvSafeRepositoryPath(row.source_file, message);
+        const recorded = currentReviewHash(row.source_sha256, message);
+        const actual = vvHash(vvCurrentSourceFile(sourceFile, message).bytes);
+        if (actual === recorded) return true;
+        // The retained navigation check predates only the two signed wording
+        // corrections. It may retain their exact pre-correction source pins,
+        // but never a generic same-word/same-route exception: the transition
+        // registry proves the full source diff and binds both byte snapshots.
+        const transition = currentTwoDefectTransition(message);
+        return [...transition.changedPages.values()].some((page) =>
+          page.sourceFile === sourceFile && page.snapshotSha256 === recorded && page.sourceSha256 === actual);
+      })());
+}
+function currentProductPublicationPass(value, page, message) {
+  // The canonical claim pin covers every field, including exact source/evidence
+  // refs, proof limits and four-field history; registry/capture pins retain the
+  // original assessment, successful excerpts and failed-matcher correction.
+  const canonical = (item) => Array.isArray(item) ? item.map(canonical) : item && typeof item === 'object'
+    ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, canonical(item[key])])) : item;
+  if (value.id !== CURRENT_PRODUCT_CLAIM_ID || page.route !== '/host/hosting-overview' ||
+    page.sourceFile !== 'host/hosting-overview.mdx' ||
+    page.sourceSha256 !== '0893d15921f55e4fae9a0aef5110336877d63d2698fe4c418bb4456fae686c7e' ||
+    vvHash(Buffer.from(JSON.stringify(canonical(value)), 'utf8')) !== CURRENT_PRODUCT_CLAIM_SHA256) return false;
+  for (const [artifact, digest] of CURRENT_PRODUCT_ARTIFACTS) {
+    if (vvHash(vvRepositoryFile(artifact, message).bytes) !== digest) throw new Error(message);
+  }
+  return true;
+}
+function currentReviewClaim(value, page, sourceCache, message) {
+  vvExactKeys(value, ['id', 'text', 'headings', 'spans', 'status', 'required_evidence_types', 'owner_role',
+    'rationale', 'next_action', 'evidence_refs', 'source_refs', 'history', 'classification', 'coverage_state'], message);
+  const coverageState = currentReviewCoverage(value.coverage_state, message);
+  const id = vvIdentifier(value.id);
+  if (coverageState !== page.coverageState) throw new Error(message);
+  const allowedFiles = new Set([page.sourceFile, ...page.dependencies.map((dependency) => dependency.sourceFile)]);
+  const spans = currentReviewExactArray(value.spans, message).map((span) => currentReviewSpan(span, allowedFiles, sourceCache, message));
+  if (!spans.length) throw new Error(message);
+  const sourceText = sourceCache.get(page.sourceFile) || currentReviewSourceText(page.sourceFile, message);
+  sourceCache.set(page.sourceFile, sourceText);
+  const sourceIndexes = new Map([...allowedFiles].map((file) => {
+    const source = sourceCache.get(file) || currentReviewSourceText(file, message);
+    sourceCache.set(file, source);
+    return [file, vvSourceIndex(source)];
+  }));
+  const headings = currentReviewHeadings(value.headings, sourceIndexes, spans, message);
+  const status = currentReviewStatus(value.status, message);
+  const connection = currentHostConnectionAdjudications(message).get(id) || null;
+  const history = currentReviewHistory(value.history, coverageState, message, id);
+  const evidenceRefs = currentReviewRefs(value.evidence_refs, message, id);
+  const sourceRefs = currentReviewSourceRefs(value.source_refs, message);
+  const connectionPass = connection ? currentHostConnectionClaim(value, page, connection, message) : false;
+  const sourceTransition = !connection && coverageState === 'CHANGED' && ['/host/first-24-hours', '/host/vms'].includes(page.route)
+    ? currentTwoDefectTransitionClaim(value, page, message) : null;
+  if ([TWO_DEFECT_REPLACEMENT_DECISION, TWO_DEFECT_LITERAL_DECISION].includes(history.carryDecision) && !sourceTransition) throw new Error(message);
+  const readonlyInput = id === CURRENT_PRODUCT_CLAIM_ID ? { result: new Map(), blockers: new Map() } : currentHostReadonlyAdjudications(message);
+  if (coverageState === 'UNCHANGED_EXACT' && history.carryDecision === 'CARRIED_FORWARD_EXACT_SOURCE' && !readonlyInput.blockers.has(id)) {
+    const frozen = currentReviewFrozenClaims(message).get(id);
+    const frozenEvidenceIds = frozen?.current?.evidence_ids || [];
+    const currentEvidenceIds = evidenceRefs.map((ref) => ref.id).sort();
+    if (!frozen || frozen.current?.status !== status || frozen.scope?.route !== page.route ||
+      frozen.scope?.source_file !== page.sourceFile || frozen.claim?.kind !== value.classification ||
+      frozen.scope?.source_text_sha256 !== history.baselineSourceTextSha256 ||
+      !headings.includes(frozen.scope?.heading) || JSON.stringify([...frozenEvidenceIds].sort()) !== JSON.stringify(currentEvidenceIds) ||
+      JSON.stringify(frozen.scope?.source_spans || []) !== JSON.stringify(spans.filter((span) => span.sourceFile === page.sourceFile).map((span) => ({ start: span.start, end: span.end})))) throw new Error(message);
+  }
+  const staticNavigationPass = value.required_evidence_types.length === 1 && value.required_evidence_types[0] === 'REPOSITORY_STATIC_CHECK' &&
+    ((value.classification === 'NAVIGATION_CONTRACT' && evidenceRefs.some((ref) => ref.id === 'EV-CURRENT-LOCAL-NAVIGATION-01' && ref.role === 'CURRENT_STATIC_RETEST' && ref.artifactRef === 'verification/evidence/2026-09-07-host-current-vv-attempt-01/current-static-checks.json' && currentStaticCheckPassed(ref.id, message))) ||
+      (value.id === 'VOL-C35' && evidenceRefs.some((ref) => ref.id === 'EV-CURRENT-VOL-C35-NAVIGATION-01' && ref.role === 'CURRENT_STATIC_RETEST' && ref.artifactRef === 'verification/evidence/2026-09-07-host-current-vv-attempt-01/current-static-checks.json' && currentStaticCheckPassed(ref.id, message))));
+  const live = ['CUR-a5b27de02fca3c9a', 'CUR-6c8062ab1c766957', 'CUR-2de1188bec6c9f72'].includes(id)
+    ? currentLiveEndpointAdjudications(message).get(id) : null;
+  const liveEndpointPass = Boolean(live && coverageState === 'CHANGED' && status === 'PASS' &&
+    history.carryDecision === 'CURRENT_LIVE_ENDPOINT_ADJUDICATION' && page.route === live.route && page.sourceFile === live.sourceFile &&
+    value.text === live.literal && value.required_evidence_types.length === 2 &&
+    value.required_evidence_types[0] === 'CANONICAL_IMPLEMENTATION_SOURCE' && value.required_evidence_types[1] === 'RUNTIME_OR_UI_OBSERVATION' &&
+    spans.length === 1 && spans[0].start === live.span.start && spans[0].end === live.span.end && spans[0].textSha256 === live.span.text_sha256 &&
+    evidenceRefs.length === 1 && evidenceRefs[0].id === live.id && evidenceRefs[0].role === 'CURRENT_LIVE_ENDPOINT_ADJUDICATION' &&
+    evidenceRefs[0].artifactRef === live.artifactRef && evidenceRefs[0].limit === live.limitations &&
+    sourceRefs.length === 2 && sourceRefs.some((ref) => ref.repository === 'vast-ai/vast-cli' && ref.revision === live.sourceRevision &&
+      ref.path === live.clientPath && ref.sourceKind === 'CANONICAL_API_CLIENT_SOURCE') &&
+    sourceRefs.some((ref) => ref.repository === 'vast-ai/docs' && ref.revision === CURRENT_HOST_REVIEW_REVISION &&
+      ref.path === live.openapiPath && ref.sourceKind === 'OPENAPI_SOURCE'));
+  const readonly = readonlyInput.result.get(id);
+  const readonlyPass = Boolean(readonly && status === 'PASS' && page.route === readonly.route && page.sourceFile === readonly.sourceFile &&
+    page.sourceSha256 === readonly.sourceSha256 && value.text === readonly.literal && JSON.stringify(value.headings) === JSON.stringify(readonly.headings) &&
+    JSON.stringify(value.required_evidence_types) === JSON.stringify(readonly.lanes) && spans.length === 1 && spans[0].start === readonly.span.start &&
+    spans[0].end === readonly.span.end && spans[0].textSha256 === readonly.span.text_sha256 &&
+    history.carryDecision === (readonly.sourceOnly ? 'CURRENT_HOST_READONLY_SOURCE_ADJUDICATION' : 'CURRENT_HOST_READONLY_COMMAND_ADJUDICATION') &&
+    evidenceRefs.length === 1 && evidenceRefs[0].id === readonly.id && evidenceRefs[0].role === 'CURRENT_HOST_READONLY_COMMAND_ADJUDICATION' &&
+    evidenceRefs[0].artifactRef === CURRENT_HOST_READONLY_ADJUDICATION_INPUT && evidenceRefs[0].limit === readonly.limits &&
+    JSON.stringify(sourceRefs) === JSON.stringify(readonly.sourceRefs));
+  const directPostcheck = H100_DIRECT_POSTCHECK_BY_CLAIM.get(id);
+  const directPostinstallPass = Boolean(directPostcheck && status === 'PASS' && page.route === '/host/installing-host-software' &&
+    value.required_evidence_types.length === 1 && value.required_evidence_types[0] === 'RUNTIME_OR_UI_OBSERVATION' &&
+    history.carryDecision === 'CURRENT_H100X4_DIRECT_POSTINSTALL_RUNTIME_ADJUDICATION' && evidenceRefs.length === 2 &&
+    evidenceRefs.some((ref) => ref.id === directPostcheck.registryId && ref.role === 'CURRENT_H100X4_DIRECT_POSTINSTALL_RUNTIME_ADJUDICATION' && ref.artifactRef === H100_DIRECT_POSTINSTALL_ADJUDICATION) &&
+    evidenceRefs.some((ref) => ref.id === directPostcheck.observationId && ref.role === 'RETAINED_H100X4_POSTINSTALL_OBSERVATION' &&
+      ref.artifactRef === H100_DIRECT_POSTCHECK_ARTIFACT) && sourceRefs.length === 0);
+  const rental = H100_RENTAL_BY_CLAIM.has(id) ? currentH100RentalAdjudications(message).get(id) : null;
+  const rentalRuntime = Boolean(rental && coverageState === 'UNCHANGED_EXACT' && page.route === rental.route &&
+    page.sourceFile === rental.sourceFile && page.sourceSha256 === rental.sourceSha256 && value.text === rental.literal &&
+    JSON.stringify(value.headings) === JSON.stringify(rental.headings) && spans.length === 1 &&
+    spans[0].sourceFile === rental.sourceFile && spans[0].start === rental.span.start && spans[0].end === rental.span.end &&
+    spans[0].textSha256 === rental.span.text_sha256 && status === rental.status &&
+    JSON.stringify(value.required_evidence_types) === JSON.stringify(['RUNTIME_OR_UI_OBSERVATION']) &&
+    history.baselineClaimId === id && history.baselineSourceTextSha256 === rental.span.text_sha256 &&
+    history.carryDecision === rental.history && sourceRefs.length === 0 &&
+    JSON.stringify(evidenceRefs) === JSON.stringify(rental.refs) &&
+    vvHash(Buffer.from(JSON.stringify(h100RentalCanonical(value)), 'utf8')) === rental.currentClaimSha256);
+  const rentalTransitionRuntime = Boolean(rental && sourceTransition && sourceTransition.oldClaim === null &&
+    status === rental.status && JSON.stringify(evidenceRefs) === JSON.stringify(rental.refs) && sourceRefs.length === 0 &&
+    history.carryDecision === TWO_DEFECT_LITERAL_DECISION);
+  // This is not a general CHANGED-source PASS path.  The transition helper has
+  // already required the signed registry, full old canonical claim hash, exact
+  // current literal/evidence/status, and the only permitted coverage/history
+  // transformation for one of its 69 inventory occurrences.
+  const transitionLiteralPass = Boolean(sourceTransition && sourceTransition.oldClaim === null &&
+    status === 'PASS' && history.carryDecision === TWO_DEFECT_LITERAL_DECISION);
+  // These four exact first-24-hours occurrences have a separate immutable gate.
+  // The cleanup-linked compound occurrence stays UNVALIDATED, so no status may be
+  // changed or borrowed evidence rebound without changing this reviewer code.
+  if (H100_RENTAL_BY_CLAIM.has(id) && !connection && !(rentalRuntime || rentalTransitionRuntime)) throw new Error(message);
+  const blocker = readonlyInput.blockers.get(id);
+  if (blocker && !connection && (status !== 'BLOCKED' || value.rationale !== blocker.rationale || value.next_action !== blocker.next_action ||
+    !evidenceRefs.some((ref) => ref.id === 'ADA-01' && ref.role === 'CURRENT_PREREQUISITE_REFRESH' && ref.artifactRef === blocker.evidence_ref) ||
+    history.carryDecision !== 'CARRIED_FORWARD_EXACT_SOURCE')) throw new Error(message);
+  const productTagged = id === CURRENT_PRODUCT_CLAIM_ID || value.classification === 'PRODUCT_DESCRIPTION' ||
+    history.carryDecision === CURRENT_PRODUCT_DECISION || value.required_evidence_types.includes('PRODUCT_PUBLICATION_SOURCE') ||
+    sourceRefs.some((ref) => ref.repository === 'vast-ai/public-website' || ref.sourceKind === 'PRODUCT_PUBLICATION_SOURCE') ||
+    evidenceRefs.some((ref) => CURRENT_PRODUCT_ARTIFACTS.has(ref.artifactRef) ||
+      [CURRENT_PRODUCT_DECISION, 'PRODUCT_PUBLICATION_CITATION'].includes(ref.role));
+  const productPublicationPass = productTagged && currentProductPublicationPass(value, page, message);
+  if (productTagged && !productPublicationPass) throw new Error(message);
+  if (connection && history.carryDecision !== CURRENT_CONNECTION_DECISION) throw new Error(message);
+  if (status === 'PASS' && !((coverageState === 'UNCHANGED_EXACT' && history.carryDecision === 'CARRIED_FORWARD_EXACT_SOURCE') ||
+    staticNavigationPass || liveEndpointPass || readonlyPass || directPostinstallPass || rentalRuntime || rentalTransitionRuntime || transitionLiteralPass || productPublicationPass || connectionPass)) throw new Error(message);
+  const passageSpans = spans.flatMap((span) => {
+    const index = sourceIndexes.get(span.sourceFile);
+    const contained = vvGenericMaterialClaims({ sourceIndex: index, sourceFile: span.sourceFile, route: page.route })
+      .filter((block) => block.start >= span.start && block.end <= span.end);
+    return contained.length ? contained.map((block) => ({ sourceFile: span.sourceFile, start: block.start, end: block.end })) : [span];
+  });
+  const sourcePassages = passageSpans.map((span) => {
+    const source = sourceCache.get(span.sourceFile) || currentReviewSourceText(span.sourceFile, message);
+    sourceCache.set(span.sourceFile, source);
+    const raw = currentReviewLines(source).slice(span.start - 1, span.end).join('\n').trim();
+    const text = vvText(raw);
+    const redacted = text !== raw;
+    const sourceIndex = vvSourceIndex(source);
+    const section = vvSectionAtLine(sourceIndex, span.start);
+    const repeats = [];
+    for (let start = 1; start <= sourceIndex.lines.length - (span.end - span.start); start++) {
+      if (vvSectionAtLine(sourceIndex, start) === section &&
+          sourceIndex.lines.slice(start - 1, start + span.end - span.start).join('\n').trim() === raw) repeats.push(start);
+    }
+    return { sourceFile: span.sourceFile, start: span.start, end: span.end, text, redacted, section,
+      occurrence: redacted ? 0 : repeats.indexOf(span.start), occurrences: redacted ? 1 : repeats.length };
+  });
+  return { id, text: currentReviewText(value.text, message), headings, spans, status,
+    requiredEvidenceTypes: currentReviewExactArray(value.required_evidence_types, message).map((item) => vvIdentifier(item)),
+    ownerRole: currentReviewText(value.owner_role, message), rationale: currentReviewText(value.rationale, message),
+    nextAction: currentReviewText(value.next_action, message), evidenceRefs,
+    sourceRefs, history, sourcePassages,
+    sourceLocation: { file: page.sourceFile, spans: spans.map((span) => ({ start: span.start, end: span.end })) },
+    classification: vvIdentifier(value.classification), coverageState,
+    sourceTransition: sourceTransition?.oldClaim ? { oldFailClaim: sourceTransition.oldClaim, replacement: sourceTransition.replacement } : null };
+}
+function currentReviewProcedure(value, page, sourceCache, message) {
+  vvExactKeys(value, ['id', 'title', 'coverage_state', 'status', 'headings', 'spans', 'limits', 'history', 'nodes'], message);
+  const coverageState = currentReviewCoverage(value.coverage_state, message);
+  if (coverageState !== page.coverageState) throw new Error(message);
+  const allowedFiles = new Set([page.sourceFile, ...page.dependencies.map((dependency) => dependency.sourceFile)]);
+  const spans = currentReviewExactArray(value.spans, message).map((span) => currentReviewSpan(span, allowedFiles, sourceCache, message));
+  const sourceText = sourceCache.get(page.sourceFile) || currentReviewSourceText(page.sourceFile, message);
+  sourceCache.set(page.sourceFile, sourceText);
+  const sourceIndexes = new Map([...allowedFiles].map((file) => {
+    const source = sourceCache.get(file) || currentReviewSourceText(file, message);
+    sourceCache.set(file, source);
+    return [file, vvSourceIndex(source)];
+  }));
+  const headings = currentReviewHeadings(value.headings, sourceIndexes, spans, message, { allowIntroduction: true, allowOutsideHeadings: true });
+  vvExactKeys(value.history, ['baseline_test_set_id', 'carry_decision', 'reason'], message);
+  if (!CURRENT_HOST_REVIEW_CARRY.has(value.history.carry_decision) ||
+    [TWO_DEFECT_REPLACEMENT_DECISION, TWO_DEFECT_LITERAL_DECISION].includes(value.history.carry_decision) ||
+    (coverageState === 'NEW') !== (value.history.baseline_test_set_id === null)) throw new Error(message);
+  if (value.history.baseline_test_set_id !== null) vvIdentifier(value.history.baseline_test_set_id);
+  const nodes = currentReviewExactArray(value.nodes, message).map((node) => {
+    try {
+    vvExactKeys(node, ['kind', 'id', 'parent_id', 'required', 'source_file', 'headings', 'spans', 'status',
+      'coverage_state', 'limits', 'next_action', 'history'], message);
+    if (!CURRENT_HOST_REVIEW_NODE_KINDS.has(node.kind) || typeof node.required !== 'boolean') throw new Error(message);
+    const nodeCoverage = currentReviewCoverage(node.coverage_state, message);
+    const nodeSpans = currentReviewExactArray(node.spans, message).map((span) => currentReviewSpan(span, allowedFiles, sourceCache, message));
+    if (!nodeSpans.length && !(nodeCoverage === 'CHANGED' && node.status === 'STALE' && node.history && node.history.baseline_target)) throw new Error(message);
+    vvExactKeys(node.history, ['baseline_level', 'baseline_target', 'baseline_status', 'carry_decision'], message);
+    if (!CURRENT_HOST_REVIEW_CARRY.has(node.history.carry_decision) ||
+      [TWO_DEFECT_REPLACEMENT_DECISION, TWO_DEFECT_LITERAL_DECISION].includes(node.history.carry_decision)) throw new Error(message);
+    const nodeSourceFile = currentReviewPath(node.source_file, message);
+    if (!allowedFiles.has(nodeSourceFile)) throw new Error(message);
+    return { kind: node.kind, id: vvIdentifier(node.id), parentId: node.parent_id === null ? null : vvIdentifier(node.parent_id),
+      required: node.required, sourceFile: nodeSourceFile, headings: currentReviewExactArray(node.headings, message).map((item) => currentReviewText(item, message)),
+      spans: nodeSpans, status: currentReviewStatus(node.status, message), coverageState: nodeCoverage,
+      limits: currentReviewExactArray(node.limits, message).map((item) => currentReviewText(item, message)),
+      nextAction: currentReviewText(node.next_action, message), history: node.history };
+    } catch (error) {
+      if (process.env.VAST_REVIEW_DEBUG === '1') console.error(`Current review node rejected: ${typeof node?.id === 'string' ? node.id : 'unknown'} (${error.message})`);
+      throw error;
+    }
+  });
+  return { id: vvIdentifier(value.id), title: currentReviewText(value.title, message), coverageState,
+    status: currentReviewStatus(value.status, message), headings, spans,
+    limits: currentReviewExactArray(value.limits, message).map((item) => currentReviewText(item, message)),
+    history: { baselineTestSetId: value.history.baseline_test_set_id, carryDecision: value.history.carry_decision,
+      reason: currentReviewText(value.history.reason, message) }, nodes };
+}
+function loadCurrentHostDocsReview() {
+  try {
+    const packageBytes = vvRepositoryFile(CURRENT_HOST_REVIEW_FILE, 'invalid current Host review package').bytes;
+    if (!packageBytes.length || packageBytes.length > VV_MAX_HISTORICAL_SOURCE_BYTES || packageBytes.includes(0)) throw new Error('invalid current Host review package');
+    const data = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(packageBytes));
+    vvExactKeys(data, ['schema_version', 'record_type', 'generated_at', 'source', 'history', 'pages', 'support_layers', 'counts', 'corrections'], 'invalid current Host review package');
+    if (data.schema_version !== '1.0' || data.record_type !== 'HOST_DOCS_CURRENT_REVIEW' || !/^\d{4}-\d\d-\d\dT/.test(data.generated_at)) throw new Error('invalid current Host review package');
+    vvExactKeys(data.source, ['repository', 'revision', 'tree', 'primary_route_count', 'cli_support_layer_count', 'sdk_support_layer_count', 'source_manifest'], 'invalid current Host review source');
+    if (data.source.repository !== 'vast-ai/docs' || data.source.revision !== CURRENT_HOST_REVIEW_REVISION ||
+      !/^[a-f0-9]{40}$/.test(data.source.tree) || data.source.primary_route_count !== 44 ||
+      data.source.cli_support_layer_count !== 18 || data.source.sdk_support_layer_count !== 15) throw new Error('invalid current Host review source');
+    const expectedTree = execFileSync('git', ['-C', VV_REPOSITORY_ROOT, 'rev-parse', `${CURRENT_HOST_REVIEW_REVISION}^{tree}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    if (data.source.tree !== expectedTree) throw new Error('stale current Host review source tree');
+    vvExactKeys(data.history, ['source_revision', 'packages'], 'invalid current Host review history');
+    if (data.history.source_revision !== VV_REVIEWED_SOURCE_REVISION) throw new Error('invalid current Host review history');
+    const historicalPackages = currentReviewExactArray(data.history.packages, 'invalid current Host review history').map((item) => {
+      vvExactKeys(item, ['path', 'sha256'], 'invalid current Host review history');
+      const file = vvSafeRepositoryPath(item.path, 'invalid current Host review history');
+      if (!CURRENT_HOST_REVIEW_HISTORY_FILES.has(file) || vvHash(vvRepositoryFile(file, 'invalid current Host review history').bytes) !== currentReviewHash(item.sha256, 'invalid current Host review history')) throw new Error('stale current Host review history');
+      return file;
+    });
+    if (historicalPackages.length !== CURRENT_HOST_REVIEW_HISTORY_FILES.size || new Set(historicalPackages).size !== historicalPackages.length) throw new Error('invalid current Host review history');
+    const sourceCache = new Map();
+    const manifest = currentReviewExactArray(data.source.source_manifest, 'invalid current Host review manifest').map((item) => {
+      vvExactKeys(item, ['kind', 'route', 'path', 'sha256'], 'invalid current Host review manifest');
+      if (!CURRENT_HOST_REVIEW_SOURCE_KINDS.has(item.kind)) throw new Error('invalid current Host review manifest');
+      const route = vvCanonicalRoute(item.route);
+      const file = currentReviewPath(item.path, 'invalid current Host review manifest');
+      if (file === 'snippets/notifications/channels.mdx' && item.kind !== 'RENDERED_DEPENDENCY') {
+        throw new Error('invalid current Host review manifest');
+      }
+      const sha256 = currentReviewHash(item.sha256, 'invalid current Host review manifest');
+      const bytes = vvCurrentSourceFile(file, 'invalid current Host review manifest').bytes;
+      if (vvHash(bytes) !== sha256) throw new Error('stale current Host review manifest');
+      sourceCache.set(file, new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+      return { kind: item.kind, route, file, sha256 };
+    });
+    const manifestBySource = new Map();
+    for (const item of manifest) {
+      const key = `${item.route}\0${item.file}`;
+      const previous = manifestBySource.get(key);
+      if (previous && (previous.kind !== item.kind || previous.sha256 !== item.sha256)) throw new Error('conflicting current Host review manifest entry');
+      manifestBySource.set(key, item);
+    }
+    const pages = currentReviewExactArray(data.pages, 'invalid current Host review pages').map((row) => {
+      vvExactKeys(row, ['route', 'title', 'source_file', 'source_sha256', 'dependencies', 'coverage_state', 'claims', 'procedures'], 'invalid current Host review page');
+      const route = vvCanonicalRoute(row.route);
+      const sourceFile = currentReviewPath(row.source_file, 'invalid current Host review page');
+      if (!sourceFile.startsWith('host/') || vvHash(vvCurrentSourceFile(sourceFile, 'invalid current Host review page').bytes) !== currentReviewHash(row.source_sha256, 'invalid current Host review page')) throw new Error('stale current Host review page');
+      const dependencies = currentReviewExactArray(row.dependencies, 'invalid current Host review dependency').map((dependency) => {
+        vvExactKeys(dependency, ['component', 'source_file', 'source_sha256', 'import_line', 'insertion_line'], 'invalid current Host review dependency');
+        const dependencyFile = currentReviewPath(dependency.source_file, 'invalid current Host review dependency');
+        if (!Number.isInteger(dependency.import_line) || !Number.isInteger(dependency.insertion_line) || dependency.import_line < 1 || dependency.insertion_line < 1 ||
+          vvHash(vvCurrentSourceFile(dependencyFile, 'invalid current Host review dependency').bytes) !== currentReviewHash(dependency.source_sha256, 'invalid current Host review dependency')) throw new Error('stale current Host review dependency');
+        return { component: currentReviewText(dependency.component, 'invalid current Host review dependency'), sourceFile: dependencyFile, sourceSha256: dependency.source_sha256,
+          importLine: dependency.import_line, insertionLine: dependency.insertion_line };
+      });
+      const page = { route, title: currentReviewText(row.title, 'invalid current Host review page'), sourceFile,
+        sourceSha256: row.source_sha256, dependencies, coverageState: currentReviewCoverage(row.coverage_state, 'invalid current Host review page') };
+      page.claims = currentReviewExactArray(row.claims, 'invalid current Host review claim').map((claim) => {
+        try {
+          return currentReviewClaim(claim, page, sourceCache, 'invalid current Host review claim');
+        } catch (error) {
+          if (process.env.VAST_REVIEW_DEBUG === '1') console.error(`Current review claim rejected: ${typeof claim?.id === 'string' ? claim.id : 'unknown'} (${error.message})`);
+          throw error;
+        }
+      });
+      page.procedures = currentReviewExactArray(row.procedures, 'invalid current Host review procedure').map((procedure) => {
+        try {
+          return currentReviewProcedure(procedure, page, sourceCache, 'invalid current Host review procedure');
+        } catch (error) {
+          if (process.env.VAST_REVIEW_DEBUG === '1') console.error(`Current review procedure rejected: ${typeof procedure?.id === 'string' ? procedure.id : 'unknown'} (${error.message})`);
+          throw error;
+        }
+      });
+      return page;
+    });
+    const pageRoutes = new Set(pages.map((page) => page.route));
+    if (pages.length !== 44 || pageRoutes.size !== pages.length || manifest.filter((item) => item.kind === 'PRIMARY').length !== 44 ||
+      pages.some((page) => !manifest.some((item) => item.kind === 'PRIMARY' && item.route === page.route && item.file === page.sourceFile && item.sha256 === page.sourceSha256)) ||
+      pages.some((page) => page.dependencies.some((dependency) => !manifest.some((item) => item.kind === 'RENDERED_DEPENDENCY' && item.route === page.route && item.file === dependency.sourceFile && item.sha256 === dependency.sourceSha256)))) throw new Error('invalid current Host review page inventory');
+    const navigation = currentHostNavigationInventory();
+    if (navigation.length !== 44 || navigation.some((item) => !pageRoutes.has(item.route))) throw new Error('stale current Host review navigation');
+    const supportLayers = currentReviewExactArray(data.support_layers, 'invalid current Host review support').map((row) => {
+      vvExactKeys(row, ['support_id', 'layer', 'route', 'source_file', 'source_sha256', 'fragment_file', 'fragment_sha256', 'central_reference_file', 'central_reference_route', 'central_reference_sha256', 'classification', 'workflow', 'status', 'coverage_state', 'evidence_refs', 'claim_limit'], 'invalid current Host review support');
+      if (!['CLI', 'SDK'].includes(row.layer) || row.classification !== 'CENTRAL_REFERENCE_SUPPORT_LAYER' || row.workflow !== false || !['UNCHANGED_EXACT', 'CHANGED'].includes(row.coverage_state)) throw new Error('invalid current Host review support');
+      const files = [['source_file', 'source_sha256'], ['fragment_file', 'fragment_sha256'], ['central_reference_file', 'central_reference_sha256']];
+      for (const [fileKey, hashKey] of files) if (vvHash(vvCurrentSourceFile(currentReviewPath(row[fileKey], 'invalid current Host review support'), 'invalid current Host review support').bytes) !== currentReviewHash(row[hashKey], 'invalid current Host review support')) throw new Error('stale current Host review support');
+      const evidenceRefs = currentReviewRefs(row.evidence_refs, 'invalid current Host review support');
+      if (!evidenceRefs.length || evidenceRefs.some((item) => !['CURRENT_STATIC_SUPPORT_STRUCTURE', 'HISTORICAL_CARRY_FORWARD_EXACT_SOURCE'].includes(item.role) || !/structure|wrapper|import|fragment|central-reference/i.test(item.limit))) throw new Error('invalid current Host review support');
+      const status = currentReviewStatus(row.status, 'invalid current Host review support');
+      if (status === 'PASS' && !evidenceRefs.some((item) => item.role === 'CURRENT_STATIC_SUPPORT_STRUCTURE')) throw new Error('invalid current Host review support');
+      if (!/^\/(?:cli\/reference|sdk\/python\/reference)\/[A-Za-z0-9._/-]+$/.test(row.central_reference_route)) throw new Error('invalid current Host review support');
+      return { id: vvIdentifier(row.support_id), layer: row.layer, route: vvCanonicalRoute(row.route), sourceFile: row.source_file,
+        sourceSha256: row.source_sha256, fragmentFile: row.fragment_file, fragmentSha256: row.fragment_sha256,
+        centralReferenceFile: row.central_reference_file, centralReferenceSha256: row.central_reference_sha256, centralReferenceRoute: currentReviewText(row.central_reference_route, 'invalid current Host review support'),
+        status, coverageState: row.coverage_state, evidenceRefs, claimLimit: currentReviewText(row.claim_limit, 'invalid current Host review support') };
+    });
+    if (supportLayers.length !== 33 || new Set(supportLayers.map((row) => row.id)).size !== supportLayers.length) throw new Error('invalid current Host review support inventory');
+    if (supportLayers.some((row) => !manifest.some((item) => item.kind === 'SUPPORT_WRAPPER' && item.route === row.route && item.file === row.sourceFile) ||
+      !manifest.some((item) => item.kind === 'SUPPORT_FRAGMENT' && item.route === row.route && item.file === row.fragmentFile) ||
+      !manifest.some((item) => item.kind === 'CENTRAL_REFERENCE' && item.route === row.route && item.file === row.centralReferenceFile))) throw new Error('invalid current Host review support manifest');
+    vvExactKeys(data.counts, ['primary_pages', 'cli_support_layers', 'sdk_support_layers', 'total_host_routes', 'total_reviewed_layers', 'claims', 'procedures', 'procedure_nodes', 'support_layers', 'claim_statuses', 'page_coverage_states'], 'invalid current Host review counts');
+    const allClaims = pages.flatMap((page) => page.claims);
+    const allProcedures = pages.flatMap((page) => page.procedures);
+    const allNodes = allProcedures.flatMap((procedure) => procedure.nodes);
+    if (new Set(allClaims.map((claim) => claim.id)).size !== allClaims.length ||
+      new Set(allProcedures.map((procedure) => procedure.id)).size !== allProcedures.length ||
+      new Set(allNodes.map((node) => node.id)).size !== allNodes.length ||
+      allNodes.some((node) => node.parentId !== null && !allNodes.some((candidate) => candidate.id === node.parentId))) throw new Error('invalid current Host review identifiers');
+    const twoDefectPages = pages.filter((page) => ['/host/first-24-hours', '/host/vms'].includes(page.route) && page.coverageState === 'CHANGED');
+    if (twoDefectPages.length) {
+      if (twoDefectPages.length !== 2) throw new Error('invalid two-defect transition page set');
+      for (const page of twoDefectPages) currentTwoDefectTransitionPage(page, 'invalid two-defect transition page inventory');
+    }
+    const exactCount = (key, value) => { if (data.counts[key] !== value) throw new Error('invalid current Host review counts'); };
+    exactCount('primary_pages', pages.length); exactCount('cli_support_layers', supportLayers.filter((row) => row.layer === 'CLI').length); exactCount('sdk_support_layers', supportLayers.filter((row) => row.layer === 'SDK').length); exactCount('total_host_routes', pages.length); exactCount('total_reviewed_layers', pages.length + supportLayers.length); exactCount('claims', allClaims.length); exactCount('procedures', allProcedures.length); exactCount('procedure_nodes', allNodes.length); exactCount('support_layers', supportLayers.length);
+    for (const [field, records, key] of [['claim_statuses', allClaims, 'status'], ['page_coverage_states', pages, 'coverageState']]) {
+      const counts = vvObject(data.counts[field]);
+      const actual = {};
+      for (const record of records) actual[record[key]] = (actual[record[key]] || 0) + 1;
+      const normalized = Object.fromEntries(Object.entries(counts).sort(([left], [right]) => left.localeCompare(right)));
+      const expected = Object.fromEntries(Object.entries(actual).sort(([left], [right]) => left.localeCompare(right)));
+      if (JSON.stringify(normalized) !== JSON.stringify(expected)) throw new Error('invalid current Host review counts');
+    }
+    const corrections = currentReviewExactArray(data.corrections, 'invalid current Host review corrections').map((row) => {
+      vvExactKeys(row, ['id', 'scope', 'history', 'current', 'reason'], 'invalid current Host review corrections');
+      return { id: vvIdentifier(row.id), scope: currentReviewText(row.scope, 'invalid current Host review corrections'), history: currentReviewText(row.history, 'invalid current Host review corrections'), current: currentReviewText(row.current, 'invalid current Host review corrections'), reason: currentReviewText(row.reason, 'invalid current Host review corrections') };
+    });
+    const artifactHashes = new Map();
+    for (const ref of [...pages.flatMap((page) => page.claims.flatMap((claim) => claim.evidenceRefs)), ...supportLayers.flatMap((layer) => layer.evidenceRefs)]) {
+      const previous = artifactHashes.get(ref.artifactRef);
+      if (previous && previous !== ref.artifactSha256) throw new Error('conflicting current Host review artifact');
+      artifactHashes.set(ref.artifactRef, ref.artifactSha256);
+    }
+    return { available: true, packageSha256: vvHash(packageBytes), navigationRoutes: navigation.map((entry) => entry.route).sort(),
+      pages, supportLayers, corrections, counts: data.counts, artifactHashes };
+  } catch (error) {
+    if (process.env.VAST_REVIEW_DEBUG === '1') console.error(`Current review package unavailable: ${error.message}`);
+    return { available: false, unavailableReason: vvText(error.message) };
+  }
+}
+const CURRENT_HOST_DOCS_REVIEW = loadCurrentHostDocsReview();
+function currentInstallEvidenceIntake() {
+  try {
+    const model = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(
+      vvRepositoryFile(CURRENT_HOST_REVIEW_FILE, 'invalid current Host review package').bytes,
+    ));
+    return { available: true, ...loadInstallEvidenceIntake({
+      read: (ref) => vvRepositoryFile(ref, 'invalid installation evidence intake').bytes,
+      model,
+    }) };
+  } catch (error) {
+    return { available: false, unavailableReason: vvText(error.message) };
+  }
+}
+function currentReviewStillFresh(record) {
+  try {
+    if (vvHash(vvRepositoryFile(CURRENT_HOST_REVIEW_FILE, 'invalid current Host review package').bytes) !== record.packageSha256) {
+      return false;
+    }
+    const routes = currentHostNavigationInventory().map((entry) => entry.route).sort();
+    if (JSON.stringify(routes) !== JSON.stringify(record.navigationRoutes)) return false;
+    if (![...(record.artifactHashes || new Map()).entries()].every(([ref, hash]) =>
+      vvHash(vvRepositoryFile(ref, 'invalid current Host review artifact').bytes) === hash)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+function currentReviewPageStillFresh(page) {
+  try {
+    const sources = [[page.sourceFile, page.sourceSha256], ...page.dependencies.map((item) => [item.sourceFile, item.sourceSha256])];
+    return sources.every(([sourceFile, sourceSha256]) => vvHash(vvCurrentSourceFile(sourceFile,
+      'invalid current Host review source').bytes) === sourceSha256);
+  } catch {
+    return false;
+  }
+}
+function currentReviewSupportStillFresh(support) {
+  try {
+    return [[support.sourceFile, support.sourceSha256], [support.fragmentFile, support.fragmentSha256],
+      [support.centralReferenceFile, support.centralReferenceSha256]].every(([sourceFile, sourceSha256]) =>
+      vvHash(vvCurrentSourceFile(sourceFile, 'invalid current Host review support').bytes) === sourceSha256);
+  } catch {
+    return false;
+  }
+}
+function currentReviewForPath(pathname) {
+  if (!CURRENT_HOST_DOCS_REVIEW.available) return { available: false, unavailableReason: CURRENT_HOST_DOCS_REVIEW.unavailableReason || 'current-review-package-unavailable' };
+  if (!currentReviewStillFresh(CURRENT_HOST_DOCS_REVIEW)) return { available: false,
+    unavailableReason: 'Current review package or Host navigation changed; regenerate the package and reload the review server.' };
+  const page = CURRENT_HOST_DOCS_REVIEW.pages.find((row) => row.route === pathname);
+  if (!page) {
+    const support = CURRENT_HOST_DOCS_REVIEW.supportLayers.find((row) => row.route === pathname);
+    if (!support) return { available: false, unavailableReason: 'current-page-not-in-current-review-package' };
+    return currentReviewSupportStillFresh(support) ? { available: true, page: null, support, corrections: [] } : { available: false,
+      unavailableReason: 'Current support source changed; regenerate the package and reload the review server.' };
+  }
+  if (!currentReviewPageStillFresh(page)) return { available: false,
+    unavailableReason: 'Current page source changed; regenerate the package and reload the review server.' };
+  const installationEvidenceIntake = currentInstallEvidenceIntake();
+  const citationDefect = (claim) => claim.status === 'FAIL' &&
+    claim.requiredEvidenceTypes.includes('AUTHORITATIVE_DOCUMENTATION_CITATION');
+  return { available: true, page, corrections: CURRENT_HOST_DOCS_REVIEW.corrections.filter((row) => row.scope === page.route || row.scope === 'ALL'),
+    installationEvidenceIntake, citationDefects: {
+      total: CURRENT_HOST_DOCS_REVIEW.pages.flatMap((row) => row.claims).filter(citationDefect).length,
+      page: page.claims.filter(citationDefect).length,
+    } };
 }
 function currentSourceFreshness(canonical, supportLayers) {
   const currentNavigation = currentHostNavigationInventory();
@@ -4295,6 +5461,12 @@ function verificationForPath(pathname) {
       evidenceLaneHints: vvMergeClassifications(VV_EVIDENCE_LANES,
         ...testSets.map((set) => set.evidenceLaneHints)),
       materialClaims, retiredMaterialClaims,
+      citationDefects: {
+        total: VERIFICATION_EVIDENCE.materialClaims.filter((claim) => claim.current.status === 'FAIL' &&
+          claim.requiredEvidenceTypes.includes('AUTHORITATIVE_DOCUMENTATION_CITATION')).length,
+        page: materialClaims.filter((claim) => claim.current.status === 'FAIL' &&
+          claim.requiredEvidenceTypes.includes('AUTHORITATIVE_DOCUMENTATION_CITATION')).length,
+      },
       retiredCommandWithdrawals: withdrawnForApi(
         VERIFICATION_EVIDENCE.retiredWithdrawnByPage.get(pageRoute) || []),
       testSets, totals: vvTotals(testSets, pageHistory) };
@@ -4317,6 +5489,7 @@ function issueDetails(key) {
 function reviewContextForPath(rawPath) {
   const pathname = normalizeReviewPath(rawPath);
   const verification = verificationForPath(pathname);
+  const currentReview = currentReviewForPath(pathname);
   const matched = PAGE_REVIEW_CONTEXTS.filter((entry) =>
     (entry.paths || []).includes(pathname) || (entry.prefixes || []).some((prefix) => pathname.startsWith(prefix))
   );
@@ -4349,6 +5522,7 @@ function reviewContextForPath(rawPath) {
     issues: issueKeys.map(issueDetails),
     blockers,
     verification,
+    currentReview,
   };
 }
 
@@ -4779,6 +5953,15 @@ const OVERLAY_JS = String.raw`
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
+  var H100_DIRECT_POSTCHECK_ARTIFACT = 'verification/evidence/2026-09-09-h100x4-direct-install-attempt-02/postcheck-02.json';
+  var H100_DIRECT_POSTINSTALL_ADJUDICATION = 'verification/current-h100x4-direct-postinstall-adjudications.json';
+  var TWO_DEFECT_TRANSITION_ARTIFACT = 'verification/current-two-defect-transition.json';
+  var H100_DIRECT_POSTCHECK_BY_CLAIM = new Map([
+    ['MCL-ead93c85c2ff4168', { label: 'View GPU visibility result', observationId: 'POST-03', predicate: 'GPU_INVENTORY_4_H100' }],
+    ['MCL-82fa8860fe3ef124', { label: 'View service-status result', observationId: 'POST-01', predicate: 'FOUR_SERVICES_ACTIVE' }],
+    ['MCL-2f9f572d80e1e8f9', { label: 'View Docker filesystem result', observationId: 'POST-05', predicate: 'DOCKER_XFS_PROJECT_QUOTA' }],
+    ['MCL-aa383ba37f55f306', { label: 'View project-quota result', observationId: 'POST-07', predicate: 'PROJECT_QUOTA_ON' }],
+  ]);
   function pageTitle() {
     var t = document.title || '';
     return t.replace(/\s*[-|–—]\s*Vast.*$/i, '').trim() || t;
@@ -5302,6 +6485,9 @@ const OVERLAY_JS = String.raw`
     '.vv-reading-location{font-size:12px;color:#5c677d}.vv-reading-card blockquote{margin:8px 0 10px;padding:0 0 0 9px;border-left:3px solid #a4b0d2;color:#172033;font-weight:600;font-size:14px;line-height:1.5}' +
     '.vv-reading-status{display:inline-block;background:#fff3cb;color:#694b00;border-radius:5px;padding:2px 7px;font-size:12px;font-weight:700}' +
     '.vv-reading-status[data-status="PASS"]{background:#e4f4eb;color:#175637}.vv-reading-status[data-status="FAIL"]{background:#ffe9e5;color:#982d20}' +
+    '.vv-citation-defect{margin:10px 0;padding:8px 9px;border-left:4px solid #9b2c63;background:#fff0f7;color:#65203f;font-size:12px;line-height:1.45}' +
+    '.vv-citation-defect b{color:#7d1749}' +
+    '.vv-source-transition{margin:10px 0;padding:10px;border-left:4px solid #356b9b;background:#eef6fc;color:#1d405f;font-size:12px;line-height:1.45}.vv-source-transition blockquote{margin:8px 0;padding:8px 10px;background:#fff;border-left:3px solid #79a6cb;white-space:pre-wrap}' +
     '.vv-reading-actions{display:flex;align-items:center;gap:12px;margin:10px 0}.vv-reading-actions button{background:#3548c5;color:#fff;border:0;border-radius:6px;padding:7px 10px;cursor:pointer;font-size:12px;font-weight:700}' +
     '.vv-reading a{color:#3045bd;text-decoration:underline;text-underline-offset:2px}.vv-reading button:focus-visible,.vv-reading a:focus-visible,.vv-reading select:focus-visible,.vv-reading summary:focus-visible{outline:2px solid #3045bd;outline-offset:3px}' +
     '.vv-reading-audit,.vv-reading-links{font-size:12px;margin-top:10px}.vv-reading-audit>summary,.vv-reading-links>summary{cursor:pointer;color:#4a5872;font-weight:600}' +
@@ -5544,6 +6730,17 @@ const OVERLAY_JS = String.raw`
       FAIL: 'Correction needed', BLOCKED: 'Waiting on a prerequisite',
       STALE: 'Needs a fresh check', NOT_APPLICABLE: 'Not applicable' }[status] || 'Needs evidence';
   }
+  function citationDefect(claim) {
+    return Boolean(claim && claim.current && claim.current.status === 'FAIL' &&
+      (claim.requiredEvidenceTypes || []).includes('AUTHORITATIVE_DOCUMENTATION_CITATION'));
+  }
+  function claimStatusLabel(claim) {
+    return citationDefect(claim) ? 'Missing authoritative citation' : readableStatus(claim.current.status);
+  }
+  function currentCitationDefect(claim) {
+    return Boolean(claim && claim.status === 'FAIL' &&
+      (claim.requiredEvidenceTypes || []).includes('AUTHORITATIVE_DOCUMENTATION_CITATION'));
+  }
   function claimWording(value) {
     // Remove inventory/Markdown notation, retaining the words the customer sees.
     var text = String(value || '');
@@ -5580,6 +6777,7 @@ const OVERLAY_JS = String.raw`
       return '\uE000INLINE' + (inline.length - 1) + '\uE001';
     });
     text = text.replace(/^[ \t]*#{1,6} .*$/gm, '')
+      .replace(/^[ \t]*(?:>[ \t]*)+/gm, '')
       .replace(/^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/gm, '')
       .replace(/^\s*\|(.+)\|\s*$/gm, '$1')
       .replace(/^[ \t]*(?:[-*+] |\d+[.)] )/gm, '')
@@ -5641,8 +6839,9 @@ const OVERLAY_JS = String.raw`
     if (section !== 'Introduction' && !heading) return { reason: 'The section could not be identified uniquely.' };
     var headings = Array.from(root.querySelectorAll('h1,h2,h3,h4,h5,h6'));
     var endHeading = headings.find(function (candidate) {
-      return heading ? (heading.compareDocumentPosition(candidate) & Node.DOCUMENT_POSITION_FOLLOWING) &&
-        Number(candidate.tagName.slice(1)) <= Number(heading.tagName.slice(1)) : candidate.tagName !== 'H1';
+      // A source passage belongs to its nearest heading, not all descendant
+      // subsections. Those have separately projected passages and occurrences.
+      return heading ? (heading.compareDocumentPosition(candidate) & Node.DOCUMENT_POSITION_FOLLOWING) : candidate.tagName !== 'H1';
     });
     var codeClaim = wording.code;
     var chars = '', offsets = [];
@@ -5694,6 +6893,9 @@ const OVERLAY_JS = String.raw`
     return { ranges: [hits[passage.occurrence]], heading: heading };
   }
   var claimSectionFilter = null;
+  var citationDefectFilter = 'ALL';
+  var currentClaimSectionFilter = null;
+  var currentCitationDefectFilter = 'ALL';
   var focusedReviewClaim = null;
   function clearClaimFocus() {
     focusedReviewClaim = null;
@@ -5717,7 +6919,7 @@ const OVERLAY_JS = String.raw`
   }
   function showReviewWording(row, button) {
     var match = claimTextMatch(row);
-    var notice = $('vv-location-notice');
+    var notice = $('' + (String(row && row.id || '').indexOf('current-') === 0 ? 'current-location-notice' : 'vv-location-notice'));
     clearClaimFocus();
     if (!match.range) {
       if (notice) notice.textContent = match.reason;
@@ -6041,6 +7243,18 @@ const OVERLAY_JS = String.raw`
       if (!actions.length && claim.nextAction) actions.push(esc(claim.nextAction.replace(/MCL-[a-f0-9]+/g, 'this wording')));
       return actions.length ? '<p><b>Next:</b> ' + Array.from(new Set(actions)).join('<br>') + '</p>' : '';
     }
+    function citationDefectHtml(claim) {
+      if (!citationDefect(claim)) return '';
+      var citationRequirement = (claim.authority.unresolvedEvidenceRequirements || []).find(function (item) {
+        return item.evidenceType === 'AUTHORITATIVE_DOCUMENTATION_CITATION';
+      });
+      var owner = citationRequirement?.responsibleRole || claim.authority.unresolvedOwnerRole || 'Responsible source owner';
+      return '<div class="vv-citation-defect"><b>Missing authoritative citation</b><br>' +
+        '<b>Why:</b> ' + esc(claim.citation.assessment || 'No authoritative citation is present in this exact source occurrence.') +
+        '<br><b>Responsible role:</b> ' + esc(owner) +
+        '<br><b>Next:</b> Obtain the authoritative source for this wording from the recorded owner, add its citation, and retain a source/link retest.' +
+        '<br><span>This is a documentation/source defect, not a failed runtime check.</span></div>';
+    }
     function readingProof(claim) {
       var current = claim.current, sources = claim.authority.sourceRefs || [];
       var links = sources.map(function (source) {
@@ -6107,11 +7321,13 @@ const OVERLAY_JS = String.raw`
       if (!claims || !claims.length) return '';
       var sections = Array.from(new Set(claims.flatMap(function (claim) { return claim.checkedContent.sections; })));
       var selected = claimSectionFilter === null ? sectionFromHash(claims) : claimSectionFilter;
+      var citationDefects = claims.filter(citationDefect);
       var counts = vv.materialDisposition && vv.materialDisposition.counts || {};
       var summary = Object.keys(counts).filter(function (status) { return counts[status]; }).map(function (status) {
         return counts[status] + ' ' + ({ PASS: 'with support', UNVALIDATED: 'awaiting evidence',
           FAIL: 'needing correction', BLOCKED: 'waiting on a prerequisite' }[status] || readableStatus(status).toLowerCase());
-      }).join(' · ');
+      }).join(' · ') + (citationDefects.length ? ' · ' + citationDefects.length + ' missing authoritative citation' +
+        (citationDefects.length === 1 ? '' : 's') : '');
       var result = '<section class="vv-reading" aria-label="Wording and proof"><h3>Wording &amp; proof</h3>' +
         '<p>Read the statement, then check its support. <b>Show on page</b> highlights the customer-visible text.</p>' +
         '<p class="vv-reading-counts">Whole page: ' + claims.length + ' statements · ' + esc(summary) + '</p>' +
@@ -6121,7 +7337,12 @@ const OVERLAY_JS = String.raw`
           var count = claims.filter(function (claim) { return claim.checkedContent.sections.indexOf(section) !== -1; }).length;
           return '<option value="' + esc(section) + '"' + (selected === section ? ' selected' : '') + '>' +
             esc(section === 'Introduction' ? 'Page introduction' : section) + ' (' + count + ')</option>';
-        }).join('') + '</select><p id="vv-location-notice" role="status" aria-live="polite"></p><div id="vv-reading-cards">';
+        }).join('') + '</select>' +
+        '<label class="vv-section-label" for="vv-citation-filter">Citation review</label>' +
+        '<select id="vv-citation-filter"><option value="ALL"' + (citationDefectFilter === 'ALL' ? ' selected' : '') +
+          '>All wording (' + claims.length + ')</option><option value="CITATION"' + (citationDefectFilter === 'CITATION' ? ' selected' : '') +
+          '>Missing authoritative citation (' + citationDefects.length + ')</option></select>' +
+        '<p id="vv-location-notice" role="status" aria-live="polite"></p><div id="vv-reading-cards">';
       claims.forEach(function (claim) {
         var section = claim.checkedContent.sections[0] || 'Introduction';
         var href = checkedContentLink(claim.checkedContent, section).href;
@@ -6157,21 +7378,23 @@ const OVERLAY_JS = String.raw`
             'Locating the page text is not proof that the option spelling works. ' +
             '<b>Maintainer follow-up:</b> mark the option as inline code and regenerate its source binding.</p>'
           : '';
+        var citationMissing = citationDefect(claim);
         result += '<article class="vv-reading-card" data-review-claim="' + esc(claim.id) + '" data-review-section="' + esc(section) + '"' +
           ' data-review-sections="' + esc(JSON.stringify(claim.checkedContent.sections)) + '"' +
-          (selected && claim.checkedContent.sections.indexOf(selected) === -1 ? ' hidden' : '') + '>' +
+          ' data-citation-defect="' + (citationMissing ? 'true' : 'false') + '"' +
+          ((selected && claim.checkedContent.sections.indexOf(selected) === -1) || (citationDefectFilter === 'CITATION' && !citationMissing) ? ' hidden' : '') + '>' +
           '<div class="vv-reading-location">' + esc(claim.checkedContent.sections.map(function (item) {
             return item === 'Introduction' ? 'Page introduction' : item;
           }).join(' / ')) + '</div>' +
           (quoteDiffers ? '<p class="vv-checking"><b>Checking:</b> ' + esc(claimWording(claim.claim.text)) + '</p>' : '') + quoteHtml +
           inheritedBindingNotice + inheritedFormattingNotice +
           '<span class="vv-reading-status" data-status="' + esc(claim.current.status) + '" title="' + esc(claim.current.status) + '">' +
-            esc(readableStatus(claim.current.status)) + '</span>' +
+            esc(claimStatusLabel(claim)) + '</span>' +
           '<div class="vv-reading-actions"><button type="button" data-show-claim="' + esc(claim.id) + '">Show on page</button>' +
           claim.checkedContent.sections.map(function (item) {
             return '<a href="' + esc(checkedContentLink(claim.checkedContent, item).href) + '">' +
               (item === 'Introduction' ? 'Open introduction' : claim.checkedContent.sections.length > 1 ? esc(item) : 'Open section') + '</a>';
-          }).join(' ') + '</div>' + readingProof(claim) + readingNextAction(claim) +
+          }).join(' ') + '</div>' + citationDefectHtml(claim) + readingProof(claim) + readingNextAction(claim) +
           '<details class="vv-reading-audit"><summary>Audit details</summary>' +
             '<p>Tracking ID: <code>' + esc(claim.id) + '</code> · ' + esc(claim.current.status) + '</p>' +
             (claim.sourceLocation ? '<p>Documentation location: <code>' + esc(claim.sourceLocation.file) + '</code><br>Source lines: ' +
@@ -6527,22 +7750,190 @@ const OVERLAY_JS = String.raw`
     });
     return readerHtml + html + '</details>';
   }
+  function currentClaimLocator(page, claim) {
+    return {
+      id: 'current-' + claim.id,
+      claim: { text: claim.text },
+      checkedContent: { route: page.route, pageTitle: page.title, sections: claim.headings },
+      sourceLocation: claim.sourceLocation,
+      sourcePassages: claim.sourcePassages,
+    };
+  }
+  function currentSourceLinks(refs) {
+    return (refs || []).map(function (ref) {
+      if (ref.repository === 'vast-ai/public-website' && ref.sourceKind === 'PRODUCT_PUBLICATION_SOURCE' &&
+          /^sha256:[a-f0-9]{64}$/.test(ref.revision || '') &&
+          ['https://vast.ai/article/vast-ai-startup-program', 'https://vast.ai/hosting', 'https://vast.ai/products/gpu-cloud'].includes(ref.path)) {
+        return '<a class="vv-source-link" href="' + esc(ref.path) + '" target="_blank" rel="noopener noreferrer">Published product source: ' +
+          esc(ref.path) + '</a> <span class="vv-subject">(' + esc(ref.locator) + '; live page may change; retained excerpt is the citation)</span>';
+      }
+      if (!/^vast-ai\/(?:docs|vast-cli|self-test)$/.test(ref.repository || '') ||
+          !/^[a-f0-9]{40}$/.test(ref.revision || '') || !/^[A-Za-z0-9._/-]+$/.test(ref.path || '') ||
+          ref.path.split('/').some(function (part) { return !part || part === '.' || part === '..'; })) return '';
+      var href = 'https://github.com/' + ref.repository + '/blob/' + ref.revision + '/' + ref.path;
+      return '<a class="vv-source-link" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">Source: ' +
+        esc(ref.path) + '</a> <span class="vv-subject">(' + esc(ref.sourceKind) + ': ' + esc(ref.locator) + ')</span>';
+    }).filter(Boolean).join('<br>');
+  }
+  function sourceTransitionHtml(transition, page, claim) {
+    if (!transition || !transition.oldFailClaim) return '';
+    var old = transition.oldFailClaim;
+    var href = '/__review__/current-artifact?ref=' + encodeURIComponent(TWO_DEFECT_TRANSITION_ARTIFACT) +
+      '&page=' + encodeURIComponent(page.route) + '&claim=' + encodeURIComponent(claim.id);
+    return '<div class="vv-source-transition"><b>Wording corrected; further evidence needed.</b><br>' +
+      'This current replacement is <b>UNVALIDATED</b>; it was not silently reclassified from the earlier finding.' +
+      '<br><b>Original finding history (FAIL):</b> ' + esc(old.rationale) +
+      '<blockquote>' + esc(old.text) + '</blockquote>' +
+      '<a class="vv-evidence-link" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">Open immutable transition record and original finding</a>' +
+      '<br><b>Current proof limits:</b> ' + esc((claim.evidenceRefs || []).map(function (ref) { return ref.limit; }).filter(Boolean).join('; ')) +
+      '</div>';
+  }
+  function currentEvidenceRefs(refs, page, claim) {
+    return (refs || []).map(function (ref) {
+      var direct = ref.artifactRef === H100_DIRECT_POSTINSTALL_ADJUDICATION ? H100_DIRECT_POSTCHECK_BY_CLAIM.get(claim.id) : null;
+      if (ref.artifactRef === H100_DIRECT_POSTCHECK_ARTIFACT && H100_DIRECT_POSTCHECK_BY_CLAIM.has(claim.id)) return '';
+      if (direct) {
+        var selectedHref = '/__review__/current-artifact?ref=' + encodeURIComponent(H100_DIRECT_POSTCHECK_ARTIFACT) +
+          '&page=' + encodeURIComponent(page.route) + '&claim=' + encodeURIComponent(claim.id) + '&postcheck=' + encodeURIComponent(direct.observationId);
+        var registryHref = '/__review__/current-artifact?ref=' + encodeURIComponent(ref.artifactRef) +
+          '&page=' + encodeURIComponent(page.route) + '&claim=' + encodeURIComponent(claim.id);
+        return '<a class="vv-evidence-link" href="' + esc(selectedHref) + '" target="_blank" rel="noopener noreferrer">' + esc(direct.label) +
+          '</a> · selected observation <code>' + esc(direct.observationId) + '</code> · <code>' + esc(direct.predicate) + '</code><br><a class="vv-evidence-link" href="' + esc(registryHref) +
+          '" target="_blank" rel="noopener noreferrer">Open runtime adjudication record</a> · ' + esc(ref.limit);
+      }
+      var href = '/__review__/current-artifact?ref=' + encodeURIComponent(ref.artifactRef || '') +
+        '&page=' + encodeURIComponent(page.route) + '&claim=' + encodeURIComponent(claim.id);
+      var role = /HISTORICAL|CARRY/i.test(ref.role) ? 'Earlier retained check' :
+        /PRODUCT_PUBLICATION/i.test(ref.role) ? 'Published product description only' :
+        /TAXONOMY/i.test(ref.role) ? 'Classification review' :
+          /SOURCE|INSPECTION/i.test(ref.role) ? 'Client source only' :
+            /NAVIGATION|STATIC/i.test(ref.role) ? 'Link check' : 'Retained check';
+      return '<a class="vv-evidence-link" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">Open retained artifact</a> · <code>' +
+        esc(ref.id) + '</code> · ' + esc(role) + ' · ' + esc(ref.limit);
+    }).join('<br>');
+  }
+  function installationIntakeRecord(intake, page, claim) {
+    if (!intake || !intake.available || page.route !== '/host/installing-host-software') return '';
+    return (intake.records || []).find(function (item) { return item.claimId === claim.id; }) || null;
+  }
+  function installationIntakeHtml(intake, page, claim) {
+    var record = installationIntakeRecord(intake, page, claim);
+    if (!record) return '';
+    var links = record.checks.concat(record.sourceLinks || []).map(function (item) {
+      var href = '/__review__/current-artifact?ref=' + encodeURIComponent(item.artifactRef) +
+        '&page=' + encodeURIComponent(page.route) + '&claim=' + encodeURIComponent(claim.id) + '&intake=1';
+      var label = item.scope || item.label || item.id;
+      var action = item.id ? 'Open historical selected observation' : 'Open supplemental preparation/source record';
+      return '<a class="vv-evidence-link" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">' + action + '</a> · ' + esc(label);
+    }).join('<br>');
+    return '<section class="vv-reading-audit"><p><b>Current installation context.</b> ' + esc(intake.message) + '</p>' +
+      '<p><b>Historical selected observation:</b> This pre-install finding remains historical and does not alter claim status by itself.</p><p><b>Scope:</b> ' + esc(record.coverage.replace(/^PREINSTALL_/, 'Historical pre-install ').replace(/_/g, ' ').toLowerCase()) + '<br><b>Limit:</b> ' + esc(record.limit) +
+      '<br><b>Remaining:</b> ' + esc(record.remainingAction) + '</p><p><b>Pinned installation context (does not alter claim status):</b><br>' + links + '</p></section>';
+  }
+  function currentReviewHtml(currentReview) {
+    if (!currentReview || !currentReview.available) {
+      return '<section class="vv-reading vv-current-reading" aria-label="Current documentation review"><h3>Current documentation review</h3>' +
+        '<p><b>Current review is unavailable.</b> The current package failed validation, so this panel refuses to present historical results as current proof.</p>' +
+        '<p><b>Next:</b> Repair and regenerate the current review package, then reload this page.</p></section>';
+    }
+    if (currentReview.support) {
+      var support = currentReview.support;
+      return '<section class="vv-reading vv-current-reading" aria-label="Current documentation review"><h3>Current documentation review</h3>' +
+        '<p><b>Current ' + esc(support.layer) + ' support layer</b>.</p>' +
+        '<p>This checks wrapper, fragment, and central-reference structure only. It does not prove a command or runtime workflow.</p>' +
+        '<p><a class="vv-central-reference" href="' + esc(support.centralReferenceRoute) + '">Open the current central reference</a></p>' +
+        '<p><b>Proof limits:</b> ' + esc((support.evidenceRefs || []).map(function (item) { return item.limit; }).join('; ')) + '</p></section>';
+    }
+    var page = currentReview.page;
+    var installationIntake = currentReview.installationEvidenceIntake;
+    var claims = Array.isArray(page.claims) ? page.claims : [];
+    var currentCitationDefects = claims.filter(currentCitationDefect);
+    var citationSummary = currentReview.citationDefects || { total: currentCitationDefects.length, page: currentCitationDefects.length };
+    var locators = claims.map(function (claim) { return currentClaimLocator(page, claim); });
+    var sections = Array.from(new Set(locators.flatMap(function (claim) { return claim.checkedContent.sections; })));
+    var selected = currentClaimSectionFilter === null ? sectionFromHash(locators) : currentClaimSectionFilter;
+    var html = '<section class="vv-reading vv-current-reading" aria-label="Current documentation review"><h3>Current documentation review</h3>' +
+      '<p><b>' + esc(page.title) + '</b>.</p>' +
+      '<p>These are the current-source records for this page. The retained V&amp;V material below is historical context only.</p>';
+    if (!claims.length) html += '<p>No current statement record is present. Review the page-level procedure record and add a current statement before treating this page as verified.</p>';
+    html += '<label class="vv-section-label" for="current-section-filter">Review section</label>' +
+      '<select id="current-section-filter"><option value=""' + (!selected ? ' selected' : '') + '>All sections (' + claims.length + ')</option>' +
+      sections.map(function (section) {
+        var count = claims.filter(function (claim) { return claim.headings.indexOf(section) !== -1; }).length;
+          return '<option value="' + esc(section) + '"' + (selected === section ? ' selected' : '') + '>' + esc(section) + ' (' + count + ')</option>';
+      }).join('') + '</select>' +
+      '<label class="vv-section-label" for="current-citation-filter">Citation review</label>' +
+      '<select id="current-citation-filter"><option value="ALL"' + (currentCitationDefectFilter === 'ALL' ? ' selected' : '') +
+        '>All current statements (' + claims.length + ')</option><option value="CITATION"' + (currentCitationDefectFilter === 'CITATION' ? ' selected' : '') +
+        '>Missing authoritative citation on this page (' + currentCitationDefects.length + ')</option></select>' +
+      '<p class="vv-reading-counts"><b>Current Host review:</b> ' + esc(citationSummary.total) +
+        ' missing authoritative citations across Host pages; ' + esc(citationSummary.page) + ' on this page. These are documentation/source defects, not failed runtime checks.</p>' +
+      '<p id="current-location-notice" role="status" aria-live="polite"></p>';
+    claims.forEach(function (claim) {
+      var locator = currentClaimLocator(page, claim);
+      var claimId = esc(locator.id);
+      var heading = claim.headings.length === 1 ? claim.headings[0] : claim.headings.join(' / ');
+      var citationMissing = currentCitationDefect(claim);
+      var sourceTransition = claim.sourceTransition;
+      var intakeRecord = installationIntakeRecord(installationIntake, page, claim);
+      var limits = Array.from(new Set((claim.evidenceRefs || []).map(function (item) { return item.limit; }).filter(Boolean)));
+      var redacted = (claim.sourcePassages || []).some(function (passage) { return passage.redacted; });
+      var passages = redacted ? [] : (claim.sourcePassages || []).map(passageWording);
+      var literal = redacted
+        ? '<p class="vv-checking"><b>Current source passage is masked in review data.</b> The checking summary below is not a quote.</p>'
+        : passages.map(function (passage) { return '<blockquote' + (passage.code ? ' class="vv-code-quote"' : '') + '>' + esc(passage.text) + '</blockquote>'; }).join('');
+      var sourceSummary = passages.map(function (passage) { return passage.text; }).join(' ');
+      var summary = redacted || comparableWording(sourceSummary) !== comparableWording(claim.text)
+        ? '<p class="vv-checking"><b>Checking summary:</b> ' + esc(claimWording(claim.text)) + '</p>' : '';
+      html += '<article class="vv-reading-card" data-review-claim="' + claimId + '" data-current-claim="' + esc(claim.id) + '" data-current-review-section="' + esc(heading) + '"' +
+        ' data-current-review-sections="' + esc(JSON.stringify(claim.headings)) + '"' +
+        ' data-current-citation-defect="' + (citationMissing ? 'true' : 'false') + '"' +
+        ((selected && claim.headings.indexOf(selected) === -1) || (currentCitationDefectFilter === 'CITATION' && !citationMissing) ? ' hidden' : '') + '>' +
+        '<div class="vv-reading-location"><b>Page heading:</b> ' + esc(heading) + '</div>' +
+        literal + summary +
+        '<span class="vv-reading-status" data-status="' + esc(claim.status) + '">' + esc(citationMissing ? 'Missing authoritative citation' : readableStatus(claim.status)) + '</span>' +
+        '<div class="vv-reading-actions"><button type="button" data-show-current-claim="' + claimId + '">Show on page</button>' +
+          claim.headings.map(function (item) { return '<a href="' + esc(checkedContentLink(locator.checkedContent, item).href) + '">' +
+            (item === 'Introduction' ? 'Open introduction' : 'Open heading') + '</a>'; }).join(' ') + '</div>' +
+        sourceTransitionHtml(sourceTransition, page, claim) +
+        (citationMissing ? '<div class="vv-citation-defect"><b>Missing authoritative citation</b><br><b>Why:</b> ' + esc(claim.rationale.replace(/^CONFIRMED_CITATION_DEFECT:\s*/, '')) +
+          '<br><b>Responsible role:</b> ' + esc(claim.ownerRole) + '<br><b>Next:</b> Obtain the authoritative source for this wording from the recorded owner, add its citation, and retain a source/link retest.' +
+          '<br><span>This is a documentation/source defect, not a failed runtime check.</span></div>' : '') +
+        (claim.evidenceRefs && claim.evidenceRefs.length
+          ? '<p><b>Proof limits:</b> ' + esc(limits.join('; ')) + '</p>'
+          : intakeRecord ? '<p><b>Proof:</b> No complete or adjudicated proof is attached. The historical and installation-context records below do not change this statement status.</p>'
+            : '<p><b>Proof:</b> No supporting proof is attached.</p>') +
+        '<p><b>Owner:</b> ' + esc(claim.ownerRole) + '<br><b>Next:</b> ' + esc(claim.nextAction) + '</p>' +
+        '<p><b>Recorded evidence:</b><br>' + (currentEvidenceRefs(claim.evidenceRefs, page, claim) ||
+          (intakeRecord ? 'No adjudicated current-model artifact is linked; separate historical and installation-context records are shown below.' : 'No retained artifact reference is linked by this record.')) + '</p>' +
+        installationIntakeHtml(installationIntake, page, claim) +
+        '<p><b>Authority sources:</b><br>' + (currentSourceLinks(claim.sourceRefs) || (intakeRecord ? 'No adjudicated current-model source pin is recorded; historical and installation-context records above are partial context only.' : 'No source pin is recorded.')) + '</p>' +
+        '<details class="vv-reading-audit"><summary>Current record details</summary><p>Tracking ID: <code>' + esc(claim.id) +
+          '</code> · source coverage <code>' + esc(claim.coverageState) + '</code></p><p>' + esc(claim.rationale) + '</p>' +
+          '<p>Source lines: ' + esc(claim.spans.map(function (span) { return span.sourceFile + ':' + span.start + '–' + span.end; }).join(', ')) + '</p></details></article>';
+    });
+    return html + '</section>';
+  }
   function renderPageContext() {
     var box = $('jiraContext');
     var epics = pageContext && Array.isArray(pageContext.epics) ? pageContext.epics : [];
     var issues = pageContext && Array.isArray(pageContext.issues) ? pageContext.issues : [];
     var blockers = pageContext && Array.isArray(pageContext.blockers) ? pageContext.blockers : [];
     var verification = pageContext && pageContext.verification ? pageContext.verification : { available: false };
+    var currentReview = pageContext && pageContext.currentReview ? pageContext.currentReview : { available: false };
     var count = $('jiraCount');
     count.hidden = blockers.length === 0;
     count.textContent = blockers.length ? '\u26A0 ' + blockers.length : '';
-    var hostPageWithUnavailableVv = location.pathname.startsWith('/host/') && !verification.available;
-    if (!epics.length && !issues.length && !blockers.length && !verification.available && !hostPageWithUnavailableVv) {
+    var hostPage = location.pathname.startsWith('/host/');
+    var hostPageWithUnavailableVv = hostPage && !verification.available;
+    if (!epics.length && !issues.length && !blockers.length && !verification.available && !currentReview.available && !hostPageWithUnavailableVv && !hostPage) {
       box.hidden = true;
       box.innerHTML = '';
       return;
     }
-    var html = verificationHtml(verification);
+    var html = hostPage ? currentReviewHtml(currentReview) : '';
+    if (hostPage) html += '<details class="vv-history"><summary>Historical V&amp;V context (not current validation)</summary>' + verificationHtml(verification) + '</details>';
+    else html += verificationHtml(verification);
     html += '<details class="vv-history"><summary>Jira context for this page</summary><div class="jira-title"><span><a href="/review-questions">review inputs</a> &middot; <a href="${TRACEABILITY_URL}" target="_blank" rel="noopener noreferrer">traceability</a></span></div>';
     html += '<div class="jira-links">';
     epics.forEach(function (issue) { html += jiraLinkHtml(issue, true); });
@@ -6569,16 +7960,51 @@ const OVERLAY_JS = String.raw`
     box.hidden = false;
   }
   $('jiraContext').addEventListener('change', function (event) {
-    if (event.target.id !== 'vv-section-filter') return;
-    claimSectionFilter = event.target.value;
+    if (event.target.id === 'current-section-filter') {
+      currentClaimSectionFilter = event.target.value;
+      clearClaimFocus();
+      shadow.querySelectorAll('[data-current-review-sections]').forEach(function (card) {
+        var sections = JSON.parse(card.getAttribute('data-current-review-sections'));
+        card.hidden = (!!currentClaimSectionFilter && sections.indexOf(currentClaimSectionFilter) === -1) ||
+          (currentCitationDefectFilter === 'CITATION' && card.getAttribute('data-current-citation-defect') !== 'true');
+      });
+      return;
+    }
+    if (event.target.id === 'current-citation-filter') {
+      currentCitationDefectFilter = event.target.value;
+      clearClaimFocus();
+      shadow.querySelectorAll('[data-current-review-sections]').forEach(function (card) {
+        var sections = JSON.parse(card.getAttribute('data-current-review-sections'));
+        card.hidden = (!!currentClaimSectionFilter && sections.indexOf(currentClaimSectionFilter) === -1) ||
+          (currentCitationDefectFilter === 'CITATION' && card.getAttribute('data-current-citation-defect') !== 'true');
+      });
+      return;
+    }
+    if (!['vv-section-filter', 'vv-citation-filter'].includes(event.target.id)) return;
+    if (event.target.id === 'vv-section-filter') claimSectionFilter = event.target.value;
+    else citationDefectFilter = event.target.value;
     clearClaimFocus();
     shadow.querySelectorAll('[data-review-section]').forEach(function (card) {
       var sections = JSON.parse(card.getAttribute('data-review-sections'));
-      card.hidden = !!claimSectionFilter && sections.indexOf(claimSectionFilter) === -1;
+      card.hidden = (!!claimSectionFilter && sections.indexOf(claimSectionFilter) === -1) ||
+        (citationDefectFilter === 'CITATION' && card.getAttribute('data-citation-defect') !== 'true');
     });
     if ($('vv-location-notice')) $('vv-location-notice').textContent = '';
   });
   $('jiraContext').addEventListener('click', function (event) {
+    var currentButton = event.target.closest('[data-show-current-claim]');
+    if (currentButton) {
+      var current = pageContext && pageContext.currentReview;
+      var page = current && current.page;
+      var claims = page && Array.isArray(page.claims) ? page.claims : [];
+      var claim = claims.find(function (item) { return 'current-' + item.id === currentButton.getAttribute('data-show-current-claim'); });
+      if (claim) {
+        var locator = currentClaimLocator(page, claim);
+        locator.id = 'current-' + claim.id;
+        showReviewWording(locator, currentButton);
+      }
+      return;
+    }
     var button = event.target.closest('[data-show-claim]');
     if (!button) return;
     var claims = pageContext && pageContext.verification && pageContext.verification.materialClaims || [];
@@ -6595,8 +8021,9 @@ const OVERLAY_JS = String.raw`
         pageContext = data || { epics: [], issues: [], blockers: [] };
         renderPageContext();
       })
-      .catch(function () {
+      .catch(function (error) {
         if (requestId !== contextRequest) return;
+        console.warn('Review context rendering failed:', error && error.name, error && error.message);
         pageContext = { epics: [], issues: [], blockers: [] };
         renderPageContext();
       });
@@ -6864,6 +8291,9 @@ const OVERLAY_JS = String.raw`
   // SPA navigation: re-anchor highlights when the route or DOM changes
   function onNavigate() {
     claimSectionFilter = null;
+    currentClaimSectionFilter = null;
+    citationDefectFilter = 'ALL';
+    currentCitationDefectFilter = 'ALL';
     clearClaimFocus();
     clearSelectionDraft();
     pageContext = { epics: [], issues: [], blockers: [] };
@@ -6879,6 +8309,9 @@ const OVERLAY_JS = String.raw`
   window.addEventListener('popstate', onNavigate);
   window.addEventListener('hashchange', function () {
     claimSectionFilter = null;
+    currentClaimSectionFilter = null;
+    citationDefectFilter = 'ALL';
+    currentCitationDefectFilter = 'ALL';
     clearClaimFocus();
     renderPageContext();
   });
@@ -7081,6 +8514,77 @@ async function handleReviewRoute(req, res, url) {
       'x-content-type-options': 'nosniff',
     });
     res.end(evidenceTextForDisplay(Buffer.from(lines, 'utf8')));
+    return;
+  }
+  if (p === '/__review__/current-artifact' && req.method === 'GET') {
+    const ref = url.searchParams.get('ref') || '';
+    const installationIntake = currentInstallEvidenceIntake();
+    const directClaimId = url.searchParams.get('claim') || '';
+    const directPostcheck = ref === H100_DIRECT_POSTCHECK_ARTIFACT && url.searchParams.has('postcheck')
+      ? H100_DIRECT_POSTCHECK_BY_CLAIM.get(directClaimId) : null;
+    const expectedHash = CURRENT_HOST_DOCS_REVIEW.artifactHashes?.get(ref) ||
+      (installationIntake.available ? INSTALL_INTAKE_ARTIFACTS.get(ref) : null) ||
+      (directPostcheck ? H100_DIRECT_POSTCHECK_SHA256 : null);
+    if (!CURRENT_HOST_DOCS_REVIEW.available || !currentReviewStillFresh(CURRENT_HOST_DOCS_REVIEW) || !expectedHash) {
+      res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+      res.end('Current review artifact not found.');
+      return;
+    }
+    try {
+      const bytes = vvRepositoryFile(ref, 'invalid current review artifact').bytes;
+      if (vvHash(bytes) !== expectedHash) throw new Error('stale current review artifact');
+      if (url.searchParams.has('page') || url.searchParams.has('claim')) {
+        const page = CURRENT_HOST_DOCS_REVIEW.pages.find((item) => item.route === url.searchParams.get('page'));
+        const claim = page?.claims.find((item) => item.id === url.searchParams.get('claim'));
+        const evidence = claim?.evidenceRefs.find((item) => item.artifactRef === ref);
+        const directRegistryEvidence = directPostcheck && claim?.evidenceRefs.find((item) => item.id === directPostcheck.registryId &&
+          item.artifactRef === H100_DIRECT_POSTINSTALL_ADJUDICATION && item.role === 'CURRENT_H100X4_DIRECT_POSTINSTALL_RUNTIME_ADJUDICATION');
+        const intakeRecord = installationIntake.available && page && claim
+          ? installationIntake.records.find((item) => item.claimId === claim.id) : null;
+        const intakeEvidence = intakeRecord && [...intakeRecord.checks, ...intakeRecord.sourceLinks]
+          .find((item) => item.artifactRef === ref);
+        if (!page || !claim || (!evidence && !intakeEvidence && !directRegistryEvidence) || !currentReviewPageStillFresh(page)) throw new Error('unbound current artifact');
+        if (directPostcheck) {
+          if (url.searchParams.get('postcheck') !== directPostcheck.observationId) throw new Error('invalid direct post-install selector');
+          const postcheck = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+          const observation = postcheck.observations?.find((item) => item.id === directPostcheck.observationId);
+          if (!observation || observation.exit_code !== 0 || observation.stdout_sha256 !== directPostcheck.stdoutSha256 ||
+            vvHash(Buffer.from(observation.stdout || '', 'utf8')) !== directPostcheck.stdoutSha256) throw new Error('direct post-install observation drift');
+          const registryHref = '/__review__/current-artifact?ref=' + encodeURIComponent(H100_DIRECT_POSTINSTALL_ADJUDICATION) +
+            '&page=' + encodeURIComponent(page.route) + '&claim=' + encodeURIComponent(claim.id);
+          res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store',
+            'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'" });
+          res.end('<!doctype html><html lang="en"><meta charset="utf-8"><title>Selected runtime observation — ' + esc(page.title) + '</title>' +
+            '<main style="max-width:1000px;margin:2rem auto;font:16px/1.5 system-ui;padding:1rem"><h1>Selected runtime observation ' + esc(directPostcheck.observationId) + '</h1>' +
+            '<p><a href="' + esc(page.route) + '">Back to the documentation page</a></p><p><b>Section:</b> ' + esc(claim.headings.join(' / ')) + '</p>' +
+            '<blockquote>' + esc(claim.text) + '</blockquote><p><b>Statement status:</b> ' + esc(claim.status) + '</p><p><b>Bound predicate:</b> ' + esc(directPostcheck.predicate) +
+            '</p><p><b>Scope limit:</b> Modified direct-route snapshot only; not stock setup-page command/download/TUI, driver/libvirt, persistence/reboot, NAT, account/listing, automatic self-test, workload/rental readiness, or general host health. A transient bandwidth-test diagnostic container was running.</p>' +
+            '<p><a href="' + esc(registryHref) + '" target="_blank" rel="noopener noreferrer">Open runtime adjudication record</a></p><details open><summary>Selected post-install command output</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(JSON.stringify(observation, null, 2)) + '</pre></details></main></html>');
+          return;
+        }
+        const intakeSelected = intakeEvidence?.observation || intakeEvidence?.finding;
+        const intakeLimit = intakeEvidence ? (intakeEvidence.scope || intakeEvidence.label || intakeRecord.limit) : evidence.limit;
+        const intakeNext = intakeEvidence ? intakeRecord.remainingAction : claim.nextAction;
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store',
+          'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'" });
+        res.end('<!doctype html><html lang="en"><meta charset="utf-8"><title>Evidence — ' + esc(page.title) + '</title>' +
+          '<main style="max-width:1000px;margin:2rem auto;font:16px/1.5 system-ui;padding:1rem"><h1>Evidence for ' + esc(page.title) + '</h1>' +
+          '<p><a href="' + esc(page.route) + '">Back to the documentation page</a></p><p><b>Section:</b> ' + esc(claim.headings.join(' / ')) + '</p>' +
+          '<blockquote>' + esc(claim.text) + '</blockquote><p>This is the statement being reviewed, not evidence for itself.</p>' +
+          '<p><b>Statement status:</b> ' + esc(claim.status) + '</p><p><b>What this artifact can establish:</b> ' + esc(intakeLimit) + '</p>' +
+          (intakeEvidence ? '<p><b>Intake scope:</b> Pre-install finding only; it does not alter this statement status.</p>' +
+            (intakeSelected ? '<details open><summary>Selected observation / source finding</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(JSON.stringify(intakeSelected, null, 2)) + '</pre></details>' : '') : '') +
+          '<p><b>Still needed:</b> ' + esc(intakeNext) + '</p><details open><summary>Retained artifact</summary>' +
+          '<pre style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(evidenceTextForDisplay(bytes)) + '</pre></details></main></html>');
+        return;
+      }
+      res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store',
+        'x-content-type-options': 'nosniff' });
+      res.end(evidenceTextForDisplay(bytes));
+    } catch {
+      res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+      res.end('Current review artifact not found.');
+    }
     return;
   }
   if (p === '/__review__/evidence' && req.method === 'GET') {

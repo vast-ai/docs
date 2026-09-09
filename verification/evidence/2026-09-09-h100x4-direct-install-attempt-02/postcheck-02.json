@@ -1,0 +1,315 @@
+{
+  "schema_version": 1,
+  "attempt_id": "ATTEMPT-2026-09-09-H100X4-DIRECT-INSTALL-02",
+  "started": "2026-09-08T22:18:34.828595+00:00",
+  "finished": "2026-09-08T22:18:36.002295+00:00",
+  "target": "NEW_H100X4_HOST",
+  "ssh_host_fingerprint": "SHA256:gbzAO9E/fJjJWs5n7bcBPXmPJSbo8tGX4C56oJeSPj0",
+  "collector_sha256": "8766a4c6452449c2a91f7f32b29c93d8ce8e53bea1d5344d72026ab58ce4d070",
+  "projection_sha256": "0cb17d66d02d24cb8817c8088bb1ca3074022e9ff4e69930206220978c0d76ff",
+  "raw_sha256": "f20e9049b83d2608efd8ba7fe6254c6a8bcba5c6ed6f58264f2acc29be56c416",
+  "exit_code": 0,
+  "observations": [
+    {
+      "id": "POST-00",
+      "argv": [
+        "date",
+        "-u",
+        "+%Y-%m-%dT%H:%M:%SZ"
+      ],
+      "exit_code": 0,
+      "stdout": "2026-09-08T22:18:35Z\n",
+      "stderr": "",
+      "stdout_sha256": "7b2a9c9ad27cedbc5e4b92b4f6c7fdc027702f4b66e19043f54e372bac9850ba"
+    },
+    {
+      "id": "POST-01",
+      "argv": [
+        "systemctl",
+        "is-active",
+        "vastai.service",
+        "vast_metrics.service",
+        "docker",
+        "nvidia-persistenced.service"
+      ],
+      "exit_code": 0,
+      "stdout": "active\nactive\nactive\nactive\n",
+      "stderr": "",
+      "stdout_sha256": "c60320ff4f955e99b9375240ed251bb17427837b8a3783b3e6cccd553c33cb69"
+    },
+    {
+      "id": "POST-02",
+      "argv": [
+        "systemctl",
+        "show",
+        "vastai.service",
+        "vast_metrics.service",
+        "docker.service",
+        "nvidia-persistenced.service",
+        "--property=Id,LoadState,ActiveState,SubState"
+      ],
+      "exit_code": 0,
+      "stdout": "Id=vastai.service\nLoadState=loaded\nActiveState=active\nSubState=running\n\nId=vast_metrics.service\nLoadState=loaded\nActiveState=active\nSubState=running\n\nId=docker.service\nLoadState=loaded\nActiveState=active\nSubState=running\n\nId=nvidia-persistenced.service\nLoadState=loaded\nActiveState=active\nSubState=running\n",
+      "stderr": "",
+      "stdout_sha256": "07a848fcb82947edcb0fb22e05eca4fdb2299bed54a1697b3766df027a39b71b"
+    },
+    {
+      "id": "POST-03",
+      "argv": [
+        "nvidia-smi",
+        "--query-gpu=name,driver_version,memory.total",
+        "--format=csv,noheader"
+      ],
+      "exit_code": 0,
+      "stdout": "NVIDIA H100 PCIe, 595.71.05, 81559 MiB\nNVIDIA H100 PCIe, 595.71.05, 81559 MiB\nNVIDIA H100 PCIe, 595.71.05, 81559 MiB\nNVIDIA H100 PCIe, 595.71.05, 81559 MiB\n",
+      "stderr": "",
+      "stdout_sha256": "e347d61e8be8994ca800500a3d3efe773ecd88a06cae5c3011c12ed27de9c273"
+    },
+    {
+      "id": "POST-04",
+      "argv": [
+        "nvidia-smi",
+        "--query-compute-apps=pid",
+        "--format=csv,noheader"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "POST-05",
+      "argv": [
+        "findmnt",
+        "/var/lib/docker",
+        "-no",
+        "SOURCE,FSTYPE,OPTIONS"
+      ],
+      "exit_code": 0,
+      "stdout": "/dev/md127 xfs    rw,relatime,attr2,inode64,logbufs=8,logbsize=32k,sunit=1024,swidth=4096,prjquota\n",
+      "stderr": "",
+      "stdout_sha256": "b0822180b94f879385131bb1bcd5ec0151aac6e4c0f1787740a5797a5d0f8c17"
+    },
+    {
+      "id": "POST-06",
+      "argv": [
+        "findmnt",
+        "--fstab",
+        "--evaluate",
+        "-rn",
+        "-o",
+        "TARGET,SOURCE,FSTYPE,OPTIONS",
+        "--mountpoint",
+        "/var/lib/docker"
+      ],
+      "exit_code": 0,
+      "stdout": "/var/lib/docker [PERSISTENT_DEVICE_ID] xfs rw,auto,pquota\n",
+      "stderr": "",
+      "stdout_sha256": "ec4033968dafa27909a5a43219590d24020fd2a3e4f72d0a2ff09fb5ff6dcbd2"
+    },
+    {
+      "id": "POST-07",
+      "argv": [
+        "sudo",
+        "-n",
+        "xfs_quota",
+        "-x",
+        "-c",
+        "state",
+        "/var/lib/docker"
+      ],
+      "exit_code": 0,
+      "stdout": "User quota state on /var/lib/docker (/dev/md127)\n  Accounting: OFF\n  Enforcement: OFF\n  Inode: N/A\nBlocks grace time: [--------]\nBlocks max warnings: 0\nInodes grace time: [--------]\nInodes max warnings: 0\nRealtime Blocks grace time: [--------]\nGroup quota state on /var/lib/docker (/dev/md127)\n  Accounting: OFF\n  Enforcement: OFF\n  Inode: N/A\nBlocks grace time: [--------]\nBlocks max warnings: 0\nInodes grace time: [--------]\nInodes max warnings: 0\nRealtime Blocks grace time: [--------]\nProject quota state on /var/lib/docker (/dev/md127)\n  Accounting: ON\n  Enforcement: ON\n  Inode: #1027 (1 blocks, 1 extents)\nBlocks grace time: [7 days]\nBlocks max warnings: 0\nInodes grace time: [7 days]\nInodes max warnings: 0\nRealtime Blocks grace time: [7 days]\n",
+      "stderr": "",
+      "stdout_sha256": "bdfc02203af317d45811830d72395120f7e6868217e9327e837a5a6cdba470f4"
+    },
+    {
+      "id": "POST-08",
+      "argv": [
+        "sudo",
+        "-n",
+        "cat",
+        "/var/lib/vastai_kaalia/host_port_range"
+      ],
+      "exit_code": 0,
+      "stdout": "30000-30499",
+      "stderr": "",
+      "stdout_sha256": "0badfb3acc6d27b951788df0c63155a5f0d6c6c6bc17f11834b8e38722440c2a"
+    },
+    {
+      "id": "POST-09",
+      "argv": [
+        "docker",
+        "version",
+        "--format",
+        "{{json .Server}}"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"Platform\":{\"Name\":\"Docker Engine - Community\"},\"Components\":[{\"Name\":\"Engine\",\"Version\":\"28.5.2\",\"Details\":{\"ApiVersion\":\"1.51\",\"Arch\":\"amd64\",\"BuildTime\":\"Wed Nov  5 14:43:10 2025\",\"Experimental\":\"false\",\"GitCommit\":\"89c5e8f\",\"GoVersion\":\"go1.25.3\",\"KernelVersion\":\"6.8.0-139-generic\",\"MinAPIVersion\":\"1.24\",\"Os\":\"linux\"}},{\"Name\":\"containerd\",\"Version\":\"v1.7.29\",\"Details\":{\"GitCommit\":\"442cb34bda9a6a0fed82a2ca7cade05c5c749582\"}},{\"Name\":\"runc\",\"Version\":\"1.3.3\",\"Details\":{\"GitCommit\":\"v1.3.3-0-gd842d771\"}},{\"Name\":\"docker-init\",\"Version\":\"0.19.0\",\"Details\":{\"GitCommit\":\"de40ad0\"}}],\"Version\":\"28.5.2\",\"ApiVersion\":\"1.51\",\"MinAPIVersion\":\"1.24\",\"GitCommit\":\"89c5e8f\",\"GoVersion\":\"go1.25.3\",\"Os\":\"linux\",\"Arch\":\"amd64\",\"KernelVersion\":\"6.8.0-139-generic\",\"BuildTime\":\"2025-11-05T14:43:10.000000000+00:00\"}\n",
+      "stderr": "",
+      "stdout_sha256": "d0c8143054597b5faa96a1500b4e26b8b05eb938615e99d5fc6c377e07a45003"
+    },
+    {
+      "id": "POST-10",
+      "argv": [
+        "docker",
+        "ps",
+        "-a",
+        "--no-trunc",
+        "--format",
+        "{{json .}}"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"Command\":\"\\\"/root/bandwidthTest --csv --device=0 --memory=pinned --mode=range --start=1073741824 --end=1073741824 --increment=1\\\"\",\"CreatedAt\":\"2026-09-09 00:18:34 +0200 SAST\",\"ID\":\"8fa20e2a91b702fa30b35a92bace004b77007edce9d12b460b8d643b5f356598\",\"Image\":\"vastai/test:bandwidth-test-nvidia\",\"Labels\":\"com.nvidia.cudnn.version=8.9.6.50,maintainer=NVIDIA CORPORATION \\u003ccudatools@nvidia.com\\u003e,org.opencontainers.image.ref.name=ubuntu,org.opencontainers.image.version=22.04\",\"LocalVolumes\":\"0\",\"Mounts\":\"\",\"Names\":\"distracted_nightingale\",\"Networks\":\"bridge\",\"Platform\":null,\"Ports\":\"\",\"RunningFor\":\"1 second ago\",\"Size\":\"30.8kB (virtual 9.74GB)\",\"State\":\"running\",\"Status\":\"Up Less than a second\"}\n",
+      "stderr": "",
+      "stdout_sha256": "b0e5092a09c0046f8a23e0cbda016f06ef7e7b6d02cdf4a1f3a587ef9965620f"
+    },
+    {
+      "id": "POST-11",
+      "argv": [
+        "docker",
+        "image",
+        "ls",
+        "--digests",
+        "--no-trunc",
+        "--format",
+        "{{json .}}"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"CreatedAt\":\"2026-08-17 11:00:47 +0200 SAST\"}\n{\"CreatedAt\":\"2026-06-17 01:10:52 +0200 SAST\"}\n{\"CreatedAt\":\"2026-05-28 00:37:13 +0200 SAST\"}\n{\"CreatedAt\":\"2025-01-29 19:29:05 +0200 SAST\"}\n{\"CreatedAt\":\"2023-11-10 08:31:11 +0200 SAST\"}\n{\"CreatedAt\":\"2023-05-30 11:32:09 +0200 SAST\"}\n",
+      "stderr": "",
+      "stdout_sha256": "6675a530ef61daabf30ba34946994953559d4dddbdcf75d507443f843c30d372"
+    },
+    {
+      "id": "POST-12",
+      "argv": [
+        "dpkg-query",
+        "-W",
+        "-f=${Package} ${Version}\n",
+        "docker-ce",
+        "docker-ce-cli",
+        "containerd.io",
+        "nvidia-docker2",
+        "nvidia-container-toolkit"
+      ],
+      "exit_code": 0,
+      "stdout": "containerd.io 1.7.29-1~ubuntu.24.04~noble\ndocker-ce 5:28.5.2-1~ubuntu.24.04~noble\ndocker-ce-cli 5:28.5.2-1~ubuntu.24.04~noble\nnvidia-container-toolkit 1.17.8-1\nnvidia-docker2 2.13.0-1\n",
+      "stderr": "",
+      "stdout_sha256": "61f971d9e3b98fd6882b006758cb07abee28e7bd7d8462544b1af1a788c29211"
+    },
+    {
+      "id": "POST-13",
+      "argv": [
+        "dpkg",
+        "--audit"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "files": [
+    {
+      "path": "/tmp/vast-docs-h100x4-q9nqn1dg/install.local-no-auto-self-test",
+      "exists": true,
+      "sha256": "4d87c48acc12a15eee1c2793d0631e1d936b2f996bdd50de4ad27b5acdf3d519"
+    },
+    {
+      "path": "/tmp/vast-docs-h100x4-q9nqn1dg/send_mach_info.py",
+      "exists": true,
+      "sha256": "23634b122d70f47fc4124175e425d340aadbe2dd127efdc3fd27cf0d045fa5f5"
+    },
+    {
+      "path": "/var/lib/vastai_kaalia/install_update.sh",
+      "exists": true,
+      "sha256": "cdcd32d74a82daad1926ae522454602e62e740795dcd9111f833c625df8ffa6d"
+    },
+    {
+      "path": "/var/lib/vastai_kaalia/send_mach_info.py",
+      "exists": true,
+      "sha256": "23634b122d70f47fc4124175e425d340aadbe2dd127efdc3fd27cf0d045fa5f5"
+    },
+    {
+      "path": "/var/lib/vastai_kaalia/update_scripts.sh",
+      "exists": true,
+      "sha256": "8b7f973b2f4b62d293c3078ce0d2c108c6e1556149877680ca7c723183c61714"
+    },
+    {
+      "path": "/var/lib/vastai_kaalia/update_launcher.sh",
+      "exists": true,
+      "sha256": "8e8959137d124ab52ad5a4b59ff75f91daf4716d7911b6cee9e5651ab9b737e6"
+    },
+    {
+      "path": "/var/lib/vastai_kaalia/test_nvml_error.sh",
+      "exists": true,
+      "sha256": "33bdcd525b722aa18278412b3ba76033a01b7b8f5ae9d0c08e8f9e3ee9f20972"
+    },
+    {
+      "path": "/var/lib/vastai_kaalia/start_self_test.sh",
+      "exists": true,
+      "sha256": "b44cfb52802f0fe44535cba8b6d78365a6672418e89574c87d34f05aa197151f"
+    }
+  ],
+  "machine_num_id": "150296",
+  "boot_sha256": "ca3913f5b87a738ce398dc81c19a5240fa498126a97fcf8a103ec528ea116be7",
+  "reboot_required": false,
+  "loopback_fallback_created": false,
+  "log_identity": [
+    {
+      "path": "/tmp/vast-docs-h100x4-q9nqn1dg/vast_host_install.log",
+      "sha256": "dea081c16f4ab93daa0f2ca48f34b569aed53ae60356d983aa8a41abb4cc9014",
+      "bytes": 184927
+    },
+    {
+      "path": "/var/lib/vastai_kaalia/kaalia.log",
+      "sha256": "1a76c9035387efa53041ea31c0adff6feff9910a165f14d4824bf2fff84e2960",
+      "bytes": 71563
+    }
+  ],
+  "diagnostics": {
+    "nvml": {
+      "observed": true,
+      "exact_marker": "NVML test ok",
+      "source_raw_sha256": "2ee67605d1d2db6e3f12ec52bf4b45022d7791112bac1f4b1db7a4c2d5bbb9ad"
+    },
+    "nccl": {
+      "observed": true,
+      "exact_marker": "NCCL test ok",
+      "source_raw_sha256": "2ee67605d1d2db6e3f12ec52bf4b45022d7791112bac1f4b1db7a4c2d5bbb9ad"
+    },
+    "machine_info_submission": {
+      "observed": true,
+      "exact_marker": "Data sent successfully.",
+      "source_raw_sha256": "dea081c16f4ab93daa0f2ca48f34b569aed53ae60356d983aa8a41abb4cc9014"
+    },
+    "automatic_self_test_omitted": {
+      "observed": true,
+      "exact_marker": "Automatic self-test/listing launch omitted in this LOCAL MODIFIED installer variant.",
+      "source_raw_sha256": "dea081c16f4ab93daa0f2ca48f34b569aed53ae60356d983aa8a41abb4cc9014"
+    }
+  },
+  "warnings": [
+    "Warning: apt-key is deprecated. Manage keyring files in trusted.gpg.d instead (see apt-key(8)).",
+    "Warning: apt-key is deprecated. Manage keyring files in trusted.gpg.d instead (see apt-key(8)).",
+    "Warning: apt-key is deprecated. Manage keyring files in trusted.gpg.d instead (see apt-key(8)).",
+    "E: Unable to acquire the dpkg frontend lock (/var/lib/dpkg/lock-frontend), is another process using it?",
+    "dpkg: error: dpkg frontend lock was locked by another process with pid 16805",
+    "E: Sub-process dpkg --set-selections returned an error code (2)",
+    "E: Executing dpkg failed. Are you root?"
+  ],
+  "prior_projection": {
+    "sha256": "6351b936a552768b8c49e0a20f0fa796105313702c270676bed09d41709003e6",
+    "retained": "Restricted local archive; no remote check rerun",
+    "reason": "Verbose first projection included environment dumps, network identifiers and provider metadata unnecessary for these claims; removed from shareable set without deleting original observations."
+  },
+  "limitations": [
+    "Read-only snapshot on this host at these times, after the approved modified direct route; not general installation or rental acceptance.",
+    "Persistent device ID and Docker container labels/IDs/names were omitted from public projection; full observations remain in restricted capture.",
+    "GPU/driver versions and OCI digests preserved as actual technical identities, not indiscriminately masked as network addresses.",
+    "NVML/NCCL markers establish the embedded checks reported success; they do not prove the separate marketplace self-test, paid rental, WAN reflection, load qualification, or reboot persistence.",
+    "Project quota must be read from the Project quota block; User and Group quota OFF do not mean project quota is off.",
+    "A transient bandwidth-test container was running at this snapshot; no claim of full diagnostic cleanup is made.",
+    "Package lock warnings retained; subsequent dpkg audit is clean. No claim is made that every installer subcommand succeeded."
+  ]
+}

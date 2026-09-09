@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Host Docs V&amp;V — independent evidence review</title>
+<script type="application/yaml" id="frontmatter">
+title: "Host Docs V&V — independent evidence review"
+type: doc-review
+status: complete
+date: 2026-09-02
+subject: HOST-DOCS-VV-LOCAL-REVIEW-HANDOFF.md
+review_commit: 3b7e56f0db6588953589e0692e75b7274526d5f9
+base_commit: 7a8a2c4
+branch: CON-1584-host-cli-api-sdk
+target: vast-ai/docs PR #185
+jira: CON-1518
+method: local desk review, read-only; no host, paid, WAN, VM, GPU-load or mutating execution
+conclusion_evidence_package: CHANGES_REQUESTED
+conclusion_documentation_merge: NOT_RECOMMENDED_YET
+findings: docs-pr153-host-cli-api-sdk/.orchestra/host-docs-vv-review/
+</script>
+<style>
+:root {
+  --bg: #ffffff;
+  --surface: #f6f8fa;
+  --text: #161b22;
+  --muted: #57626f;
+  --faint: #8b95a1;
+  --rule: #dce2e9;
+  --rule-strong: #c3ccd6;
+  --accent: #0e5c68;
+  --accent-bg: #e7f2f4;
+  --code-bg: #eef2f6;
+  --pass: #1c6e45;
+  --pass-bg: #e4f2ea;
+  --warn: #8a5807;
+  --warn-bg: #f8f0de;
+  --defect: #a32e1c;
+  --defect-bg: #fbe9e5;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1218;
+    --surface: #151b23;
+    --text: #e4e9ef;
+    --muted: #9aa6b3;
+    --faint: #6e7a87;
+    --rule: #242d38;
+    --rule-strong: #33404e;
+    --accent: #5fc5d3;
+    --accent-bg: #122a30;
+    --code-bg: #1b222b;
+    --pass: #5fcb93;
+    --pass-bg: #10281c;
+    --warn: #dfae5a;
+    --warn-bg: #2a2214;
+    --defect: #f0806c;
+    --defect-bg: #2e1712;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 3rem 1.5rem 6rem;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.62 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+main { max-width: 54rem; margin: 0 auto; }
+
+h1, h2, h3 { line-height: 1.25; font-weight: 650; text-wrap: balance; }
+h1 { font-size: 1.95rem; margin: 0 0 .5rem; letter-spacing: -.015em; }
+h2 {
+  font-size: 1.3rem; margin: 3rem 0 .5rem; letter-spacing: -.01em;
+  border-bottom: 1px solid var(--rule); padding-bottom: .45rem;
+}
+h3 { font-size: 1.04rem; margin: 1.6rem 0 .5rem; }
+
+p, li { margin: 0 0 .75rem; }
+ul, ol { padding-left: 1.3rem; }
+li > ul { margin-top: .4rem; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+
+code, .mono {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+code {
+  background: var(--code-bg); padding: .1em .35em;
+  border-radius: 3px; font-size: .87em;
+}
+pre {
+  margin: .5rem 0 0; background: var(--code-bg); border: 1px solid var(--rule);
+  border-radius: 5px; padding: .65rem .8rem; overflow-x: auto;
+  font-size: .8rem; line-height: 1.55; color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+
+.eyebrow {
+  font-size: .72rem; letter-spacing: .13em; text-transform: uppercase;
+  font-weight: 650; color: var(--faint);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  display: block; margin-bottom: .5rem;
+}
+
+/* masthead */
+header.masthead { border-bottom: 2px solid var(--rule-strong); padding-bottom: 1.5rem; }
+.subtitle { font-size: 1.05rem; color: var(--muted); max-width: 62ch; }
+.meta {
+  display: flex; flex-wrap: wrap; gap: .3rem 1.4rem;
+  font-size: .8rem; color: var(--faint); margin: .9rem 0 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.meta span { white-space: nowrap; }
+
+/* the two decisions */
+.decisions {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 1rem; margin: 1.2rem 0 0;
+}
+.decision {
+  background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 7px; padding: 1.2rem 1.3rem;
+}
+.decision.changes { border-left: 4px solid var(--defect); }
+.decision.hold { border-left: 4px solid var(--warn); }
+.decision .call { font-size: 1.18rem; font-weight: 650; line-height: 1.3; margin: 0 0 .5rem; }
+.decision.changes .call { color: var(--defect); }
+.decision.hold .call { color: var(--warn); }
+.decision p:last-child { margin: 0; font-size: .9rem; color: var(--muted); }
+
+/* tables */
+.tablewrap {
+  overflow-x: auto; border: 1px solid var(--rule);
+  border-radius: 7px; background: var(--surface); margin: 1rem 0 0;
+}
+table { border-collapse: collapse; width: 100%; font-size: .89rem; }
+th, td { text-align: left; padding: .6rem .85rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+thead th {
+  font-size: .69rem; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--faint); font-weight: 650; background: var(--code-bg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+tbody tr:last-child td { border-bottom: none; }
+td.num {
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.ok { color: var(--pass); font-weight: 650; }
+.bad { color: var(--defect); font-weight: 650; }
+
+/* defect register */
+.defect-item {
+  background: var(--surface); border: 1px solid var(--rule);
+  border-left: 4px solid var(--defect); border-radius: 7px;
+  padding: 1.2rem 1.3rem; margin: 1rem 0 0;
+}
+.defect-item h3 { margin: 0 0 .6rem; display: flex; flex-wrap: wrap; gap: .55rem .8rem; align-items: baseline; }
+.did {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .76rem; font-weight: 650; background: var(--defect-bg);
+  color: var(--defect); padding: .15rem .45rem; border-radius: 4px;
+}
+.defect-item p { font-size: .94rem; }
+.defect-item .fix { color: var(--muted); font-size: .89rem; margin: .8rem 0 0; }
+.defect-item .rerun { margin: .9rem 0 0; }
+.rerun .eyebrow { font-size: .65rem; margin-bottom: .3rem; }
+
+/* held-up cards */
+.held { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: .85rem; margin: 1rem 0 0; }
+.hcard { background: var(--surface); border: 1px solid var(--rule); border-radius: 7px; padding: 1rem 1.1rem; }
+.chip {
+  display: inline-block; font-size: .66rem; letter-spacing: .07em;
+  text-transform: uppercase; font-weight: 650; background: var(--pass-bg);
+  color: var(--pass); padding: .13rem .42rem; border-radius: 4px; margin-bottom: .5rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.hcard h3 { margin: 0 0 .35rem; font-size: .98rem; }
+.hcard p { margin: 0; font-size: .87rem; color: var(--muted); }
+
+/* scope note */
+.note {
+  background: var(--accent-bg); border: 1px solid var(--rule);
+  border-left: 4px solid var(--accent); border-radius: 7px;
+  padding: 1.2rem 1.3rem; margin: 1rem 0 0;
+}
+.note h3 { margin: 0 0 .6rem; color: var(--accent); }
+.note p, .note li { font-size: .9rem; color: var(--muted); }
+.note :last-child { margin-bottom: 0; }
+
+footer {
+  border-top: 1px solid var(--rule); margin-top: 3.5rem; padding-top: 1.2rem;
+  font-size: .82rem; color: var(--faint);
+}
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+@media (max-width: 34rem) { body { padding: 2.2rem 1.05rem 4rem; } h1 { font-size: 1.6rem; } }
+</style>
+</head>
+<body>
+<main>
+
+<header class="masthead">
+  <span class="eyebrow">Independent evidence review · CON-1584 · CON-1518</span>
+  <h1>Host Docs V&amp;V — independent evidence review</h1>
+  <p class="subtitle">A local desk review of the Host Docs V&amp;V evidence package. The package
+  claims its accounting is honest — not that the documentation is correct. That claim was
+  tested directly, and it fails at four specific points, all repairable in hours.</p>
+  <p class="meta">
+    <span>commit 3b7e56f</span>
+    <span>base 7a8a2c4</span>
+    <span>branch CON-1584-host-cli-api-sdk</span>
+    <span>vast-ai/docs PR #185</span>
+    <span>2026-09-02</span>
+  </p>
+</header>
+
+<h2>Conclusion</h2>
+<p>The handoff asks for two separate decisions. They are separate here.</p>
+
+<div class="decisions">
+  <div class="decision changes">
+    <span class="eyebrow">Evidence package</span>
+    <p class="call">Changes requested</p>
+    <p>The package's sole claim is accounting integrity. The accounting is provably wrong by
+    one target, and three of its citation paths cannot be followed by anyone other than the
+    author, on this machine. After D1–D4 are fixed, the package is acceptable for PR review.</p>
+  </div>
+  <div class="decision hold">
+    <span class="eyebrow">The documentation itself</span>
+    <p class="call">Merge not recommended yet</p>
+    <p>30 of 39 pages are BLOCKED, 15 command carriers hold zero execution evidence, and five
+    source-owner confirmations remain open. This is the package's own stated position and it
+    is correct. Final merge acceptance belongs to the authorised PR reviewers and source
+    owners.</p>
+  </div>
+</div>
+
+<h2>What was verified directly</h2>
+<p>Every row below was checked by running the command in this checkout, not by reading the
+package's summary of it. Nothing in this table is taken on trust.</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Check</th><th>Claimed</th><th>Observed</th><th>Verdict</th></tr></thead>
+<tbody>
+<tr><td>Reviewer test suite</td><td class="num">17 pass / 0 fail</td><td class="num">17 pass / 0 fail</td><td class="ok">holds</td></tr>
+<tr><td>Persona &amp; frontmatter check</td><td class="num">39 pages</td><td class="num">39 pages</td><td class="ok">holds</td></tr>
+<tr><td>Inventory reconciliation</td><td class="num">72 pg · 484 tgt · 182 cmd</td><td class="num">72 pg · 484 tgt · 182 cmd</td><td class="ok">holds</td></tr>
+<tr><td>JSON parse · JS syntax · whitespace</td><td>all clean</td><td>all exit 0</td><td class="ok">holds</td></tr>
+<tr><td>Target arithmetic by level</td><td class="num">39+97+203+468+165</td><td class="num">= 972</td><td class="ok">holds</td></tr>
+<tr><td>Score arithmetic</td><td class="num">138 scored + 27 N/A</td><td class="num">= 165 carriers</td><td class="ok">holds</td></tr>
+<tr><td>Observation arithmetic</td><td class="num">37 cmd + 14 proc</td><td class="num">= 51, disjoint</td><td class="ok">holds</td></tr>
+<tr><td>Score 3 implies functional PASS</td><td class="num">all 11</td><td class="num">all 11 PASS</td><td class="ok">holds</td></tr>
+<tr><td>Page / test-set PASS is direct, not a rollup</td><td class="num">6 records</td><td class="num">6 cite evidence IDs</td><td class="ok">holds</td></tr>
+<tr><td>Snapshot hash enforced at runtime</td><td>fails closed</td><td>enforced, and hashes every <code>.mdx</code></td><td class="ok">stronger than claimed</td></tr>
+<tr><td>Published status split</td><td class="num">N/A 28 · UNVAL 277</td><td class="num">N/A 27 · UNVAL 278</td><td class="bad">off by one</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>Confirmed defects</h2>
+<p>Four items block acceptance of the evidence package. None of them inflates a PASS — every
+one is conservative in direction. All four were reproduced independently after a reviewer
+raised them; the <em>re-run</em> block under each is the exact command.</p>
+
+<div class="defect-item">
+  <h3><span class="did">D1</span> A stale rollup makes the published accounting wrong by one</h3>
+  <p>Step <code>ERR-T04-B02-S03</code> is recorded <code>NOT_APPLICABLE</code> with the
+  rationale <em>"EVIDENCE_LINKAGE ALL_CHILDREN_NOT_APPLICABLE"</em>. Its only child,
+  <code>CLM-720bb6982a2e7948</code>, is <code>UNVALIDATED</code> — because it was correctly
+  demoted from <code>NOT_APPLICABLE/3</code> to <code>UNVALIDATED/2</code> in
+  <code>withdrawn_records</code> (the NVSwitch branch that a non-NVSwitch observation had
+  been treated as proving). The parent rollup was never recomputed.</p>
+  <p><strong>The correct split is N/A 27 / UNVALIDATED 278, not 28 / 277.</strong> This also
+  falsifies the reconciliation attempt's own PASS justification in
+  <code>verification/evidence/2026-09-01-host-current-reconciliation-attempt-01/result.md</code>,
+  which states the 972-target accounting is "complete and internally consistent". It is not.</p>
+  <div class="rerun">
+    <span class="eyebrow">Re-run</span>
+<pre><code>jq -r '.current_status_projection.records[]
+  | select(.level=="STEP" and .current_status=="NOT_APPLICABLE")' \
+  verification/host-docs-test-results.json
+
+jq -r '.current_status_projection.records[]
+  | select(.level=="COMMAND" and .target.step_id=="ERR-T04-B02-S03")' \
+  verification/host-docs-test-results.json</code></pre>
+  </div>
+  <p class="fix"><strong>Fix:</strong> recompute the rollup, correct the split in
+  <code>HOST-DOCS-QA-SUMMARY.md</code> and the handoff, and issue a new reconciliation attempt
+  rather than editing the existing one in place.</p>
+</div>
+
+<div class="defect-item">
+  <h3><span class="did">D2</span> Three PASS results cite evidence files that are not in the commit</h3>
+  <p>Four retained evidence records point at detail tables under
+  <code>.orchestra/host-vv-reconciliation-20260901/findings/</code>, which is untracked and
+  outside the review commit. Three of the four back a test-set <code>PASS</code>:</p>
+  <ul>
+    <li><code>faq-route-audit.html</code> — backs the package's <strong>only page-level PASS</strong></li>
+    <li><code>team-cli-catalog-audit.html</code> — backs <code>TS-TEAM-C01</code></li>
+    <li><code>self-test-reference-parity.html</code> — backs <code>TS-STR-C01</code></li>
+  </ul>
+  <p>The files exist on this machine, so a local reviewer is unaffected. Once the branch is
+  pushed, a remote reviewer following the handoff's own "After the commit is pushed"
+  instructions gets dangling references. The detail-audit SHA-256 is recorded in each result,
+  so tamper-detection survives — the artifact itself does not travel.</p>
+  <div class="rerun">
+    <span class="eyebrow">Re-run</span>
+<pre><code>grep -rn "\.orchestra/" verification/evidence/
+
+git ls-files --error-unmatch \
+  .orchestra/host-vv-reconciliation-20260901/findings/faq-route-audit.html</code></pre>
+  </div>
+  <p class="fix"><strong>Fix:</strong> commit the four sanitized detail tables under
+  <code>verification/evidence/</code>, or replace each path with an explicit "retained outside
+  the repository" statement alongside the existing hash.</p>
+</div>
+
+<div class="defect-item">
+  <h3><span class="did">D3</span> Every score cites one evidence record that disclaims itself</h3>
+  <p>All 138 scored command records — the 11 score-3 rows included — carry
+  <code>evidence_ids: ["EV-HOST-COMMAND-ASSESSMENT-01"]</code>. That record's own
+  <code>limitations</code> field reads:</p>
+  <p><em>"Score-traceability evidence only. All 138 numeric-score carriers remain UNVALIDATED
+  in this assessment evidence… Functional current status is owned by separate exact
+  reconciliation evidence."</em></p>
+  <p>So a reviewer following a score-3's citation in search of its proof lands on a record
+  stating it proves nothing functional. The real supporting evidence does exist, in
+  <code>command_results</code>, keyed by <code>command_id</code> — but the citation field does
+  not lead there, so the chain has to be re-derived by hand. This is not dishonest; it is also
+  not independently followable, which is the property an evidence package exists to provide.</p>
+  <div class="rerun">
+    <span class="eyebrow">Re-run</span>
+<pre><code>jq -c '.records[].evidence_ids' \
+  verification/host-docs-command-scores.json | sort | uniq -c
+# =&gt; 138 ["EV-HOST-COMMAND-ASSESSMENT-01"]
+
+jq -r '.procedure_results[]
+  | select(.evidence_id=="EV-HOST-COMMAND-ASSESSMENT-01") | .limitations' \
+  verification/host-docs-test-results.json</code></pre>
+  </div>
+  <p class="fix"><strong>Fix:</strong> populate each score record's <code>evidence_ids</code>
+  with the <code>command_results</code> evidence ID that actually supports it, retaining the
+  assessment record as a secondary traceability reference.</p>
+</div>
+
+<div class="defect-item">
+  <h3><span class="did">D4</span> Two V&amp;V records are marked PASS against expectations the system now fails</h3>
+  <p><code>verification/inventory.md:13</code> (VV-HOST-001) states its expected observable as
+  <em>"expect 72 Host pages, 474 targets, 176 commands reconciled across five access
+  groups"</em> and is marked <code>PASS</code>. The current script outputs <strong>484 targets,
+  182 commands</strong>. Line 16 (VV-HOST-004) expects <em>"9 tests passing and exit 0"</em>;
+  the suite is now <strong>17</strong>.</p>
+  <p><code>HOST-DOCS-QA-SUMMARY.md:164-173</code> repeats the same superseded numbers
+  (474 / 176 / 9-of-9) under an unmarked <em>"Verified results"</em> heading, with no
+  as-of date and no superseded marker, while the current 972-target table sits at the top of
+  the same file.</p>
+  <p>The drift is benign in direction — coverage grew. But a verification record whose stated
+  acceptance criterion no longer matches the system, still carrying a PASS mark, is a broken
+  verification record, in a package whose entire subject is exactly that.</p>
+  <div class="rerun">
+    <span class="eyebrow">Re-run</span>
+<pre><code>grep -n "474\|176\|expect 9" verification/inventory.md
+python3 -B scripts/inventory_host_docs.py --check   # =&gt; 484 targets, 182 commands
+npm run test-review-context                          # =&gt; 17 pass</code></pre>
+  </div>
+  <p class="fix"><strong>Fix:</strong> re-baseline VV-HOST-001 and VV-HOST-004 to 484 / 182 / 17,
+  or mark the older section explicitly superseded with its 2026-08-27 date. Do not silently
+  overwrite the PASS — retain the earlier expectation the way the FAQ failure was retained.</p>
+</div>
+
+<h2>What held up</h2>
+<p>Seven reviewers were briefed to break the claims below and could not. Each was then
+spot-checked directly against the repository.</p>
+
+<div class="held">
+  <div class="hcard">
+    <span class="chip">Retained failures</span>
+    <h3>Nothing was laundered</h3>
+    <p>All three original FAQ route-ownership failures and the invalid Hardware Prep
+    multi-target mount check survive verbatim, each linked to its correction retest. The
+    retained failure record even forbids overwriting or relabelling itself.</p>
+  </div>
+  <div class="hcard">
+    <span class="chip">Self-demotion</span>
+    <h3>The package removes its own passes</h3>
+    <p>Of 7 withdrawn records, 5 are demotions: three <code>PASS/3 → UNVALIDATED/2</code> on
+    <code>/host/vms</code> after the IOMMU target was ruled unrepresentative, one
+    <code>PASS/3 → STALE</code>, and one <code>NOT_APPLICABLE/3 → UNVALIDATED/2</code>.</p>
+  </div>
+  <div class="hcard">
+    <span class="chip">Fails closed</span>
+    <h3>The panel cannot fake a pass</h3>
+    <p>No render path turns BLOCKED or UNVALIDATED into passing. The snapshot hash is enforced
+    at load (<code>review-server.mjs:442-443</code>) and every <code>host/*.mdx</code> is hashed
+    too (<code>:330-334</code>) — editing a doc page without re-running the pipeline breaks the
+    panel rather than drifting quietly.</p>
+  </div>
+  <div class="hcard">
+    <span class="chip">Corrections traceable</span>
+    <h3>Audit → fix → rescore is followable</h3>
+    <p>The two 2-line <code>.mdx</code> edits in this commit add bounded-follow wording with
+    explicit <code>Ctrl+C</code> and exit confirmation to a <code>journalctl -kf</code> and a
+    <code>tail -f</code>. They map exactly onto the two <code>BLOCKED/1 → BLOCKED/2</code>
+    withdrawals.</p>
+  </div>
+  <div class="hcard">
+    <span class="chip">Score 1</span>
+    <h3>Real gaps, not scraping noise</h3>
+    <p>All 15 score-1 carriers are well-formed, cross-page-consistent commands with zero
+    retained execution evidence — genuine evidence gaps rather than extraction artifacts. No
+    dangerous advice was found sitting in published documentation.</p>
+  </div>
+  <div class="hcard">
+    <span class="chip">Gates</span>
+    <h3>Conservative, not an excuse ledger</h3>
+    <p>All 34 BLOCKED command carriers map onto a declared gate class — mutation/installer,
+    external TCP/UDP, Docker GPU injection, paid or state-changing CLI, or live-follow runtime.
+    No harmless read-only command hides among them.</p>
+  </div>
+  <div class="hcard">
+    <span class="chip">Pages</span>
+    <h3>No page oversells its status</h3>
+    <p>All 8 representative pages' recorded statuses are consistent with what their prose
+    actually claims to a reader. No page implies more readiness than its evidence supports.</p>
+  </div>
+  <div class="hcard">
+    <span class="chip">Sanitization</span>
+    <h3>No secrets in committed evidence</h3>
+    <p>Pattern scans for API keys, private keys, and non-localhost IP addresses across
+    <code>verification/evidence/</code> return zero hits. This is the first direct test of that
+    claim.</p>
+  </div>
+</div>
+
+<h2>Non-blocking observations</h2>
+<p>None of these changes the conclusion. All are worth knowing before the headline numbers are
+quoted elsewhere.</p>
+
+<ul>
+<li><strong>BLOCKED is mostly inherited, not observed.</strong> Only 22 command results carry a
+real named <code>blocker_class</code> (CREDENTIAL_PERMISSION 6, INTERACTIVE_PRIVILEGE 4,
+TEST_ENVIRONMENT_NOT_REPRESENTATIVE 4, DOCKER_SOCKET_PRIVILEGE 2, STATE_CHANGING_LIVE_ACTION 2,
+plus 4 singletons). Of 589 BLOCKED targets, 235 carry the single derived rationale
+<code>NONCOMMAND_LINKAGE BLOCKED_AUTHORITY</code>. The direction is safe — propagating BLOCKED
+never inflates a PASS — but the label reads as <em>we were prevented</em> where <em>not
+attempted</em> is equally defensible.</li>
+
+<li><strong>The one page-level PASS is small.</strong>
+<code>/host/common-host-questions</code> has exactly one test set, one branch, one step and zero
+command carriers. Its whole V&amp;V surface is a static route-ownership audit. The PASS is
+earned, but it should not be read as "a Host page was proven to work".</li>
+
+<li><strong>37% of command PASSes are static catalog conformance.</strong> 17 of the 46 are
+<code>host-teams.mdx:140-148</code> help-path acceptance, with runtime, permissions and billing
+explicitly UNVALIDATED in the rationale. Two more validate empty-state behaviour only.
+<code>verification/HOST-DOCS-COMMAND-COVERAGE.md:41-43</code> discloses this; the headline
+table in <code>HOST-DOCS-QA-SUMMARY.md:22</code> carries no such caveat.</li>
+
+<li><strong>All 27 N/A carriers share one blanket approval hash</strong>, and that hash
+(<code>4d5ad9a0…</code>) is simply the test-sets snapshot SHA-256. <code>approval_ref</code> is
+therefore a pointer to the frozen inventory, not a per-carrier human sign-off. 26 of the 27
+were independently confirmed genuinely display-only; the bare <code>tcpdump</code> prose token
+is borderline but defensible, and its owning manual/WAN procedure remains separately blocked.</li>
+
+<li><strong>Score-2 rationales are 73% templated</strong> — 112 records across 30 distinct
+strings. Spot-checks over 20 carriers on 11 pages found the templates do track genuinely
+repeated evidence situations, so this is phrasing economy rather than a dumping ground. Two
+minor issues: one template lists "mutations" among unexecuted aspects even for read-only
+commands, and one template is reused verbatim across both BLOCKED and UNVALIDATED records.</li>
+
+<li><strong>33 of the PR's 72 Host pages sit outside procedure V&amp;V.</strong> The generated
+CLI/SDK reference pages are excluded by an explicit scope decision
+(<code>HOST-DOCS-PROCEDURE-VV-GOAL.md:116-121</code>) and are covered by the older static
+registry check instead (179/181 occurrences). Defensible — but that reduction is disclosed only
+inside a long goal document, not in the handoff's own scope line, and the 182↔165 command
+mapping is documented nowhere reviewer-facing.</li>
+
+<li><strong>One small test gap.</strong> Attempt supersession is exercised by the suite, but the
+two specific throws at <code>review-server.mjs:483-484</code> — self-reference and dangling
+pointer — have no fixture of their own.</li>
+</ul>
+
+<h2>Scope of this review</h2>
+
+<div class="note">
+  <h3>What was not done</h3>
+  <p>No command was run against a Vast host. No money was spent. No VM transition, GPU load,
+  privileged change, mutation or WAN test was performed. The working tree was not modified —
+  <code>HEAD</code> remains <code>3b7e56f</code> and <code>git diff HEAD</code> is empty.</p>
+  <ul>
+    <li>The fresh-clone path (<code>gh pr checkout 185</code> → <code>npm ci</code> →
+    <code>npm run dev:review</code>) was never executed end to end; network access was outside
+    this review. Every component was validated in place, but the published instruction itself
+    is unproven — and a fresh clone would additionally hit the D2 dangling references.</li>
+    <li>PR #185 could not be confirmed as the review target without network access. It is
+    consistent across all four internal documents, despite this checkout being named
+    <code>docs-pr153-*</code>.</li>
+    <li>The absence of every identifier class — hostnames, serial numbers — cannot be proven by
+    pattern scan alone. Credentials, keys and non-localhost IPs were scanned and are clean.</li>
+    <li>The review interface was read as source code, not driven in a browser. If a rendered
+    walkthrough is wanted, that is a separate pass.</li>
+  </ul>
+</div>
+
+<h2>Method</h2>
+<p>Eight independent reviewers were dispatched against separate parts of the package: the 11
+score-3 carriers, the 15 score-1 carriers, the 27 approved N/A carriers, the retained
+failure/correction history, the fail-closed behaviour of <code>review-server.mjs</code>, the
+eight representative pages named in the handoff, and a cross-page score-2 sample — followed by
+an adversarial synthesis pass briefed to argue against acceptance. Reviewers received the
+requirement and the artifact, not the package author's reasoning.</p>
+<p>Every finding reported here was reproduced by the orchestrator before being recorded. Claims
+that did not survive that check were dropped, including one reviewer's assertion that
+supersession integrity had no test coverage at all — the suite does exercise it; only the two
+invalid-supersession throws are uncovered.</p>
+<p>Reviewer findings are retained at
+<code>.orchestra/host-docs-vv-review/</code> — <code>ledger.html</code> for verified facts and
+<code>findings/&lt;agent&gt;.html</code> for each reviewer.</p>
+
+<footer>
+  <p>Independent local desk review of the Host Docs V&amp;V evidence package at
+  <span class="mono">3b7e56f</span>, against
+  <span class="mono">HOST-DOCS-VV-LOCAL-REVIEW-HANDOFF.md</span>. Conclusion: evidence package
+  — changes requested; documentation — merge not recommended yet. These are separate decisions,
+  and final merge acceptance belongs to the authorised PR reviewers and source owners.</p>
+</footer>
+
+</main>
+</body>
+</html>

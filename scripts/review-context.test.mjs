@@ -42,7 +42,9 @@ async function freePort() {
 
 async function waitForReviewServer() {
   let lastError;
-  for (let i = 0; i < 80; i += 1) {
+  // Both frozen and current evidence packages are validated before listen.
+  // Keep a bounded startup deadline without assuming the old single-package cost.
+  for (let i = 0; i < 400; i += 1) {
     if (reviewProcess.exitCode != null) {
       throw new Error(`review server exited early (${reviewProcess.exitCode})\n${reviewOutput}`);
     }
@@ -94,6 +96,12 @@ async function materializeReviewedSourceFixture(fixtureRoot) {
     await fs.mkdir(path.dirname(destination), { recursive: true });
     await fs.writeFile(destination, bytes);
   }
+}
+
+async function copyInstallationIntakeModule(fixtureRoot) {
+  await fs.mkdir(path.join(fixtureRoot, 'scripts'), { recursive: true });
+  await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_install_evidence_intake.mjs'),
+    path.join(fixtureRoot, 'scripts', 'current_host_install_evidence_intake.mjs'));
 }
 
 function sourceLiteral(lines, { start, end }) {
@@ -161,6 +169,7 @@ async function isolatedVerificationContext(mode, pathname = '/host/network-ports
   const fixtureRoot = await fs.mkdtemp(path.join(path.dirname(ROOT), '.vast-review-vv-'));
   const script = path.join(fixtureRoot, 'review-server.mjs');
   await fs.copyFile(path.join(ROOT, 'review-server.mjs'), script);
+  await copyInstallationIntakeModule(fixtureRoot);
   if (!mode) {
     // Deliberately omit the canonical package: loader must fail closed.
   } else if (mode === 'malformed') {
@@ -630,6 +639,7 @@ async function isolatedVerificationContext(mode, pathname = '/host/network-ports
 async function startHistoricalReviewServer() {
   historicalFixtureRoot = await fs.mkdtemp(path.join(path.dirname(ROOT), '.vast-review-history-'));
   await fs.copyFile(path.join(ROOT, 'review-server.mjs'), path.join(historicalFixtureRoot, 'review-server.mjs'));
+  await copyInstallationIntakeModule(historicalFixtureRoot);
   const gitSource = path.join(ROOT, '.git');
   const gitStat = await fs.lstat(gitSource);
   if (gitStat.isDirectory()) await fs.cp(gitSource, path.join(historicalFixtureRoot, '.git'), { recursive: true });

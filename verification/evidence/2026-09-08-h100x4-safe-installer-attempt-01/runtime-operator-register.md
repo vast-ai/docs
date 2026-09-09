@@ -1,0 +1,18 @@
+# Runtime/operator work — new H100×4 preparation
+
+PR #185 / CON-1518, 2026-09-08. This is an additive installation-specific register,
+not closure of the [existing runtime work](../2026-09-08-host-client-unblocking-attempt-01/runtime-operator-register.md).
+Source findings and limits are in [the exact-page summary](source-review-summary.json).
+
+| State | Page / passage affected | Missing prerequisite or evidence; impact | Responsible role and next action |
+|---|---|---|---|
+| BLOCKED | Installing Host Software / Host Installer Wizard; current setup command, MCL-009da802cabe1bc9 | No fresh one-hour team-host installation setup key has been supplied by secure entry/account. Credentialed installation cannot start. SSH and ordinary Host/client keys are not substitutes. | Crypto Labs setup-key administrator: create a fresh key, save it securely, and supply only the exact Keychain service and account. Do not reuse the key pasted into chat. |
+| FAIL, scoped compatibility check | Host Installer Wizard; MCL-fd7e8b86c5cfd383 and MCL-009da802cabe1bc9 | The reviewed local TUI expects the omitted self-test banner and reports failure at its deadline. This route cannot be represented as successful stock TUI verification. The downloaded binary's source correspondence remains UNVALIDATED. | Operator with installer maintainer: use a clearly labeled direct modified-installer route, or implement/test an explicit TUI skip state before claiming TUI completion. |
+| UNVALIDATED | Headless Fallback / GPU and Docker filesystem checks; MCL-ead93c85c2ff4168 and MCL-ec2e1c9a8be1a706 | Read-only GPU, mount and fstab observations exist; installation, quota enforcement and container behavior do not. Missing fstab observation from the older attempt is now resolved, not still blocked. | Operator: recheck exact identity and reuse conditions immediately before execution, freeze arguments, disallow storage fallback and driver/reboot changes, then retain postconditions. |
+| UNVALIDATED | Host Installer Wizard and After Install; MCL-009da802cabe1bc9 and MCL-ce118e1ce7bf71bb | Normal privileged package/service, registration, updater, GPU/container and speed-test effects remain. No full installer or downstream chain executed. | Operator: bound these effects and stop conditions for the exact route, retain resolved code/image identities and sanitized logs. Obtain any genuinely missing authorization or inaccessible source explicitly; an evidence gap alone is not BLOCKED. No reboot. |
+| UNVALIDATED | After Install; automatic self-test statement, MCL-ce118e1ce7bf71bb | The direct helper launch is omitted in the prepared candidate. This is not proof of the stock installer, initialization delay, diagnostic result or every downstream publication path. | Operator: capture start/end time, variant/dependency hashes, arguments without secrets, service/registration results, actual diagnostics and cleanup. Keep modified-route results separate from stock TUI/standard route results. |
+| UNVALIDATED | Future listing of the new H100×4 only | The approved prices and expiry are not applied or read back. Preparation does not list anything. | Authorized Host operator: only after installation/readiness, apply USD 3/GPU-hour, USD 0.30/GPU-hour minimum bid, USD 0.50/GB-month, and fixed expiry no later than September 15, 2026. Retain exact machine identity, absolute expiry and independent API/UI readback. No separate volume offer. |
+
+No live install, listing, rental, explicit self-test, API/setup-key use, reboot or
+customer-workload operation occurred in this attempt. Earlier failures are preserved.
+Preparation observations do not change the 22 canonical BLOCKED claim count.

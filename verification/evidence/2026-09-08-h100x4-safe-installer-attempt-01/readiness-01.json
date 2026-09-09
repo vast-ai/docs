@@ -1,0 +1,105 @@
+{
+  "id": "SAFE-05-READINESS-01",
+  "started": "2026-09-08T19:34:32.521567+00:00",
+  "finished": "2026-09-08T19:34:33.749144+00:00",
+  "target_alias": "NEW_H100X4_HOST",
+  "method": "Strictly pinned, unprivileged read-only SSH; no host-side writes or commands outside the frozen allowlist",
+  "collector_sha256": "9c73a9b66230386cff0feee58276047b01e4dd5b086a2c3b90a7a76d479af859",
+  "remote_program_sha256": "3e1873b59ed1c38ce2e71c536362c12678c6e91cf5e45c034129c34e8d46630a",
+  "ssh_pin_sha256": "d482a079effd5894b1608de52bb34cea7033399d723b57c9e7163ebd91cf879c",
+  "approved_ssh_identity_matches": true,
+  "exit_code": 0,
+  "error": null,
+  "raw_sha256": "2f1b8cbf0d0c4386a73c86ee1b596ac383a2cf9fe16a22a89bb2106b0c8df85b",
+  "observations": [
+    {
+      "argv": [
+        "date",
+        "-u",
+        "+%Y-%m-%dT%H:%M:%SZ"
+      ],
+      "exit_code": 0,
+      "stdout": "2026-09-08T19:34:33Z\n",
+      "stderr": ""
+    },
+    {
+      "check": "hostname_matches_approved_new_host",
+      "matches": true,
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "uname",
+        "-srmo"
+      ],
+      "exit_code": 0,
+      "stdout": "Linux 6.8.0-139-generic x86_64 GNU/Linux\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "nvidia-smi",
+        "--query-gpu=name,driver_version,memory.total,pci.bus_id",
+        "--format=csv,noheader"
+      ],
+      "exit_code": 0,
+      "stdout": "NVIDIA H100 PCIe, 595.71.05, 81559 MiB, 00000000:01:00.0\nNVIDIA H100 PCIe, 595.71.05, 81559 MiB, 00000000:25:00.0\nNVIDIA H100 PCIe, 595.71.05, 81559 MiB, 00000000:C1:00.0\nNVIDIA H100 PCIe, 595.71.05, 81559 MiB, 00000000:E1:00.0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "findmnt",
+        "-rn",
+        "-o",
+        "TARGET,SOURCE,FSTYPE,OPTIONS",
+        "--mountpoint",
+        "/var/lib/docker"
+      ],
+      "exit_code": 0,
+      "stdout": "/var/lib/docker /dev/md127 xfs rw,relatime,attr2,inode64,logbufs=8,logbsize=32k,sunit=1024,swidth=4096,prjquota\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "findmnt",
+        "--fstab",
+        "--evaluate",
+        "-rn",
+        "-o",
+        "TARGET,SOURCE,FSTYPE,OPTIONS",
+        "--mountpoint",
+        "/var/lib/docker"
+      ],
+      "exit_code": 0,
+      "stdout": "/var/lib/docker [PERSISTENT_DOCKER_DEVICE_ID] xfs rw,auto,pquota\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "show",
+        "vastai.service",
+        "docker.service",
+        "nvidia-persistenced.service",
+        "--property=Id,LoadState,ActiveState,SubState"
+      ],
+      "exit_code": 0,
+      "stdout": "Id=vastai.service\nLoadState=not-found\nActiveState=inactive\nSubState=dead\n\nId=docker.service\nLoadState=not-found\nActiveState=inactive\nSubState=dead\n\nId=nvidia-persistenced.service\nLoadState=loaded\nActiveState=active\nSubState=running\n",
+      "stderr": ""
+    },
+    {
+      "check": "boot_identity",
+      "sha256": "ca3913f5b87a738ce398dc81c19a5240fa498126a97fcf8a103ec528ea116be7",
+      "read_error": null
+    },
+    {
+      "check": "reboot_required_marker",
+      "exists": false
+    }
+  ],
+  "limitations": [
+    "Preparation observations only; no installation, quota enforcement, Docker, workload, network or no-reboot guarantee.",
+    "This capture uses the approved SSH key, not an API/setup credential. Raw host identity, persistent storage identifier and boot identifier remain restricted."
+  ],
+  "status": "PASS"
+}

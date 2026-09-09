@@ -5,8 +5,8 @@
 This view groups every documented command by the resources needed for a representative execution. It is an execution-planning aid, not authorization to run the commands. Existing safety tiers, stable IDs, source lines, and non-execution status remain authoritative.
 
 - Source revision: `f11812acc5c789d0185499212287c2224eaa0d2e`
-- Content fingerprint: `sha256:0722ea2a33ee19b19fed37056d16d43b2e6a834a40ca9221b9cbe5d44e148894`
-- Unique command targets: **228**
+- Content fingerprint: `sha256:20209ff5a3aefe1a49f958b99c11eaec2d3b70b3328b947ff528f3a1db34858a`
+- Unique command targets: **229**
 - Documented commands executed while generating this report: **0**
 
 ## Access matrix
@@ -17,7 +17,7 @@ This view groups every documented command by the resources needed for a represen
 | Paid resource, no Host root | 2 | Creates or uses a billable resource; the documented command itself does not require Host root. |
 | Host root/privileged access, no paid resource | 73 | Conservatively requires root or privileged Host access and does not itself create a paid resource. |
 | Host machine, no root in command | 31 | Needs a representative Host or Host artifact, but the documented command does not itself use root. |
-| No paid resource or Host root | 122 | Can be checked without paid spend or Host root; account, credential, mutation, environment, or external-client gates may still apply. |
+| No paid resource or Host root | 123 | Can be checked without paid spend or Host root; account, credential, mutation, environment, or external-client gates may still apply. |
 
 ## Non-exclusive resource totals
 
@@ -169,6 +169,7 @@ No command targets are currently classified in this group.
 | com-2384e2069c | [host/common-errors-diagnostics.mdx:79](./host/common-errors-diagnostics.mdx#L79) | vastai dump-logs &lt;machine_id&gt; | local-safe | account-authentication |
 | com-022b4a74b6 | [host/common-errors-diagnostics.mdx:85](./host/common-errors-diagnostics.mdx#L85) | vastai dump-logs &lt;machine_id&gt; --include-local-host-artifacts | local-safe | account-authentication |
 | com-ce86d1e774 | [host/disable-ssh-password-login.mdx:79](./host/disable-ssh-password-login.mdx#L79) | cp -n | local-safe | none |
+| com-f1990989ee | [host/first-24-hours.mdx:60](./host/first-24-hours.mdx#L60) | vastai search offers 'machine_id=&lt;machine_id&gt; verified=any' --limit 200 | account-read-only | account-authentication |
 | com-7c8b33bd93 | [host/fleet-operations.mdx:22](./host/fleet-operations.mdx#L22), [host/fleet-operations.mdx:76](./host/fleet-operations.mdx#L76) | vastai show machines --raw | account-read-only | account-authentication |
 | com-9441748e81 | [host/fleet-operations.mdx:32](./host/fleet-operations.mdx#L32) | vastai list machines &lt;selected-machines&gt; -e 12/31/2026 --retry 6 | destructive-or-mutating | account-authentication, destructive-or-mutating |
 | com-433c2e0c1e | [host/fleet-operations.mdx:44](./host/fleet-operations.mdx#L44) | vastai schedule maint &lt;selected-machine&gt; --sdate 1782950400 --duration 2 --maintenance_category power vastai show maints --ids &lt;selected-machine&gt; vastai cancel maint &lt;selected-machine&gt; | destructive-or-mutating | account-authentication, destructive-or-mutating |
@@ -291,6 +292,6 @@ No command targets are currently classified in this group.
 
 ## Reconciliation
 
-The five mutually exclusive groups contain **228** commands, matching the **228** unique command targets in the full inventory.
+The five mutually exclusive groups contain **229** commands, matching the **229** unique command targets in the full inventory.
 
 Use [`host-docs-command-access.json`](./host-docs-command-access.json) for the same classification in machine-readable form.

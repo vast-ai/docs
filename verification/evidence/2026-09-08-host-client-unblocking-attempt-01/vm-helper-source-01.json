@@ -1,0 +1,31 @@
+{
+  "check_id": "SOURCE-01",
+  "recorded_at": "2026-09-08T16:51:27.821921+00:00",
+  "source_path": "/var/lib/vastai_kaalia/enable_vms.py",
+  "target_binding_sha256": "d2b4124529dd252e355a60fa305370706843af0cc89592bacdf233942f46bbfb",
+  "method": "SSH exact installed file read; not import/execution",
+  "exit_code": 0,
+  "source_sha256": "bb7c5922931aacbdff85528fcfb52733639db00361ae00b232f3cbfad0d251de",
+  "bytes": 23301,
+  "source_origin": "Installed Host artifact on user-designated Ada; upstream revision/publishing provenance unknown",
+  "scope": "Restricted full source inspected for check-mode safety. Public record retains only small source excerpts, not configuration content or renter data.",
+  "excerpts": [
+    {
+      "start": 13,
+      "end": 22,
+      "text": "from argparse import ArgumentParser\nimport subprocess\nimport sys\nimport time\nimport json\nfrom base64 import b64decode\nfrom pathlib import Path\nimport re\nimport os.path\nimport xml.etree.ElementTree as ET"
+    },
+    {
+      "start": 306,
+      "end": 328,
+      "text": "        print(\"pending\")\n        return\n    try:\n        with open(\"/var/lib/vastai_kaalia/kaalia.cfg\", \"r\") as f:\n            for line in f.readlines():\n                entries = (line.split('='))\n                if len(entries)==2 and entries[0].strip() == 'gpu_type' and entries[1].strip() == 'nvidia_vm':\n                    print(\"on\")\n                    return\n    except:\n        pass\n    print(\"off\")\n    \ndef vm_on(args, logf):\n    def run_check_log(sargs):\n        return subprocess.run(\n            sargs,\n            check=True,\n            stdout=logf,\n            stderr=subprocess.STDOUT\n        )\n\n    if not check_if_iommu_ok(gpus_by_iommu_by_index(), devices_by_iommu_by_index()):"
+    },
+    {
+      "start": 576,
+      "end": 610,
+      "text": "    \nif __name__ == \"__main__\": \n    parser = ArgumentParser()\n    parser.add_argument(\"--logfile\", default=\"/var/lib/vastai_kaalia/enable_vms.log\")\n    subparsers = parser.add_subparsers(dest=\"command\")\n    on_parser = subparsers.add_parser(\"on\")\n    on_parser.add_argument(\"-f\", action=\"store_true\", help=\"Forces enablement to run even if it has failed before.\")\n    on_parser.add_argument(\"-i\", action=\"store_true\", help=\"Interactive mode.\")\n    off_parser = subparsers.add_parser(\"off\")\n    check_parser = subparsers.add_parser(\"check\")\n    validate_parser = subparsers.add_parser(\"validate\")\n\n    args = parser.parse_args()\n    if args.command == \"on\":\n        with open(args.logfile, \"a\") as f:\n            if not (args.f or args.i):\n                sys.stdout = f\n                sys.stderr = sys.stdout\n            else:\n                f = sys.stdout\n            try:\n                vm_on(args,f)\n            except Exception as e:\n                print(e)\n    elif args.command == \"off\":\n        vm_off(args)\n    elif args.command == \"check\":\n        vm_check(args)\n    elif args.command == \"validate\":\n        if not check_if_iommu_ok(gpus_by_iommu_by_index(), devices_by_iommu_by_index()):\n            print(\"Iommu Groups not set up for VMs\")\n            sys.exit(1)\n    else:\n        print(\"No command selected, options are [\\\"on\\\"]\")\n            # Always reenable vastai even if we have errors."
+    }
+  ],
+  "limitations": "Installed-artifact inspection, not upstream source-owner approval. vm_check catches file-read exceptions and may report pending/off without authoritative state reads. No enable/disable/validate invocation."
+}
+

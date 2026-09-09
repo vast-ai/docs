@@ -1,0 +1,5 @@
+# Intermediate numeric ID and owned-machine lookup
+
+While the direct installer was still running its embedded diagnostic/image-pull stage, the host's non-secret `machine_num_id` file returned **150296**. The first exact owned-machine GET using the separately authorized Host Keychain key returned HTTP200 with an empty JSON array. This does not establish ownership or listing state, and is not evidence that installation failed. It is an intermediate observation before the final machine-info submission; the reason for the empty result is not established.
+
+The first collector asserted that exactly one matching row must exist before writing its public projection. That local assertion failed; the complete original HTTP status/body and timestamp were already retained privately. The public projection preserves the empty result and names that collector failure. The collector was corrected to retain an unmatched response before returning nonzero. No listing mutation was attempted. A new post-install readback is required; do not repeat an early lookup merely to chase a pass.

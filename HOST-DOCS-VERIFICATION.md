@@ -7,21 +7,21 @@ This inventory answers two separate questions: whether documented examples are s
 ## Coverage and current result
 
 - Source revision: `f11812acc5c789d0185499212287c2224eaa0d2e`
-- Content fingerprint: `sha256:0722ea2a33ee19b19fed37056d16d43b2e6a834a40ca9221b9cbe5d44e148894`
+- Content fingerprint: `sha256:20209ff5a3aefe1a49f958b99c11eaec2d3b70b3328b947ff528f3a1db34858a`
 - Primary Host pages scanned: **44** (43 authored, 1 generated Self-Test reference)
 - Central-reference CLI/SDK support routes scanned: **33** (support layers, not separate Host workflows)
 - Total Host route files scanned: **77**
 - Imported Host snippet dependencies scanned: **33**
-- Unique verification targets: **593** across **679** occurrences
+- Unique verification targets: **597** across **683** occurrences
 - Structural/local-reference issues: **0**
 - Documented commands executed: **0** (intentional safety boundary)
 
 | Kind | Unique items |
 |---|---:|
-| behavior-claim | 258 |
-| command | 228 |
+| behavior-claim | 262 |
+| command | 229 |
 | error | 84 |
-| threshold | 23 |
+| threshold | 22 |
 
 ## Reproduce the audit
 
@@ -39,7 +39,7 @@ The first command regenerates this Markdown report plus JSON and CSV. `--check` 
 
 | Tier | Count | Meaning |
 |---|---:|---|
-| account-read-only | 36 | Needs current CLI plus a non-production authenticated account; should not mutate state. |
+| account-read-only | 37 | Needs current CLI plus a non-production authenticated account; should not mutate state. |
 | credential-bearing | 7 | Needs an approved test credential and redaction/logging review. |
 | destructive-or-mutating | 75 | Needs disposable/non-production state and peer-reviewed execution. |
 | environment-dependent | 14 | Needs matching OS, GPU, Docker, storage, or network conditions. |
@@ -49,11 +49,11 @@ The first command regenerates this Markdown report plus JSON and CSV. `--check` 
 | paid-live | 2 | Can create billable resources; requires explicit budget/target approval and exact evidence metadata. |
 | privileged-host | 53 | Needs a disposable supported host and records of before/after state. |
 | source-or-fixture | 55 | Needs a code source and/or captured redacted runtime fixture. |
-| source-owner | 248 | Needs the owning code, policy, or stakeholder confirmation. |
+| source-owner | 251 | Needs the owning code, policy, or stakeholder confirmation. |
 
 ## Command execution access groups
 
-The 228 command targets are also grouped by the resources needed for representative execution. These access groups are independent of the safety tier and do **not** authorize paid, root, credential-bearing, destructive, or production actions.
+The 229 command targets are also grouped by the resources needed for representative execution. These access groups are independent of the safety tier and do **not** authorize paid, root, credential-bearing, destructive, or production actions.
 
 See [Host Docs command access groups](./HOST-DOCS-COMMAND-ACCESS.md) for every command ID, source line, access group, and additional gate.
 
@@ -63,7 +63,7 @@ See [Host Docs command access groups](./HOST-DOCS-COMMAND-ACCESS.md) for every c
 | Paid resource, no Host root | 2 | Creates or uses a billable resource; the documented command itself does not require Host root. |
 | Host root/privileged access, no paid resource | 73 | Conservatively requires root or privileged Host access and does not itself create a paid resource. |
 | Host machine, no root in command | 31 | Needs a representative Host or Host artifact, but the documented command does not itself use root. |
-| No paid resource or Host root | 122 | Can be checked without paid spend or Host root; account, credential, mutation, environment, or external-client gates may still apply. |
+| No paid resource or Host root | 123 | Can be checked without paid spend or Host root; account, credential, mutation, environment, or external-client gates may still apply. |
 
 ## Issues found by the generator
 
@@ -111,6 +111,7 @@ These remain open even if every local test passes.
 | com-84cdd61bea | [host/disable-ssh-password-login.mdx:152](./host/disable-ssh-password-login.mdx#L152) | echo "PasswordAuthentication no" \| sudo tee -a /etc/ssh/sshd_config sudo sshd -t &amp;&amp; sudo systemctl restart ssh.service sudo sshd -T \| grep passwordauthentication | destructive-or-mutating | static-syntax-passed-not-executed |
 | com-7499f747c9 | [host/disable-ssh-password-login.mdx:169](./host/disable-ssh-password-login.mdx#L169) | sudo sh -c 'for f in /etc/ssh/sshd_config.orig /etc/ssh/sshd_config.d/*.orig; do [ -e "$f" ] &amp;&amp; cp "$f" "$&#123;f%.orig&#125;"; done' sudo sshd -t &amp;&amp; sudo systemctl restart ssh.service | destructive-or-mutating | static-syntax-passed-not-executed |
 | com-348b4a5efd | [host/first-24-hours.mdx:29](./host/first-24-hours.mdx#L29) | systemctl is-active vastai.service vast_metrics.service docker nvidia-persistenced.service systemctl --no-pager --full status vastai.service vast_metrics.service docker nvidia-persistenced.service sudo journalctl -u vas… | privileged-host | static-syntax-passed-not-executed |
+| com-f1990989ee | [host/first-24-hours.mdx:60](./host/first-24-hours.mdx#L60) | vastai search offers 'machine_id=&lt;machine_id&gt; verified=any' --limit 200 | account-read-only | static-syntax-passed-not-executed |
 | com-7c8b33bd93 | [host/fleet-operations.mdx:22](./host/fleet-operations.mdx#L22), [host/fleet-operations.mdx:76](./host/fleet-operations.mdx#L76) | vastai show machines --raw | account-read-only | static-syntax-passed-not-executed |
 | com-9441748e81 | [host/fleet-operations.mdx:32](./host/fleet-operations.mdx#L32) | vastai list machines &lt;selected-machines&gt; -e 12/31/2026 --retry 6 | destructive-or-mutating | static-syntax-passed-not-executed |
 | com-433c2e0c1e | [host/fleet-operations.mdx:44](./host/fleet-operations.mdx#L44) | vastai schedule maint &lt;selected-machine&gt; --sdate 1782950400 --duration 2 --maintenance_category power vastai show maints --ids &lt;selected-machine&gt; vastai cancel maint &lt;selected-machine&gt; | destructive-or-mutating | static-syntax-passed-not-executed |
@@ -409,7 +410,6 @@ These remain open even if every local test passes.
 |---|---|---|---|---|
 | thr-aa3f76d05b | [host/datacenter-status.mdx:29](./host/datacenter-status.mdx#L29) | - At least 5 GPU servers listed, or evidence of significant equipment to list. | source-owner | source-confirmation-required |
 | thr-e1b8643916 | [host/how-to-self-test.mdx:43](./host/how-to-self-test.mdx#L43) | - Direct ports are at least 3 ports per listed GPU. | source-owner | source-confirmation-required |
-| thr-f56389fcd5 | [host/market-metrics.mdx:144](./host/market-metrics.mdx#L144) | Market metrics update every 5 minutes. Location data can be cached for up to 2 hours. Each endpoint allows up to 5 requests per second per user. | source-owner | source-confirmation-required |
 | thr-b0ac625fb9 | [host/network-ports.mdx:18](./host/network-ports.mdx#L18) | Self-test requires at least 3 direct ports per listed GPU. For production hosting, plan for about 100 direct ports per listed GPU. One instance can map up to 64 ports, and a larger range gives headroom while old mapping… | source-owner | source-confirmation-required |
 | thr-872dfe9462 | [host/notifications.mdx:85](./host/notifications.mdx#L85) | Machine listing ending soon \| A machine's marketplace listing is within 7 days of its end date. Renew it to keep the machine rentable. | source-owner | source-confirmation-required |
 | thr-2ad71df8a0 | [host/self-test-reference.mdx:56](./host/self-test-reference.mdx#L56) | pcie.bandwidth PCIe bandwidth \| Required: PCIe bandwidth &gt; 2.85 GB/s \| Low PCIe bandwidth can make GPU stress and transfer checks fail or time out. \| Check BIOS PCIe generation/lane settings and confirm GPUs are seated… | generated-source | generator-check-required |
@@ -567,7 +567,10 @@ These remain open even if every local test passes.
 | beh-c10bff3aab | [host/machine-metrics.mdx:118](./host/machine-metrics.mdx#L118) | - All off clears the chart. All on turns on the CPU, memory, and summary metrics, but leaves per-device series off so the chart does not fill with one line per GPU | source-owner | source-confirmation-required |
 | beh-3e4414d1c7 | [host/machine-metrics.mdx:154](./host/machine-metrics.mdx#L154) | The chart stops short of right now \| Expected. The page does not follow the clock. Reload it | source-owner | source-confirmation-required |
 | beh-0376cff20d | [host/machine-offline.mdx:16](./host/machine-offline.mdx#L16) | &gt; Important: Do not reboot the machine, stop customer containers, force-stop VMs, or delete instance data while there are active rentals, unless instructed by Vast.ai Support. These actions may interrupt customer worklo… | source-owner | source-confirmation-required |
+| beh-0eda28f187 | [host/machine-offline.mdx:24](./host/machine-offline.mdx#L24) | This command sends 4 test packets directly to Cloudflare's public IP address (1.1.1.1). It tests reachability of that IP over ICMP while bypassing DNS. A successful result does not prove that DNS or every outbound servi… | source-owner | source-confirmation-required |
 | beh-5e23fe1295 | [host/machine-offline.mdx:48](./host/machine-offline.mdx#L48) | This command asks your DNS server to translate the domain name vast.ai into an IP address. The host daemon connects to Vast.ai servers by domain name, so even with a working internet connection, the machine cannot reach… | source-owner | source-confirmation-required |
+| beh-6565368885 | [host/machine-offline.mdx:65](./host/machine-offline.mdx#L65) | What to look for: a Name: line followed by an Address: line containing an IP address shows that the configured resolver answered this query (the exact IP returned may differ). ;; connection timed out; no servers could b… | source-owner | source-confirmation-required |
+| beh-5f84280db0 | [host/machine-offline.mdx:81](./host/machine-offline.mdx#L81) | What to look for: a single public IPv4 address is the egress address observed by this request (your own address will differ from the example). A timeout or an error such as Could not resolve host shows that this request… | source-owner | source-confirmation-required |
 | beh-b484ac4161 | [host/machine-offline.mdx:116](./host/machine-offline.mdx#L116) | This command shows the NVIDIA driver status and every GPU the operating system currently sees, including temperature, power, and memory usage. The Vastai service requires all GPUs to be visible at this level — if the dr… | source-owner | source-confirmation-required |
 | beh-264111af1a | [host/machine-offline.mdx:168](./host/machine-offline.mdx#L168) | Show the last 100 lines of the Vastai daemon log. This is where the actual error text is written — look for messages logged right before the service exited or crashed: | source-owner | source-confirmation-required |
 | beh-2df944930d | [host/machine-offline.mdx:194](./host/machine-offline.mdx#L194) | &gt; Note: Do not restart or modify NVIDIA drivers while active customer instances are running unless instructed by Support. | source-owner | source-confirmation-required |
@@ -580,6 +583,7 @@ These remain open even if every local test passes.
 | beh-b6b80106c5 | [host/maintenance-windows.mdx:61](./host/maintenance-windows.mdx#L61) | If you must take the machine down unexpectedly, schedule a maintenance window so clients are notified and can save their work. The start date is Unix epoch seconds in UTC, and the duration is in hours. | source-owner | source-confirmation-required |
 | beh-65c0b763c2 | [host/market-metrics.mdx:16](./host/market-metrics.mdx#L16) | All Vast market metric methods require a host-enabled account. Some views also require the account to have at least one registered machine. | source-owner | source-confirmation-required |
 | beh-069af22c85 | [host/market-metrics.mdx:65](./host/market-metrics.mdx#L65) | This is a better starting point than price alone because utilization matters. A GPU with a higher hourly price can still earn less if it is rented less often. Treat this as a rough gross compute estimate; it does not in… | source-owner | source-confirmation-required |
+| beh-6a793d4219 | [host/market-metrics.mdx:144](./host/market-metrics.mdx#L144) | Read the current snapshot API definition, historical trends API definition, and locations API definition for endpoint paths, request fields, and response shapes. These are the sources read for this page. They do not doc… | source-owner | source-confirmation-required |
 | beh-61def46506 | [host/network-ports.mdx:26](./host/network-ports.mdx#L26) | The forwarded router/firewall range must match the range configured in the host software. The 100-port guidance is practical headroom, not a self-test minimum. | source-owner | source-confirmation-required |
 | beh-fb6fc6cde7 | [host/network-ports.mdx:56](./host/network-ports.mdx#L56) | Vast instances need public inbound TCP and UDP reachability. CGNAT, double NAT without a real public forwarding path, many residential Starlink setups, incompatible IPv6-only service, blocked inbound ports, or no public… | source-owner | source-confirmation-required |
 | beh-74a2a545a3 | [host/network-ports.mdx:58](./host/network-ports.mdx#L58) | Compare your router WAN IP with your public IP and test from outside the LAN. If the router does not have a public inbound address or cannot forward the configured ports to the host, use a network connection that provid… | source-owner | source-confirmation-required |
@@ -667,7 +671,7 @@ These remain open even if every local test passes.
 | beh-1920b6eaf1 | [host/verification-stages.mdx:208](./host/verification-stages.mdx#L208) | Fix the underlying issue and wait for automation to refresh state. Most machine error states clear only after the platform sees sustained healthy behavior. | source-owner | source-confirmation-required |
 | beh-21e32db945 | [host/vms.mdx:16](./host/vms.mdx#L16) | VMs interact more directly with hardware than containers. Enable them only when the machine supports IOMMU and remains stable. | source-owner | source-confirmation-required |
 | beh-9a805c8f69 | [host/vms.mdx:47](./host/vms.mdx#L47) | on \| VM support is enabled. | source-owner | source-confirmation-required |
-| beh-8fc8caad84 | [host/vms.mdx:48](./host/vms.mdx#L48) | off \| VM support is disabled or a previous test failed. | source-owner | source-confirmation-required |
+| beh-9881264c26 | [host/vms.mdx:48](./host/vms.mdx#L48) | off \| VM support is disabled, a previous test failed, or the status helper could not read its configuration. | source-owner | source-confirmation-required |
 | beh-46c880fb01 | [host/vms.mdx:51](./host/vms.mdx#L51) | These values describe VM configuration state only. They do not confirm that the Host is idle or that a VM workload is healthy. | source-owner | source-confirmation-required |
 | beh-b6ca05d5b6 | [host/vms.mdx:63](./host/vms.mdx#L63) | The command marks VM enablement disabled and removes the VM configuration entry when present. It does not stop workloads, end rentals, or verify that the Host is safe to change. | source-owner | source-confirmation-required |
 | beh-2b6e894b54 | [host/vms.mdx:65](./host/vms.mdx#L65) | Run Check VM Status afterwards and confirm it reports off. Most hosts do not need to disable anything; unsupported machines are detected automatically. | source-owner | source-confirmation-required |

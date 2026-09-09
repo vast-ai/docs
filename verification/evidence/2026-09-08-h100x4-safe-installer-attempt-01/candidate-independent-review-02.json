@@ -1,0 +1,190 @@
+{
+  "schema_version": 1,
+  "id": "SAFE-04-INDEPENDENT-CANDIDATE-REVIEW-02",
+  "method": "Independent static read, byte comparison, line comparison, SHA-256, file-type/mode inspection, exact-token search, and Python AST parsing of the named original and candidate. The installer was neither imported nor executed. No network, SSH, API, keychain, sudo, host access, package/service mutation, container, workload, or reboot action was performed.",
+  "status": "PASS",
+  "status_scope": "Independent static candidate preparation review only; live execution not performed or approved by this record.",
+  "original_reviewer_record_sha256": "62f1842c04c362571f8df1ef08ffb6ec97ea584ba7992dc5b62eda5262f1edab",
+  "projection": "Selected fields copied from the independent restricted report. Restricted local paths omitted; original is retained privately.",
+  "inputs": {
+    "original": {
+      "name": "public-install",
+      "sha256": "6b00488ccf837ed6b7b5375270b75db284c3906f6aec832ad9c8573f44eaac6c"
+    },
+    "candidate": {
+      "name": "public-install.local-no-auto-self-test-retest",
+      "sha256": "4d87c48acc12a15eee1c2793d0631e1d936b2f996bdd50de4ad27b5acdf3d519"
+    },
+    "readiness": {
+      "ref": "verification/evidence/2026-09-08-h100x4-safe-installer-attempt-01/readiness-01.json",
+      "sha256": "c8f09cf82479a252b8b24b9f33a51024ecc601fb3e3a2c0ed2a1d01b5c06ac4b"
+    }
+  },
+  "checks": [
+    {
+      "id": "CAND-02-01",
+      "result": "PASS",
+      "claim": "Candidate identity matches the expected digest and the file is a regular, non-symlink, mode-0600 file.",
+      "sourceRefs": [
+        "public-install.local-no-auto-self-test-retest"
+      ],
+      "sourceHashes": [
+        "4d87c48acc12a15eee1c2793d0631e1d936b2f996bdd50de4ad27b5acdf3d519"
+      ],
+      "observationMethod": "Read-only lstat/stat plus SHA-256 over retained bytes."
+    },
+    {
+      "id": "CAND-02-02",
+      "result": "PASS",
+      "claim": "The candidate equals the pinned original with exactly one 696-byte block replaced by the approved 204-byte block; there are no other byte changes.",
+      "sourceRefs": [
+        "public-install:1961-1969",
+        "public-install.local-no-auto-self-test-retest:1961-1965"
+      ],
+      "sourceHashes": [
+        "6b00488ccf837ed6b7b5375270b75db284c3906f6aec832ad9c8573f44eaac6c",
+        "4d87c48acc12a15eee1c2793d0631e1d936b2f996bdd50de4ad27b5acdf3d519"
+      ],
+      "metrics": {
+        "replacementCount": 1,
+        "oldBlockBytes": 696,
+        "newBlockBytes": 204,
+        "byteDelta": -492,
+        "unchangedPrefixBytes": 87793,
+        "unchangedSuffixBytes": 531,
+        "expectedTransformationEqualsCandidate": true,
+        "unifiedDiffHunks": 1,
+        "lineOpcodesZeroBasedHalfOpen": [
+          [
+            "equal",
+            0,
+            1961,
+            0,
+            1961
+          ],
+          [
+            "replace",
+            1961,
+            1969,
+            1961,
+            1965
+          ],
+          [
+            "equal",
+            1969,
+            1988,
+            1965,
+            1984
+          ]
+        ]
+      },
+      "observationMethod": "Independent read_bytes comparison constructed expected = original prefix + approved new block + original suffix, then required exact equality with candidate; SequenceMatcher and unified diff independently showed one replacement hunk."
+    },
+    {
+      "id": "CAND-02-03",
+      "result": "PASS",
+      "claim": "The candidate parses as Python and the sole machine_id-and-send_mach_output conditional now contains only a log expression; no executable AST call containing start_self_test.sh remains in the candidate.",
+      "sourceRefs": [
+        "public-install:1961-1969",
+        "public-install.local-no-auto-self-test-retest:1961-1965"
+      ],
+      "sourceHashes": [
+        "6b00488ccf837ed6b7b5375270b75db284c3906f6aec832ad9c8573f44eaac6c",
+        "4d87c48acc12a15eee1c2793d0631e1d936b2f996bdd50de4ad27b5acdf3d519"
+      ],
+      "ast": {
+        "parse": "PASS",
+        "matchingConditionalCount": 1,
+        "matchingConditionalSpan": "candidate:1961-1965",
+        "matchingConditionalBodyNodeTypes": [
+          "Expr"
+        ],
+        "executableCallsContainingHelperFilename": 0
+      },
+      "removedExactExcerpt": "process_open([\"sudo\",\"/var/lib/vastai_kaalia/start_self_test.sh\", str(machine_id), _gpu_pph, \"1\", \"0\", server_url, machine_api_key, args.api_key], preexec_fn=os.setpgrp)",
+      "insertedExactExcerpt": "log(\n                \"Automatic self-test/listing launch omitted in this LOCAL MODIFIED installer variant.\",\n                level=1,\n            )",
+      "observationMethod": "Python ast.parse and AST walk over decoded retained candidate bytes; no import or execution."
+    },
+    {
+      "id": "CAND-02-04",
+      "result": "PASS_WITH_LIMITS",
+      "claim": "Exact-token search found no direct vast list machine, vast self-test machine, vast unlist machine, report_self_test_results, or start_self_test helper text in this candidate. This is a property of this retained installer file only, not of downloaded updater, daemon, helper, send_mach_info, server-side, or TUI code.",
+      "sourceRefs": [
+        "public-install.local-no-auto-self-test-retest:1-1984"
+      ],
+      "sourceHashes": [
+        "4d87c48acc12a15eee1c2793d0631e1d936b2f996bdd50de4ad27b5acdf3d519"
+      ],
+      "tokenCounts": {
+        "start_self_test": 0,
+        "vast list machine": 0,
+        "vast self-test machine": 0,
+        "vast unlist machine": 0,
+        "report_self_test_results": 0
+      },
+      "observationMethod": "Case-sensitive exact-token search of retained candidate bytes."
+    },
+    {
+      "id": "CAND-02-05",
+      "result": "VERIFIED_RESIDUAL_ACTIONS",
+      "claim": "The one-hunk edit leaves registration/identity, updater, send_mach_info speedtest, Docker/container pulls, NVML, NCCL, daemon/service, storage, and failure-log upload paths byte-identical to the original outside the changed block.",
+      "sourceRefs": [
+        "public-install.local-no-auto-self-test-retest:97-291",
+        "public-install.local-no-auto-self-test-retest:356-389",
+        "public-install.local-no-auto-self-test-retest:926-1168",
+        "public-install.local-no-auto-self-test-retest:1319-1334",
+        "public-install.local-no-auto-self-test-retest:1567-1662",
+        "public-install.local-no-auto-self-test-retest:1777-1959",
+        "public-install.local-no-auto-self-test-retest:1975-1981"
+      ],
+      "sourceHashes": [
+        "4d87c48acc12a15eee1c2793d0631e1d936b2f996bdd50de4ad27b5acdf3d519"
+      ],
+      "remainingTokenCounts": {
+        "send_identify(": 2,
+        "send_mach_info.py": 8,
+        "update_scripts.sh": 4,
+        "test_nvml_error.sh": 4,
+        "test_NCCL.py": 4,
+        "docker_diag_run(": 3
+      },
+      "observationMethod": "Byte-equality proof outside the one replacement plus exact-token search and static control-flow read.",
+      "limit": "Do not call the candidate offline, no-publication, workload-free, fully self-test-free, or safe for live execution."
+    },
+    {
+      "id": "CAND-02-06",
+      "result": "OBSERVATION_GAP_CLOSED_NOT_RUNTIME_PROOF",
+      "claim": "The newer readiness artifact closes the earlier evidence gap about whether a matching /var/lib/docker fstab entry was observed: at 2026-09-08T19:34:33Z it records the current mount as /dev/md127 XFS with prjquota and an evaluated matching fstab row as XFS with pquota. Those values support the default branch's current reuse predicates, because the source accepts pquota or prjquota. They do not prove the state will be unchanged at installer execution, the exact invocation will select that branch, quota enforcement, or complete storage safety.",
+      "sourceRefs": [
+        "verification/evidence/2026-09-08-h100x4-safe-installer-attempt-01/readiness-01.json:49-75",
+        "verification/evidence/2026-09-08-h100x4-safe-installer-attempt-01/readiness-01.json:100-102",
+        "public-install:926-929",
+        "public-install:1101-1116"
+      ],
+      "sourceHashes": [
+        "c8f09cf82479a252b8b24b9f33a51024ecc601fb3e3a2c0ed2a1d01b5c06ac4b",
+        "6b00488ccf837ed6b7b5375270b75db284c3906f6aec832ad9c8573f44eaac6c"
+      ],
+      "exactExcerpts": [
+        "/var/lib/docker /dev/md127 xfs rw,relatime,attr2,inode64,logbufs=8,logbsize=32k,sunit=1024,swidth=4096,prjquota",
+        "/var/lib/docker [PERSISTENT_DOCKER_DEVICE_ID] xfs rw,auto,pquota",
+        "return \"pquota\" in opts or \"prjquota\" in opts",
+        "in_fstab = (DOCKER_DIR_NOS in open(\"/etc/fstab\", \"r\").read())"
+      ],
+      "observationMethod": "SHA-bound JSON parse of already-retained readiness evidence and static comparison to the pinned installer's storage-reuse predicate; the reviewer performed no live refresh."
+    }
+  ],
+  "limitations": [
+    "The retained candidate proves only the one direct helper-launch omission in this source file. Unretained or mutable downloaded code can still act later.",
+    "No fresh setup/API credential was supplied or inspected; live installation remains blocked on a separately authorized credential and frozen invocation.",
+    "The authorized eventual prices of $3/GPU-hour, $0.30 bid, $0.50 GB-month and expiry no later than 2026-09-15 are not applied by this patch and were not tested.",
+    "No direct reboot command was added by this hunk, but whole-chain no-reboot behavior is not established because external downloaded executables remain unpinned/unretained and the exact driver/invocation path is not frozen.",
+    "The readiness artifact is a momentary preparation observation and explicitly provides no installation, quota-enforcement, Docker, workload, network, or no-reboot guarantee.",
+    "The original source review remains authoritative for the broader action-chain findings; this record only changes the earlier candidate-bytes status from unreviewed to a scoped static PASS."
+  ],
+  "original_review_preservation": {
+    "safe-installer-source-review.html": "037292f4c2da959aa9b6a08efa9dc377e783d0e9a509fd404ee6e7b6936a0a43",
+    "safe-installer-source-review.json": "1dbc38daa22a9e475ef5fb15a591dc3978399d713953e9ffe16362f3af449412",
+    "statement": "This follow-up record is additive. The original HTML and JSON reports were not edited."
+  }
+}
