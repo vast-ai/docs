@@ -8,7 +8,7 @@ Copy files/folders to and from cloud providers
 ## Usage
 
 ```bash
-vastai cloud copy --src SRC --dst DST --instance INSTANCE_ID -connection CONNECTION_ID --transfer TRANSFER_TYPE
+vastai cloud copy --src SRC --dst DST --instance INSTANCE_ID --connection CONNECTION_ID --transfer TRANSFER_TYPE
 ```
 
 ## Options
@@ -54,10 +54,11 @@ vastai cloud copy --src SRC --dst DST --instance INSTANCE_ID -connection CONNECT
 </ParamField>
 
 <ParamField path="--schedule" type="string">
-  try to schedule a command to run hourly, daily, or monthly. Valid values are HOURLY, DAILY, WEEKLY  For ex. `--schedule` DAILY Choices: `HOURLY`, `DAILY`, `WEEKLY`
+  try to schedule a command to run hourly, daily, or weekly. Valid values are HOURLY, DAILY, WEEKLY  For ex. --schedule DAILY
+  Allowed values: HOURLY, DAILY, WEEKLY
 </ParamField>
 
-<ParamField path="--start_date" type="string">
+<ParamField path="--start_date" type="string" default="2026-09-09">
   Start date/time in format 'YYYY-MM-DD HH:MM:SS PM' (UTC). Default is now. (optional)
 </ParamField>
 
@@ -65,12 +66,12 @@ vastai cloud copy --src SRC --dst DST --instance INSTANCE_ID -connection CONNECT
   End date/time in format 'YYYY-MM-DD HH:MM:SS PM' (UTC). Default is contract's end. (optional)
 </ParamField>
 
-<ParamField path="--day" type="integer" default="0">
-  Day of week you want scheduled job to run on (0-6, where 0=Sunday) or "*". Default will be 0. For ex. `--day` 0
+<ParamField path="--day" type="parse_day_cron_style">
+  Day of week you want scheduled job to run on (0-6, where 0=Sunday) or "*". Default will be 0. For ex. --day 0
 </ParamField>
 
-<ParamField path="--hour" type="integer" default="0">
-  Hour of day you want scheduled job to run on (0-23) or "*" (UTC). Default will be 0. For ex. `--hour` 16
+<ParamField path="--hour" type="parse_hour_cron_style">
+  Hour of day you want scheduled job to run on (0-23) or "*" (UTC). Default will be 0. For ex. --hour 16
 </ParamField>
 
 ## Description
@@ -87,10 +88,15 @@ vastai show connections
  ID    NAME      Cloud Type
  1001  test_dir  drive
  1003  data_dir  drive
+ 1004  hf_data   hf
 
  vastai cloud copy --src /folder --dst /workspace --instance 6003036 --connection 1001 --transfer "Instance To Cloud"
+ vastai cloud copy --src my-bucket/data --dst /workspace --instance 6003036 --connection 1004 --transfer "Cloud To Instance"
 
-The example copies all contents of /folder into /workspace on instance 6003036 from gdrive connection 'test_dir'.
+The first cloud copy example copies all contents of /folder on instance 6003036 into /workspace in gdrive connection 'test_dir'.
+The second cloud copy example copies my-bucket/data from Hugging Face connection 'hf_data' into /workspace on the instance.
+
+Note: Hugging Face cloud destinations must already exist as bucket paths; directories are not created automatically.
 ```
 
 ## Global Options
