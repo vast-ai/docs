@@ -1,0 +1,134 @@
+---
+title: "Automatic Security Updates"
+description: "Keep Ubuntu security updates installing on their own on a host machine, and keep the reboot a kernel update needs inside a maintenance window."
+---
+
+A host machine has a public address and serves clients continuously, so a
+security fix that waits for the next maintenance window stays unapplied for as
+long as it waits. Ubuntu installs those fixes on a timer through
+`unattended-upgrades`, which a stock Ubuntu Server install has installed and
+enabled. Leave it that way.
+
+The kernel is the one that needs planning. A kernel update does not take effect
+until a reboot, and a reboot stops every running instance, so the reboot
+belongs in a maintenance window.
+
+## Check what the machine does now
+
+Two APT settings and two timers control this. Query APT for the resolved value
+rather than reading a config file, because more than one file in
+`/etc/apt/apt.conf.d/` sets these and APT reads them in filename order:
+
+```bash
+apt-config dump APT::Periodic::Update-Package-Lists APT::Periodic::Unattended-Upgrade
+systemctl is-enabled apt-daily.timer apt-daily-upgrade.timer
+```
+
+```
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+enabled
+enabled
+```
+
+That is the stock Ubuntu Server result, and it is what a host machine wants.
+`"1"` is a daily interval in days: the machine refreshes package lists and runs
+the upgrade once a day. `apt-daily.timer` does the refresh and download,
+`apt-daily-upgrade.timer` runs the upgrade itself. What the last run installed
+is recorded in `/var/log/unattended-upgrades/unattended-upgrades.log`.
+
+<Note>
+`cat /etc/apt/apt.conf.d/20auto-upgrades` is not a sufficient check on its own.
+`update-notifier-common` ships `10periodic`, which also sets
+`APT::Periodic::Update-Package-Lists`. `apt-config dump` reports the merged
+result of every file.
+
+A setting that no file sets prints no line. This is equivalent to `"0"`,
+because APT defaults both settings to off.
+</Note>
+
+<Note>
+`systemctl is-enabled unattended-upgrades` is not the check for the daily run.
+That unit is the shutdown-time helper. The daily run is driven by
+`apt-daily-upgrade.timer` and gated on the APT settings above.
+</Note>
+
+## Confirm only security updates are allowed
+
+`unattended-upgrades` installs from the pockets listed in its allowed origins
+and nothing else:
+
+```bash
+apt-config dump Unattended-Upgrade::Allowed-Origins
+```
+
+```
+Unattended-Upgrade::Allowed-Origins "";
+Unattended-Upgrade::Allowed-Origins:: "${distro_id}:${distro_codename}";
+Unattended-Upgrade::Allowed-Origins:: "${distro_id}:${distro_codename}-security";
+Unattended-Upgrade::Allowed-Origins:: "${distro_id}ESMApps:${distro_codename}-apps-security";
+Unattended-Upgrade::Allowed-Origins:: "${distro_id}ESM:${distro_codename}-infra-security";
+```
+
+This is the default in `/etc/apt/apt.conf.d/50unattended-upgrades` and it is
+security only. The release pocket, `${distro_codename}`, does not change after
+release; it is listed so that a security update can pull in a dependency that
+is not itself a security update.
+
+A `${distro_codename}-updates` line means the machine installs the general
+updates pocket as well. Comment it out to return to security only.
+
+Third-party repositories are a separate origin, so nothing from NVIDIA's CUDA
+repository or Docker's repository is upgraded automatically regardless of the
+settings on this page.
+
+## Turn them on if they are off
+
+If the checks above report `"0"`, `disabled`, or no line at all:
+
+```bash
+sudo apt-get update
+sudo apt-get install unattended-upgrades
+sudo tee /etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+EOF
+sudo systemctl enable --now apt-daily.timer apt-daily-upgrade.timer
+```
+
+`20auto-upgrades` is read after `10periodic`, so writing both settings there
+takes precedence. Run the check from the first section again to confirm.
+
+## The kernel takes effect at the next reboot
+
+None of this changes the kernel the machine is running, and the machine never
+reboots itself: `Unattended-Upgrade::Automatic-Reboot` defaults to `false`.
+
+Keeping the kernel at the latest security patch level for your Ubuntu release
+is a [verification requirement](/host/verification-stages), and
+[Upgrade the Kernel](/host/upgrade-kernel) covers checking what is available,
+both upgrade paths, and the NVIDIA driver steps required afterwards.
+
+## Knowing when a reboot is pending
+
+An update that needs a reboot leaves a flag behind:
+
+```bash
+cat /var/run/reboot-required /var/run/reboot-required.pkgs 2>/dev/null
+```
+
+```
+*** System restart required ***
+linux-base
+```
+
+`update-notifier-common` writes the first file when a package that requires a
+reboot is installed and appends the package name to the second. A kernel
+update is recorded as `linux-base`, not as the `linux-image` package that was
+installed, so do not go looking for that name. No output means nothing is
+waiting on a reboot.
+
+`/var/run` is a symlink to `/run`, a tmpfs, so the flag clears on reboot
+without anything having to remove it. When it appears, schedule a window with
+[`vastai schedule maintenance`](/host/cli/schedule-maint) so clients are
+notified, and reboot then.
