@@ -1,0 +1,444 @@
+{
+  "record_type": "BOUNDED_UNVALIDATED_STATIC_SOURCE_CANDIDATES",
+  "prepared_at_utc": "2026-09-14T19:08:38.303894+00:00",
+  "mode": "READ_ONLY_CANDIDATE_MAPPING_NO_MODEL_CHANGE",
+  "family": "CLI self-test preflight thresholds and bandwidth formula",
+  "docs_repository": "/Users/hanneszietsman/VastAi/CON-1584/docs-pr185-closure-20260914",
+  "docs_head": "c1bf28dacd051500505523e74bc1eac7528ada49",
+  "model_path": "/Users/hanneszietsman/VastAi/CON-1584/docs-pr185-closure-20260914/verification/current-host-docs-review.json",
+  "model_sha256": "4349f33a08afe8a8110ea60feb99bd45a90b377fea46fbdef6108dc87522c478",
+  "counts": {
+    "candidate_claims": 12,
+    "direct_source_supported": 10,
+    "held_for_rounding_scope": 2,
+    "model_changes": 0
+  },
+  "sources": [
+    {
+      "id": "CLI_DIAGNOSTICS",
+      "repository": "vast-ai/vast-cli",
+      "revision": "1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc",
+      "path": "vastai/cli/self_test/machine_diagnostics.py",
+      "local_snapshot_path": "/private/tmp/host-docs-d10-3o6tftdu/current-cli/vastai/cli/self_test/machine_diagnostics.py",
+      "sha256": "9cd1ddbdffbc97d86e0ecf00b3e166bcbffc8d0f5d9daf97cc561eda61e72152",
+      "exact_git_object_match": true,
+      "url": "https://github.com/vast-ai/vast-cli/blob/1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc/vastai/cli/self_test/machine_diagnostics.py"
+    },
+    {
+      "id": "CLI_BANDWIDTH",
+      "repository": "vast-ai/vast-cli",
+      "revision": "1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc",
+      "path": "vastai/cli/util.py",
+      "local_snapshot_path": "/private/tmp/host-docs-d10-3o6tftdu/current-cli/vastai/cli/util.py",
+      "sha256": "c1963374ddf6e7483afffbe8a607f6d1a58bafd915cd4b85a0fb778012cd83d8",
+      "exact_git_object_match": true,
+      "url": "https://github.com/vast-ai/vast-cli/blob/1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc/vastai/cli/util.py"
+    }
+  ],
+  "source_excerpts": [
+    {
+      "id": "CUDA",
+      "source_id": "CLI_DIAGNOSTICS",
+      "start_line": 167,
+      "end_line": 178,
+      "text": "        _check(\n            \"cuda.version\",\n            \"CUDA version\",\n            safe_float(offer.get(\"cuda_max_good\")),\n            11.8,\n            \">=\",\n            \"CUDA\",\n            safe_float(offer.get(\"cuda_max_good\")) >= 11.8,\n            \"The self-test image needs a host driver stack compatible with CUDA 11.8 or newer.\",\n            \"Update the NVIDIA driver/CUDA stack, then confirm with: vastai search offers \"\n            f\"'machine_id={offer.get('machine_id') or 'unknown'} rentable=any rented=any'\",\n        ),",
+      "text_sha256": "d561acb325be99f387548f8b27ae3189a4d2ac5e0616b268a2ed0b44c8824b25"
+    },
+    {
+      "id": "RELIABILITY",
+      "source_id": "CLI_DIAGNOSTICS",
+      "start_line": 179,
+      "end_line": 189,
+      "text": "        _check(\n            \"reliability\",\n            \"Reliability\",\n            safe_float(offer.get(\"reliability\")),\n            0.90,\n            \">\",\n            \"ratio\",\n            safe_float(offer.get(\"reliability\")) > 0.90,\n            \"Self-test uses reliability as a guardrail before launching a temporary instance.\",\n            \"Let the host stabilize and resolve recent failures before retrying the self-test.\",\n        ),",
+      "text_sha256": "3747eca28fcd094a7df3300512d0df418c4c90d0fdf0347a31a848584c1be25b"
+    },
+    {
+      "id": "PCIE",
+      "source_id": "CLI_DIAGNOSTICS",
+      "start_line": 207,
+      "end_line": 217,
+      "text": "        _check(\n            \"pcie.bandwidth\",\n            \"PCIe bandwidth\",\n            safe_float(offer.get(\"pcie_bw\")),\n            2.85,\n            \">\",\n            \"GB/s\",\n            safe_float(offer.get(\"pcie_bw\")) > 2.85,\n            \"Low PCIe bandwidth can make GPU stress and transfer checks fail or time out.\",\n            \"Check BIOS PCIe generation/lane settings and confirm GPUs are seated in full-speed slots.\",\n        ),",
+      "text_sha256": "818a271600f62bb516fdb46d9fa36480fee943c12938cb8f24fa1db74c432242"
+    },
+    {
+      "id": "BANDWIDTH_INPUT",
+      "source_id": "CLI_DIAGNOSTICS",
+      "start_line": 151,
+      "end_line": 154,
+      "text": "def preflight_requirement_checks(offer):\n    gpu_total_ram = safe_float(offer.get(\"gpu_total_ram\"))\n    per_gpu_ram_gib = per_gpu_vram_gib(offer)\n    required_mbps = required_inet_mbps(gpu_total_ram)",
+      "text_sha256": "7eceb5affae6afc9cce9d396afb4dd5dc950a7a7c2bdfa42ace65b75dcd5fbf9"
+    },
+    {
+      "id": "BANDWIDTH_COMPARISONS",
+      "source_id": "CLI_DIAGNOSTICS",
+      "start_line": 218,
+      "end_line": 239,
+      "text": "        _check(\n            \"network.download\",\n            \"Download speed\",\n            safe_float(offer.get(\"inet_down\")),\n            round(required_mbps, 2),\n            \">=\",\n            \"Mb/s\",\n            safe_float(offer.get(\"inet_down\")) >= required_mbps,\n            \"The bandwidth floor scales with total VRAM so large GPU hosts can complete data movement tests.\",\n            \"Improve host download bandwidth or reduce contention, then rerun the Vast host verification.\",\n        ),\n        _check(\n            \"network.upload\",\n            \"Upload speed\",\n            safe_float(offer.get(\"inet_up\")),\n            round(required_mbps, 2),\n            \">=\",\n            \"Mb/s\",\n            safe_float(offer.get(\"inet_up\")) >= required_mbps,\n            \"The tester needs enough upload bandwidth to report progress and complete network checks.\",\n            \"Improve host upload bandwidth or reduce contention, then rerun the Vast host verification.\",\n        ),",
+      "text_sha256": "0474377bced06bcd5989c17e7aee632c7d2ba654a0eb7cd09b277e764b3efd5e"
+    },
+    {
+      "id": "RAM_CAP_CONSTANT",
+      "source_id": "CLI_DIAGNOSTICS",
+      "start_line": 23,
+      "end_line": 26,
+      "text": "# Very large GPU hosts, such as 8x B300 systems, can exceed 2 TB of total VRAM.\n# Once a host has about 2 TB of system RAM, do not disqualify it only because it\n# is slightly below 95% of total VRAM.\nSYSTEM_RAM_REQUIREMENT_CAP_MIB = 2_000_000",
+      "text_sha256": "89eb5949bb6b42d4d6bc8ec10dd9909061f34d6727eea772a4719f298495fe4a"
+    },
+    {
+      "id": "RAM_CAP_USE",
+      "source_id": "CLI_DIAGNOSTICS",
+      "start_line": 151,
+      "end_line": 164,
+      "text": "def preflight_requirement_checks(offer):\n    gpu_total_ram = safe_float(offer.get(\"gpu_total_ram\"))\n    per_gpu_ram_gib = per_gpu_vram_gib(offer)\n    required_mbps = required_inet_mbps(gpu_total_ram)\n    cpu_ram = safe_float(offer.get(\"cpu_ram\"))\n    cpu_cores = int(safe_float(offer.get(\"cpu_cores\")))\n    num_gpus = int(safe_float(offer.get(\"num_gpus\")))\n    listed_gpus = num_gpus if num_gpus > 0 else 1\n    direct_port_count = safe_float(offer.get(\"direct_port_count\"))\n    required_min_ports = 3 * listed_gpus\n    recommended_max_ports = 64 * listed_gpus\n    uncapped_required_cpu_ram = 0.95 * gpu_total_ram\n    required_cpu_ram = min(uncapped_required_cpu_ram, SYSTEM_RAM_REQUIREMENT_CAP_MIB)\n    required_cpu_cores = 2 * num_gpus",
+      "text_sha256": "19a92b3764e7160efbf9a8d45164746a46399070f1bc74720e6c51c77dbba422"
+    },
+    {
+      "id": "FORMULA",
+      "source_id": "CLI_BANDWIDTH",
+      "start_line": 706,
+      "end_line": 719,
+      "text": "def required_inet_mbps(gpu_total_ram_mib):\n    \"\"\"Machine-total VRAM-scaled bandwidth floor for the self-test pre-flight check.\n\n    Returns the minimum inet_down / inet_up (Mb/s) a machine needs to qualify\n    for the GPU verification pipeline. Floors at 100, caps at 500, scales\n    linearly with total VRAM against a 192 GiB reference point.\n\n    Falsy / missing gpu_total_ram falls to the 100 Mb/s floor. The column is\n    MiB (binary), so a B200 reporting 183359 MiB (~179 GiB) lands at 466\n    Mb/s; the cap is reached once total VRAM crosses 192 GiB, e.g. multi-GPU\n    machines.\n    \"\"\"\n    total_vram_gib = (gpu_total_ram_mib or 0) / 1024.0\n    return min(500.0, max(100.0, 500.0 * total_vram_gib / 192.0))",
+      "text_sha256": "8b1415cde83bb76575264f8a92e9c5b7287b21252e8b7ffdea5856eeee4d7bf4"
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "MCL-b165e7ceb4cea896",
+      "status_observed": "UNVALIDATED",
+      "classification_observed": "REVIEWED_TECHNICAL_DECLARATION",
+      "required_evidence_types": [
+        "CANONICAL_IMPLEMENTATION_SOURCE"
+      ],
+      "page": "host/how-to-self-test.mdx",
+      "page_sha256": "270e1e04dfffb976bad99d3a0dce086ab96c8b2470f45f9a508710666cede44a",
+      "spans": [
+        {
+          "source_file": "host/how-to-self-test.mdx",
+          "start": 41,
+          "end": 41,
+          "text_sha256": "b01e99bf67857a9c98d1d4384b8c0601d11d805a070479e082f30f825d3e5d76"
+        }
+      ],
+      "literal": "- Reliability is greater than `0.90`.",
+      "source_excerpt_ids": [
+        "RELIABILITY"
+      ],
+      "support": "Declares the client preflight strict reliability comparison >0.90.",
+      "candidate_disposition": "SOURCE_SUPPORTED_DECLARATION",
+      "scope_limit": "Client declaration/formula at the exact pinned CLI revision only; no claim that a machine meets it, backend verification uses it, or a runtime/self-test/rental ran or passed.",
+      "context": "Line 37 introduces the list as what the CLI checks before renting; do not also approve adjacent line 49 claim that these are the same as platform verification requirements."
+    },
+    {
+      "claim_id": "MCL-66dcd03d8d3ac701",
+      "status_observed": "UNVALIDATED",
+      "classification_observed": "REVIEWED_TECHNICAL_DECLARATION",
+      "required_evidence_types": [
+        "CANONICAL_IMPLEMENTATION_SOURCE"
+      ],
+      "page": "host/how-to-self-test.mdx",
+      "page_sha256": "270e1e04dfffb976bad99d3a0dce086ab96c8b2470f45f9a508710666cede44a",
+      "spans": [
+        {
+          "source_file": "host/how-to-self-test.mdx",
+          "start": 42,
+          "end": 42,
+          "text_sha256": "e332ba106fac96ddcbd06ba89b760b1f62d4314926af303e682a1507cd167750"
+        }
+      ],
+      "literal": "- CUDA compatibility is `>= 11.8`.",
+      "source_excerpt_ids": [
+        "CUDA"
+      ],
+      "support": "Declares the client preflight CUDA comparison >=11.8.",
+      "candidate_disposition": "SOURCE_SUPPORTED_DECLARATION",
+      "scope_limit": "Client declaration/formula at the exact pinned CLI revision only; no claim that a machine meets it, backend verification uses it, or a runtime/self-test/rental ran or passed.",
+      "context": "Line 37 introduces the list as what the CLI checks before renting; do not also approve adjacent line 49 claim that these are the same as platform verification requirements."
+    },
+    {
+      "claim_id": "MCL-9a580f94561b2775",
+      "status_observed": "UNVALIDATED",
+      "classification_observed": "REVIEWED_TECHNICAL_DECLARATION",
+      "required_evidence_types": [
+        "CANONICAL_IMPLEMENTATION_SOURCE"
+      ],
+      "page": "host/how-to-self-test.mdx",
+      "page_sha256": "270e1e04dfffb976bad99d3a0dce086ab96c8b2470f45f9a508710666cede44a",
+      "spans": [
+        {
+          "source_file": "host/how-to-self-test.mdx",
+          "start": 44,
+          "end": 44,
+          "text_sha256": "40a380e06fdbf58f3cfc375e62361eb523e41f4c38f79d292a8f131387a6d9f8"
+        }
+      ],
+      "literal": "- PCIe bandwidth is greater than 2.85 GB/s.",
+      "source_excerpt_ids": [
+        "PCIE"
+      ],
+      "support": "Declares the client preflight PCIe bandwidth comparison >2.85 GB/s.",
+      "candidate_disposition": "SOURCE_SUPPORTED_DECLARATION",
+      "scope_limit": "Client declaration/formula at the exact pinned CLI revision only; no claim that a machine meets it, backend verification uses it, or a runtime/self-test/rental ran or passed.",
+      "context": "Line 37 introduces the list as what the CLI checks before renting; do not also approve adjacent line 49 claim that these are the same as platform verification requirements."
+    },
+    {
+      "claim_id": "MCL-3b82e89867c343f8",
+      "status_observed": "UNVALIDATED",
+      "classification_observed": "REVIEWED_TECHNICAL_DECLARATION",
+      "required_evidence_types": [
+        "CANONICAL_IMPLEMENTATION_SOURCE"
+      ],
+      "page": "host/how-to-self-test.mdx",
+      "page_sha256": "270e1e04dfffb976bad99d3a0dce086ab96c8b2470f45f9a508710666cede44a",
+      "spans": [
+        {
+          "source_file": "host/how-to-self-test.mdx",
+          "start": 45,
+          "end": 45,
+          "text_sha256": "bcbf56da1238d2ac54313d5babd0aaae34aad9bf3e15c2c9d0ecd5c57fc6585a"
+        }
+      ],
+      "literal": "- Upload/download bandwidth meet the VRAM-scaled requirement.",
+      "source_excerpt_ids": [
+        "FORMULA",
+        "BANDWIDTH_INPUT",
+        "BANDWIDTH_COMPARISONS"
+      ],
+      "support": "Declares that both client network checks use the total-VRAM-scaled threshold.",
+      "candidate_disposition": "SOURCE_SUPPORTED_DECLARATION",
+      "scope_limit": "Client declaration/formula at the exact pinned CLI revision only; no claim that a machine meets it, backend verification uses it, or a runtime/self-test/rental ran or passed.",
+      "context": "Line 37 introduces the list as what the CLI checks before renting; do not also approve adjacent line 49 claim that these are the same as platform verification requirements."
+    },
+    {
+      "claim_id": "CUR-86637c5b58be0905",
+      "status_observed": "UNVALIDATED",
+      "classification_observed": "REVIEWED_TECHNICAL_DECLARATION",
+      "required_evidence_types": [
+        "CANONICAL_IMPLEMENTATION_SOURCE"
+      ],
+      "page": "host/self-test-reference.mdx",
+      "page_sha256": "3cfcbcfff94bdfab2510054e5af11d7e9ffcda49d96d196c083a8905b09b28c9",
+      "spans": [
+        {
+          "source_file": "host/self-test-reference.mdx",
+          "start": 65,
+          "end": 65,
+          "text_sha256": "ecf506c5b15d5acc33e217e34787817648c794d7d11702f8717e3866cdf1e6c4"
+        }
+      ],
+      "literal": "For B300 and other very-high-VRAM hosts, the system RAM gate stops scaling at 2,000,000 MiB (about 2 TB).",
+      "source_excerpt_ids": [
+        "RAM_CAP_CONSTANT",
+        "RAM_CAP_USE"
+      ],
+      "support": "Matches the declared system RAM threshold cap of 2,000,000 MiB; approximately 2 TB is intentionally approximate.",
+      "candidate_disposition": "SOURCE_SUPPORTED_DECLARATION",
+      "scope_limit": "Client declaration/formula at the exact pinned CLI revision only; no claim that a machine meets it, backend verification uses it, or a runtime/self-test/rental ran or passed."
+    },
+    {
+      "claim_id": "CUR-a0c1b91834ef5f98",
+      "status_observed": "UNVALIDATED",
+      "classification_observed": "REVIEWED_TECHNICAL_DECLARATION",
+      "required_evidence_types": [
+        "CANONICAL_IMPLEMENTATION_SOURCE"
+      ],
+      "page": "host/self-test-reference.mdx",
+      "page_sha256": "3cfcbcfff94bdfab2510054e5af11d7e9ffcda49d96d196c083a8905b09b28c9",
+      "spans": [
+        {
+          "source_file": "host/self-test-reference.mdx",
+          "start": 87,
+          "end": 89,
+          "text_sha256": "2bda33cf7af713f68baa5498ea225d51e3b2c1b3fdbb3ea83a81c84b2050a9c8"
+        }
+      ],
+      "literal": "```text\nrequired_mbps = min(500, max(100, 500 * total_vram_gib / 192))\n```",
+      "source_excerpt_ids": [
+        "FORMULA"
+      ],
+      "support": "Exact algebraic rendering of the pinned helper, with total_vram_gib corresponding to input MiB/1024.",
+      "candidate_disposition": "SOURCE_SUPPORTED_DECLARATION",
+      "scope_limit": "Client declaration/formula at the exact pinned CLI revision only; no claim that a machine meets it, backend verification uses it, or a runtime/self-test/rental ran or passed."
+    },
+    {
+      "claim_id": "CUR-e2bb91ee982dd5b1",
+      "status_observed": "UNVALIDATED",
+      "classification_observed": "REVIEWED_TECHNICAL_DECLARATION",
+      "required_evidence_types": [
+        "CANONICAL_IMPLEMENTATION_SOURCE"
+      ],
+      "page": "host/self-test-reference.mdx",
+      "page_sha256": "3cfcbcfff94bdfab2510054e5af11d7e9ffcda49d96d196c083a8905b09b28c9",
+      "spans": [
+        {
+          "source_file": "host/self-test-reference.mdx",
+          "start": 93,
+          "end": 93,
+          "text_sha256": "dba81cdad827434128342df5b148f22d843a009697bca9b39cb8d09de8edbfff"
+        }
+      ],
+      "literal": "| 8 GiB total VRAM | 100 Mb/s |",
+      "source_excerpt_ids": [
+        "FORMULA"
+      ],
+      "support": "At 8 GiB the 100 Mb/s floor applies.",
+      "candidate_disposition": "SOURCE_SUPPORTED_DECLARATION",
+      "scope_limit": "Client declaration/formula at the exact pinned CLI revision only; no claim that a machine meets it, backend verification uses it, or a runtime/self-test/rental ran or passed."
+    },
+    {
+      "claim_id": "CUR-acbd513b75fc99a9",
+      "status_observed": "UNVALIDATED",
+      "classification_observed": "REVIEWED_TECHNICAL_DECLARATION",
+      "required_evidence_types": [
+        "CANONICAL_IMPLEMENTATION_SOURCE"
+      ],
+      "page": "host/self-test-reference.mdx",
+      "page_sha256": "3cfcbcfff94bdfab2510054e5af11d7e9ffcda49d96d196c083a8905b09b28c9",
+      "spans": [
+        {
+          "source_file": "host/self-test-reference.mdx",
+          "start": 94,
+          "end": 94,
+          "text_sha256": "a93ba1310aeea5177c4790bd26ea0eb0a2f5e3b3e9e291ba970ab6a34b1c41f2"
+        }
+      ],
+      "literal": "| 48 GiB total VRAM | 125 Mb/s |",
+      "source_excerpt_ids": [
+        "FORMULA"
+      ],
+      "support": "At 48 GiB the exact threshold is 125 Mb/s.",
+      "candidate_disposition": "SOURCE_SUPPORTED_DECLARATION",
+      "scope_limit": "Client declaration/formula at the exact pinned CLI revision only; no claim that a machine meets it, backend verification uses it, or a runtime/self-test/rental ran or passed."
+    },
+    {
+      "claim_id": "CUR-d4f1da8861e06594",
+      "status_observed": "UNVALIDATED",
+      "classification_observed": "REVIEWED_TECHNICAL_DECLARATION",
+      "required_evidence_types": [
+        "CANONICAL_IMPLEMENTATION_SOURCE"
+      ],
+      "page": "host/self-test-reference.mdx",
+      "page_sha256": "3cfcbcfff94bdfab2510054e5af11d7e9ffcda49d96d196c083a8905b09b28c9",
+      "spans": [
+        {
+          "source_file": "host/self-test-reference.mdx",
+          "start": 95,
+          "end": 95,
+          "text_sha256": "8c59b06933299981d63d32e2fbfc7cd15b8a2191301520fc843324bfe2940133"
+        }
+      ],
+      "literal": "| 80 GiB total VRAM | 208.33 Mb/s |",
+      "source_excerpt_ids": [
+        "FORMULA",
+        "BANDWIDTH_COMPARISONS"
+      ],
+      "support": "At 80 GiB the exact threshold is 625/3 Mb/s; 208.33 is the two-decimal display, not the exact comparison boundary.",
+      "candidate_disposition": "HOLD_FOR_ROUNDING_SCOPE",
+      "scope_limit": "Client declaration/formula at the exact pinned CLI revision only; no claim that a machine meets it, backend verification uses it, or a runtime/self-test/rental ran or passed.",
+      "precision_detail": {
+        "total_vram_gib": 80,
+        "exact_mbps_fraction": "625/3",
+        "two_decimal_display": "208.33",
+        "implementation_compares_unrounded": true,
+        "implementation_displays_rounded": true,
+        "minimum_follow_up": "Qualify the table as rounded diagnostic display values and state the exact gate uses the formula before closing this literal; do not silently equate a rounded number with an exact pass threshold."
+      }
+    },
+    {
+      "claim_id": "CUR-46851196d475b688",
+      "status_observed": "UNVALIDATED",
+      "classification_observed": "REVIEWED_TECHNICAL_DECLARATION",
+      "required_evidence_types": [
+        "CANONICAL_IMPLEMENTATION_SOURCE"
+      ],
+      "page": "host/self-test-reference.mdx",
+      "page_sha256": "3cfcbcfff94bdfab2510054e5af11d7e9ffcda49d96d196c083a8905b09b28c9",
+      "spans": [
+        {
+          "source_file": "host/self-test-reference.mdx",
+          "start": 96,
+          "end": 96,
+          "text_sha256": "6610b3f44dbc6eb2e19dc9a9ccc5ba18d670e36fc330195df894de525c858ae1"
+        }
+      ],
+      "literal": "| 96 GiB total VRAM | 250 Mb/s |",
+      "source_excerpt_ids": [
+        "FORMULA"
+      ],
+      "support": "At 96 GiB the exact threshold is 250 Mb/s.",
+      "candidate_disposition": "SOURCE_SUPPORTED_DECLARATION",
+      "scope_limit": "Client declaration/formula at the exact pinned CLI revision only; no claim that a machine meets it, backend verification uses it, or a runtime/self-test/rental ran or passed."
+    },
+    {
+      "claim_id": "CUR-6a6640ac777aa39c",
+      "status_observed": "UNVALIDATED",
+      "classification_observed": "REVIEWED_TECHNICAL_DECLARATION",
+      "required_evidence_types": [
+        "CANONICAL_IMPLEMENTATION_SOURCE"
+      ],
+      "page": "host/self-test-reference.mdx",
+      "page_sha256": "3cfcbcfff94bdfab2510054e5af11d7e9ffcda49d96d196c083a8905b09b28c9",
+      "spans": [
+        {
+          "source_file": "host/self-test-reference.mdx",
+          "start": 97,
+          "end": 97,
+          "text_sha256": "ed924be5ebbc8d00e146c9753739fc041f26cddc23ffa810570ce28c294c8d4f"
+        }
+      ],
+      "literal": "| 160 GiB total VRAM | 416.67 Mb/s |",
+      "source_excerpt_ids": [
+        "FORMULA",
+        "BANDWIDTH_COMPARISONS"
+      ],
+      "support": "At 160 GiB the exact threshold is 1250/3 Mb/s; 416.67 is the two-decimal display, not the exact comparison boundary.",
+      "candidate_disposition": "HOLD_FOR_ROUNDING_SCOPE",
+      "scope_limit": "Client declaration/formula at the exact pinned CLI revision only; no claim that a machine meets it, backend verification uses it, or a runtime/self-test/rental ran or passed.",
+      "precision_detail": {
+        "total_vram_gib": 160,
+        "exact_mbps_fraction": "1250/3",
+        "two_decimal_display": "416.67",
+        "implementation_compares_unrounded": true,
+        "implementation_displays_rounded": true,
+        "minimum_follow_up": "Qualify the table as rounded diagnostic display values and state the exact gate uses the formula before closing this literal; do not silently equate a rounded number with an exact pass threshold."
+      }
+    },
+    {
+      "claim_id": "CUR-8b49b48a8f4b55e6",
+      "status_observed": "UNVALIDATED",
+      "classification_observed": "REVIEWED_TECHNICAL_DECLARATION",
+      "required_evidence_types": [
+        "CANONICAL_IMPLEMENTATION_SOURCE"
+      ],
+      "page": "host/self-test-reference.mdx",
+      "page_sha256": "3cfcbcfff94bdfab2510054e5af11d7e9ffcda49d96d196c083a8905b09b28c9",
+      "spans": [
+        {
+          "source_file": "host/self-test-reference.mdx",
+          "start": 98,
+          "end": 98,
+          "text_sha256": "0694c8e20dafbfbe5b1200d17f907d1b0e7add63c101fa73fb5a3f5819f99f9c"
+        }
+      ],
+      "literal": "| 192 GiB total VRAM or more | 500 Mb/s |",
+      "source_excerpt_ids": [
+        "FORMULA"
+      ],
+      "support": "At 192 GiB and above the 500 Mb/s cap applies.",
+      "candidate_disposition": "SOURCE_SUPPORTED_DECLARATION",
+      "scope_limit": "Client declaration/formula at the exact pinned CLI revision only; no claim that a machine meets it, backend verification uses it, or a runtime/self-test/rental ran or passed."
+    }
+  ],
+  "already_retained_provenance": [
+    "verification/evidence/2026-09-14-host-closure-correction-attempt-01/generator-source-refresh.json",
+    "/Users/hanneszietsman/VastAi/research/host-docs-meeting-20260914/reconciliation/generator-check.json"
+  ],
+  "limits": [
+    "No new network, Host/account operation, paid run, source import or test was performed. Only exact source bytes and literal scope were read.",
+    "Generator reproduction/provenance is supporting source-location evidence, not independent behavior proof.",
+    "All 12 current occurrences require only canonical source and already use REVIEWED_TECHNICAL_DECLARATION.",
+    "The six bandwidth rows share one exact helper; duplicate/equivalent occurrence accounting remains per literal, not six executions.",
+    "The two rounding rows are deliberately withheld from the direct 10 subset.",
+    "Snapshot source bytes matched the exact Git objects. Selected excerpts are retained here so source evidence need not depend only on temporary filesystem survival.",
+    "Adjacent claims about eligibility, platform-wide verification policy, runtime success, full workflow or image publication were not selected."
+  ]
+}

@@ -2,7 +2,7 @@
 
 Current-source claims requiring proof or correction. Historical evidence is carried only where exact source identity is recorded.
 
-Current dispositions: 2008 occurrences (345 PASS, 87 editorial NOT_APPLICABLE, 1576 requiring review or evidence). Most dispositions are automated or exact historical carry-forward; this package records no invented manual completion.
+Current dispositions: 2008 occurrences (369 PASS, 87 editorial NOT_APPLICABLE, 1552 requiring review or evidence). Most dispositions are automated or exact historical carry-forward; this package records no invented manual completion.
 
 ## [Hosting Overview](http://127.0.0.1:4000/host/hosting-overview)
 
@@ -5396,34 +5396,6 @@ Current dispositions: 2008 occurrences (345 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** The Self-Test and Verification source owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-d4c66781870fa855 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-d4c66781870fa855 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [What Self-Test Checks](http://127.0.0.1:4000/host/how-to-self-test#what-self-test-checks) — `MCL-b165e7ceb4cea896`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Reliability is greater than `0.90`.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [What Self-Test Checks](http://127.0.0.1:4000/host/how-to-self-test#what-self-test-checks) — `MCL-66dcd03d8d3ac701`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - CUDA compatibility is `>= 11.8`.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [What Self-Test Checks](http://127.0.0.1:4000/host/how-to-self-test#what-self-test-checks) — `MCL-c7d653bb5b01f0a2`
 
 **Status:** UNVALIDATED
@@ -5437,34 +5409,6 @@ Current dispositions: 2008 occurrences (345 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-c7d653bb5b01f0a2 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [What Self-Test Checks](http://127.0.0.1:4000/host/how-to-self-test#what-self-test-checks) — `MCL-9a580f94561b2775`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - PCIe bandwidth is greater than 2.85 GB/s.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [What Self-Test Checks](http://127.0.0.1:4000/host/how-to-self-test#what-self-test-checks) — `MCL-3b82e89867c343f8`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Upload/download bandwidth meet the VRAM-scaled requirement.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [What Self-Test Checks](http://127.0.0.1:4000/host/how-to-self-test#what-self-test-checks) — `MCL-9051c0fd8445ad78`
 
@@ -6252,20 +6196,6 @@ Current dispositions: 2008 occurrences (345 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [Preflight Checks](http://127.0.0.1:4000/host/self-test-reference#preflight-checks) — `CUR-86637c5b58be0905`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** For B300 and other very-high-VRAM hosts, the system RAM gate stops scaling at 2,000,000 MiB (about 2 TB).
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [Direct Ports And Port Mapping](http://127.0.0.1:4000/host/self-test-reference#direct-ports-and-port-mapping) — `CUR-cf7d3f00409a8f1c`
 
 **Status:** UNVALIDATED
@@ -6392,48 +6322,6 @@ Current dispositions: 2008 occurrences (345 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [Bandwidth Formula](http://127.0.0.1:4000/host/self-test-reference#bandwidth-formula) — `CUR-a0c1b91834ef5f98`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```text required_mbps = min(500, max(100, 500 * total_vram_gib / 192)) ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Bandwidth Formula](http://127.0.0.1:4000/host/self-test-reference#bandwidth-formula) — `CUR-e2bb91ee982dd5b1`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | 8 GiB total VRAM | 100 Mb/s |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Bandwidth Formula](http://127.0.0.1:4000/host/self-test-reference#bandwidth-formula) — `CUR-acbd513b75fc99a9`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | 48 GiB total VRAM | 125 Mb/s |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [Bandwidth Formula](http://127.0.0.1:4000/host/self-test-reference#bandwidth-formula) — `CUR-d4f1da8861e06594`
 
 **Status:** UNVALIDATED
@@ -6448,39 +6336,11 @@ Current dispositions: 2008 occurrences (345 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
-### [Bandwidth Formula](http://127.0.0.1:4000/host/self-test-reference#bandwidth-formula) — `CUR-46851196d475b688`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | 96 GiB total VRAM | 250 Mb/s |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [Bandwidth Formula](http://127.0.0.1:4000/host/self-test-reference#bandwidth-formula) — `CUR-6a6640ac777aa39c`
 
 **Status:** UNVALIDATED
 
 **Literal source text:** | 160 GiB total VRAM | 416.67 Mb/s |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Bandwidth Formula](http://127.0.0.1:4000/host/self-test-reference#bandwidth-formula) — `CUR-8b49b48a8f4b55e6`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | 192 GiB total VRAM or more | 500 Mb/s |
 
 **Required proof:** Canonical Implementation Source
 
@@ -7581,48 +7441,6 @@ Current dispositions: 2008 occurrences (345 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Host implementation source owner
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Diagnostic Bundles](http://127.0.0.1:4000/host/self-test-reference#diagnostic-bundles) — `CUR-31030b5f3ede8df7`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Default output directory: `/tmp`.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Diagnostic Bundles](http://127.0.0.1:4000/host/self-test-reference#diagnostic-bundles) — `CUR-47f7eac245b806c6`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Disable automatic bundles with `--no-support-bundle` or `VAST_SELF_TEST_SUPPORT_BUNDLE=0`.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Diagnostic Bundles](http://127.0.0.1:4000/host/self-test-reference#diagnostic-bundles) — `CUR-fa63eb10bec89134`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Choose another directory with `--support-bundle-dir <dir>`.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [Diagnostic Bundles](http://127.0.0.1:4000/host/self-test-reference#diagnostic-bundles) — `CUR-abbdd33f4e5840c2`
 
@@ -17096,20 +16914,6 @@ Current dispositions: 2008 occurrences (345 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Close every still-UNVALIDATED evidence lane for CLM-d31f5b78bbf99242; current carrier context: The exact bounded privileged daemon-log tail completed on the current Host, confirming the path, privilege form, and bounded output. It does not reproduce an install failure or incident diagnosis, so this carrier has direct but partial score-2 support only. Retain a claim-suitable source or runtime retest before changing the overall status.
 
-### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-14556d751bb3fc5b`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** For self-test failures, the CLI can create a diagnostic bundle. The normal command is:
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Backend and Host-daemon source owner; Authorized Host/API operator
-
-**Next:** The Backend and Host-daemon source owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-14556d751bb3fc5b and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-14556d751bb3fc5b and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
 ### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-d825fab0e420cfa3`
 
 **Status:** UNVALIDATED
@@ -17124,20 +16928,6 @@ Current dispositions: 2008 occurrences (345 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** The Backend and Host-daemon source owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-d825fab0e420cfa3 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-d825fab0e420cfa3 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-582bf3922775c488`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Failure bundles are saved by default under:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-720745be69fff90b`
 
 **Status:** UNVALIDATED
@@ -17151,20 +16941,6 @@ Current dispositions: 2008 occurrences (345 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-720745be69fff90b and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-9006e38f7277157f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** You can override the output directory:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-3aca6b1f291d4d0c`
 
@@ -17185,62 +16961,6 @@ Current dispositions: 2008 occurrences (345 PASS, 87 editorial NOT_APPLICABLE, 1
 **Status:** UNVALIDATED
 
 **Literal source text:** Bundles can include:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-151132b1bb16b498`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - `self-test-output.log`
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-33c81159a9587c53`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - `self-test-result.json`
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-23baa90e841cbe43`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - `manifest.json`
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-e5ac633b4cd16181`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - `collection-errors.json`
 
 **Required proof:** Canonical Implementation Source
 
@@ -21264,34 +20984,6 @@ Current dispositions: 2008 occurrences (345 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
 
-### [Related Pages](http://127.0.0.1:4000/host/workload-policy#related-pages) — `MCL-b4de2df6a8e20829`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Host agreement | [Host Agreement](https://cloud.vast.ai/host/agreement) |
-
-**Required proof:** Repository Static Check
-
-**Existing proof / limit:** [EV-HOST-REVIEW-CLEANUP-EDITORIAL-04](evidence/2026-09-11-host-review-cleanup-attempt-01/editorial-local-projection-04.json) — Passage-level editorial/navigation/arithmetic inspection only; no product/runtime proof.
-
-**Responsible role:** Documentation reviewer
-
-**Next:** Bind an authorized current destination check or a matching retained authoritative source.
-
-### [Related Pages](http://127.0.0.1:4000/host/workload-policy#related-pages) — `MCL-6bcbb0e678b9eb65`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Terms | [Terms of Service](https://vast.ai/terms) |
-
-**Required proof:** Repository Static Check
-
-**Existing proof / limit:** [EV-HOST-REVIEW-CLEANUP-EDITORIAL-04](evidence/2026-09-11-host-review-cleanup-attempt-01/editorial-local-projection-04.json) — Passage-level editorial/navigation/arithmetic inspection only; no product/runtime proof.
-
-**Responsible role:** Documentation reviewer
-
-**Next:** Bind an authorized current destination check or a matching retained authoritative source.
-
 ### [Renter Reports And Host Logs](http://127.0.0.1:4000/host/workload-policy#renter-reports-and-host-logs) — `CUR-2b941108a664d7e6`
 
 **Status:** UNVALIDATED
@@ -21956,20 +21648,6 @@ Current dispositions: 2008 occurrences (345 PASS, 87 editorial NOT_APPLICABLE, 1
 
 ## [Hosting Agreement](http://127.0.0.1:4000/host/hosting-agreement)
 
-### [Where to find and accept it](http://127.0.0.1:4000/host/hosting-agreement#where-to-find-and-accept-it) — `MCL-e9e8363bc9d2fc20`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Hosting agreement (canonical) | [cloud.vast.ai/host/agreement](https://cloud.vast.ai/host/agreement) |
-
-**Required proof:** Repository Static Check
-
-**Existing proof / limit:** [EV-HOST-REVIEW-CLEANUP-EDITORIAL-04](evidence/2026-09-11-host-review-cleanup-attempt-01/editorial-local-projection-04.json) — Passage-level editorial/navigation/arithmetic inspection only; no product/runtime proof.
-
-**Responsible role:** Documentation reviewer
-
-**Next:** Bind an authorized current destination check or a matching retained authoritative source.
-
 ### [Where to find and accept it](http://127.0.0.1:4000/host/hosting-agreement#where-to-find-and-accept-it) — `MCL-0eeef126e388e068`
 
 **Status:** UNVALIDATED
@@ -21983,20 +21661,6 @@ Current dispositions: 2008 occurrences (345 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Documentation technical-source reviewer
 
 **Next:** Inspect canonical account/team/auth/invoice/payout configuration and applicable retained console or API observation for the exact transition. Existing general docs are navigation to sources, not terminal proof.
-
-### [Where to find and accept it](http://127.0.0.1:4000/host/hosting-agreement#where-to-find-and-accept-it) — `MCL-f48f7f89c7355a3f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Terms of Service (platform-wide) | [vast.ai/terms](https://vast.ai/terms) |
-
-**Required proof:** Repository Static Check
-
-**Existing proof / limit:** [EV-HOST-REVIEW-CLEANUP-EDITORIAL-04](evidence/2026-09-11-host-review-cleanup-attempt-01/editorial-local-projection-04.json) — Passage-level editorial/navigation/arithmetic inspection only; no product/runtime proof.
-
-**Responsible role:** Documentation reviewer
-
-**Next:** Bind an authorized current destination check or a matching retained authoritative source.
 
 ### [What you commit to, in plain language](http://127.0.0.1:4000/host/hosting-agreement#what-you-commit-to-in-plain-language) — `MCL-015fcb36fdd0e6f7`
 

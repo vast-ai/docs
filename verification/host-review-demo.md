@@ -22,6 +22,12 @@ Open [Host Payouts](http://127.0.0.1:4000/host/payment#payout-methods). The $20 
 
 Open [Host Diagnostics — Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles). The retained normal Self-Test attempt failed its requirements before any diagnostic rental. Its failure bundle is evidence of that bounded attempt, not a successful official workload.
 
+## Inspect the new unchanged-source checks
+
+Open [How to Self-Test](http://127.0.0.1:4000/host/how-to-self-test) or [Self-Test Reference](http://127.0.0.1:4000/host/self-test-reference). Ten threshold/formula declarations and three bundle options have exact source checks; the two rounded bandwidth rows remain pending. The source controls identify the pinned CLI and exact lines. This does not confirm backend qualification or a successful self-test.
+
+On [Host Diagnostics](http://127.0.0.1:4000/host/common-errors-diagnostics), seven bundle statements now have scoped checks. The default directory is source-only because the retained run used an override. Four possible member names also occur in the retained failed-preflight archive; they do not prove all failure paths or archive completeness. Four Agreement/Terms navigation entries are checked only for their destination identity.
+
 ## Find the other owner questions
 
 - [Hosting Overview](http://127.0.0.1:4000/host/hosting-overview#the-rental-contract): nine unsupported rental assertions have narrower guidance. Open their original FAIL history and current scoped source checks. The separate date-edit and availability questions remain UNVALIDATED; the replacement PASSes do not answer them.

@@ -2,7 +2,9 @@
 
 Prepared 14 September 2026 for CON-1518 / [PR185](https://github.com/vast-ai/docs/pull/185).
 
-The current model contains two FAIL occurrences, both Vast-specific tax assertions. Nine rental-date or availability assertions have been withdrawn into narrower source-bounded guidance, with their original FAIL assertions and evidence preserved in history. The separate 21 BLOCKED and 1,553 UNVALIDATED occurrences retain their own evidence scope; they are not a new checklist of required live tests.
+The current model contains two FAIL occurrences, both Vast-specific tax assertions. Nine rental-date or availability assertions have been withdrawn into narrower source-bounded guidance, with their original FAIL assertions and evidence preserved in history. The separate 21 BLOCKED and 1,529 UNVALIDATED occurrences retain their own evidence scope; they are not a new checklist of required live tests.
+
+A separate [unchanged-source reconciliation](evidence/2026-09-14-host-unvalidated-source-attempt-01/result.md) supports 24 of 26 frozen UNVALIDATED candidates, holds two rounded bandwidth rows, and changes no customer wording or owner question. Current totals are 369 PASS / 2 FAIL / 21 BLOCKED / 87 NOT_APPLICABLE / 1,529 UNVALIDATED. Of the original 1,558 UNVALIDATED passages, 31 now have scoped PASS results; two earlier BLOCKED passages separately entered UNVALIDATED.
 
 The bounded closure correction accounted for all 26 earlier FAIL IDs. Nineteen were narrowed to supported wording, five unsupported application checklist clauses were retired, and two tax assertions remain unchanged. The single existing application instruction retains all five withdrawn FAIL objects in its history. No five new product PASSes were created.
 

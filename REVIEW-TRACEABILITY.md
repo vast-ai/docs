@@ -9,9 +9,41 @@ new-page review coverage are separate from the retained 40-page proof).
 
 Review PR: [vast-ai/docs#185](https://github.com/vast-ai/docs/pull/185)
 
-## Bounded closure reconciliation, 14 September 2026
+## Existing-source reconciliation, 14 September 2026
 
-The current package contains **2,008 active claims across 44 Host pages: 345 PASS,
+The current package contains **2,008 active claims across 44 Host pages: 369 PASS,
+2 FAIL, 21 BLOCKED, 87 NOT_APPLICABLE and 1,529 UNVALIDATED**. A frozen batch of
+26 unchanged passages supports 24 scoped source/declaration/navigation checks;
+two rounded bandwidth rows stay UNVALIDATED. Customer MDX and commands, all
+procedures, all owner questions and the two tax FAILs are unchanged.
+
+Of the original 1,558 UNVALIDATED passages, **31 now have scoped PASS results**:
+seven from earlier corrections and 24 in this batch. Two previously BLOCKED
+Volume passages were separately changed to UNVALIDATED, explaining the current
+1,529 count. These are passage occurrences, including repeats, not 1,529 unique
+defects or a new list of required live tests. The original 26 FAIL findings are
+accounted for separately; 24 have earlier corrections or withdrawals.
+
+The 24 new checks cover ten CLI threshold/formula declarations, three bundle
+options/defaults, four legal-document links and seven diagnostic-bundle
+statements. Relevant current-default source files exactly match the files used
+for the retained preflight archive. Default-directory guidance is source-only;
+the retained run used an override and failed preflight. No current whole-CLI run,
+backend verification rule, successful diagnostic workload or acceptance is inferred.
+
+Focused closure/owner checks passed **19/19**, including full Python/JavaScript
+projection equality, immutable customer sources, unchanged procedures/owners,
+exact canonical bindings, held-row preservation and rejection of scope drift.
+The current HTML export and consistency check passed: 339 embedded files,
+100,010,000 bytes (below 100 MiB). Its native manifest records the exact digest.
+
+[Current result and limits](verification/evidence/2026-09-14-host-unvalidated-source-attempt-01/result.md) ·
+[Frozen exact inventory](verification/evidence/2026-09-14-host-unvalidated-source-attempt-01/inventory.json) ·
+[Current owner questions](verification/current-host-owner-questions.json)
+
+## Earlier bounded closure reconciliation, 14 September 2026
+
+At that checkpoint, the package contained **2,008 active claims across 44 Host pages: 345 PASS,
 2 FAIL, 21 BLOCKED, 87 NOT_APPLICABLE and 1,553 UNVALIDATED**. Nineteen earlier
 FAIL occurrences have narrower supported wording. Five unsupported application
 checklist clauses are withdrawn into one existing application instruction; all

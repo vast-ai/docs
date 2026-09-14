@@ -15,7 +15,7 @@ async function withRegistry(change){const edited=structuredClone(registry);chang
 test('Python/JavaScript project the same newest model and preserve original finding accounting',()=>{
  assert.deepEqual(projected.model,model);assert.deepEqual(loadCurrentHostReviewTransition({read,model,exists}).model,model);
  const py=JSON.parse(execFileSync('python3',['-c',"import json,sys;from pathlib import Path;sys.path.insert(0,'scripts');import current_host_closure_correction as m;print(json.dumps(m.project(Path.cwd())))"],{cwd:new URL('../',import.meta.url),maxBuffer:16*1024*1024}));assert.deepEqual(py,model);
- assert.equal(claims.size,2008);assert.deepEqual(model.counts.claim_statuses,{BLOCKED:21,FAIL:2,NOT_APPLICABLE:87,PASS:345,UNVALIDATED:1553});assert.equal(registry.original_findings.length,26);assert.equal(new Set(registry.original_findings.map(f=>f.claim_id)).size,26);
+ assert.equal(claims.size,2008);assert.deepEqual(model.counts.claim_statuses,{BLOCKED:21,FAIL:2,NOT_APPLICABLE:87,PASS:369,UNVALIDATED:1529});assert.equal(registry.original_findings.length,26);assert.equal(new Set(registry.original_findings.map(f=>f.claim_id)).size,26);
  for(const item of registry.original_findings.filter(f=>f.disposition!=='CORRECT_NOW'))assert.deepEqual(claims.get(item.claim_id),before.get(item.claim_id));
 });
 test('five application failures retire into one existing navigation instruction, retaining historical failures',()=>{
@@ -76,7 +76,8 @@ test('nine withdrawn rental assertions retain FAIL history and exact bounded rep
   assert.match(basis.excerpt,/contract offer expiration - the available until date/);
  }
  for(const id of change.unchanged_tax_failures)assert.deepEqual(claims.get(id),previous.get(id));
- const changedIds=new Set([...change.original_fail_corrections,...change.adjacent_edits]);
+ const sourceReview=JSON.parse(read('verification/evidence/2026-09-14-host-unvalidated-source-attempt-01/inventory.json'));
+ const changedIds=new Set([...change.original_fail_corrections,...change.adjacent_edits,...sourceReview.accepted_ids]);
  for(const [id,claim]of claims)if(!changedIds.has(id))assert.deepEqual(claim,previous.get(id),`unrelated claim changed: ${id}`);
  const owners=loadHostReviewOwnerQuestions({read,model,modelSha256:sha(read('verification/current-host-docs-review.json'))});
  for(const id of ['HQ-RENTAL-DATES','HQ-RENTAL-AVAILABILITY']){const q=owners.questions.find(q=>q.id===id);assert.equal(q.status,'UNVALIDATED');assert.match(q.coverageGaps.join(' '),/does not resolve this owner question/);}
@@ -100,4 +101,33 @@ test('two adjacent edits preserve hypothetical scope, shared introductions, comm
  const invalidated=[];for(const [id,node]of procedures(model)){const prior=oldProcedures.get(id);if(prior.status!=='STALE'&&node.status==='STALE'){invalidated.push(id);assert.equal(node.history.carry_decision,'CURRENT_HOST_CLOSURE_SOURCE_CHANGED');assert.deepEqual(node.evidence_refs,prior.evidence_refs);}}
  assert.deepEqual(invalidated.sort(),['CUR-hosting-overview-H05','PRICE-C01-main-s03','MNT-E01-B01-S02','MNT-E01-B02-S03','MNT-E01-B-common','MNT-E01-B-common-S01','MNT-E01-B-common-S02'].sort());
  const manifest=JSON.parse(read(attempt+'/attempt-01-artifact-manifest.json'));for(const file of manifest.files)assert.equal(sha(read(file.path)),file.sha256,`attempt-01 changed: ${file.path}`);
+});
+
+test('frozen unchanged-source batch promotes only 24 exact declarations and keeps two rounded rows unvalidated',async()=>{
+ const attempt='verification/evidence/2026-09-14-host-unvalidated-source-attempt-01',inventory=JSON.parse(read(attempt+'/inventory.json'));
+ assert.equal(inventory.candidates.length,26);assert.equal(inventory.accepted_ids.length,24);
+ assert.deepEqual(inventory.held_ids,['CUR-d4f1da8861e06594','CUR-6a6640ac777aa39c']);
+ for(const item of inventory.candidates){
+  const claim=claims.get(item.claim_id),prior=item.original_claim;
+  assert.equal(prior.status,'UNVALIDATED');assert.equal(claim.text,prior.text);assert.deepEqual(claim.spans,prior.spans);
+  if(inventory.held_ids.includes(item.claim_id)){assert.deepEqual(claim,prior);continue;}
+  assert.equal(claim.status,'PASS');assert.deepEqual(claim.required_evidence_types,prior.required_evidence_types);assert.equal(claim.classification,prior.classification);
+  assert.deepEqual(projected.presentation.get(item.claim_id).previous,prior);
+  assert.match(claim.rationale,/only|not|No/);assert.equal(claim.history.predecessor.status,'UNVALIDATED');
+ }
+ const defaultDirectory=registry.transitions.find(t=>t.claim_id==='MCL-582bf3922775c488');
+ assert.ok(defaultDirectory.basis.every(b=>b.kind==='CANONICAL_IMPLEMENTATION_SOURCE'));
+ assert.match(defaultDirectory.after.rationale,/source-only.*override/);
+ const bundle=JSON.parse(read('verification/evidence/2026-09-09-host-ssh-jupyter-selftest-attempt-01/selftest-normal-preflight-01.json'));
+ assert.equal(bundle.structured_result.success,false);assert.equal(bundle.source_revision,'ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd');assert.equal(bundle.bundle_inventory[0].members.length,4);
+ for(const source of JSON.parse(read(attempt+'/runtime-source-equivalence.json')).sources)assert.equal(sha(read(source.current_source_artifact)),source.whole_file_sha256);
+ for(const [ref,hash]of Object.entries(inventory.customer_mdx_sha256))assert.equal(sha(read(ref)),hash);
+ const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(k=>[k,canonical(value[k])])):value;
+ const hashObject=value=>sha(JSON.stringify(canonical(value)));
+ for(const [id,claim]of claims)if(!inventory.accepted_ids.includes(id))assert.equal(hashObject(claim),inventory.all_current_claim_hashes[id]);
+ assert.equal(hashObject(model.pages.map(p=>p.procedures)),inventory.procedures_sha256);
+ const ownerRegistry=JSON.parse(read('verification/current-host-owner-questions.json'));delete ownerRegistry.model_sha256;assert.equal(hashObject(ownerRegistry),inventory.owner_questions_without_model_hash_sha256);
+ let run=await withRegistry(r=>{r.transitions.find(t=>t.claim_id===inventory.accepted_ids[0]).after.text+=' invented';});assert.throws(run,/unchanged review scope/);
+ run=await withRegistry(r=>{r.transitions.find(t=>t.claim_id===inventory.accepted_ids[0]).after.required_evidence_types=[];});assert.throws(run,/unchanged review scope/);
+ run=await withRegistry(r=>{r.transitions.find(t=>t.claim_id==='MCL-b4de2df6a8e20829').after.source_refs[0].path='https://vast.ai/terms';});assert.throws(run,/unchanged review canonical binding/);
 });

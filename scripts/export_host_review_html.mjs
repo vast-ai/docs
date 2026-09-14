@@ -439,7 +439,7 @@ export function buildReport() {
     for (const source of closure.registry.sources) add(source.before_artifact.path, source.before_artifact.sha256);
     for (const artifact of closure.registry.artifacts) add(artifact.path, artifact.sha256);
     // Bounded attempt context stays navigable offline; it is not extra claim proof.
-    const closureAttempt = path.posix.dirname(closure.resultRef);
+    const closureAttempt = 'verification/evidence/2026-09-14-host-closure-correction-attempt-02';
     for (const name of ['plan.md', 'change-map.json', 'pre-narrowing-model.json',
       'pre-narrowing-registry.json', 'attempt-01-artifact-manifest.json',
       'focused-tests-01.json', 'focused-tests-01.log',
@@ -449,6 +449,14 @@ export function buildReport() {
       'scoped-integrity-check-01.json', 'root-browser-pages.json',
       'root-source-controls.json']) add(`${closureAttempt}/${name}`);
     add('verification/evidence/2026-09-14-host-closure-correction-attempt-01/result.md');
+    add(`${closureAttempt}/result.md`);
+    const unchangedAttempt = path.posix.dirname(closure.resultRef);
+    for (const name of ['plan.md', 'inventory.json', 'unvalidated-source-candidates.json',
+      'unvalidated-navigation-bundle-review.json', 'unvalidated-root-source-review.json',
+      'unvalidated-runtime-independent-review.json', 'runtime-bundle-review.json',
+      'runtime-source-equivalence.json', 'focused-tests-01.json',
+      'focused-tests-01.log', 'unvalidated-root-integration-review.json',
+      'static-checks-01.json']) add(`${unchangedAttempt}/${name}`);
   }
   for (const ref of installationIntake.artifactRefs) add(ref);
   add(currentResultPath); add(currentAuthorityBaselinePath); add(claimCorrectionResultPath);

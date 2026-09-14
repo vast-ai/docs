@@ -6,7 +6,7 @@ from collections import Counter
 from pathlib import Path
 
 REGISTRY = 'verification/current-host-closure-correction.json'
-REGISTRY_SHA256 = 'f5be2bcc0efb251565d40f89c3c780704902a6c29dc83861dd25b4428734eb30'
+REGISTRY_SHA256 = '7db54cd1a7c993e65853419292e8d4f24df1cd71e10ab13f0988de9ce5b33164'
 ATTEMPT = 'verification/evidence/2026-09-14-host-closure-correction-attempt-01'
 MARKER = 'HOST-CLOSURE-CORRECTION-01'
 BASELINE = ATTEMPT + '/pre-correction-model.json'
@@ -21,6 +21,12 @@ RUNTIME = {'MCL-d2f649ad765ea7bb','MCL-b15c6cfc26e189c2','MCL-115b4938222083ac',
 UPSTREAM = {'CUR-f9aad9428d594b40','MCL-217525688a0854b4','CUR-65ffc3ba1623ad1c','CUR-bf6233f2e53eca43','MCL-9dc3b0e54070a926','MCL-ab00ca89f31d5db1'}
 NAVIGATION = {'MCL-0ae9c2fd5ac2ef9a','MCL-9459e18a155808c9'}
 IDS = CORRECTED | RUNTIME | UPSTREAM | NAVIGATION | ADJACENT
+UNCHANGED_REVIEW = {'MCL-b165e7ceb4cea896','MCL-66dcd03d8d3ac701','MCL-9a580f94561b2775','MCL-3b82e89867c343f8','CUR-86637c5b58be0905','CUR-a0c1b91834ef5f98','CUR-e2bb91ee982dd5b1','CUR-acbd513b75fc99a9','CUR-46851196d475b688','CUR-8b49b48a8f4b55e6','CUR-31030b5f3ede8df7','CUR-47f7eac245b806c6','CUR-fa63eb10bec89134','MCL-b4de2df6a8e20829','MCL-6bcbb0e678b9eb65','MCL-e9e8363bc9d2fc20','MCL-f48f7f89c7355a3f','MCL-14556d751bb3fc5b','MCL-582bf3922775c488','MCL-9006e38f7277157f','MCL-151132b1bb16b498','MCL-33c81159a9587c53','MCL-23baa90e841cbe43','MCL-e5ac633b4cd16181'}
+UNCHANGED_HELD = {'CUR-d4f1da8861e06594','CUR-6a6640ac777aa39c'}
+UNCHANGED_ATTEMPT = 'verification/evidence/2026-09-14-host-unvalidated-source-attempt-01'
+UNCHANGED_INVENTORY = UNCHANGED_ATTEMPT + '/inventory.json'
+UNCHANGED_INVENTORY_SHA256 = 'fd7d453317ec6aebea68701e49e55fb93337134beb3095d42923d6c3855ec783'
+IDS |= UNCHANGED_REVIEW
 STALE = 'Closure source changed; retained procedure evidence does not transfer to changed steps.'
 def sha(value): return hashlib.sha256(value).hexdigest()
 def canon(value): return json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=False)
@@ -57,6 +63,10 @@ def project(root: Path):
     req(registry['schema_version']=='1.0' and registry['record_type']=='HOST_CLOSURE_CORRECTION','registry type')
     req(registry['baseline']=={'path':BASELINE,'sha256':BASELINE_SHA256},'baseline substitution')
     baseline=json.loads(pin(root,BASELINE,BASELINE_SHA256));old=index(baseline)
+    inventory=json.loads(pin(root,UNCHANGED_INVENTORY,UNCHANGED_INVENTORY_SHA256))
+    req(set(inventory['accepted_ids'])==UNCHANGED_REVIEW and set(inventory['held_ids'])==UNCHANGED_HELD and len(inventory['candidates'])==26,'unchanged review inventory')
+    req(all(item['original_claim']==old[item['claim_id']] and objhash(item['original_claim'])==item['original_claim_sha256'] for item in inventory['candidates']),'unchanged review predecessor')
+    for ref,wanted in inventory['customer_mdx_sha256'].items():pin(root,ref,wanted)
     req(len(old)==2013 and len(registry['transitions'])==len(IDS) and {x['claim_id'] for x in registry['transitions']}==IDS,'transition inventory')
     req(len(registry['retirements'])==5 and {x['claim_id'] for x in registry['retirements']}==RETIRED,'retirement inventory')
     findings={x['claim_id']:x for x in registry['original_findings']}
@@ -91,10 +101,13 @@ def project(root: Path):
     for entry in registry['transitions']:
         cid=entry['claim_id'];prior=old[cid];req(objhash(prior)==entry['before_sha256'],'claim predecessor '+cid)
         patch=entry['after'];req(set(patch)<= {'text','spans','status','classification','required_evidence_types','owner_role','rationale','next_action','evidence_refs','source_refs','coverage_state'},'unsupported claim patch')
+        if cid in UNCHANGED_REVIEW:
+            req(prior['status']=='UNVALIDATED' and patch['status']=='PASS' and 'spans' not in patch and all(patch[k]==prior[k] for k in ['text','classification','required_evidence_types','owner_role']),'unchanged review scope')
         if cid in RUNTIME:req(patch['text']==prior['text'] and patch['status']==('UNVALIDATED' if cid.startswith('VOL-') else prior['status']),'runtime promotion forbidden')
         for basis in entry['basis']:
             req(basis['artifactRef'] in artifacts and selection(artifacts[basis['artifactRef']],basis['text_pointer'])==basis['excerpt'],'source selector/excerpt drift '+cid)
             req(basis['support_rationale'] and any(e['artifact_ref']==basis['artifactRef'] for e in patch['evidence_refs']),'unbound scoped evidence')
+            if cid in UNCHANGED_REVIEW:req(any(ref['path']==(basis['sourceUrl'] or basis['artifactRef']) and ref['locator']==basis['text_pointer'] for ref in patch['source_refs']),'unchanged review canonical binding')
             if basis['text_pointer'].startswith('/observations/'):
                 observation=json.loads(artifacts[basis['artifactRef']])['observations'][int(basis['text_pointer'].split('/')[2])]
                 if isinstance(observation,dict) and observation.get('url'):
@@ -127,8 +140,13 @@ def project(root: Path):
     remaining=index(out);req(set(remaining)==set(old)-RETIRED and len(remaining)==2008,'active inventory drift')
     for cid,f in findings.items():
         if f['disposition']!='CORRECT_NOW':req(remaining[cid]==old[cid],'unresolved stronger assertion changed '+cid)
+    req(set(remaining)==set(inventory['all_current_claim_hashes']) and all(objhash(c)==inventory['all_current_claim_hashes'][cid] for cid,c in remaining.items() if cid not in UNCHANGED_REVIEW),'unrelated current claim changed')
+    req(objhash([p['procedures'] for p in out['pages']])==inventory['procedures_sha256'],'unchanged review procedure drift')
+    req(out['source']['source_manifest']==inventory['source_manifest'],'unchanged review source manifest drift')
+    owners=json.loads(safe(root,'verification/current-host-owner-questions.json').read_bytes());owners.pop('model_sha256')
+    req(objhash(owners)==inventory['owner_questions_without_model_hash_sha256'],'unchanged review owner question drift')
     out['counts']['claims']=len(remaining);out['counts']['claim_statuses']=dict(sorted(Counter(c['status'] for c in remaining.values()).items()));out['counts']['page_coverage_states']=dict(sorted(Counter(p['coverage_state'] for p in out['pages']).items()))
-    out['generated_at']=registry['generated_at'];out['corrections'].append({'id':MARKER,'scope':'24 original findings handled: 19 narrowed corrections and 5 retired checklist clauses; 2 adjacent rental edits; 8 bounded evidence/status reconciliations; upstream PR948 and CON1531 routing','history':'Complete sealed predecessor replayed against exact frozen source bytes. Five historical FAIL objects remain in the application instruction history and frozen baseline.','current':'Two tax FAIL assertions remain open. Nine original rental FAIL assertions are retained in history after withdrawal from active prose; backend and maintenance owner questions remain open. Partial runtime observations do not promote compound workflows.','reason':registry['limits']})
+    out['generated_at']=registry['generated_at'];out['corrections'].append({'id':MARKER,'scope':'24 original findings handled: 19 narrowed corrections and 5 retired checklist clauses; 2 adjacent rental edits; 8 bounded evidence/status reconciliations; upstream PR948 and CON1531 routing; 24 unchanged source/declaration occurrences from a frozen 26-candidate inventory','history':'Complete sealed predecessor replayed against exact frozen source bytes. Five historical FAIL objects remain in the application instruction history and frozen baseline.','current':'Two tax FAIL assertions remain open. Nine original rental FAIL assertions are retained in history after withdrawal from active prose; backend and maintenance owner questions remain open. Partial runtime observations do not promote compound workflows.','reason':registry['limits']})
     return out
 
 def load_closure_correction(root,model):
