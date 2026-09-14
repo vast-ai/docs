@@ -2265,3 +2265,16 @@ It does not semantically recheck documents; 2,571 files produced no nodes and
 HTML graph visualization was skipped due to size. No payment, account, Host,
 push, merge or human acceptance action. Remaining corrections and both external
 workstreams are open. Result: verification/evidence/2026-09-14-payout-invoice-correction-attempt-01/result.md.
+
+## 2026-09-14: committed and updated existing PR185
+
+Recorded the pre-staging tree, completed scope/dependency/privacy checks and
+reran 93 Python / 68 JavaScript tests. The stale publication warning was corrected
+and separately retested; the final HTML still matches its deterministic export.
+Staged bytes matched the reviewed files. The first commit attempt was blocked by
+the sandbox's GPG access; retrying with local signing access created signed
+95b7165. Normal push succeeded and GitHub PR185 readback matched the full SHA.
+Updated the PR description with current evidence, 26 remaining corrections,
+separate external registers and reviewer setup. PR remains open/draft; no merge
+or acceptance. GitHub accepted the retained large HTML/patch with warnings.
+Result: verification/evidence/2026-09-14-host-docs-publish-attempt-01/result.md.

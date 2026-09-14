@@ -1905,3 +1905,17 @@ payout records were incorrectly labeled Needs triage. This presentation fix adds
 no product proof. Root tests: 93 Python, 68 JavaScript, 38 Payment locators, six
 exact reviewer/source mappings and a separate visible two-source-dialog check.
 See verification/evidence/2026-09-14-payout-invoice-correction-attempt-01/result.md.
+
+## 2026-09-14: Host Docs publication package
+
+The 1,749-file baseline contains coupled authority, classification, citation and
+reviewer layers; the latest payout correction is not a standalone subset.
+Scoped dependency closure found 443 repository references and 294 path/hash
+pairs present/matching. The current transition read 408 repository files.
+The final HTML needed a version/digest check in place of its stale 'not pushed'
+warning. Its original failing test and passing retest are retained. A bounded
+independent privacy review scanned the frozen files, 190 archive entries and
+55 unique images; no confirmed credential/private payment-data blocker was found.
+The signed content commit 95b7165 and existing draft PR185 now match remotely.
+Current model/status counts are unchanged. Two large-file warnings did not
+prevent the push. This is publication, not merge, CI approval or Host acceptance.

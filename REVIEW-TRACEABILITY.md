@@ -9,6 +9,24 @@ new-page review coverage are separate from the retained 40-page proof).
 
 Review PR: [vast-ai/docs#185](https://github.com/vast-ai/docs/pull/185)
 
+## Publication checkpoint, 14 September 2026
+
+The accumulated Host Docs corrections, offline review HTML and traceability
+were committed and pushed as
+[95b7165](https://github.com/jjziets/docs/commit/95b7165a9cfebe539ec1bbf6115544407ae65ff8).
+GitHub PR185 readback matched that content commit, and its description now links
+the current review package, remaining corrections and localhost setup instructions.
+The PR remains **open and draft**, not merged or accepted.
+
+Publication retests passed 93 Python and 68 JavaScript tests, with the final
+publication wording checked separately and the HTML export unchanged after
+commit. The bounded privacy/archive audit found no confirmed credential or
+private payment-data blocker. The current claim totals below did not change.
+No new Host/API, account, payment or paid operation was performed. The empty
+GitHub check list at readback is not a CI PASS.
+
+[Publication result and limitations](verification/evidence/2026-09-14-host-docs-publish-attempt-01/result.md)
+
 ## Current payout and invoice guidance correction, 14 September 2026
 
 Four citation corrections and two repeated timing passages now cite the exact
