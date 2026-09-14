@@ -1,0 +1,967 @@
+---
+title: "Network Maintenance"
+description: "The routine network check for a host machine: line speed, link health, public IPv4, and the forwarded port range, plus the network changes that need a maintenance window."
+---
+
+Vast requires 500 Mbps down and up, wired Ethernet, a public IPv4 address that
+is yours rather than shared, and 5 forwarded ports per GPU with 100 per GPU
+recommended. See the [verification requirements](/host/verification-stages).
+
+Networking drifts away from that without anything appearing to break. A cable
+that renegotiated down, a reboot that moved your machine off the address your
+router forwards to, a firmware update that re-entered a rule over a shorter
+range: in each case the machine stays online, the daemon stays connected, and
+it keeps taking rentals while quietly failing the requirement.
+
+This page is for a machine that is up and drifting. For a machine that has
+dropped off the platform entirely, start with
+[Offline Machine](/host/machine-offline).
+
+The steps are the same on Ubuntu Server 22.04 and 24.04.
+
+<Note>
+Read the general checks, then the section matching your setup. One machine
+behind a router and a rack behind a shared uplink fail in different ways.
+</Note>
+
+<Warning>
+Most of the general checks read state rather than change it, but two are not
+free. Step 2 saturates your line while it measures, and step 6 can change the
+machine's address. Both need a maintenance window on a machine with rentals on
+it. Everything that interrupts is collected in
+[Changes that need a window](#changes-that-need-a-window).
+</Warning>
+
+---
+
+## General checks
+
+Run these on every machine you host, on whatever cadence you have settled on.
+Most produce a number worth writing down, because what matters is this window's
+number against your last one.
+
+### 1. Find the interface
+
+Everything below acts on the interface carrying the default route, so resolve
+it once and let the later commands read it:
+
+```bash
+NIC=$(ip -o route get 1.1.1.1 | grep -oP 'dev \K\S+'); echo "${NIC:?no default route found}"
+```
+
+```
+enp1s0
+```
+
+Confirm it is a physical port rather than something layered on top of one:
+
+```bash
+readlink -f /sys/class/net/"$NIC"
+```
+
+```
+/sys/devices/pci0000:00/0000:00:01.2/0000:01:00.0/net/enp1s0
+```
+
+A path through `/devices/pci...` is a real NIC. If instead you get `$NIC` as a
+bond, VLAN, bridge, or VPN tunnel (`bond0`, `enp1s0.100`, `wg0`, `tailscale0`),
+it has no physical link of its own, and steps 3 and 4 have to be run against
+each physical member interface instead. `ethtool` will happily report
+`Duplex: Full` and `Link detected: yes` on a tunnel, so this is worth
+confirming rather than assuming.
+
+`NIC` lives only in the shell session you set it in. If your connection drops,
+or you open a second terminal, set it again before continuing.
+
+<Warning>
+If this resolves to a wireless interface, usually a name beginning `wl`, the
+machine is routing over Wi-Fi. Wired Ethernet is a requirement and a machine on
+Wi-Fi does not meet it, however fast the link tests. Move it back to Ethernet
+before going on.
+</Warning>
+
+### 2. Measure the line
+
+Measure from the machine itself. A laptop on the same network takes a different
+path through the switch, and on Wi-Fi it is not measuring your machine's link
+at all.
+
+<Warning>
+This drives the line to saturation for the length of the run, so anything a
+renter is transferring slows down while it happens. Run it when the machine is
+idle, or inside a window scheduled with
+[`vastai schedule maintenance`](/host/cli/schedule-maint).
+</Warning>
+
+```bash
+sudo apt-get update
+sudo apt-get install -y speedtest-cli iperf3
+```
+
+```bash
+speedtest-cli --secure
+```
+
+```
+Retrieving speedtest.net configuration...
+Testing from Example ISP (198.51.100.7)...
+Retrieving speedtest.net server list...
+Selecting best server based on ping...
+Hosted by Example Host (City) [12.34 km]: 8.129 ms
+Testing download speed................................................................................
+Download: 942.31 Mbit/s
+Testing upload speed......................................................................................................
+Upload: 918.44 Mbit/s
+```
+
+Both numbers must be at or above 500 Mbit/s. Upload is the one that fails
+first: consumer and small-business lines are frequently sold asymmetric, and a
+line advertised as 1 Gbps is often 1000 down and 50 up, which does not meet the
+requirement however good the download figure looks.
+
+Treat that result as one data point rather than the verdict. `speedtest-cli` is
+an unmaintained Python client measuring over HTTP against a public server you
+did not choose, so the figure moves with that server's load and the path to it.
+On a fast line, confirm with `iperf3` against a public server:
+
+```bash
+iperf3 -c <public iperf3 server hostname> -t 30 -P 4
+iperf3 -c <public iperf3 server hostname> -t 30 -P 4 -R
+```
+
+The first run measures upload and the second download. Read the final
+`[SUM]` line of each, the one marked `receiver`:
+
+```
+[SUM]   0.00-30.00  sec  3.28 GBytes   940 Mbits/sec                  receiver
+```
+
+Many public `iperf3` servers cap stream count and duration and listen on a
+non-default port, so check the terms of whichever you pick.
+
+Measure at a busy hour, not only at night. A line returning 900/900 at 03:00
+and 300/150 at 20:00 fails the requirement for most of the day your renters are
+actually using it.
+
+### 3. Check the link itself
+
+Your line can only be as fast as the link the NIC negotiated with whatever it
+is plugged into:
+
+```bash
+sudo ethtool "$NIC" | grep -E 'Speed|Duplex|Auto-negotiation|Link detected'
+```
+
+```
+	Speed: 10000Mb/s
+	Duplex: Full
+	Auto-negotiation: on
+	Link detected: yes
+```
+
+`Duplex: Full` and `Link detected: yes` are the only acceptable values on a
+physical port. `Half` duplex collapses throughput under load and points at a
+switch port that failed to negotiate.
+
+`Speed` is the value to record and compare. It is not a fixed property of the
+machine: a link renegotiates on every cable reseat, switch reboot, and port
+move, and a marginal cable comes back at a lower speed rather than not at all.
+A machine that reported `10000Mb/s` last window and reports `1000Mb/s` now has
+a physical problem, even though every other check here will pass.
+
+If the speed is lower than your hardware should manage, read the full output
+and compare the supported modes against the advertised ones:
+
+```bash
+sudo ethtool "$NIC"
+```
+
+A NIC that supports 10 Gb but advertises only 1 Gb has usually been pinned by
+an `ethtool -s` command run by hand or from a systemd unit, a udev rule, or a
+systemd-networkd `[Link]` section. Netplan has no key for link speed, so there
+is no point looking for one in your YAML. A NIC that supports 10 Gb where the
+link partner does not is a switch port or transceiver question.
+
+On a fibre link, read the transceiver's own diagnostics as well. Optical
+receive power falling window over window is the classic months-long
+degradation, and it shows up here before it shows up anywhere else:
+
+```bash
+sudo ethtool -m "$NIC"
+```
+
+### 4. Read the error counters
+
+This is the check that finds a failing cable before it takes the machine down,
+and a single reading is worthless. Counters are cumulative since boot, so the
+number alone means nothing; the number against last window's, over a known
+number of days, is the signal.
+
+The Network tab in [Machine Metrics](/host/machine-metrics) already charts RX
+and TX errors and drops per machine, sampled rather than accumulated, so a
+healthy interface reads a flat zero and anything above it stands out without
+any arithmetic on your part. Read the trend there first. The commands below are
+the point-in-time confirmation on the machine itself.
+
+```bash
+sudo ethtool -S "$NIC" | grep -iE 'err|drop|discard|crc|fail' | grep -v ': 0$'
+```
+
+Empty output does not by itself mean the interface is clean, because it also
+looks exactly like a NIC whose driver exposes no statistics or names its
+counters outside those words. Confirm the counters exist, and read the generic
+ones the kernel keeps for every interface:
+
+```bash
+sudo ethtool -S "$NIC" | wc -l
+ip -s -s link show "$NIC"
+```
+
+A count of `1`, or `no stats available`, means this driver has nothing to
+offer and `ip -s -s link` is your only source. Record whatever either prints:
+
+```
+     rx_crc_errors: 1847
+     rx_missed_errors: 293
+```
+
+Non-zero is not automatically a fault. Plenty of drivers carry a small standing
+count that never moves. `rx_crc_errors` climbing means frames are arriving
+corrupted, which is a cabling, transceiver, or switch port fault rather than a
+software one. `rx_missed_errors` means the NIC received frames it had no buffer
+for, which points at the machine rather than the cable.
+
+Take the uptime alongside it, so your next window can work out a rate:
+
+```bash
+uptime -p
+```
+
+<Note>
+A count that has not moved since last window is fine however large it is. A
+machine that logged 2,000 CRC errors during a switch replacement months ago and
+none since has a clean link. One adding to the count steadily does not, and it
+reaches your renters as slow transfers long before it reaches you as a failure.
+</Note>
+
+### 5. Confirm the public IPv4 address
+
+```bash
+curl -4 -s ifconfig.me; echo
+```
+
+```
+198.51.100.7
+```
+
+The maintenance question is whether this has changed since your last window. If
+it has, update everything pinned to the old value: dynamic DNS, and any router
+rule written against a specific WAN address.
+
+<Note>
+How the platform picks up a changed address is part of machine setup rather
+than maintenance. See the
+[host setup guide](https://cloud.vast.ai/host/setup/).
+</Note>
+
+Then compare the address against the WAN address your router reports. They must match.
+If your router's WAN interface holds a different address, something between you
+and the internet is doing NAT you do not control, and renters cannot be
+forwarded through it. That comparison is the general test, and it catches every
+shared-address case, including the ones that do not use a recognizable range.
+
+<Warning>
+A router WAN address inside `100.64.0.0/10` means your ISP has put the
+connection behind carrier-grade NAT. Ports cannot be forwarded through it, and
+[the requirements](/host/verification-stages) exclude both CGNAT and a shared
+ISP address from hosting. ISPs migrate existing customers onto CGNAT without
+announcing it, so this is worth re-checking rather than treating as settled at
+setup.
+</Warning>
+
+<Note>
+Sharing one public address across several of your own machines is a different
+thing and is fine, as long as each machine has its own forwarded range. See
+[Allocate non-overlapping port ranges](#3-allocate-non-overlapping-port-ranges).
+</Note>
+
+### 6. Pin the machine to one LAN address
+
+Your router forwards the port range to a LAN address. If the machine's address
+moves, the rule points at whatever else picked it up, or at nothing.
+
+```bash
+sudo grep -rE 'dhcp4|addresses' /etc/netplan/
+```
+
+```
+/etc/netplan/00-installer-config.yaml:      dhcp4: true
+```
+
+The `sudo` is not optional. On 24.04 the netplan files are root-only, and an
+unprivileged `grep` prints permission errors to stderr and no matches to
+stdout, which reads exactly like a machine that is already static.
+
+`dhcp4: true` means the address is a lease, and a lease is not a promise. It
+usually survives a reboot, and then one day it does not: the machine is off
+long enough for the lease to expire during a drive replacement, the router
+rebuilds its lease table, or another device claims the address first. The
+machine comes back healthy on a new address with your forwarding rule pointing
+at the old one. Every other maintenance page ends in a reboot, which is what
+makes this worth checking rather than assuming.
+
+Fix it in one of two places. Prefer a DHCP reservation on your router, keyed to
+the machine's MAC address: your forwarding rule and the address it points at
+then live in the same place, and the machine still boots correctly if you swap
+it out.
+
+```bash
+cat /sys/class/net/"$NIC"/address
+```
+
+```
+3c:ec:ef:1a:2b:3c
+```
+
+A static address in netplan also works and is the better choice if your
+router's DHCP server is unreliable. Set it outside the DHCP pool so nothing
+else is ever handed the same address, and on a cloud-init managed server write
+`/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg` as well, or cloud-init
+regenerates `50-cloud-init.yaml` on the next boot and undoes the change.
+
+<Warning>
+Changing the address drops your SSH session and the daemon's connection to
+Vast. Do it inside a window scheduled with
+[`vastai schedule maintenance`](/host/cli/schedule-maint), and see
+[Applying a netplan change without locking yourself out](#applying-a-netplan-change-without-locking-yourself-out).
+</Warning>
+
+### 7. Size the port range against the GPU count
+
+The number of ports the machine needs is a function of how many GPUs are in it,
+so it changes whenever your hardware does.
+
+```bash
+nvidia-smi --query-gpu=name --format=csv,noheader | wc -l
+```
+
+```
+8
+```
+
+A result of `0` means `nvidia-smi` failed rather than that the machine has no
+GPUs; the error goes to stderr and `wc -l` counts nothing.
+
+<Note>
+**Formula for verification:** forwarded ports >= 5 x number of GPUs, with
+100 x number of GPUs recommended
+
+**Example:** 8 GPUs means at least 40 forwarded ports to qualify for
+verification, and 800 recommended
+</Note>
+
+| GPUs | Minimum for verification | Recommended |
+| --- | --- | --- |
+| 1 | 5 | 100 |
+| 2 | 10 | 200 |
+| 4 | 20 | 400 |
+| 8 | 40 | 800 |
+
+Compare that against the range you have forwarded on your router. If you have
+added GPUs since setup, the machine is running on a range sized for the
+hardware it used to have. Nothing reports this as an error; the machine simply
+takes fewer rentals and loses the ones needing many ports.
+
+The **Ports** value on the machine's card under **Host → Machines** in the
+console is what the platform believes the machine offers, so check your
+arithmetic against it. A machine showing no port data there has not reported a
+usable range at all, which [How to Self-Test](/host/how-to-self-test) lists as
+something to fix before the self-test will run.
+
+Resizing a range is two changes, not one. Widening the rule on your router is
+the first; telling the platform its new range is the second, which the
+[host setup guide](https://cloud.vast.ai/host/setup/) covers.
+
+<Warning>
+Changing the range moves instances that were mapped into the old one. Do it
+inside a window scheduled with
+[`vastai schedule maintenance`](/host/cli/schedule-maint).
+</Warning>
+
+### 8. Check the firewall and the ephemeral port range
+
+Two host-side settings can break a range your router is forwarding perfectly.
+
+```bash
+sudo ufw status verbose
+```
+
+`ufw` is Ubuntu's default firewall tool and is present on a server install, but
+it ships disabled. A machine where you have never turned it on reports:
+
+```
+Status: inactive
+```
+
+That is a valid answer here. An inactive firewall is not blocking your range,
+so it is not a candidate when the port test in step 9 fails, and there is
+nothing further to check in this half of the step.
+
+Where you have enabled it, read the rules:
+
+```
+Status: active
+Logging: on (low)
+Default: deny (incoming), allow (outgoing), disabled (routed)
+New profiles: skip
+
+To                         Action      From
+--                         ------      ----
+22/tcp                     ALLOW IN    Anywhere
+61000:61799/tcp            ALLOW IN    Anywhere
+61000:61799/udp            ALLOW IN    Anywhere
+```
+
+<Warning>
+Allow SSH before you enable or reload `ufw`. Run `sudo ufw allow 22/tcp` first:
+enabling a default-deny firewall without it ends your session, and the recovery
+is a trip to the machine or its BMC. Whatever else you change, your range must
+stay reachable and the daemon's outbound connection must stay open.
+`Default: allow (outgoing)` above is what keeps the daemon able to reach the
+Vast controller, and a default deny outbound takes the machine offline with
+every inbound rule still correct.
+</Warning>
+
+Now check that your range does not sit inside the range the kernel hands out
+for outbound connections:
+
+```bash
+sysctl net.ipv4.ip_local_port_range
+```
+
+```
+net.ipv4.ip_local_port_range = 32768	60999
+```
+
+A forwarded range overlapping this one is a slow, density-dependent failure: an
+outbound connection from the machine can take a port an instance later needs to
+bind, so rentals fail to start intermittently while every check on this page
+passes. Keep your range clear of it, on either side, or reserve it with
+`net.ipv4.ip_local_reserved_ports`.
+
+<Note>
+Instances are Docker containers, and Docker publishes their ports through its
+own chains rather than through `ufw`, so a `deny (incoming)` default does not
+close them. To restrict the Vast range at the host, use the `DOCKER-USER`
+chain, which Docker leaves alone:
+
+```bash
+sudo iptables -t nat -S DOCKER
+sudo iptables -S DOCKER-USER
+```
+</Note>
+
+`ufw` rules persist across a reboot. Rules added by hand with `iptables` do
+not, unless something restores them:
+
+```bash
+sudo iptables -S
+dpkg -l | grep -E 'iptables-persistent|netfilter-persistent'
+```
+
+Ignore the `DOCKER`, `DOCKER-USER`, and `DOCKER-ISOLATION` chains in that
+output; dockerd rebuilds those itself at boot. Only rules you added by hand are
+at risk, and the fix for those is to move them into `ufw`.
+
+<Warning>
+Do not run `netfilter-persistent save` on a machine running instances. It
+snapshots the container rules dockerd created, and restoring them at boot
+before dockerd starts breaks instance port mapping.
+</Warning>
+
+### 9. Test both ends of the range from outside
+
+Testing one port in the middle of your range is the check that misses the
+failure this step exists for. A rule re-entered after a firmware update over a
+shorter range than you configured still passes that test and leaves the rest of
+the range dead.
+
+You do not have to test every port. Where your range is one forwarding rule,
+the lowest and the highest port tell you whether the whole thing arrives, and
+the highest is the one that matters: a rule truncated at the top end is the
+common failure, and every renter landing on the working part has a normal
+experience.
+
+If your router made you enter the range as several rules, test the first and
+last port of each of them.
+
+Test from **outside** your network, on a VPS, a phone hotspot, or anything on a
+different connection. Running it from inside your LAN tells you nothing,
+because your router may answer its own public address differently than the
+internet does.
+
+On the machine, start a listener on the lowest port in your range:
+
+```bash
+nc -l <lowest port in your range>
+```
+
+From your outside connection:
+
+```bash
+nc -v <your public IPv4 address> <lowest port in your range>
+```
+
+```
+Connection to 198.51.100.7 61000 port [tcp/*] succeeded!
+```
+
+Type a line and press enter. It appears in the listener on the machine, which
+is what proves the connection arrived rather than being answered by something
+in between. Press Ctrl-C at both ends.
+
+That covers TCP. Repeat both commands with `-u` to prove UDP arrives too, since
+renters can [map UDP ports](/guides/instances/connect/networking) as well:
+
+```bash
+nc -u -l <lowest port in your range>
+```
+
+```bash
+nc -u -v <your public IPv4 address> <lowest port in your range>
+```
+
+UDP has no handshake to succeed, so the only proof is the line you type
+appearing in the listener.
+
+Now run all of it again with the **highest** port in your range.
+
+<Warning>
+Run the listener as your normal user, never with `sudo`, and never on a port an
+instance is currently using. `nc` sets `SO_REUSEPORT`, so a root-owned listener
+binds alongside the instance already on that port and takes a share of that
+renter's incoming connections rather than failing.
+</Warning>
+
+<Note>
+If `ufw` is active, this test goes through it, because the listener is an
+ordinary host socket. A range blocked in `ufw` fails here even though instance
+ports on the same range would work, since Docker publishes those through its
+own chains. That is why step 8 comes first.
+</Note>
+
+### 10. Check for loss and DNS drift
+
+A machine passing every check above can still be unreliable if the path to it
+drops packets.
+
+```bash
+ping -c 100 -i 0.2 1.1.1.1 | tail -3
+```
+
+```
+--- 1.1.1.1 ping statistics ---
+100 packets transmitted, 100 received, 0% packet loss, time 19898ms
+rtt min/avg/max/mdev = 8.104/8.393/9.221/0.184 ms
+```
+
+`0% packet loss` is the expected result, and any sustained loss is worth
+chasing: it costs far more throughput than its percentage suggests, because
+every lost segment is a retransmit and a congestion-window cut. A high `mdev`
+is jitter, which renters notice on interactive sessions first.
+
+Where the loss happens matters more than that it happens:
+
+```bash
+sudo apt-get install -y mtr-tiny
+mtr -r -c 100 1.1.1.1
+```
+
+```
+HOST: gpu-01                      Loss%   Snt   Last   Avg  Best  Wrst StDev
+  1.|-- 192.168.1.1                0.0%   100    0.4   0.5   0.3   1.2   0.1
+  2.|-- 203.0.113.9               12.0%   100    9.1   9.4   8.7  18.2   1.3
+  3.|-- 203.0.113.1                0.0%   100    8.9   9.2   8.6  15.1   0.9
+  4.|-- 1.1.1.1                    0.0%   100    8.4   8.6   8.1  11.9   0.6
+```
+
+Loss at an intermediate hop that does not carry through to the last line, as at
+hop 2 here, is that router deprioritizing its own ICMP replies. It is not
+affecting traffic, and it is the most common false alarm in this check. Loss
+appearing at a hop and persisting to the final hop is real.
+
+For DNS, the question is not whether resolution works right now but whether it
+depends on a single resolver that can take the machine offline on its own:
+
+```bash
+resolvectl status "$NIC"
+```
+
+```
+Link 2 (enp1s0)
+    Current Scopes: DNS
+         Protocols: +DefaultRoute +LLMNR -mDNS -DNSOverTLS DNSSEC=no/unsupported
+Current DNS Server: 192.168.1.1
+       DNS Servers: 192.168.1.1
+```
+
+One entry under `DNS Servers` is a single point of failure, and that entry is
+usually your router. The daemon reaches the Vast controller by name, so a
+router reboot or a flapping upstream resolver takes the machine offline while
+your line is working perfectly. Add a second resolver, such as `1.1.1.1` or
+`8.8.8.8`, so the machine keeps resolving when the first stops answering.
+
+<Note>
+If this shows no DNS servers while resolution plainly works, the machine has a
+hand-written `/etc/resolv.conf` bypassing `systemd-resolved`. Read that file
+instead.
+</Note>
+
+Resolution failing outright is covered by
+[Offline Machine](/host/machine-offline).
+
+<Check>
+`speedtest-cli` at or above 500 Mbit/s both ways, `ethtool` reporting the speed
+you expect at full duplex, no error counter moving since your last window, your
+public address unchanged and matching your router's WAN address, your LAN
+address pinned, your range clear of the ephemeral range with the firewall rules
+surviving a reboot, both ends of the range answering over TCP and UDP from
+outside, and no sustained loss to the final hop. Record the speeds, the link
+speed, the error counts, your public address, and the date.
+
+For the platform's own verdict on the same ground, run
+[`vastai self-test machine`](/host/cli/self-test-machine) while the machine is
+idle. It checks network speed, stability, and open ports directly.
+</Check>
+
+---
+
+## Single-machine hosts
+
+One machine behind one router. Almost everything that drifts here drifts on the
+router rather than on the machine, so if you only ever log into the machine,
+you never see it coming.
+
+### 1. Re-verify the range after any router work
+
+Firmware updates, factory resets, and configuration restores all lose or
+rewrite forwarding rules, and consumer routers rarely tell you they have. Treat
+any router work as a change to the machine and re-run
+[the port test](#9-test-both-ends-of-the-range-from-outside) afterwards.
+
+The same applies to a rule still listed that no longer works. Check that its
+destination address still matches the machine, that it covers both TCP and UDP,
+and that its range matches what you sized in
+[step 7](#7-size-the-port-range-against-the-gpu-count).
+
+<Warning>
+Re-entering rules or rebooting the router drops the machine off the network and
+stops every running instance. Schedule it with
+[`vastai schedule maintenance`](/host/cli/schedule-maint).
+</Warning>
+
+### 2. Check the router is not the bottleneck
+
+Your router can pass a speed test and still cap the machine, because a speed
+test opens a handful of connections and a busy machine opens thousands. The
+symptom is a line measuring at full speed while renters report slow or stalled
+connections during busy periods.
+
+Consumer routers have a finite NAT connection table, and the recommended 100
+ports per GPU is a lot of concurrent state for a small device. If yours exposes
+a connection count or NAT table size, record it during a busy period alongside
+the rest of this check. A router at its limit drops new connections while
+existing ones keep working, which is what makes it hard to catch.
+
+The machine keeps its own table, and it fills the same way as rental density
+grows:
+
+```bash
+sysctl net.netfilter.nf_conntrack_count net.netfilter.nf_conntrack_max
+```
+
+The maximum is derived from installed RAM, so read yours rather than comparing
+against a published figure. A count approaching it puts
+`nf_conntrack: table full, dropping packet` in `dmesg`.
+
+The same class of limit applies to the forwarding rules themselves. Some
+routers cap the number of entries, and some cannot express a large contiguous
+range at all and want it entered as many individual rules. Both bite at the
+recommended port count rather than the minimum, so check what yours can express
+before sizing a range around 100 ports per GPU.
+
+---
+
+## Multi-machine hosts on one network
+
+Once there is more than one machine behind the same uplink, capacity is shared
+and the requirement is per machine. Everything here is about what the fleet
+does to itself, and it gets worse as the fleet grows without any individual
+machine changing.
+
+### 1. Measure the uplink under load
+
+A machine tested on an otherwise idle network tells you nothing about what it
+delivers when its neighbors are busy. The requirement is 500 Mbps each way for
+each machine, at the same time.
+
+<Note>
+**Derived from the per-machine requirement**, not a published Vast figure:
+uplink >= 500 Mbps x number of machines, in each direction. Six machines need
+3 Gbps symmetric, sustained.
+</Note>
+
+Measure it rather than assuming. Run this on every machine at once, from
+separate terminals:
+
+```bash
+iperf3 -c <public iperf3 server hostname> -t 30 -P 4
+```
+
+Then run the download direction with `-R`, and add the final `[SUM]` figures
+across all the machines. A total that stops rising as you add machines is the
+uplink saturating, and every machine on it is below requirement at that moment
+regardless of what each measured alone.
+
+<Warning>
+This saturates the uplink for the length of the run, which affects renters on
+every machine and anything else on the network. Schedule it with
+[`vastai schedule maintenance`](/host/cli/schedule-maint) on each machine.
+</Warning>
+
+### 2. Check the switch uplink, not just the ISP line
+
+The most common capacity fault in a multi-machine setup is not the ISP link. It
+is the single cable between the switch your machines are plugged into and the
+router.
+
+Eight machines on 1 Gb access ports feeding one 1 Gb uplink gives the whole
+fleet 1 Gb to share, about 125 Mbps each under full load, on an internet
+connection measuring 10 Gb all day from any single machine.
+
+Test the fabric directly rather than through the internet. On one machine:
+
+```bash
+sudo ufw allow from <your LAN subnet> to any port 5201 proto tcp
+iperf3 -s
+```
+
+The `ufw` rule is needed because `iperf3 -s` listens on an ordinary host socket
+that a `deny (incoming)` default drops, and the client then just times out with
+no indication why. Remove it when you are done.
+
+On another machine:
+
+```bash
+iperf3 -c <the listening machine's LAN address> -t 30 -P 4
+```
+
+```
+[SUM]   0.00-30.00  sec  3.28 GBytes   940 Mbits/sec                  receiver
+```
+
+Two machines on gigabit ports should reach roughly 940 Mbit/s between them,
+which is the practical TCP ceiling on a 1 Gb link once framing overhead is
+taken out. Substantially less means the switch, the cabling, or a port is the
+limit, and no amount of ISP bandwidth will help. Run
+[the link](#3-check-the-link-itself) and
+[counter](#4-read-the-error-counters) checks on every machine, not just the one
+complaining: a single machine with a marginal cable pushes retransmits through
+a shared switch and slows its neighbors.
+
+### 3. Allocate non-overlapping port ranges
+
+Machines behind one public IPv4 address share one port space. Each needs its
+own range, sized to its own GPU count, and the ranges must not overlap.
+
+Work it out per machine before you touch the router. For a fleet of three, one
+with 8 GPUs, one with 4, and one with 8, the arithmetic from
+[step 7](#7-size-the-port-range-against-the-gpu-count) gives 800, 400, and 800
+ports at the recommended count: 2,000 ports in total, as three non-overlapping
+ranges, each of which is itself contiguous. Leave gaps between them if you
+expect GPU counts to change, because growing a range into one another machine
+is using is an outage for both.
+
+Keep the range, the machine, and its LAN address written down together. Your
+router only shows you the first and last of those three. Watch the ceiling as
+the fleet grows: one address has 65,535 ports, the ephemeral range claims
+roughly 28,000 of them by default, and at 800 ports per 8-GPU machine that runs
+out sooner than it looks.
+
+Verify each range with
+[the port test](#9-test-both-ends-of-the-range-from-outside), run once per
+machine against that machine's own lowest and highest port.
+
+That proves each range is forwarded. It does not prove each reaches the *right*
+machine, and adjacent ranges typed into a router are exactly where that goes
+wrong. Confirm the destination for at least one port per machine. On the
+machine:
+
+```bash
+nc -l <an unused port from that machine's range>
+```
+
+From outside your network:
+
+```bash
+nc -v <your public IPv4 address> <the same port>
+```
+
+Anything you type appears on the machine you started the listener on. If it
+appears on a different machine, two rules have been transposed.
+
+### 4. Size the shared infrastructure for the fleet
+
+Three limits on shared equipment scale with machine count and quietly stop
+being adequate:
+
+- **The DHCP pool.** Large enough for every machine plus everything else on the
+  network, with a reservation for each so that
+  [pinned addresses](#6-pin-the-machine-to-one-lan-address) hold across the
+  fleet.
+- **The connection tracking table** on the router. Every renter connection to
+  every machine is an entry, and this is the limit that turns into fleet-wide
+  connection failures during busy periods while each machine looks healthy.
+- **Bandwidth fairness.** Nothing stops one machine saturating the shared line
+  and pushing the others below 500 Mbps. If your router supports per-client
+  rate limiting, cap each machine at its share.
+
+### 5. Treat adding a machine as maintenance on all of them
+
+Adding a machine divides the uplink again, consumes another block of the shared
+port space, and adds load to the router's connection table. The new machine is
+the one being installed; the existing machines are the ones that change
+behavior.
+
+Afterwards, re-run [the uplink measurement](#1-measure-the-uplink-under-load)
+across the whole fleet and confirm the new range overlaps nothing.
+
+<Warning>
+A router or switch reboot takes every machine behind it offline at once, not
+just the one you are working on. Firmware updates, configuration restores, and
+moving a machine between switch ports all count. Schedule the window on
+**every** affected machine with
+[`vastai schedule maintenance`](/host/cli/schedule-maint) before starting, and
+wait until no machine in the fleet has an active rental contract running
+through it.
+</Warning>
+
+---
+
+## Changes that need a window
+
+Most of this page reads state. These are the changes it leads to, and all of
+them interrupt rentals. Schedule them with
+[`vastai schedule maintenance`](/host/cli/schedule-maint).
+
+| Change | What it interrupts |
+| --- | --- |
+| Measuring the line with `speedtest-cli` or `iperf3` | Transfers for every renter on the machine |
+| Changing the machine's LAN address | SSH, the daemon connection, every running instance |
+| Applying any netplan change | The machine's networking, briefly |
+| Enabling or reloading `ufw` | Your own session, if SSH is not allowed first |
+| Changing the forwarded port range | Instances mapped into the old range |
+| Replacing a cable or moving a switch port | That machine |
+| Router or switch firmware update or reboot | Every machine behind it |
+
+### Applying a netplan change without locking yourself out
+
+A wrong netplan file applied over SSH leaves an unreachable machine, and the
+recovery is a trip to the machine or its BMC. `netplan try` exists for this: it
+applies the configuration, waits, and rolls back automatically unless you
+confirm at the console.
+
+```bash
+sudo netplan try
+```
+
+```
+Do you want to keep these settings?
+
+Press ENTER before the timeout to accept the new configuration
+
+Changes will revert in 120 seconds
+```
+
+If the change breaks your connection you cannot press ENTER, the timeout
+expires, and the machine reverts to what was working. Pressing ENTER keeps the
+configuration, which is already applied at that point, so there is nothing
+further to run.
+
+<Warning>
+`netplan try` cannot protect a bonded or bridged configuration with custom
+parameters. It exits before applying anything with
+`reverting custom parameters for bridges and bonds is not supported`. Apply
+that one from the console or over the BMC, not over SSH.
+</Warning>
+
+<Note>
+Changing the address means your existing session is connected to the old one.
+Open a session against the new address before closing the old one, and keep the
+old one open until the new one works.
+</Note>
+
+---
+
+## Recovery
+
+### Neither end of the range connects
+
+Your rule is not delivering traffic to the machine at all. In order of
+likelihood: the rule was lost by a router firmware update or reset; it points
+at a LAN address the machine no longer holds, which is
+[the DHCP problem](#6-pin-the-machine-to-one-lan-address); it covers TCP where
+your range needs UDP too; or `ufw` is blocking the listener, which
+[step 8](#8-check-the-firewall-and-the-ephemeral-port-range) will show.
+
+Re-enter the rule, confirm its destination matches what
+`ip -4 -brief addr show "$NIC"` reports, and test again.
+
+<Warning>
+Re-entering a forwarding rule is a router change and can drop the machine.
+Schedule it with
+[`vastai schedule maintenance`](/host/cli/schedule-maint).
+</Warning>
+
+### The lowest port connects but the highest does not
+
+Your router is forwarding a narrower range than you sized. Open the rule and
+read the range it actually contains: that tells you directly whether it was
+truncated or was never as wide as you thought, without probing the range from
+outside. Widen it against the arithmetic in
+[step 7](#7-size-the-port-range-against-the-gpu-count), then re-test the new
+highest port.
+
+If you run several machines on one network, confirm the widened range does not
+run into the next machine's allocation before you apply it.
+
+### The link renegotiated to a lower speed
+
+This is physical. Reseat the cable at both ends, and if the speed does not come
+back, move the machine to a different switch port to establish which end is at
+fault. A cable that worked for a year and now negotiates at a tenth of its
+rated speed is failing rather than failed, and it will keep getting worse.
+
+<Warning>
+Reseating a cable or moving a switch port drops the machine off the network and
+stops every running instance. Schedule it with
+[`vastai schedule maintenance`](/host/cli/schedule-maint).
+</Warning>
+
+### Error counters are climbing
+
+Note the count and the uptime, then check again a day later to establish a rate
+before doing anything physical. A climbing rate follows the same path as the
+section above: cable first, then port, then transceiver on fibre or DAC links.
+Replace one thing at a time and re-measure, because replacing all three at once
+tells you nothing about which was at fault.
+
+### Bandwidth is below requirement and nothing on the machine is wrong
+
+Establish where the ceiling is before contacting anyone. If two machines cannot
+reach line rate between themselves on the LAN, it is the switch or the cabling
+and it is yours to fix. If the LAN is clean and the uplink saturates below what
+the fleet needs, work out whether the sum of what your machines need exceeds
+what the line was sold to deliver, using
+[the uplink arithmetic](#1-measure-the-uplink-under-load). Only once the
+machines and the LAN are ruled out is the line itself the problem.
