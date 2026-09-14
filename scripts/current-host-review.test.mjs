@@ -152,9 +152,12 @@ async function fixtureRoot() {
   await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_review_cleanup.mjs'), path.join(root, 'scripts', 'current_host_review_cleanup.mjs')).catch(error => { if (error.code !== 'ENOENT') throw error; });
   await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_review_transition.mjs'), path.join(root, 'scripts', 'current_host_review_transition.mjs'));
   await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_payout_provider_correction.mjs'), path.join(root, 'scripts', 'current_host_payout_provider_correction.mjs'));
+  await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_payout_terms_correction.mjs'), path.join(root, 'scripts', 'current_host_payout_terms_correction.mjs'));
+  await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_payout_invoice_correction.mjs'), path.join(root, 'scripts', 'current_host_payout_invoice_correction.mjs'));
   await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_clarification.mjs'), path.join(root, 'scripts', 'current_host_clarification.mjs'));
   await fs.copyFile(path.join(ROOT, 'scripts', 'host_review_reader_copy.mjs'), path.join(root, 'scripts', 'host_review_reader_copy.mjs'));
   await fs.copyFile(path.join(ROOT, 'scripts', 'host_review_work_queue.mjs'), path.join(root, 'scripts', 'host_review_work_queue.mjs'));
+  await fs.copyFile(path.join(ROOT, 'scripts', 'host_review_owner_questions.mjs'), path.join(root, 'scripts', 'host_review_owner_questions.mjs'));
   const scanPath = 'verification/current-host-authority-scan.json';
   const scan = await fs.readFile(path.join(ROOT, scanPath), 'utf8').then(JSON.parse).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
   if (scan) {

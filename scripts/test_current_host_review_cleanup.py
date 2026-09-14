@@ -7,7 +7,6 @@ import json
 import copy
 import unittest
 from pathlib import Path
-from contextlib import contextmanager
 from unittest import mock
 from scripts.test_current_host_authority_scan import frozen_payout_payment
 
@@ -17,25 +16,22 @@ TARGET = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader
 SPEC.loader.exec_module(TARGET)
 
-@contextmanager
-def frozen_cleanup_predecessor():
-    """Run cleanup's old chain against the hash-pinned payout predecessor."""
-    original=TARGET.predecessor
-    def predecessor(root, baseline):
-        jurisdiction_spec=importlib.util.spec_from_file_location('cleanup_jurisdiction_fixture', ROOT/'scripts/current_host_jurisdiction.py')
-        jurisdiction=importlib.util.module_from_spec(jurisdiction_spec); assert jurisdiction_spec.loader; jurisdiction_spec.loader.exec_module(jurisdiction)
-        prior=jurisdiction.predecessor
-        jurisdiction.predecessor=lambda repo, model, old: prior(repo, model, {**old, 'host/payment.mdx': frozen_payout_payment()})
-        return jurisdiction.validate_model(baseline, root)
-    with mock.patch.object(TARGET, 'predecessor', predecessor):
-        yield
+
+def closure_before_sources():
+    """Replay this historical phase with the sealed pre-closure Host pages."""
+    registry = json.loads((ROOT / 'verification/current-host-closure-correction.json').read_text())
+    return {source['path']: (ROOT / source['before_artifact']['path']).read_bytes()
+            for source in registry['sources']}
+
+def cleanup_source_view():
+    return {**closure_before_sources(), 'host/payment.mdx': frozen_payout_payment()}
 
 def cleanup_project():
-    with frozen_cleanup_predecessor():
-        return TARGET.project(ROOT)
+    return TARGET.project(ROOT, cleanup_source_view())
 
 def cleanup_load(model):
-    with frozen_cleanup_predecessor():
+    original = TARGET.project
+    with mock.patch.object(TARGET, 'project', side_effect=lambda root, frozen_source_overrides=None: original(root, {**cleanup_source_view(), **(frozen_source_overrides or {})})):
         return TARGET.load_cleanup(ROOT, model)
 
 
@@ -68,9 +64,7 @@ class CleanupGateTest(unittest.TestCase):
         jurisdiction = importlib.util.module_from_spec(jurisdiction_spec)
         assert jurisdiction_spec.loader
         jurisdiction_spec.loader.exec_module(jurisdiction)
-        prior=jurisdiction.predecessor
-        jurisdiction.predecessor=lambda root, model, old: prior(root, model, {**old, 'host/payment.mdx': frozen_payout_payment()})
-        self.assertEqual(baseline, jurisdiction.project(ROOT))
+        self.assertEqual(baseline, jurisdiction.project(ROOT, cleanup_source_view()))
 
     def test_unselected_claim_tamper_fails_whole_projection_gate(self) -> None:
         model = copy.deepcopy(self.current())

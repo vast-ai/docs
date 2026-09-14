@@ -1,7 +1,8 @@
+import {beforeClosure} from './closure_historical_test_sources.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {PAYOUT_INVOICE_PATH,projectPayoutInvoiceCorrection,loadPayoutInvoiceCorrection} from './current_host_payout_invoice_correction.mjs';
-const read=ref=>fs.readFileSync(ref),exists=ref=>fs.existsSync(ref),ids=['MCL-e2b956d14494e470','MCL-df7b287adb0df683','MCL-5936430d1b2d8de9','MCL-bbd64c772e9b4693','MCL-3d796f5ae7f2020e','MCL-3afd93ae0b6cf8a4'];
+const read=beforeClosure(ref=>fs.readFileSync(ref)),exists=ref=>fs.existsSync(ref),ids=['MCL-e2b956d14494e470','MCL-df7b287adb0df683','MCL-5936430d1b2d8de9','MCL-bbd64c772e9b4693','MCL-3d796f5ae7f2020e','MCL-3afd93ae0b6cf8a4'];
 const projected=projectPayoutInvoiceCorrection({read,exists}),claims=new Map(projected.model.pages.flatMap(p=>p.claims.map(c=>[c.id,c])));
 assert.deepEqual(projected.model.counts.claim_statuses,{PASS:319,UNVALIDATED:1558,NOT_APPLICABLE:87,FAIL:26,BLOCKED:23});
 for(const id of ids){assert.equal(claims.get(id).status,'PASS');assert.equal(claims.get(id).history.predecessor.claim_id,id);}

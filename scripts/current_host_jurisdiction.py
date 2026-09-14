@@ -45,8 +45,8 @@ def safe(root: Path,ref: str)->Path:
     for part in ref.split('/'):
         path/=part; require(not path.is_symlink(),'unsafe symlink')
     require(path.is_file() and path.resolve().is_relative_to(root.resolve()),'missing path '+ref); return path
-def pinned(root: Path,ref: str,wanted: str)->bytes:
-    value=safe(root,ref).read_bytes(); require(digest(value)==wanted,'digest drift '+ref); return value
+def pinned(root: Path, ref: str, wanted: str, frozen_source_overrides=None)->bytes:
+    value=(frozen_source_overrides or {}).get(ref) if ref in (frozen_source_overrides or {}) else safe(root,ref).read_bytes(); require(digest(value)==wanted,'digest drift '+ref); return value
 def decode(value: bytes)->dict[str,Any]:
     result=json.loads(value); require(isinstance(result,dict),'JSON object required'); return result
 def keys(value: Any,expected: set[str])->None: require(isinstance(value,dict) and set(value)==expected,'missing/unknown fields')
@@ -60,16 +60,9 @@ def pointer(capture: dict[str,Any],ref: str)->str:
         require(parent['text_sha256']==digest(value.encode()),'selected source text hash drift')
     return value
 
-def predecessor(root: Path,baseline: dict[str,Any],old: dict[str,bytes])->None:
+def predecessor(root: Path,baseline: dict[str,Any],old: dict[str,bytes],frozen_source_overrides=None)->None:
     terms=module('current_host_terms_binding')
-    # Terms has no overlay parameter. This private module instance retains its
-    # complete projector while passing the two frozen page bytes through its
-    # existing clarification/authority predecessor gate.
-    def validate_prior(r: Path,model: dict[str,Any],old_workload: bytes)->None:
-        authority=module('current_host_authority_scan'); clarification=module('current_host_clarification')
-        clarification.validate_model(model,r,lambda rr,phase43: authority.validate_model(phase43,rr,{**old,terms.SOURCE:old_workload}))
-    terms.predecessor=validate_prior
-    terms.validate_model(baseline,root)
+    terms.validate_model(baseline,root,{**(frozen_source_overrides or {}),**old})
 
 def correction(sources: list[dict[str,Any]])->dict[str,str]:
     return {'id':MARKER,'scope':'Eight exact Tax Guide, Workload Policy and Datacenter source/advice corrections',
@@ -77,7 +70,7 @@ def correction(sources: list[dict[str,Any]])->dict[str,str]:
         'current':'8 bounded claim transitions; 2 exact source transitions: '+ '; '.join(s['path']+' '+s['before_sha256']+' → '+s['after_sha256'] for s in sources)+'.',
         'reason':'Contextual advice, existing Agreement rule and published program scope only; no tax determination, runtime outcome, certification, procedure completion or human acceptance is inferred.'}
 
-def project(root: Path)->dict[str,Any]:
+def project(root: Path, frozen_source_overrides=None)->dict[str,Any]:
     root=root.resolve(); registry=decode(pinned(root,REGISTRY,REGISTRY_SHA256))
     keys(registry,{'schema_version','record_type','generated_at','baseline','sources','artifacts','retained_raw_sources','transitions'})
     require(registry['schema_version']=='1.0' and registry['record_type']=='HOST_JURISDICTION_TRANSITION','wrong registry type')
@@ -89,13 +82,13 @@ def project(root: Path)->dict[str,Any]:
         keys(source['before_artifact'],{'path','sha256'})
         old[ref]=pinned(root,source['before_artifact']['path'],source['before_artifact']['sha256'])
         require(digest(old[ref])==source['before_sha256'],'before source mismatch')
-        current[ref]=pinned(root,ref,source['after_sha256'])
+        current[ref]=pinned(root,ref,source['after_sha256'],frozen_source_overrides)
         left=old[ref].decode().splitlines(); right=current[ref].decode().splitlines()
         require(len(left)==len(right),'source line count changed')
         edited[ref]={i+1 for i,(a,b) in enumerate(zip(left,right)) if a!=b}
         require(edited[ref]==SOURCES[ref],'source edits exceed exact approved lines')
     require(set(old)==set(SOURCES),'two source transitions required')
-    baseline=decode(pinned(root,BASELINE,BASELINE_SHA256)); predecessor(root,baseline,old)
+    baseline=decode(pinned(root,BASELINE,BASELINE_SHA256)); predecessor(root,baseline,old,frozen_source_overrides)
     artifacts={}
     for artifact in registry['artifacts']:
         keys(artifact,{'id','path','sha256','kind','origin','source_label'}); aid=artifact['id']
@@ -125,7 +118,7 @@ def project(root: Path)->dict[str,Any]:
         require(claim['status']=='PASS' and claim['classification']==classification and claim['required_evidence_types']==expected_lanes,'invalid bounded classification/status/lanes')
         require(claim['headings']==prior['headings'] and len(claim['spans'])==1,'heading/span scope drift')
         span=claim['spans'][0]; require({k:v for k,v in span.items() if k!='text_sha256'}=={k:v for k,v in prior['spans'][0].items() if k!='text_sha256'},'span location drift')
-        ref=span['source_file']; content=current.get(ref) or safe(root,ref).read_bytes(); lines=content.decode().splitlines()
+        ref=span['source_file']; content=current.get(ref) or (frozen_source_overrides or {}).get(ref) or safe(root,ref).read_bytes(); lines=content.decode().splitlines()
         literal='\n'.join(lines[span['start']-1:span['end']]); require(claim['text']==literal and span['text_sha256']==digest(literal.encode()),'claim literal/span drift')
         if cid==WORKLOAD: require(claim['text']==prior['text'] and claim['spans']==prior['spans'],'Workload wording/citation must remain unchanged')
         rv=next((r for r in review['reviews'] if r['claim_id']==cid),None)
@@ -161,7 +154,7 @@ def project(root: Path)->dict[str,Any]:
     result['counts']['claim_statuses']=dict(sorted(Counter(c['status'] for c in after.values()).items()))
     result['generated_at']=registry['generated_at']; result['corrections'].append(correction(registry['sources'])); return result
 
-def validate_model(model: dict[str,Any],root: Path)->None: require(model==project(root),'whole model differs from jurisdiction projection')
+def validate_model(model: dict[str,Any],root: Path,frozen_source_overrides=None)->None: require(model==project(root,frozen_source_overrides),'whole model differs from jurisdiction projection')
 def load_jurisdiction(root: Path,model: dict[str,Any])->dict[str,Any]|None:
     present=(root/REGISTRY).is_file(); marked=any(c.get('id')==MARKER for c in model.get('corrections',[]))
     if not present:

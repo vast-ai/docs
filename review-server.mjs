@@ -36,6 +36,7 @@ import { AUTHORITY_SCAN_PATH, AUTHORITY_SCAN_DECISION, AUTHORITY_SCAN_RELOCATION
 import { loadCurrentHostReviewTransition } from './scripts/current_host_review_transition.mjs';
 import { hostReviewReaderCopy } from './scripts/host_review_reader_copy.mjs';
 import { buildHostReviewQueue, describeHostReview } from './scripts/host_review_work_queue.mjs';
+import { loadHostReviewOwnerQuestions } from './scripts/host_review_owner_questions.mjs';
 let CURRENT_AUTHORITY_SCAN = null;
 let AUTHORITY_SCAN_HISTORICAL_SOURCES = null;
 let AUTHORITY_SCAN_HISTORICAL_READS = null;
@@ -322,6 +323,7 @@ const CURRENT_REVIEW_RELOCATIONS = new Set([
   'CURRENT_HOST_JURISDICTION_SOURCE_CHANGED',
   'CURRENT_HOST_PAYOUT_PROVIDER_UI_CORRECTION_SOURCE_CHANGED',
   'CURRENT_HOST_PAYOUT_TERMS_CORRECTION_SOURCE_CHANGED',
+  'CURRENT_HOST_CLOSURE_SOURCE_CHANGED',
 ]);
 const CURRENT_HOST_REVIEW_ARTIFACTS = new Set([
   'verification/host-docs-test-results.json', 'verification/current-host-docs-review.json',
@@ -2777,7 +2779,9 @@ function currentReviewForPath(pathname) {
   const installationEvidenceIntake = currentInstallEvidenceIntake();
   const citationDefect = (claim) => claim.status === 'FAIL' &&
     claim.requiredEvidenceTypes.includes('AUTHORITATIVE_DOCUMENTATION_CITATION');
-  return { available: true, workQueue: buildHostReviewQueue(page.claims), page: { ...page, claims: page.claims.map(claim => ({ ...claim, reviewWork: describeHostReview(claim), readerCopy: hostReviewReaderCopy(claim), readonlyProof: currentReadonlyProof(claim) })) }, corrections: CURRENT_HOST_DOCS_REVIEW.corrections.filter((row) => row.scope === page.route || row.scope === 'ALL'),
+  const ownerQuestions = loadHostReviewOwnerQuestions({ read: ref => vvRepositoryFile(ref, 'invalid owner-question registry').bytes,
+    model: CURRENT_HOST_DOCS_REVIEW, modelSha256: CURRENT_HOST_DOCS_REVIEW.packageSha256 });
+  return { available: true, workQueue: buildHostReviewQueue(page.claims), ownerQuestions, page: { ...page, claims: page.claims.map(claim => ({ ...claim, reviewWork: describeHostReview(claim), readerCopy: hostReviewReaderCopy(claim), readonlyProof: currentReadonlyProof(claim) })) }, corrections: CURRENT_HOST_DOCS_REVIEW.corrections.filter((row) => row.scope === page.route || row.scope === 'ALL'),
     installationEvidenceIntake, citationDefects: {
       total: CURRENT_HOST_DOCS_REVIEW.pages.flatMap((row) => row.claims).filter(citationDefect).length,
       page: page.claims.filter(citationDefect).length,
@@ -8189,10 +8193,20 @@ const OVERLAY_JS = String.raw`
     var page = currentReview.page;
     var installationIntake = null;
     var claims = Array.isArray(page.claims) ? page.claims : [];
+    // Sort only the rendered cards. The reviewed model and its payload order stay intact.
+    var currentStatusOrder = ['FAIL', 'BLOCKED', 'UNVALIDATED', 'PASS', 'NOT_APPLICABLE'];
+    var displayClaims = claims.slice().sort(function (left, right) { return currentStatusOrder.indexOf(left.status) - currentStatusOrder.indexOf(right.status); });
     var queue = currentReview.workQueue;
     var workFilter = typeof currentWorkFilter === 'string' ? currentWorkFilter : '';
     var statusFilter = typeof currentStatusFilter === 'string' ? currentStatusFilter : 'ALL';
     var currentCitationDefects = claims.filter(currentCitationDefect);
+    var pageStatusSummary = currentStatusOrder.filter(function (status) { return queue && queue.statuses[status]; }).map(function (status) {
+      return esc(queue.statuses[status]) + ' ' + esc(queue.statusLabels[status] || status);
+    }).join(' · ');
+    var ownerQuestions = currentReview.ownerQuestions;
+    var pageOwnerQuestions = ownerQuestions?.available ? ownerQuestions.questions.filter(function (question) {
+      return question.relatedClaims.some(function (claim) { return claim.route === page.route; });
+    }) : [];
     var citationSummary = currentReview.citationDefects || { total: currentCitationDefects.length, page: currentCitationDefects.length };
     var locators = claims.map(function (claim) { return currentClaimLocator(page, claim); });
     var sections = Array.from(new Set(locators.flatMap(function (claim) { return claim.checkedContent.sections; })));
@@ -8200,15 +8214,24 @@ const OVERLAY_JS = String.raw`
     var html = '<section class="vv-reading vv-current-reading" aria-label="Current documentation review"><h3>Current documentation review</h3>' +
       '<p><b>' + esc(page.title) + '</b>.</p>' +
       '<p>Review the current wording, its bound sources, limits, and next action.</p>' +
-      '<p class="vv-review-summary">' + (queue ? esc(queue.total) + ' ' + (queue.total === 1 ? 'passage' : 'passages') + ' on this page. Use the category and completion filters to narrow them.' : 'Use the section and completion filters to narrow this page.') + '</p>' +
+      '<p class="vv-review-summary"><b>Page-wide exact claim summary:</b> ' + (queue ? esc(queue.total) + ' ' + (queue.total === 1 ? 'passage' : 'passages') + '. ' + pageStatusSummary + '.' : 'Use the section and completion filters to narrow this page.') + ' This summary is independent of all filters.</p>' +
+      '<p class="vv-reading-actions"><button type="button" data-current-show-all-corrections="1">Show all page corrections</button></p>' +
       '<details class="vv-reading-audit vv-review-guide"><summary>How the review chooses evidence</summary><p>Basic product descriptions can use official Vast sources. Policy instructions need an approved rule, not a test rental. If that rule is unclear, its owner should confirm or correct it. Claims about system behavior still need technical evidence.</p></details>';
+    if (ownerQuestions?.available) {
+      html += '<section class="vv-reading-audit vv-owner-questions"><h4>Open owner questions</h4><p>These are separate handoff questions, not claim statuses, proof, or recorded acceptance. They remain visible while claim filters change.</p>' +
+        (pageOwnerQuestions.length ? pageOwnerQuestions.map(function (question) {
+          return '<article><p><b>' + esc(question.question) + '</b></p><p>Proposed teams: ' + esc(question.proposedTeams.join(' / ')) + ' · <small>Tracking ID: ' + esc(question.id) + ' · ' + esc(question.status) + '</small></p><p><b>Needed:</b> ' + esc(question.requiredDecisionOrSource) + '</p><p><b>Related exact passages:</b> ' + question.relatedClaims.map(function (claim) {
+            return '<button type="button" data-current-owner-question-claim="' + esc(claim.id) + '">Open passage: ' + esc(String(claim.text || '').slice(0, 140)) + '</button><small> ' + esc(claim.headings.join(' / ')) + ' · ' + esc(claim.id) + '</small>';
+          }).join(' ') + '</p>' + (question.coverageGaps.length ? '<p><b>Coverage gap:</b> ' + esc(question.coverageGaps.join(' ')) + '</p>' : '') + '</article>';
+        }).join('') : '<p>No selected-page owner question. The registry still contains the separate handoff list.</p>') + '</section>';
+    } else html += '<section class="vv-reading-audit vv-owner-unavailable" role="alert"><b>Owner-question registry unavailable.</b><br>' + esc(ownerQuestions?.error || 'Regenerate the registry before treating this review as current.') + '</section>';
     if (queue) {
       html += '<section class="vv-work-queue" aria-label="Review work on this page"><h4>Review work on this page</h4><p>' + esc(queue.total) +
         ' passages. Counts are not unique questions; support layers are separate.</p>' +
         '<label class="vv-section-label" for="current-work-filter">Review work</label><select id="current-work-filter"><option value="">All categories</option>' +
         queue.buckets.map(function (bucket) { return '<option value="' + esc(bucket.id) + '"' + (workFilter === bucket.id ? ' selected' : '') + '>' + esc(bucket.label) + ' (' + esc(bucket.count) + ')</option>'; }).join('') + '</select>' +
         '<label class="vv-section-label" for="current-status-filter">Completion status</label><select id="current-status-filter"><option value="ALL">All statuses</option>' +
-        Object.keys(queue.statuses).map(function (status) { return '<option value="' + esc(status) + '"' + (statusFilter === status ? ' selected' : '') + '>' + esc(queue.statusLabels[status] || 'Needs triage') + ' (' + esc(queue.statuses[status]) + ')</option>'; }).join('') + '</select>' +
+        currentStatusOrder.filter(function (status) { return queue.statuses[status]; }).map(function (status) { return '<option value="' + esc(status) + '"' + (statusFilter === status ? ' selected' : '') + '>' + esc(queue.statusLabels[status] || 'Needs triage') + ' (' + esc(queue.statuses[status]) + ')</option>'; }).join('') + '</select>' +
         '<details class="vv-reading-audit vv-work-queue-details"><summary>Category descriptions and shared wording</summary>' +
         '<p>Counts are passages, not unique questions. The category buttons below set the same visible filter.</p>' +
         queue.buckets.filter(function (bucket) { return bucket.count || bucket.id !== 'triage'; }).map(function (bucket) {
@@ -8238,7 +8261,7 @@ const OVERLAY_JS = String.raw`
       '<p class="vv-reading-counts"><b>Current Host review:</b> ' + esc(citationSummary.total) +
         ' missing authoritative citations across Host pages; ' + esc(citationSummary.page) + ' on this page. Link the required official sources for these statements.</p>' +
       '<p id="current-location-notice" role="status" aria-live="polite"></p>';
-    claims.forEach(function (claim) {
+    displayClaims.forEach(function (claim) {
       var locator = currentClaimLocator(page, claim);
       var claimId = esc(locator.id);
       var heading = claim.headings.length === 1 ? claim.headings[0] : claim.headings.join(' / ');
@@ -8326,8 +8349,10 @@ const OVERLAY_JS = String.raw`
     var verification = pageContext && pageContext.verification ? pageContext.verification : { available: false };
     var currentReview = pageContext && pageContext.currentReview ? pageContext.currentReview : { available: false };
     var count = $('jiraCount');
-    count.hidden = blockers.length === 0;
-    count.textContent = blockers.length ? '\u26A0 ' + blockers.length : '';
+    var openChecks = currentReview.available && currentReview.workQueue ? currentReview.workQueue.total -
+      ((currentReview.workQueue.statuses.PASS || 0) + (currentReview.workQueue.statuses.NOT_APPLICABLE || 0)) : 0;
+    count.hidden = openChecks === 0 && blockers.length === 0;
+    count.textContent = currentReview.available ? 'V&V open checks: ' + openChecks + (blockers.length ? ' · context blockers: ' + blockers.length : '') : (blockers.length ? 'context blockers: ' + blockers.length : '');
     var hostPage = location.pathname.startsWith('/host/');
     var hostPageWithUnavailableVv = hostPage && !verification.available;
     if (!epics.length && !issues.length && !blockers.length && !verification.available && !currentReview.available && !hostPageWithUnavailableVv && !hostPage) {
@@ -8415,6 +8440,23 @@ const OVERLAY_JS = String.raw`
     if (workButton) {
       currentWorkFilter = workButton.getAttribute('data-current-work-category'); currentStatusFilter = 'ALL'; currentClaimSectionFilter = ''; currentCitationDefectFilter = 'ALL';
       renderPageContext(); return;
+    }
+    var allCorrectionsButton = event.target.closest('[data-current-show-all-corrections]');
+    if (allCorrectionsButton) {
+      currentWorkFilter = ''; currentStatusFilter = 'FAIL'; currentClaimSectionFilter = ''; currentCitationDefectFilter = 'ALL';
+      renderPageContext();
+      var firstCorrection = shadow.querySelector('[data-current-status="FAIL"]');
+      if (firstCorrection) firstCorrection.scrollIntoView({block: 'start'});
+      return;
+    }
+    var ownerQuestionButton = event.target.closest('[data-current-owner-question-claim]');
+    if (ownerQuestionButton) {
+      var ownerClaimId = ownerQuestionButton.getAttribute('data-current-owner-question-claim');
+      currentWorkFilter = ''; currentStatusFilter = 'ALL'; currentClaimSectionFilter = ''; currentCitationDefectFilter = 'ALL';
+      renderPageContext();
+      var ownerCard = Array.from(shadow.querySelectorAll('[data-current-claim]')).find(function (card) { return card.getAttribute('data-current-claim') === ownerClaimId; });
+      if (ownerCard) { ownerCard.scrollIntoView({block: 'start'}); var ownerAction = ownerCard.querySelector('[data-show-current-claim]'); ownerAction.focus(); ownerAction.click(); }
+      return;
     }
     var queueButton = event.target.closest('[data-current-queue-claim]');
     if (queueButton) {

@@ -53,7 +53,7 @@ test('production readers separate contextual review notes from independent sourc
   let dialogTitle = '', dialog = '';
   const offline = vm.createContext({report: {authority_scan: {transitions}, files}, claimMap: claims, escapeHTML, pill: () => '',
     showDialog: (title, content) => {dialogTitle = title; dialog = content;}});
-  vm.runInContext(section(template, 'function authorityScanHTML(', 'function twoDefectTransitionHTML('), offline);
+  vm.runInContext(section(template, 'function proofGuideHTML(', 'function twoDefectTransitionHTML('), offline);
   const basisEndpoint = section(server, "        if (url.searchParams.has('basis')) {", '        if (authorityHistoryRef)');
   for (const id of ['CUR-708c718cf735c8b2', 'CUR-555543e9b2ceddb4', 'CUR-2ead4eda972e84b0', 'MCL-8fe2020c0e7efe26']) {
     const item = claims.get(id), scan = transitions[id], before = JSON.stringify(scan);
@@ -102,7 +102,7 @@ test('production readers present local cleanup observations as neutral documenta
   const claim={id:'LOCAL-ONE',text:'Read the guide.',status:'PASS',classification:'REVIEWED_ADVICE',required_evidence_types:['REPOSITORY_STATIC_CHECK'],headings:['Guide'],spans:[],evidence_refs:[],authorityScan:scan};
   let shown;
   const context={claim,report:{authority_scan:{transitions:{[claim.id]:scan}},files:{[basis.artifactRef]:{text:'Retained record',sha256:'f'.repeat(64)}}},claimMap:new Map([[claim.id,claim]]),escapeHTML,pill:()=>'',showDialog:(title,body)=>{shown={title,body};}};
-  const source=section(template,'function authorityScanHTML(','function twoDefectTransitionHTML(');
+  const source=section(template,'function proofGuideHTML(','function twoDefectTransitionHTML(');
   const html=vm.runInNewContext(source+'\nauthorityScanHTML(claim);',context);
   assert.match(html,/class="callout partial documentation-check"/);assert.match(html,/data-basis="0"/);assert.match(html,/CHECK-01/);
   assert.doesNotMatch(html,/What the source proves|Open exact bound source/);

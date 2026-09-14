@@ -3,6 +3,16 @@ export const REVIEW_STATUS_LABELS = Object.freeze({
   UNVALIDATED: 'Review pending', FAIL: 'Correction needed', BLOCKED: 'Prerequisite unavailable',
   PASS: 'Checked within scope', NOT_APPLICABLE: 'Not applicable',
 });
+// Presentation priority only. Claim payloads retain their source/model order.
+export const REVIEW_STATUS_DISPLAY_ORDER = Object.freeze(['FAIL', 'BLOCKED', 'UNVALIDATED', 'PASS', 'NOT_APPLICABLE']);
+export function reviewStatusRank(status) {
+  const rank = REVIEW_STATUS_DISPLAY_ORDER.indexOf(status);
+  return rank === -1 ? REVIEW_STATUS_DISPLAY_ORDER.length : rank;
+}
+export function sortHostReviewDisplay(claims) {
+  return claims.map((claim, index) => ({claim, index})).sort((left, right) =>
+    reviewStatusRank(left.claim.status) - reviewStatusRank(right.claim.status) || left.index - right.index).map(item => item.claim);
+}
 export const REVIEW_WORK_BUCKETS = Object.freeze([
   {id: 'documentation', label: 'Documentation checks', description: 'Review advice, links, examples and wording.'},
   {id: 'source', label: 'Source/citation checks', description: 'Check the relevant code, publication or official rule.'},
@@ -71,7 +81,7 @@ export function buildHostReviewQueue(claims) {
     grouped.get(key).occurrenceIds.push(claim.id);
   }
   const groups = [...grouped.values()];
-  return {total: claims.length, buckets, statuses, statusLabels: REVIEW_STATUS_LABELS, types, groups,
+  return {total: claims.length, buckets, statuses, statusLabels: REVIEW_STATUS_LABELS, statusDisplayOrder: REVIEW_STATUS_DISPLAY_ORDER, types, groups,
     sharedWordingGroups: groups.filter(group => group.occurrenceIds.length > 1).length,
     sharedWordingOccurrences: groups.filter(group => group.occurrenceIds.length > 1).reduce((sum,group) => sum + group.occurrenceIds.length,0),
     countMeaning: 'Counts are passages, not unique questions. Shared wording does not mean the same proven fact. Each passage keeps its own evidence and review status.'};

@@ -26,32 +26,28 @@ def safe(root:Path,ref:str)->Path:
  for p in ref.split('/'):
   path/=p;req(not path.is_symlink(),'unsafe symlink')
  req(path.is_file() and path.resolve().is_relative_to(root.resolve()),'missing path '+ref);return path
-def pin(root,ref,wanted):
- value=safe(root,ref).read_bytes();req(sha(value)==wanted,'digest drift '+ref);return value
+def pin(root,ref,wanted,frozen_source_overrides=None):
+ value=(frozen_source_overrides or {}).get(ref) if ref in (frozen_source_overrides or {}) else safe(root,ref).read_bytes();req(sha(value)==wanted,'digest drift '+ref);return value
 def span(line,lines):return {'source_file':SOURCE,'start':line,'end':line,'text_sha256':sha(lines[line-1].encode())}
 
-def predecessor(root,baseline,before):
- terms=mod('current_host_payout_terms_correction'); original=terms.pin
- def oldpin(inner,ref,wanted):
-  if ref==SOURCE:req(sha(before)==wanted,'predecessor source drift');return before
-  return original(inner,ref,wanted)
- terms.pin=oldpin
- req(terms.project(root)==baseline,'sealed payout Terms predecessor differs from invoice baseline')
+def predecessor(root,baseline,before,frozen_source_overrides=None):
+ terms=mod('current_host_payout_terms_correction')
+ req(terms.project(root,{**(frozen_source_overrides or {}),SOURCE:before})==baseline,'sealed payout Terms predecessor differs from invoice baseline')
 
-def project(root:Path)->dict[str,Any]:
+def project(root: Path, frozen_source_overrides=None)->dict[str,Any]:
  root=root.resolve(); registry=json.loads(pin(root,REGISTRY,REGISTRY_SHA256))
  req(set(registry)=={'schema_version','record_type','generated_at','baseline','source','guidance','transitions'},'registry keys')
  req(registry['schema_version']=='1.0' and registry['record_type']=='HOST_PAYOUT_INVOICE_CORRECTION','registry type')
  req(registry['baseline']=={'path':BASELINE,'sha256':BASELINE_SHA256},'baseline')
  req(registry['guidance']=={'path':GUIDANCE,'sha256':GUIDANCE_SHA256},'guidance')
  req(registry['source']['path']==SOURCE and registry['source']['before_artifact']=={'path':BEFORE,'sha256':BEFORE_SHA256} and registry['source']['before_sha256']==BEFORE_SHA256 and registry['source']['changed_lines']==sorted(CHANGED),'source scope')
- before=pin(root,BEFORE,BEFORE_SHA256);after=pin(root,SOURCE,registry['source']['after_sha256']);oldlines=before.decode().splitlines(); lines=after.decode().splitlines()
+ before=pin(root,BEFORE,BEFORE_SHA256);after=pin(root,SOURCE,registry['source']['after_sha256'],frozen_source_overrides);oldlines=before.decode().splitlines(); lines=after.decode().splitlines()
  req(len(oldlines)==len(lines) and {i+1 for i,(a,b) in enumerate(zip(oldlines,lines)) if a!=b}==CHANGED,'source edits exceed six approved lines')
  guidance=json.loads(pin(root,GUIDANCE,GUIDANCE_SHA256)); sections={s['heading_id']:s for s in guidance.get('sections',[])}
  req(guidance.get('url')=='https://docs.vast.ai/host/payment' and guidance.get('limitations')=='This records current published Vast guidance from the same docs repository. It is not independent backend scheduling, account enforcement, actual payment, or owner approval evidence. The deployed Git revision is not identified by the page.','guidance provenance')
  req(set(sections)=={'minimum-payout-threshold','invoice-generation','payment-timeline','when-will-i-get-paid','my-account-is-not-generating-invoices'} and all(s['text_sha256']==sha(s['text'].encode()) for s in sections.values()),'guidance sections')
  req('$20 USD before an invoice can be generated.' in sections['minimum-payout-threshold']['text'] and 'roll forward until the minimum threshold' in sections['minimum-payout-threshold']['text'] and 'weekly on Fridays' in sections['invoice-generation']['text'] and 'valid payout method connected' in sections['invoice-generation']['text'] and 'up to two weeks to receive your first payout' in sections['payment-timeline']['text'] and 'depending on the provider and your region' in sections['payment-timeline']['text'],'guidance wording')
- baseline=json.loads(pin(root,BASELINE,BASELINE_SHA256)); predecessor(root,baseline,before); old={c['id']:c for p in baseline['pages'] for c in p['claims']};req(len(old)==2013 and set(IDS)<=set(old),'claim inventory')
+ baseline=json.loads(pin(root,BASELINE,BASELINE_SHA256)); predecessor(root,baseline,before,frozen_source_overrides); old={c['id']:c for p in baseline['pages'] for c in p['claims']};req(len(old)==2013 and set(IDS)<=set(old),'claim inventory')
  req({x.get('claim_id'):x.get('before_sha256') for x in registry['transitions']}=={k:objhash(old[k]) for k in IDS},'claim predecessor')
  result=copy.deepcopy(baseline);claims={c['id']:c for p in result['pages'] for c in p['claims']}
  def evidence(anchor):return {'id':'EV-PAYOUT-INVOICE-GUIDANCE-01-'+anchor,'role':'PUBLISHED_PAYOUT_INVOICE_GUIDANCE','limit':LIMIT,'artifact_ref':GUIDANCE}
@@ -69,7 +65,7 @@ def project(root:Path)->dict[str,Any]:
   if item['path']==SOURCE:item['sha256']=sha(after)
  req(sum(old[k]==claims[k] for k in old)==2007,'unrelated claim drift')
  result['counts']['claim_statuses']=dict(sorted(Counter(c['status'] for c in claims.values()).items()));result['generated_at']=registry['generated_at'];result['corrections'].append({'id':MARKER,'scope':'Six exact Host Payouts invoice/payout guidance occurrences','history':'Payout Terms predecessor and pre-correction payment source are hash-pinned.','current':'Four former FAIL and two formerly UNVALIDATED occurrences are attributed to captured published guidance; agreement evidence remains separately bounded.','reason':'Published guidance only; no backend scheduling, invoice generation, payment processing, account enforcement, Finance approval, or owner acknowledgement is inferred.'});return result
-def validate_model(model,root):req(model==project(root),'whole model differs from payout/invoice projection')
+def validate_model(model,root,frozen_source_overrides=None):req(model==project(root,frozen_source_overrides),'whole model differs from payout/invoice projection')
 def load_payout_invoice_correction(root,model):
  present=(root/REGISTRY).is_file();marked=any(x.get('id')==MARKER for x in model.get('corrections',[]))
  if not present:req(not marked,'invoice-marked model has no registry');return None

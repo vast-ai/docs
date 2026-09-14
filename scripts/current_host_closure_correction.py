@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+"""One sealed, bounded closure successor. Source evidence is not runtime proof."""
+from __future__ import annotations
+import copy, hashlib, importlib.util, json
+from collections import Counter
+from pathlib import Path
+
+REGISTRY = 'verification/current-host-closure-correction.json'
+REGISTRY_SHA256 = '6997552e8fee36aa619915508f57feb47a9f5e7de32d8a7787e9ef960935c37c'
+ATTEMPT = 'verification/evidence/2026-09-14-host-closure-correction-attempt-01'
+MARKER = 'HOST-CLOSURE-CORRECTION-01'
+BASELINE = ATTEMPT + '/pre-correction-model.json'
+BASELINE_SHA256 = '56650fad892d1f1d387dd4328bdb474f7c2c923907419a2b74868c4a68b7daf5'
+CORRECTED = {'CUR-a991f28f683ba829','CUR-93f089288e67669d','MCL-b61d15c0282ef567','MCL-c59caa4cd52bcc1f','MCL-af1c482a08b09316','MCL-393941d0e9be9d31','MCL-57133525f112013a','MCL-dcb653ae3a927dae','MCL-47b85b40f58091a2','MCL-ae7f4423cef61511'}
+RETIRED = {'MCL-08d534d1cc02eb2c','MCL-4be2159765519977','MCL-b87645b43a9136dd','MCL-d5001953fbd7df0b','MCL-e03564808f65b40b'}
+RUNTIME = {'MCL-d2f649ad765ea7bb','MCL-b15c6cfc26e189c2','MCL-115b4938222083ac','MCL-9edeb94eaa736bca','MCL-e6fb82f7e167fdc8','MCL-3aca6b1f291d4d0c','VOL-C31','VOL-C33'}
+UPSTREAM = {'CUR-f9aad9428d594b40','MCL-217525688a0854b4','CUR-65ffc3ba1623ad1c','CUR-bf6233f2e53eca43','MCL-9dc3b0e54070a926','MCL-ab00ca89f31d5db1'}
+NAVIGATION = {'MCL-0ae9c2fd5ac2ef9a','MCL-9459e18a155808c9'}
+IDS = CORRECTED | RUNTIME | UPSTREAM | NAVIGATION
+STALE = 'Closure source changed; retained procedure evidence does not transfer to changed steps.'
+def sha(value): return hashlib.sha256(value).hexdigest()
+def canon(value): return json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=False)
+def objhash(value): return sha(canon(value).encode())
+def req(value, message):
+    if not value: raise ValueError('host closure correction: ' + message)
+def safe(root, ref):
+    req(isinstance(ref,str) and ref and not ref.startswith('/') and '\\' not in ref and all(p not in {'','.','..'} for p in ref.split('/')), 'unsafe path')
+    path=root.resolve()
+    for part in ref.split('/'):
+        path/=part; req(not path.is_symlink(),'unsafe symlink')
+    req(path.is_file() and path.resolve().is_relative_to(root.resolve()),'missing path '+ref)
+    return path
+
+def pin(root, ref, wanted):
+    value=safe(root,ref).read_bytes();req(sha(value)==wanted,'digest drift '+ref);return value
+
+def selection(raw, pointer):
+    req(isinstance(pointer,str) and pointer.startswith('/'),'invalid source selector')
+    if pointer.startswith('/lines/'):
+        first,last=map(int,pointer[7:].split('-'));lines=raw.decode().splitlines()
+        req(0<first<=last<=len(lines),'invalid source line range')
+        return '\n'.join(lines[first-1:last])
+    value=json.loads(raw)
+    for part in pointer[1:].split('/'):
+        value=value[int(part)] if isinstance(value,list) else value[part]
+    return value if isinstance(value,str) else canon(value)
+
+def index(model): return {c['id']:c for p in model['pages'] for c in p['claims']}
+
+def project(root: Path):
+    root=root.resolve();registry=json.loads(pin(root,REGISTRY,REGISTRY_SHA256))
+    req(set(registry)=={'schema_version','record_type','generated_at','baseline','sources','artifacts','transitions','retirements','original_findings','limits'},'registry keys')
+    req(registry['schema_version']=='1.0' and registry['record_type']=='HOST_CLOSURE_CORRECTION','registry type')
+    req(registry['baseline']=={'path':BASELINE,'sha256':BASELINE_SHA256},'baseline substitution')
+    baseline=json.loads(pin(root,BASELINE,BASELINE_SHA256));old=index(baseline)
+    req(len(old)==2013 and len(registry['transitions'])==len(IDS) and {x['claim_id'] for x in registry['transitions']}==IDS,'transition inventory')
+    req(len(registry['retirements'])==5 and {x['claim_id'] for x in registry['retirements']}==RETIRED,'retirement inventory')
+    findings={x['claim_id']:x for x in registry['original_findings']}
+    req(len(registry['original_findings'])==26 and set(findings)=={cid for cid,c in old.items() if c['status']=='FAIL'},'original finding inventory')
+    req({cid for cid,f in findings.items() if f['disposition']=='CORRECT_NOW'}==CORRECTED|RETIRED,'correction decision scope')
+    before={};current={};maps={};after_hashes={}
+    for source in registry['sources']:
+        ref=source['path'];req(ref.startswith('host/') and ref not in before,'source scope')
+        req(source['before_artifact']['path']==ATTEMPT+'/sources-before/'+ref,'source snapshot path')
+        before[ref]=pin(root,source['before_artifact']['path'],source['before_artifact']['sha256']);current[ref]=pin(root,ref,source['after_sha256']);after_hashes[ref]=sha(current[ref])
+        oldlines,newlines=before[ref].decode().splitlines(),current[ref].decode().splitlines()
+        maps[ref]=dict(source['line_map']);req(len(maps[ref])==len(source['line_map']) and len(set(maps[ref].values()))==len(maps[ref]),'duplicate line map')
+        req(list(maps[ref])==sorted(maps[ref]) and list(maps[ref].values())==sorted(maps[ref].values()),'unordered line map')
+        for a,b in maps[ref].items():req(0<a<=len(oldlines) and 0<b<=len(newlines) and oldlines[a-1]==newlines[b-1],'source relocation drift')
+        oldchanged={n for e in source['edits'] for n in range(e['before_start'],e['before_end']+1)};newchanged={n for e in source['edits'] for n in range(e['after_start'],e['after_end']+1)}
+        req(set(maps[ref]).isdisjoint(oldchanged) and set(maps[ref])|oldchanged==set(range(1,len(oldlines)+1)),'before line partition')
+        req(set(maps[ref].values()).isdisjoint(newchanged) and set(maps[ref].values())|newchanged==set(range(1,len(newlines)+1)),'after line partition')
+    spec=importlib.util.spec_from_file_location('closure_invoice_predecessor',Path(__file__).with_name('current_host_payout_invoice_correction.py'));pre=importlib.util.module_from_spec(spec);spec.loader.exec_module(pre)
+    req(pre.project(root,frozen_source_overrides=before)==baseline,'complete sealed predecessor differs from frozen baseline')
+    artifacts={a['path']:pin(root,a['path'],a['sha256']) for a in registry['artifacts']};req(len(artifacts)==len(registry['artifacts']),'duplicate artifact')
+    def relocate(span):
+        ref=span['source_file']
+        if ref not in maps:return copy.deepcopy(span)
+        values=[maps[ref].get(i) for i in range(span['start'],span['end']+1)]
+        if None in values or values!=list(range(values[0],values[-1]+1)):return None
+        return {**span,'start':values[0],'end':values[-1]}
+    def verify_span(span):
+        ref=span['source_file'];raw=current.get(ref) or safe(root,ref).read_bytes();lines=raw.decode().splitlines()
+        req(0<span['start']<=span['end']<=len(lines),'claim span bounds')
+        text='\n'.join(lines[span['start']-1:span['end']]);req(sha(text.encode())==span['text_sha256'],'claim span hash drift');return text
+    out=copy.deepcopy(baseline);claims=index(out)
+    for entry in registry['transitions']:
+        cid=entry['claim_id'];prior=old[cid];req(objhash(prior)==entry['before_sha256'],'claim predecessor '+cid)
+        patch=entry['after'];req(set(patch)<= {'text','spans','status','classification','required_evidence_types','owner_role','rationale','next_action','evidence_refs','source_refs','coverage_state'},'unsupported claim patch')
+        if cid in RUNTIME:req(patch['text']==prior['text'] and patch['status']==('UNVALIDATED' if cid.startswith('VOL-') else prior['status']),'runtime promotion forbidden')
+        for basis in entry['basis']:
+            req(basis['artifactRef'] in artifacts and selection(artifacts[basis['artifactRef']],basis['text_pointer'])==basis['excerpt'],'source selector/excerpt drift '+cid)
+            req(basis['support_rationale'] and any(e['artifact_ref']==basis['artifactRef'] for e in patch['evidence_refs']),'unbound scoped evidence')
+            if basis['text_pointer'].startswith('/observations/'):
+                observation=json.loads(artifacts[basis['artifactRef']])['observations'][int(basis['text_pointer'].split('/')[2])]
+                if isinstance(observation,dict) and observation.get('url'):
+                    req(basis['sourceUrl']==observation['url'] and any(ref['path']==observation['url'] and ref['locator']==basis['text_pointer'] for ref in patch['source_refs']),'selected observation canonical URL drift '+cid)
+        claims[cid].update(copy.deepcopy(patch));claims[cid]['history']={**prior.get('history',{}),'carry_decision':'CURRENT_HOST_CLOSURE_CORRECTION','reason':prior.get('history',{}).get('reason','')+' '+entry['limits'],'predecessor':{'claim_id':cid,'status':prior['status'],'text':prior['text'],'text_sha256':sha(prior['text'].encode())}}
+    for retired in registry['retirements']:
+        cid=retired['claim_id'];req(retired['before_sha256']==objhash(old[cid]) and retired['replaced_by']=='MCL-0ae9c2fd5ac2ef9a','retirement predecessor')
+    claims['MCL-0ae9c2fd5ac2ef9a']['history']['superseded_claims']=[{'claim':copy.deepcopy(old[x['claim_id']]),'reason':x['reason']} for x in registry['retirements']]
+    entries={x['claim_id']:x for x in registry['transitions']}
+    for page in out['pages']:
+        page['claims']=[c for c in page['claims'] if c['id'] not in RETIRED]
+        if page['source_file'] in after_hashes:page['source_sha256']=after_hashes[page['source_file']];page['coverage_state']='CHANGED'
+        for dep in page['dependencies']:
+            if dep['source_file'] in after_hashes:dep['source_sha256']=after_hashes[dep['source_file']];page['coverage_state']='CHANGED'
+        for claim in page['claims']:
+            cid=claim['id']
+            if 'spans' not in entries.get(cid,{}).get('after',{}):
+                claim['spans']=[relocate(s) for s in old[cid]['spans']];req(None not in claim['spans'],'unreviewed changed occurrence '+cid)
+            literal='\n'.join(verify_span(s) for s in claim['spans'])
+            if claim['text']!=old[cid]['text']:req(literal==claim['text'],'changed literal mismatch '+cid)
+            if cid not in IDS:req({k:v for k,v in claim.items() if k!='spans'}=={k:v for k,v in old[cid].items() if k!='spans'},'unrelated claim drift '+cid)
+        for procedure in page['procedures']:
+            for node in [procedure,*procedure['nodes']]:
+                relocated=[relocate(s) for s in node.get('spans',[])]
+                if None in relocated:
+                    node['spans']=[];node['status']='STALE';node['coverage_state']='CHANGED';node['limits']=[*node.get('limits',[]),STALE];node['history']={**node.get('history',{}),'carry_decision':'CURRENT_HOST_CLOSURE_SOURCE_CHANGED'}
+                else:node['spans']=relocated
+    for item in out['source']['source_manifest']:
+        if item['path'] in after_hashes:item['sha256']=after_hashes[item['path']]
+    remaining=index(out);req(set(remaining)==set(old)-RETIRED and len(remaining)==2008,'active inventory drift')
+    for cid,f in findings.items():
+        if f['disposition']!='CORRECT_NOW':req(remaining[cid]==old[cid],'unresolved stronger assertion changed '+cid)
+    out['counts']['claims']=len(remaining);out['counts']['claim_statuses']=dict(sorted(Counter(c['status'] for c in remaining.values()).items()));out['counts']['page_coverage_states']=dict(sorted(Counter(p['coverage_state'] for p in out['pages']).items()))
+    out['generated_at']=registry['generated_at'];out['corrections'].append({'id':MARKER,'scope':'15 supported findings: 10 narrowed corrections and 5 retired checklist clauses; 8 bounded evidence/status reconciliations; upstream PR948 and CON1531 routing','history':'Complete sealed predecessor replayed against exact frozen source bytes. Five historical FAIL objects remain in the application instruction history and frozen baseline.','current':'11 stronger FAIL assertions remain open. Partial runtime observations do not promote compound workflows.','reason':registry['limits']})
+    return out
+
+def load_closure_correction(root,model):
+    present=(root/REGISTRY).is_file();marked=any(x.get('id')==MARKER for x in model.get('corrections',[]))
+    if not present:req(not marked,'closure-marked model has no registry');return None
+    req(model==project(root),'whole model differs from closure projection');return {'registry':REGISTRY,'registry_sha256':REGISTRY_SHA256}

@@ -19,12 +19,18 @@ TARGETS = {"MCL-77f72f0e0ac77e54", "MCL-a04f3ef2f5a7d5fd", "MCL-cc62439b0f816902
 TERMS_BEFORE = "verification/evidence/2026-09-14-payout-terms-correction-attempt-01/pre-correction-payment.mdx"
 RAW_PINNED = payout.pinned
 
-def frozen_pinned(root: Path, ref: str, wanted: str) -> bytes:
-    return RAW_PINNED(root, TERMS_BEFORE, "95e6585980cb936f72c657a0ef508abf917361b210faa8b86b4b5af5896ad0a9") if ref == payout.SOURCE else RAW_PINNED(root, ref, wanted)
+def closure_before_sources():
+    """Replay this historical phase with the sealed pre-closure Host pages."""
+    registry = json.loads((ROOT / 'verification/current-host-closure-correction.json').read_text())
+    return {source['path']: (ROOT / source['before_artifact']['path']).read_bytes()
+            for source in registry['sources']}
+
+def frozen_pinned(root: Path, ref: str, wanted: str, frozen_source_overrides=None) -> bytes:
+    return RAW_PINNED(root, TERMS_BEFORE, "95e6585980cb936f72c657a0ef508abf917361b210faa8b86b4b5af5896ad0a9") if ref == payout.SOURCE else RAW_PINNED(root, ref, wanted, frozen_source_overrides)
 
 def project_frozen() -> dict:
     with patch.object(payout, "pinned", side_effect=frozen_pinned):
-        return payout.project(ROOT)
+        return payout.project(ROOT, closure_before_sources())
 
 
 class PayoutProviderCorrectionTests(unittest.TestCase):
@@ -45,24 +51,24 @@ class PayoutProviderCorrectionTests(unittest.TestCase):
         original_pinned = payout.pinned
         with self.assertRaises(ValueError):
             payout.pinned(ROOT, payout.OBSERVATION, "0" * 64)
-        def stale_source(root: Path, ref: str, wanted: str) -> bytes:
-            value = original_pinned(root, TERMS_BEFORE, "95e6585980cb936f72c657a0ef508abf917361b210faa8b86b4b5af5896ad0a9") if ref == payout.SOURCE else original_pinned(root, ref, wanted)
+        def stale_source(root: Path, ref: str, wanted: str, frozen_source_overrides=None) -> bytes:
+            value = original_pinned(root, TERMS_BEFORE, "95e6585980cb936f72c657a0ef508abf917361b210faa8b86b4b5af5896ad0a9") if ref == payout.SOURCE else original_pinned(root, ref, wanted, frozen_source_overrides)
             return value.replace(b"Stripe, PayPal or Wise", b"Stripe, PayPal, Wise and ACH") if ref == payout.SOURCE else value
         with patch.object(payout, "pinned", side_effect=stale_source):
             with self.assertRaises(ValueError):
-                payout.project(ROOT)
+                payout.project(ROOT, closure_before_sources())
         original_loads = payout.json.loads
         registry = original_loads((ROOT / payout.REGISTRY).read_text())
         registry["transitions"][-1]["observation_ids"] = ["PAYOUT-UI-DIRECT-01"]
-        with patch.object(payout, "pinned", side_effect=lambda root, ref, wanted: json.dumps(registry).encode() if ref == payout.REGISTRY else (original_pinned(root, TERMS_BEFORE, "95e6585980cb936f72c657a0ef508abf917361b210faa8b86b4b5af5896ad0a9") if ref == payout.SOURCE else original_pinned(root, ref, wanted))):
+        with patch.object(payout, "pinned", side_effect=lambda root, ref, wanted, frozen_source_overrides=None: json.dumps(registry).encode() if ref == payout.REGISTRY else (original_pinned(root, TERMS_BEFORE, "95e6585980cb936f72c657a0ef508abf917361b210faa8b86b4b5af5896ad0a9") if ref == payout.SOURCE else original_pinned(root, ref, wanted, frozen_source_overrides))):
             with self.assertRaises(ValueError):
-                payout.project(ROOT)
+                payout.project(ROOT, closure_before_sources())
         model = project_frozen()
         unselected = next(claim for page in model["pages"] for claim in page["claims"] if claim["id"] not in TARGETS)
         unselected["rationale"] += " tampered"
         with self.assertRaises(ValueError):
             with patch.object(payout, "pinned", side_effect=frozen_pinned):
-                payout.validate_model(model, ROOT)
+                payout.validate_model(model, ROOT, closure_before_sources())
 
 
 if __name__ == "__main__":

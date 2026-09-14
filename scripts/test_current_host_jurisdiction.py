@@ -4,7 +4,6 @@ import json
 import unittest
 from unittest import mock
 from pathlib import Path
-from contextlib import contextmanager
 from scripts.test_current_host_authority_scan import frozen_payout_payment, PAYOUT_BEFORE
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -18,22 +17,21 @@ def load(ref): return json.loads((ROOT/ref).read_text())
 def claims(model): return {c['id']:c for p in model['pages'] for c in p['claims']}
 def jurisdiction_model(): return load(CLEANUP_PREDECESSOR if (ROOT/CLEANUP_PREDECESSOR).is_file() else 'verification/current-host-docs-review.json')
 
-@contextmanager
-def frozen_payout_predecessor():
-    """Keep this pre-payout phase on its pinned payment source only."""
-    original=JUR.predecessor
-    def predecessor(root, baseline, old):
-        return original(root, baseline, {**old, 'host/payment.mdx': frozen_payout_payment()})
-    with mock.patch.object(JUR, 'predecessor', predecessor):
-        yield
+
+def closure_before_sources():
+    """Replay this historical phase with the sealed pre-closure Host pages."""
+    registry = json.loads((ROOT / 'verification/current-host-closure-correction.json').read_text())
+    return {source['path']: (ROOT / source['before_artifact']['path']).read_bytes()
+            for source in registry['sources']}
+
+def jurisdiction_source_view():
+    return {**closure_before_sources(), 'host/payment.mdx': frozen_payout_payment()}
 
 def project_jurisdiction():
-    with frozen_payout_predecessor():
-        return JUR.project(ROOT)
+    return JUR.project(ROOT, jurisdiction_source_view())
 
 def validate_jurisdiction(model):
-    with frozen_payout_predecessor():
-        return JUR.validate_model(model, ROOT)
+    return JUR.validate_model(model, ROOT, jurisdiction_source_view())
 
 class JurisdictionReviewTests(unittest.TestCase):
     def test_python_projector_reproduces_sealed_jurisdiction_predecessor(self):
@@ -54,7 +52,7 @@ class JurisdictionReviewTests(unittest.TestCase):
         registry=load(JUR.REGISTRY); model=jurisdiction_model()
         for source in registry['sources']:
             old=(ROOT/source['before_artifact']['path']).read_text().splitlines()
-            current=(ROOT/source['path']).read_text().splitlines()
+            current=jurisdiction_source_view()[source['path']].decode().splitlines()
             self.assertEqual(len(old),len(current))
             self.assertEqual({i+1 for i,(a,b) in enumerate(zip(old,current)) if a!=b},JUR.SOURCES[source['path']])
             page=next(p for p in model['pages'] if p['source_file']==source['path'])
@@ -65,7 +63,9 @@ class JurisdictionReviewTests(unittest.TestCase):
 
     def test_changed_registry_source_capture_raw_and_baseline_all_fail_closed(self):
         registry=load(JUR.REGISTRY)
-        refs=[JUR.REGISTRY,JUR.BASELINE,*JUR.SOURCES,*[s['before_artifact']['path'] for s in registry['sources']],
+        closure=load('verification/current-host-closure-correction.json')
+        historical_sources=[s['before_artifact']['path'] for s in closure['sources'] if s['path'] in JUR.SOURCES]
+        refs=[JUR.REGISTRY,JUR.BASELINE,*historical_sources,*[s['before_artifact']['path'] for s in registry['sources']],
               *[a['path'] for a in registry['artifacts']],*[a['path'] for a in registry['retained_raw_sources']],
               PAYOUT_BEFORE,'verification/current-host-terms-binding.json']
         original=Path.read_bytes
@@ -88,7 +88,7 @@ class JurisdictionReviewTests(unittest.TestCase):
 
     def test_missing_registry_cannot_validate_a_marked_model(self):
         model=jurisdiction_model(); original=Path.is_file
-        with frozen_payout_predecessor(), mock.patch.object(Path,'is_file',lambda path:False if path==ROOT/JUR.REGISTRY else original(path)):
+        with mock.patch.object(Path,'is_file',lambda path:False if path==ROOT/JUR.REGISTRY else original(path)):
             with self.assertRaisesRegex(ValueError,'has no registry'): JUR.load_jurisdiction(ROOT,model)
             self.assertIsNone(JUR.load_jurisdiction(ROOT,load(JUR.BASELINE)))
 

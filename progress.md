@@ -1,5 +1,16 @@
 # Progress Log: Host Docs verification inventory
 
+## September 14: reviewer handoff completed locally
+
+- Page summaries, correction controls and six separate owner questions are
+  available in the regenerated HTML and restarted localhost reviewer.
+- 17 native-browser/source-identity checks and 93 Python tests pass. All 209
+  JavaScript cases have passing coverage across the broad run and focused
+  retests; the original failures remain retained, not replaced by a blanket PASS.
+- Model, Host source and earlier evidence hashes are unchanged. Traceability,
+  correction walkthrough and demo guide updated. No publication or acceptance.
+- Temporary worker checkout removed after preserving its patch and new files.
+
 ## September 14: approved payout-provider correction completed locally
 
 - Four scoped corrected PASS records; 31 FAIL remain. All other 2,009 complete

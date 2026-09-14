@@ -40,9 +40,9 @@ def safe(root: Path, ref: str) -> Path:
     for part in ref.split('/'):
         path/=part; require(not path.is_symlink(),'unsafe path')
     require(path.resolve().is_relative_to(root.resolve()) and path.is_file(),'missing path '+ref); return path
-def pinned(root: Path, ref: str, wanted: str) -> bytes:
+def pinned(root: Path, ref: str, wanted: str, frozen_source_overrides=None) -> bytes:
     require(isinstance(wanted,str) and re.fullmatch('[0-9a-f]{64}',wanted),'invalid pin')
-    value=safe(root,ref).read_bytes(); require(digest(value)==wanted,'digest drift '+ref); return value
+    value=(frozen_source_overrides or {}).get(ref) if ref in (frozen_source_overrides or {}) else safe(root,ref).read_bytes(); require(digest(value)==wanted,'digest drift '+ref); return value
 def json_object(value: bytes, name: str) -> dict[str,Any]:
     try: result=json.loads(value)
     except Exception as error: raise ValueError('terms binding: invalid JSON '+name) from error
@@ -58,9 +58,9 @@ def relocate(span: dict[str,Any], mapping: dict[int,int], after: list[str]) -> d
 def module(name: str):
     spec=importlib.util.spec_from_file_location(name,Path(__file__).with_name(name+'.py')); result=importlib.util.module_from_spec(spec); assert spec.loader; spec.loader.exec_module(result); return result
 
-def predecessor(root: Path, baseline: dict[str,Any], old_source: bytes) -> None:
+def predecessor(root: Path, baseline: dict[str,Any], old_source: bytes, frozen_source_overrides=None) -> None:
     authority=module('current_host_authority_scan'); clarification=module('current_host_clarification')
-    clarification.validate_model(baseline,root,lambda r,phase43: authority.validate_model(phase43,r,{SOURCE:old_source}))
+    clarification.validate_model(baseline,root,lambda r,phase43: authority.validate_model(phase43,r,{**(frozen_source_overrides or {}),SOURCE:old_source}))
 
 def source_text(artifact: dict[str,Any], pointer: str) -> str:
     value: Any=json_object(artifact['_bytes'],artifact['path'])
@@ -75,7 +75,7 @@ def source_text(artifact: dict[str,Any], pointer: str) -> str:
     require(not isinstance(parent,dict) or 'text_sha256' not in parent or parent['text_sha256']==digest(value.encode()),'Terms pointer hash mismatch')
     return value
 
-def project(root: Path) -> dict[str,Any]:
+def project(root: Path, frozen_source_overrides=None) -> dict[str,Any]:
     root=root.resolve(); registry=json_object(pinned(root,REGISTRY,REGISTRY_SHA256),REGISTRY)
     keys(registry,{'schema_version','record_type','generated_at','baseline','source','artifacts','transitions'},name='registry')
     require(registry['schema_version']=='1.0' and registry['record_type']=='HOST_TERMS_BINDING_TRANSITION','wrong registry type')
@@ -83,8 +83,8 @@ def project(root: Path) -> dict[str,Any]:
     keys(registry['source'],{'path','before_sha256','after_sha256','before_artifact'},name='source transition'); source=registry['source']
     require(source['path']==SOURCE,'only Workload Policy may change'); keys(source['before_artifact'],{'path','sha256'},name='before source')
     old=pinned(root,source['before_artifact']['path'],source['before_artifact']['sha256']); require(digest(old)==source['before_sha256'],'before source mismatch')
-    current=pinned(root,SOURCE,source['after_sha256'])
-    baseline=json_object(pinned(root,BASELINE,BASELINE_SHA256),BASELINE); predecessor(root,baseline,old)
+    current=pinned(root,SOURCE,source['after_sha256'],frozen_source_overrides)
+    baseline=json_object(pinned(root,BASELINE,BASELINE_SHA256),BASELINE); predecessor(root,baseline,old,frozen_source_overrides)
     artifacts={}
     for item in registry['artifacts']:
         keys(item,{'id','path','sha256','kind','origin'},name='artifact'); require(item['id'] not in artifacts and item['kind']=='GOVERNING_SOURCE','invalid/duplicate Terms artifact')
@@ -148,7 +148,7 @@ def project(root: Path) -> dict[str,Any]:
     result['corrections'].append({'id':MARKER,'scope':'Six Workload Policy Terms bindings after frozen clarification','history':'Phase-43 authority and phase-46 clarification predecessors remain hash-pinned and are validated against the exact frozen Workload Policy bytes.','current':f'{len(entries)} exact Terms claim bindings; one source SHA-256 transition {source["before_sha256"]} → {source["after_sha256"]}.','reason':'Published-rule citations are bounded policy source proof only; no runtime, monitoring, escalation, acceptance, or whole-page inference is authorized.'})
     return result
 
-def validate_model(model: dict[str,Any],root:Path)->None: require(model==project(root),'whole model differs from Terms projection')
+def validate_model(model: dict[str,Any],root:Path,frozen_source_overrides=None)->None: require(model==project(root,frozen_source_overrides),'whole model differs from Terms projection')
 def load_terms_binding(root:Path,model:dict[str,Any])->dict[str,Any]|None:
     candidate=root.resolve()/REGISTRY
     present=candidate.is_file() and not candidate.is_symlink()

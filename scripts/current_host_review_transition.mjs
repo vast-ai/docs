@@ -7,9 +7,12 @@ import { loadJurisdiction } from './current_host_jurisdiction.mjs';
 import { loadReviewCleanup } from './current_host_review_cleanup.mjs';
 import { loadPayoutProviderCorrection } from './current_host_payout_provider_correction.mjs';
 import { loadPayoutTermsCorrection } from './current_host_payout_terms_correction.mjs';
+import { loadClosureCorrection } from './current_host_closure_correction.mjs';
 import { loadPayoutInvoiceCorrection } from './current_host_payout_invoice_correction.mjs';
 
 export function loadCurrentHostReviewTransition({read, model, exists}) {
+  const closure = loadClosureCorrection({read, model, exists});
+  if (closure) return closure;
   const payoutInvoice = loadPayoutInvoiceCorrection({read, model, exists});
   if (payoutInvoice) return payoutInvoice;
   const payoutTerms = loadPayoutTermsCorrection({read, model, exists});

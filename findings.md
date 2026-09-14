@@ -1,5 +1,14 @@
 # Findings & Decisions: Host Docs verification inventory
 
+## Clear reviewer handoff, 14 September
+
+Datacenter's Requirements filter hid all five existing corrections. The readers
+now show page-wide totals, open-first ordering and a direct correction control.
+Six selected owner questions stay separate from claim evidence and statuses;
+source-only payout PASS remains bounded. All 2,013 claims, 77 Host/support sources
+and 3,914 earlier evidence files are unchanged. Final browser checks: 17 PASS.
+Result: verification/evidence/2026-09-14-host-review-handoff-attempt-01/result.md.
+
 ## Payout-provider correction basis, 14 September
 
 Current outcome: four corrected occurrences are supported only for their visible

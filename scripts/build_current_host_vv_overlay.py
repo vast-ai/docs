@@ -971,6 +971,9 @@ def build() -> dict[str, Any]:
     The transition projection is an internal output-only snapshot: it must not
     change this established builder API or leak into the public JSON package.
     """
+    closure = closure_module()
+    if (REPO / closure.REGISTRY).exists():
+        return closure.project(REPO)
     payout_invoice = payout_invoice_module()
     if (REPO / payout_invoice.REGISTRY).exists():
         return payout_invoice.project(REPO)
@@ -1058,6 +1061,14 @@ def payout_terms_module() -> Any:
     spec.loader.exec_module(module)
     return module
 
+def closure_module() -> Any:
+    spec = importlib.util.spec_from_file_location('current_host_closure_correction',
+        Path(__file__).with_name('current_host_closure_correction.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def payout_invoice_module() -> Any:
     spec = importlib.util.spec_from_file_location('current_host_payout_invoice_correction',
         Path(__file__).with_name('current_host_payout_invoice_correction.py'))
@@ -1068,6 +1079,14 @@ def payout_invoice_module() -> Any:
 
 def classify_literal_source_first(source_file: str, text: str) -> tuple[str, list[str], bool]:
     """Exact reviewed current classifier shared with repository reconciliation."""
+    closure = closure_module()
+    if (REPO / closure.REGISTRY).exists():
+        model = closure.project(REPO)
+        matches = [claim for page in model['pages'] for claim in page['claims'] if claim['text'] == text and any(span['source_file'] == source_file for span in claim['spans'])]
+        if not matches: raise ValueError('closure classification has no exact reviewed occurrence')
+        values = {(claim['classification'], tuple(claim['required_evidence_types'])) for claim in matches}
+        if len(values) != 1: raise ValueError('same literal has differing closure classifications; select exact claim ID')
+        classification, lanes = next(iter(values)); return classification, list(lanes), 'AUTHORITATIVE_DOCUMENTATION_CITATION' in lanes
     payout_invoice = payout_invoice_module()
     if (REPO / payout_invoice.REGISTRY).exists():
         model = payout_invoice.project(REPO)
@@ -1132,6 +1151,10 @@ def classify_literal_source_first(source_file: str, text: str) -> tuple[str, lis
 
 
 def outputs() -> dict[Path, bytes]:
+    closure = closure_module()
+    if (REPO / closure.REGISTRY).exists():
+        package=closure.project(REPO); worklist_md,runtime_md,owner_md=worklist(package)
+        return {OUT:(json.dumps(package,indent=2,ensure_ascii=False)+'\n').encode(),WORKLIST:worklist_md.encode(),RUNTIME_REGISTER:runtime_md.encode(),OWNER_REGISTER:owner_md.encode()}
     payout_invoice = payout_invoice_module()
     if (REPO / payout_invoice.REGISTRY).exists():
         package=payout_invoice.project(REPO); worklist_md,runtime_md,owner_md=worklist(package)

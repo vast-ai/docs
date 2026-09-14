@@ -19,6 +19,7 @@ const REGISTRY='verification/current-host-authority-scan.json';
 const JURISDICTION_REGISTRY='verification/current-host-jurisdiction.json';
 const CLEANUP_REGISTRY='verification/current-host-review-cleanup.json';
 const PAYOUT_TERMS_REGISTRY='verification/current-host-payout-terms-correction.json';
+const CLOSURE_REGISTRY='verification/current-host-closure-correction.json';
 const PAYOUT_INVOICE_REGISTRY='verification/current-host-payout-invoice-correction.json';
 const jurisdictionLabels=new Map([
  ['CUR-708c718cf735c8b2','Advice checked'],['CUR-555543e9b2ceddb4','Advice checked'],['CUR-2ead4eda972e84b0','Advice checked'],
@@ -35,9 +36,10 @@ async function fixture(){
  for(const name of ['vast-cli','self-test'])await fs.symlink(await sibling(name),path.join(container,name),'dir');
  for(const ref of ['.git','docs.json','host','snippets','cli','sdk','verification','host-docs-cli-command-check.json'])await fs.cp(path.join(INPUT_ROOT,ref),path.join(root,ref),{recursive:true});
  await fs.mkdir(path.join(root,'scripts/templates'),{recursive:true});
- for(const ref of ['review-server.mjs','scripts/current_host_authority_scan.mjs','scripts/current_host_clarification.mjs','scripts/current_host_terms_binding.mjs','scripts/current_host_jurisdiction.mjs','scripts/current_host_review_transition.mjs','scripts/current_host_payout_terms_correction.mjs','scripts/current_host_payout_invoice_correction.mjs','scripts/current_host_install_evidence_intake.mjs','scripts/export_host_review_html.mjs','scripts/templates/host-docs-review.html'])await fs.copyFile(path.join(CODE_ROOT,ref),path.join(root,ref));
+ for(const ref of ['review-server.mjs','scripts/current_host_authority_scan.mjs','scripts/current_host_clarification.mjs','scripts/current_host_terms_binding.mjs','scripts/current_host_jurisdiction.mjs','scripts/current_host_review_transition.mjs','scripts/current_host_payout_terms_correction.mjs','scripts/current_host_payout_invoice_correction.mjs','scripts/current_host_closure_correction.mjs','scripts/current_host_install_evidence_intake.mjs','scripts/export_host_review_html.mjs','scripts/templates/host-docs-review.html'])await fs.copyFile(path.join(CODE_ROOT,ref),path.join(root,ref));
  await fs.copyFile(path.join(CODE_ROOT,'scripts/host_review_reader_copy.mjs'),path.join(root,'scripts/host_review_reader_copy.mjs'));
  await fs.copyFile(path.join(CODE_ROOT,'scripts/host_review_work_queue.mjs'),path.join(root,'scripts/host_review_work_queue.mjs'));
+ await fs.copyFile(path.join(CODE_ROOT,'scripts/host_review_owner_questions.mjs'),path.join(root,'scripts/host_review_owner_questions.mjs'));
  await fs.copyFile(path.join(CODE_ROOT,'scripts/current_host_review_cleanup.mjs'),path.join(root,'scripts/current_host_review_cleanup.mjs')).catch(error=>{if(error.code!=='ENOENT')throw error;});
  await fs.copyFile(path.join(CODE_ROOT,'scripts/current_host_payout_provider_correction.mjs'),path.join(root,'scripts/current_host_payout_provider_correction.mjs'));
  if(process.env.VV_SCAN_FIXTURE_PRODUCER){
@@ -63,6 +65,9 @@ test('active scan retains all current pages and exact source selectors; tamperin
   const context=async route=>{for(let i=0;i<600;i++){try{const response=await fetch(`${origin}/__review__/api/context?path=${encodeURIComponent(route)}`);if(response.ok)return response.json();}catch{}await new Promise(resolve=>setTimeout(resolve,25));}throw Error(`Local reader did not start: ${logs}`);};
   let seen=0,controls=0,sameSource=0,readonlyClaims=0,readonlyControls=0;const reviews=[];
   for(const page of f.model.pages){const current=await context(page.route);assert.equal(current.currentReview.available,true,String(current.currentReview.unavailableReason)+logs);assert.equal(current.currentReview.page.claims.length,page.claims.length);seen+=page.claims.length;
+   assert.equal(current.currentReview.ownerQuestions.available,true,current.currentReview.ownerQuestions.error);
+   assert.equal(current.currentReview.ownerQuestions.questions.length,JSON.parse(await fs.readFile(path.join(f.root,'verification/current-host-owner-questions.json'))).questions.length);
+   for(const question of current.currentReview.ownerQuestions.questions){assert.equal(question.status,'UNVALIDATED');assert.ok(!page.claims.some(claim=>claim.id===question.id));}
    reviews.push(current.currentReview);
    for(const claim of current.currentReview.page.claims){
     if(claim.readonlyProof){readonlyClaims++;
@@ -83,7 +88,16 @@ test('active scan retains all current pages and exact source selectors; tamperin
     }
    }
   }
-  assert.equal(seen,2013);assert.ok(controls>0);assert.ok(sameSource>0,'multiple excerpts from the same artifact remain separately selectable');
+  assert.equal(seen,f.model.counts.claims);assert.ok(controls>0);assert.ok(sameSource>0,'multiple excerpts from the same artifact remain separately selectable');
+  const ownerRegistry=path.join(f.root,'verification/current-host-owner-questions.json');
+  await fs.rename(ownerRegistry,ownerRegistry+'.temporarily-unavailable');
+  try{
+   const missing=await context('/host/datacenter-status');
+   assert.equal(missing.currentReview.available,true,'missing questions must not replace valid claims');
+   assert.equal(missing.currentReview.page.claims.length,f.model.pages.find(p=>p.route==='/host/datacenter-status').claims.length);
+   assert.equal(missing.currentReview.ownerQuestions.available,false,'missing questions must be visibly unavailable, not empty');
+   assert.equal(missing.currentReview.ownerQuestions.questions,undefined);
+  }finally{await fs.rename(ownerRegistry+'.temporarily-unavailable',ownerRegistry);}
   assert.equal(readonlyClaims,10);assert.ok(readonlyControls>=10);
   if(f.model.corrections.some(entry=>entry.id==='HOST-TERMS-BINDING-01')){
    const termsIds=new Set(['MCL-99ca28f707d5966a','MCL-2c3f7082e2c7fdf2','MCL-c4c4bfc59eb7b49f','MCL-399798a3c4946b5f','MCL-633317ca7ebecfef','MCL-fe3eccd1cd40b4bd']);
@@ -131,12 +145,13 @@ test('active scan retains all current pages and exact source selectors; tamperin
   }
   const source=path.join(f.root,f.model.pages.at(-1).source_file),before=await fs.readFile(source);await fs.writeFile(source,Buffer.concat([before,Buffer.from('\nUnreviewed source addition.\n')]));assert.equal((await context(f.model.pages[0].route)).currentReview.available,false,'other-page source tamper must invalidate full model');await fs.writeFile(source,before);
   const oldRegistry=path.join(f.root,'verification/current-host-connection-adjudications.json'),oldBytes=await fs.readFile(oldRegistry);await fs.writeFile(oldRegistry,Buffer.from('{}'));assert.equal((await context(f.model.pages[0].route)).currentReview.available,false,'preserved proof registry tamper must invalidate current presentation');await fs.writeFile(oldRegistry,oldBytes);
-  const {buildReport}=await import(pathToFileURL(path.join(f.root,'scripts/export_host_review_html.mjs')));const report=buildReport();assert.equal(report.payload.claims.length,2013);assert.equal(report.payload.readonly_command_proofs.length,10);
+  const {buildReport}=await import(pathToFileURL(path.join(f.root,'scripts/export_host_review_html.mjs')));const report=buildReport();assert.equal(report.payload.claims.length,f.model.counts.claims);assert.equal(report.payload.readonly_command_proofs.length,10);
   const authorityModule=await import(pathToFileURL(path.join(f.root,'scripts/current_host_authority_scan.mjs'))),clarificationRegistry=JSON.parse(await fs.readFile(path.join(f.root,'verification/current-host-clarification.json'))),phase43Model=JSON.parse(await fs.readFile(path.join(f.root,clarificationRegistry.baseline.path)));
   const termsRegistry=await fs.readFile(path.join(f.root,'verification/current-host-terms-binding.json'),'utf8').then(JSON.parse).catch(error=>{if(error.code==='ENOENT')return null;throw error;});
   const payoutTermsRegistry=await fs.readFile(path.join(f.root,PAYOUT_TERMS_REGISTRY),'utf8').then(JSON.parse).catch(error=>{if(error.code==='ENOENT')return null;throw error;});
   const payoutInvoiceRegistry=await fs.readFile(path.join(f.root,PAYOUT_INVOICE_REGISTRY),'utf8').then(JSON.parse).catch(error=>{if(error.code==='ENOENT')return null;throw error;});
-  const beforeSourceRefs=new Map((jurisdictionRegistry?.sources||[]).map(source=>[source.path,source.before_artifact.path]));
+  const closureRegistry=await fs.readFile(path.join(f.root,CLOSURE_REGISTRY),'utf8').then(JSON.parse).catch(error=>{if(error.code==='ENOENT')return null;throw error;});
+  const beforeSourceRefs=new Map([...(closureRegistry?.sources||[]),...(jurisdictionRegistry?.sources||[])].map(source=>[source.path,source.before_artifact.path]));
   if(termsRegistry)beforeSourceRefs.set(termsRegistry.source.path,termsRegistry.source.before_artifact.path);
   if (payoutInvoiceRegistry||payoutTermsRegistry||report.payload.payout_provider_transition) {
    const frozen='verification/evidence/2026-09-14-payout-provider-correction-attempt-01/pre-correction-payment.mdx';
@@ -146,8 +161,11 @@ test('active scan retains all current pages and exact source selectors; tamperin
   const phase43=authorityModule.validateAuthorityScanInput({read:ref=>fsSync.readFileSync(path.join(f.root,beforeSourceRefs.get(ref)||ref)),model:phase43Model,pins:{registry:authorityModule.AUTHORITY_SCAN_REGISTRY_SHA256,baseline:authorityModule.AUTHORITY_SCAN_BASELINE_SHA256,snapshot:authorityModule.AUTHORITY_SCAN_SNAPSHOT_SHA256}});
   const cleanupRegistry=await fs.readFile(path.join(f.root,CLEANUP_REGISTRY),'utf8').then(JSON.parse).catch(error=>{if(error.code==='ENOENT')return null;throw error;});
   const phase43Ids=new Set(phase43.presentation.keys()),clarificationIds=new Set(clarificationRegistry.claims.map(entry=>entry.claim_id)),termsIds=new Set((termsRegistry?.transitions||[]).map(entry=>entry.claim_id)),jurisdictionIds=new Set((jurisdictionRegistry?.transitions||[]).map(entry=>entry.claim_id)),cleanupIds=new Set((cleanupRegistry?.transitions||[]).map(entry=>entry.claim_id)),payoutTermsIds=new Set((payoutTermsRegistry?.transitions||[]).map(entry=>entry.claim_id)),payoutInvoiceIds=new Set((payoutInvoiceRegistry?.transitions||[]).map(entry=>entry.claim_id)),expectedIds=new Set([...phase43Ids,...clarificationIds,...termsIds,...jurisdictionIds,...cleanupIds,...payoutTermsIds,...payoutInvoiceIds]),transitions=report.payload.authority_scan.transitions;
+  for(const entry of closureRegistry?.transitions||[])expectedIds.add(entry.claim_id);
+  for(const retired of closureRegistry?.retirements||[])expectedIds.delete(retired.claim_id);
   const retainedTransition=(entry,registryRef)=>{if(entry.registryRef===registryRef)return entry;for(const previous of entry.auditHistory||[]){const retained=retainedTransition(previous,registryRef);if(retained)return retained;}return null;};
   assert.equal(phase43Ids.size,JSON.parse(registryBytes).transitions.length,'all phase-43 transition IDs are present');assert.equal(clarificationIds.size,clarificationRegistry.claims.length,'all clarification IDs are present');if(cleanupRegistry)assert.equal(cleanupIds.size,cleanupRegistry.transitions.length,'all exact cleanup transition IDs are present');if(payoutTermsRegistry)assert.equal(payoutTermsIds.size,payoutTermsRegistry.transitions.length,'all exact payout Terms transition IDs are present');if(payoutInvoiceRegistry)assert.equal(payoutInvoiceIds.size,payoutInvoiceRegistry.transitions.length,'all exact payout invoice transition IDs are present');assert.deepEqual(new Set(Object.keys(transitions)),expectedIds,'presentation is the exact phase-43/clarification/Terms/jurisdiction/cleanup/payout Terms/payout invoice ID union');
+  for(const retired of closureRegistry?.retirements||[])transitions[retired.claim_id]=transitions[retired.replaced_by].auditHistory.find(entry=>entry.previous?.id===retired.claim_id);
   for(const [id,original] of phase43.presentation){
    if(!termsIds.has(id)){
     const retained=retainedTransition(transitions[id],REGISTRY);
@@ -173,8 +191,8 @@ test('active scan retains all current pages and exact source selectors; tamperin
   if(jurisdictionRegistry){
    const before=new Map(JSON.parse(await fs.readFile(path.join(f.root,jurisdictionRegistry.baseline.path))).pages.flatMap(page=>page.claims).map(claim=>[claim.id,claim]));
    assert.equal(report.payload.jurisdiction_transition.changed_claims,8);assert.equal(jurisdictionIds.size,8);
-   assert.equal(report.payload.current_result_ref,(report.payload.payout_invoice_transition||report.payload.payout_terms_transition||report.payload.payout_provider_transition||report.payload.cleanup_transition||report.payload.jurisdiction_transition).result_ref);
-   assert.match(report.payload.current_result_ref,report.payload.payout_invoice_transition?/payout-invoice-correction-attempt-01\/result\.md$/:report.payload.payout_terms_transition?/payout-terms-correction-attempt-01\/result\.md$/:report.payload.payout_provider_transition?/payout-provider-correction-attempt-01\/result\.md$/:report.payload.cleanup_transition?/host-review-cleanup-attempt-01\/result\.md$/:/host-jurisdiction-authority-attempt-01\/result\.md$/);
+   assert.equal(report.payload.current_result_ref,(report.payload.closure_transition||report.payload.payout_invoice_transition||report.payload.payout_terms_transition||report.payload.payout_provider_transition||report.payload.cleanup_transition||report.payload.jurisdiction_transition).result_ref);
+   assert.match(report.payload.current_result_ref,report.payload.closure_transition?/host-closure-correction-attempt-01\/result\.md$/:report.payload.payout_invoice_transition?/payout-invoice-correction-attempt-01\/result\.md$/:report.payload.payout_terms_transition?/payout-terms-correction-attempt-01\/result\.md$/:report.payload.payout_provider_transition?/payout-provider-correction-attempt-01\/result\.md$/:report.payload.cleanup_transition?/host-review-cleanup-attempt-01\/result\.md$/:/host-jurisdiction-authority-attempt-01\/result\.md$/);
    for(const id of jurisdictionIds){const transition=transitions[id];assert.equal(transition.registryRef,JURISDICTION_REGISTRY,id);assert.equal(transition.baselineRef,jurisdictionRegistry.baseline.path,id);assert.deepEqual(transition.previous,before.get(id),id);assert.ok(transition.auditHistory.length,id);}
   }
  }finally{if(child&&child.exitCode===null){child.kill('SIGTERM');await new Promise(resolve=>child.once('exit',resolve));}if(target)await new Promise(resolve=>target.close(resolve));await fs.rm(f.container,{recursive:true,force:true});}

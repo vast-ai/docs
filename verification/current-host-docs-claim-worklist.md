@@ -2,7 +2,7 @@
 
 Current-source claims requiring proof or correction. Historical evidence is carried only where exact source identity is recorded.
 
-Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1607 requiring review or evidence). Most dispositions are automated or exact historical carry-forward; this package records no invented manual completion.
+Current dispositions: 2008 occurrences (335 PASS, 87 editorial NOT_APPLICABLE, 1586 requiring review or evidence). Most dispositions are automated or exact historical carry-forward; this package records no invented manual completion.
 
 ## [Hosting Overview](http://127.0.0.1:4000/host/hosting-overview)
 
@@ -61,20 +61,6 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
 
 **Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [Host Commitment](http://127.0.0.1:4000/host/hosting-overview#host-commitment) — `MCL-b61d15c0282ef567`
-
-**Status:** FAIL
-
-**Literal source text:** Do not run local gaming, mining, display workloads, or other GPU jobs on a rented machine. For policy context, see [Workload Policy](/host/workload-policy).
-
-**Required proof:** Authoritative Documentation Citation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation policy-source reviewer; accountable Vast policy owner only for missing or ambiguous rules
-
-**Next:** Check the applicable Terms, Hosting Agreement or approved policy for this exact instruction and scope. Cite a matching clause. Ask the accountable policy owner to confirm or correct only a missing or unclear rule; retain that decision and its citation. Confirm whether the rule covers the whole machine or only rented resources.
 
 ### [Offers And Rental Contracts](http://127.0.0.1:4000/host/hosting-overview#offers-and-rental-contracts) — `MCL-3b63eef0c333379b`
 
@@ -679,20 +665,6 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
 
 **Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Unsupported Or Discouraged Setups](http://127.0.0.1:4000/host/supported-hardware#unsupported-or-discouraged-setups) — `MCL-c59caa4cd52bcc1f`
-
-**Status:** FAIL
-
-**Literal source text:** | Gaming/workstation use during rentals | Rented machines should be dedicated. |
-
-**Required proof:** Authoritative Documentation Citation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation policy-source reviewer; accountable Vast policy owner only for missing or ambiguous rules
-
-**Next:** Check the applicable Terms, Hosting Agreement or approved policy for this exact instruction and scope. Cite a matching clause. Ask the accountable policy owner to confirm or correct only a missing or unclear rule; retain that decision and its citation. Preserve “should”; confirm whether dedication is advice or a requirement and which resources it covers.
 
 ### [Unsupported Or Discouraged Setups](http://127.0.0.1:4000/host/supported-hardware#unsupported-or-discouraged-setups) — `MCL-50d830db2c44850b`
 
@@ -1526,20 +1498,6 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 
 ## [Tax Guide for Hosts](http://127.0.0.1:4000/host/guide-to-taxes)
 
-### [Introduction](http://127.0.0.1:4000/host/guide-to-taxes) — `CUR-a991f28f683ba829`
-
-**Status:** FAIL
-
-**Literal source text:** **Disclaimer:** The [Hosting Agreement — Independent Contractors](https://cloud.vast.ai/host/agreement) identifies the parties as independent contractors, and its Hardware as a Service Payments section assigns the provider responsibility for taxes connected with its activities. Track your earnings and seek advice from a tax professional about your filings. Vast.ai cannot provide tax advice, and we cannot verify the accuracy of publicly available tax guidance.
-
-**Required proof:** Authoritative Documentation Citation
-
-**Existing proof / limit:** [SCAN-SOURCE-CUR-a991f28f683ba829-agreement-contractor](evidence/2026-09-09-host-authority-scan-attempt-01/agreement-full-source-01.json) — Supports only the exact quoted published clause or pinned technical declaration. No account acceptance, runtime compliance, backend execution, or operational completion is inferred.
-
-**Responsible role:** Documentation authoritative-source reviewer
-
-**Next:** Locate an independent source for the unresolved governed assertion: Corporate tax-advice service disclaimer is retained but not independently proved. If sources remain silent or conflict, request only the relevant Product/Compliance or source-owning decision.
-
 ### [Introduction](http://127.0.0.1:4000/host/guide-to-taxes) — `CUR-99fb8d131e321e03`
 
 **Status:** UNVALIDATED
@@ -1553,20 +1511,6 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Documentation authoritative-source reviewer
 
 **Next:** Inspect applicable tax authority/provider guidance and existing official Vast reporting/withholding statement for the exact jurisdiction, period, and actor; retain those applicability limits.
-
-### [International Hosts](http://127.0.0.1:4000/host/guide-to-taxes#international-hosts) — `CUR-93f089288e67669d`
-
-**Status:** FAIL
-
-**Literal source text:** Vast.ai does not provide tax documents or tax advice to hosts residing outside the United States. International hosts are responsible for understanding and complying with their local tax obligations; [Hosting Agreement — Hardware as a Service Payments](https://cloud.vast.ai/host/agreement) assigns the provider responsibility for taxes connected with its activities.
-
-**Required proof:** Authoritative Documentation Citation
-
-**Existing proof / limit:** [SCAN-SOURCE-CUR-93f089288e67669d-agreement-payments](evidence/2026-09-09-host-authority-scan-attempt-01/agreement-full-source-01.json) — Supports only the exact quoted published clause or pinned technical declaration. No account acceptance, runtime compliance, backend execution, or operational completion is inferred.
-
-**Responsible role:** Documentation authoritative-source reviewer
-
-**Next:** Locate an independent source for the unresolved governed assertion: Blanket international tax-document/service claim remains unresolved; citation does not prove it. If sources remain silent or conflict, request only the relevant Product/Compliance or source-owning decision.
 
 ### [By Payout Method](http://127.0.0.1:4000/host/guide-to-taxes#by-payout-method) — `CUR-11f83626486ada1d`
 
@@ -1611,20 +1555,6 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 **Next:** Locate the exact canonical implementation/schema/configuration for this behavior and reuse applicable retained source/execution/UI evidence. Client dispatch or documentation alone cannot prove backend effects.
 
 ## [Host Account and Agreement](http://127.0.0.1:4000/host/account-hosting-agreement)
-
-### [Do I need a separate host account?](http://127.0.0.1:4000/host/account-hosting-agreement#do-i-need-a-separate-host-account) — `MCL-57133525f112013a`
-
-**Status:** FAIL
-
-**Literal source text:** Yes. Use a dedicated account for hosting. Do not use the same account for both client rentals and host operations, because that setup is unsupported and can cause account and machine-management issues.
-
-**Required proof:** Authoritative Documentation Citation, Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation authoritative-source reviewer
-
-**Next:** Inspect the retained Performance of Services or applicable official support/account publication first; inspect implementation and retained UI for any actual account, networking, or support capability assertion.
 
 ### [Do I need a separate host account?](http://127.0.0.1:4000/host/account-hosting-agreement#do-i-need-a-separate-host-account) — `MCL-0dc4f7d9c8e39ab3`
 
@@ -3704,11 +3634,11 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
 
-**Existing proof / limit:** [EV-HOST-SAFE-READONLY-01](evidence/2026-09-02-host-safe-readonly-attempt-01/result.md) — Direct carrier evidence is retained but its score is partial; it does not validate the full exact command claim.
+**Existing proof / limit:** [EV-HOST-CLOSURE-MCL-d2f649ad765ea7bb-1](evidence/2026-09-09-h100x4-direct-install-attempt-02/postcheck-02.json) — POST-01 services active; POST-03 four H100 driver595.71.05; POST-05 XFS/prjquota; POST-06 fstab pquota; POST-07 project quota accounting/enforcement ON; POST-08 port range30000-30499. One Linux H100x4 snapshot, kernel6.8.0-139, Docker28.5.2; not reboot persistence, forwarding, every installer route, NVMe performance or Volume behavior. POST-08 used sudo -n versus displayed sudo.; [EV-HOST-CLOSURE-MCL-d2f649ad765ea7bb-2](evidence/2026-09-09-h100x4-direct-install-attempt-02/postcheck-02.json) — POST-01 services active; POST-03 four H100 driver595.71.05; POST-05 XFS/prjquota; POST-06 fstab pquota; POST-07 project quota accounting/enforcement ON; POST-08 port range30000-30499. One Linux H100x4 snapshot, kernel6.8.0-139, Docker28.5.2; not reboot persistence, forwarding, every installer route, NVMe performance or Volume behavior. POST-08 used sudo -n versus displayed sudo.; [EV-HOST-CLOSURE-MCL-d2f649ad765ea7bb-3](evidence/2026-09-09-h100x4-direct-install-attempt-02/postcheck-02.json) — POST-01 services active; POST-03 four H100 driver595.71.05; POST-05 XFS/prjquota; POST-06 fstab pquota; POST-07 project quota accounting/enforcement ON; POST-08 port range30000-30499. One Linux H100x4 snapshot, kernel6.8.0-139, Docker28.5.2; not reboot persistence, forwarding, every installer route, NVMe performance or Volume behavior. POST-08 used sudo -n versus displayed sudo.; [EV-HOST-CLOSURE-MCL-d2f649ad765ea7bb-4](evidence/2026-09-09-h100x4-direct-install-attempt-02/postcheck-02.json) — POST-01 services active; POST-03 four H100 driver595.71.05; POST-05 XFS/prjquota; POST-06 fstab pquota; POST-07 project quota accounting/enforcement ON; POST-08 port range30000-30499. One Linux H100x4 snapshot, kernel6.8.0-139, Docker28.5.2; not reboot persistence, forwarding, every installer route, NVMe performance or Volume behavior. POST-08 used sudo -n versus displayed sudo.; [EV-HOST-SAFE-READONLY-01](evidence/2026-09-02-host-safe-readonly-attempt-01/result.md) — Direct carrier evidence is retained but its score is partial; it does not validate the full exact command claim.
 
 **Responsible role:** Host installer and operations engineering owner; Authorized Host/API operator
 
-**Next:** Close every still-UNVALIDATED evidence lane for CLM-c7a8ac27359a2b4b; current carrier context: The exact bounded installed-Host health snapshot completed successfully. It remains partial support because it does not establish installation history, account visibility, external forwarding, or rental readiness. Retain a claim-suitable source or runtime retest before changing the overall status.
+**Next:** Review the exact remaining source/equivalence or broader assertion above before any new live check; reuse these retained observations rather than repeat an already demonstrated subclaim.
 
 ### [After Install](http://127.0.0.1:4000/host/installing-host-software#after-install) — `MCL-bdd6688c1ca10f78`
 
@@ -8158,20 +8088,6 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Inspect the retained agreement Offer/Rental Contract/Operation and Maintenance clauses and any current published terms; bind only supported clauses. Inspect the corresponding offer/update/unlist/extension implementation and retained execution for actual system effects.
 
-### [Changing Price Later](http://127.0.0.1:4000/host/pricing-your-listing#changing-price-later) — `MCL-dcb653ae3a927dae`
-
-**Status:** FAIL
-
-**Literal source text:** | Unlist machine | Stops new rentals; active contracts continue. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation, Authoritative Documentation Citation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation authoritative-source reviewer
-
-**Next:** Inspect the retained agreement Offer/Rental Contract/Operation and Maintenance clauses and any current published terms; bind only supported clauses. Inspect the corresponding offer/update/unlist/extension implementation and retained execution for actual system effects.
-
 ### [Changing Price Later](http://127.0.0.1:4000/host/pricing-your-listing#changing-price-later) — `MCL-939467a533f82627`
 
 **Status:** FAIL
@@ -8582,7 +8498,7 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 
 ### [Local Volume Limits](http://127.0.0.1:4000/host/volume-offers#local-volume-limits) — `VOL-C31`
 
-**Status:** BLOCKED
+**Status:** UNVALIDATED
 
 **Literal source text:** - Has a fixed size after creation.
 
@@ -8610,7 +8526,7 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 
 ### [Local Volume Limits](http://127.0.0.1:4000/host/volume-offers#local-volume-limits) — `VOL-C33`
 
-**Status:** BLOCKED
+**Status:** UNVALIDATED
 
 **Literal source text:** - Is persistent storage, but is not an off-machine backup.
 
@@ -9874,20 +9790,6 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
-### [How Verification Works](http://127.0.0.1:4000/host/understanding-verification#how-verification-works) — `MCL-217525688a0854b4`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Verification is not permanent. Automation can move machines between Unverified, Verified, and Deverified as reliability, health, performance, network reachability, and marketplace conditions change.
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-217525688a0854b4 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
 ### [Main Factors](http://127.0.0.1:4000/host/understanding-verification#main-factors) — `MCL-6c6a3378c5fb5ba0`
 
 **Status:** UNVALIDATED
@@ -10225,20 +10127,6 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-b0cfd010cb0e16f6 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
 ## [Verification Stages](http://127.0.0.1:4000/host/verification-stages)
-
-### [Introduction](http://127.0.0.1:4000/host/verification-stages) — `CUR-65ffc3ba1623ad1c`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Verification is automated. There is no manual review step for ordinary host verification.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [Lifecycle](http://127.0.0.1:4000/host/verification-stages#lifecycle) — `CUR-718eae8798859de8`
 
@@ -11024,20 +10912,6 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [Deverified](http://127.0.0.1:4000/host/verification-stages#deverified) — `CUR-bf6233f2e53eca43`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Deverified means a previously verified machine no longer meets requirements. It appears as Unverified until the issue clears.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
 ### [Deverified](http://127.0.0.1:4000/host/verification-stages#deverified) — `CUR-874bfd0e38d8ba2c`
 
 **Status:** UNVALIDATED
@@ -11085,20 +10959,6 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 **Status:** UNVALIDATED
 
 **Literal source text:** - Container launch failures.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Deverified](http://127.0.0.1:4000/host/verification-stages#deverified) — `CUR-f9aad9428d594b40`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Reliability dropping to or below the gate.
 
 **Required proof:** Canonical Implementation Source
 
@@ -11372,11 +11232,11 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Required proof:** Canonical Implementation Source
 
-**Existing proof / limit:** No retained proof
+**Existing proof / limit:** [EV-HOST-CLOSURE-MCL-b15c6cfc26e189c2-1](evidence/2026-09-09-h100x4-listing-rental-attempt-02/rate-001/listing-readback-verification-01.json) — Independent Host readback matched approved listing terms. Single listing and fixed expiry, no proof price changes preserve old rentals.
 
 **Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
 
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
+**Next:** Review the exact remaining source/equivalence or broader assertion above before any new live check; reuse these retained observations rather than repeat an already demonstrated subclaim.
 
 ### [Healthy Daemon](http://127.0.0.1:4000/host/first-24-hours#healthy-daemon) — `MCL-115b4938222083ac`
 
@@ -11386,11 +11246,11 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Required proof:** Canonical Implementation Source
 
-**Existing proof / limit:** No retained proof
+**Existing proof / limit:** [EV-HOST-CLOSURE-MCL-115b4938222083ac-1](evidence/2026-09-09-h100x4-listing-rental-attempt-02/rental-run-03/rental-fresh-offer-01.json) — Separate client found the fresh offer50363390 for machine150296. No arbitrary ranking, all-account visibility, or future availability.; [EV-HOST-CLOSURE-MCL-115b4938222083ac-2](evidence/2026-09-09-h100x4-listing-rental-attempt-02/rate-001/listing-readback-verification-01.json) — Independent Host readback matched approved listing terms. Single listing and fixed expiry, no proof price changes preserve old rentals.
 
 **Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
 
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
+**Next:** Review the exact remaining source/equivalence or broader assertion above before any new live check; reuse these retained observations rather than repeat an already demonstrated subclaim.
 
 ### [Healthy Daemon](http://127.0.0.1:4000/host/first-24-hours#healthy-daemon) — `MCL-9b0df58d283c19ce`
 
@@ -11414,11 +11274,11 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Required proof:** Canonical Implementation Source
 
-**Existing proof / limit:** No retained proof
+**Existing proof / limit:** [EV-HOST-CLOSURE-MCL-9edeb94eaa736bca-1](evidence/2026-09-09-h100x4-direct-install-attempt-02/postcheck-02.json) — POST-01 services active; POST-03 four H100 driver595.71.05; POST-05 XFS/prjquota; POST-06 fstab pquota; POST-07 project quota accounting/enforcement ON; POST-08 port range30000-30499. One Linux H100x4 snapshot, kernel6.8.0-139, Docker28.5.2; not reboot persistence, forwarding, every installer route, NVMe performance or Volume behavior. POST-08 used sudo -n versus displayed sudo.
 
 **Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
 
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
+**Next:** Review the exact remaining source/equivalence or broader assertion above before any new live check; reuse these retained observations rather than repeat an already demonstrated subclaim.
 
 ### [Healthy Daemon](http://127.0.0.1:4000/host/first-24-hours#healthy-daemon) — `MCL-fc279702e0127bb7`
 
@@ -11554,11 +11414,11 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
 
-**Existing proof / limit:** No retained proof
+**Existing proof / limit:** [EV-HOST-CLOSURE-MCL-e6fb82f7e167fdc8-1](evidence/2026-09-09-h100x4-listing-rental-attempt-02/rental-run-03/rental-fresh-offer-01.json) — Separate client found the fresh offer50363390 for machine150296. No arbitrary ranking, all-account visibility, or future availability.; [EV-HOST-CLOSURE-MCL-e6fb82f7e167fdc8-2](evidence/2026-09-09-h100x4-listing-rental-attempt-02/rental-run-03/gpu-result-01.json) — Instance50364501 ran CUDA with one H100; nonce and sum-of-squares1240.0. Small GPU operation, not burn/thermal/stability test or full official self-test.
 
 **Responsible role:** Host installer and operations engineering owner; Authorized Host/API operator
 
-**Next:** The Host installer and operations engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-e6fb82f7e167fdc8 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-e6fb82f7e167fdc8 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
+**Next:** Review the exact remaining source/equivalence or broader assertion above before any new live check; reuse these retained observations rather than repeat an already demonstrated subclaim.
 
 ### [Test Like A Client](http://127.0.0.1:4000/host/first-24-hours#test-like-a-client) — `MCL-99b44c97aa29736c`
 
@@ -11706,11 +11566,11 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Status:** UNVALIDATED
 
-**Literal source text:** The gate exists so machines that have not been online for a sufficient amount of time are not put through verification testing. Above the gate, higher reliability can make verification more likely because the automated process has more confidence in the machine. Sustained instability after verification can cause a verified machine to be deverified.
+**Literal source text:** The gate exists so machines that have not been online for a sufficient amount of time are not put through verification testing. Above the gate, higher reliability can make verification more likely because the automated process has more confidence in the machine. For how active errors affect verification, see [reliability and verification](#reliability-and-verification).
 
 **Required proof:** Runtime Or Ui Observation
 
-**Existing proof / limit:** No retained proof
+**Existing proof / limit:** [EV-HOST-CLOSURE-MCL-ab00ca89f31d5db1-1](evidence/2026-09-14-host-closure-correction-attempt-01/upstream-175a318-hosting-overview.mdx) — Published guidance from upstream 175a318 / PR948 only; no independent verification transition, reliability calculation, recovery timing or PR185 approval is established.
 
 **Responsible role:** Authorized Host/API operator
 
@@ -11729,20 +11589,6 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-1fdf3f5df77ef7d8 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Will restarting lower reliability or remove verification?](http://127.0.0.1:4000/host/reliability-uptime#will-restarting-lower-reliability-or-remove-verification) — `MCL-9dc3b0e54070a926`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Reliability does not directly determine verification state by itself. Verification is separate from the reliability score, but outages, failed starts, driver issues, network drops, or other instability can reduce reliability and may eventually contribute to deverification if the machine becomes unhealthy. Plan restarts around active contracts and use maintenance windows whenever possible.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer
-
-**Next:** Record the engineering rationale, inspect relevant canonical technical behavior, and reuse applicable retained observations. Split guidance from any actual obligation or effect when their methods differ.
 
 ### [Preventing score drops](http://127.0.0.1:4000/host/reliability-uptime#preventing-score-drops) — `MCL-8d9f98bd90eefb0d`
 
@@ -15312,20 +15158,6 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 
 ## [Removing or Recreating Machines](http://127.0.0.1:4000/host/removing-recreating-machines)
 
-### [How do I unlist, delete, or recreate a machine?](http://127.0.0.1:4000/host/removing-recreating-machines#how-do-i-unlist-delete-or-recreate-a-machine) — `MCL-ae7f4423cef61511`
-
-**Status:** FAIL
-
-**Literal source text:** Unlisting stops new rental contracts from being created, but it does not end existing contracts. Deleting or recreating a machine should only happen after active commitments and stored workloads are understood. Recreating may be useful after a failed install, stale record, or major hardware change, but do not use undocumented reset or recovery flags unless Vast support specifically instructs you to do so.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation, Authoritative Documentation Citation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation authoritative-source reviewer
-
-**Next:** Inspect the retained agreement Offer/Rental Contract/Operation and Maintenance clauses and any current published terms; bind only supported clauses. Inspect the corresponding offer/update/unlist/extension implementation and retained execution for actual system effects.
-
 ### [What changes when I swap GPUs or other hardware?](http://127.0.0.1:4000/host/removing-recreating-machines#what-changes-when-i-swap-gpus-or-other-hardware) — `MCL-02397010364a9a76`
 
 **Status:** UNVALIDATED
@@ -17454,11 +17286,11 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
 
-**Existing proof / limit:** [EV-HOST-SELF-TEST-01](evidence/2026-09-02-host-self-test-attempt-01/result.md) — Static or partial evidence does not establish the prohibited or unavailable runtime behavior.; [ADA-01](evidence/2026-09-08-host-ada-readiness-attempt-01/api-01.json) — Read-only candidate access/metadata snapshot only; it is not authorization, reservation, workload execution, health, or cleanup proof.
+**Existing proof / limit:** [EV-HOST-CLOSURE-MCL-3aca6b1f291d4d0c-1](evidence/2026-09-09-host-ssh-jupyter-selftest-attempt-01/selftest-normal-preflight-01.json) — Normal support-bundle CLI command reached requirements, success=false; offer reliability0.8506588 and upload221.1Mb/s failed >0.90/500 thresholds; mode0600 failure archive with four hashed members. Advertised values at that time, not present state/new bandwidth measurement. No create request, diagnostic image, runtime result, remote workload logs or settled billing; raw exit0 is not success.; [EV-HOST-SELF-TEST-01](evidence/2026-09-02-host-self-test-attempt-01/result.md) — Static or partial evidence does not establish the prohibited or unavailable runtime behavior.; [ADA-01](evidence/2026-09-08-host-ada-readiness-attempt-01/api-01.json) — Read-only candidate access/metadata snapshot only; it is not authorization, reservation, workload execution, health, or cleanup proof.
 
 **Responsible role:** Backend and Host-daemon source owner; Authorized Host/API operator
 
-**Next:** Obtain explicit self-test workload authorization and create permission, controlled spend/window/runtime bounds, and authority for cleanup of only task-created resources; reconfirm target occupancy before execution.
+**Next:** For the remaining official diagnostic workload, use a currently suitable authorized machine and bounded window; reconfirm occupancy and cleanup scope. Retain the exact diagnostic result, not only preflight.
 
 ### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-7ffec0f9b23aaf16`
 
@@ -20868,90 +20700,6 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Product/Compliance identifies which dated rule applies to this Host program, then update the exact requirement and retain that decision. Existing public sources establish the conflict, not its resolution.
 
-### [Apply](http://127.0.0.1:4000/host/datacenter-status#apply) — `MCL-08d534d1cc02eb2c`
-
-**Status:** FAIL
-
-**Literal source text:** Prepare: - Any additional due-diligence documents Vast requests.
-
-**Required proof:** Authoritative Documentation Citation, Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation authoritative-source reviewer
-
-**Next:** Inspect the current official datacenter application/program publication or verification requirements as applicable, then applicable configuration/enforcement and retained UI. Do not use a generic marketing page to prove a specific threshold.
-
-### [Apply](http://127.0.0.1:4000/host/datacenter-status#apply) — `MCL-4be2159765519977`
-
-**Status:** FAIL
-
-**Literal source text:** Prepare: - Business registration or certificate of good standing.
-
-**Required proof:** Authoritative Documentation Citation, Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation authoritative-source reviewer
-
-**Next:** Inspect the current official datacenter application/program publication or verification requirements as applicable, then applicable configuration/enforcement and retained UI. Do not use a generic marketing page to prove a specific threshold.
-
-### [Apply](http://127.0.0.1:4000/host/datacenter-status#apply) — `MCL-b87645b43a9136dd`
-
-**Status:** FAIL
-
-**Literal source text:** Prepare: - Datacenter name, address, and certificates.
-
-**Required proof:** Authoritative Documentation Citation, Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation authoritative-source reviewer
-
-**Next:** Inspect the current official datacenter application/program publication or verification requirements as applicable, then applicable configuration/enforcement and retained UI. Do not use a generic marketing page to prove a specific threshold.
-
-### [Apply](http://127.0.0.1:4000/host/datacenter-status#apply) — `MCL-d5001953fbd7df0b`
-
-**Status:** FAIL
-
-**Literal source text:** Prepare: - Government-issued ID for business owner(s).
-
-**Required proof:** Authoritative Documentation Citation, Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation authoritative-source reviewer
-
-**Next:** Inspect the current official datacenter application/program publication or verification requirements as applicable, then applicable configuration/enforcement and retained UI. Do not use a generic marketing page to prove a specific threshold.
-
-### [Apply](http://127.0.0.1:4000/host/datacenter-status#apply) — `MCL-e03564808f65b40b`
-
-**Status:** FAIL
-
-**Literal source text:** Prepare: - Contract or invoice linking the business to the datacenter.
-
-**Required proof:** Authoritative Documentation Citation, Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation authoritative-source reviewer
-
-**Next:** Inspect the current official datacenter application/program publication or verification requirements as applicable, then applicable configuration/enforcement and retained UI. Do not use a generic marketing page to prove a specific threshold.
-
-### [Apply](http://127.0.0.1:4000/host/datacenter-status#apply) — `MCL-0ae9c2fd5ac2ef9a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Apply at [vast.ai/data-center-application](https://vast.ai/data-center-application).
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-0ae9c2fd5ac2ef9a and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
 ## [Host Payouts](http://127.0.0.1:4000/host/payment)
 
 ### [Introduction](http://127.0.0.1:4000/host/payment) — `MCL-335de916e219e04a`
@@ -21348,20 +21096,6 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Verify the residual scope using canonical implementation or a scoped read-only/runtime observation as appropriate: Actual isolation design/enforcement still requires technical/runtime evidence. Do not use the agreement as evidence of actual compliance.
 
-### [Host Responsibilities](http://127.0.0.1:4000/host/workload-policy#host-responsibilities) — `MCL-393941d0e9be9d31`
-
-**Status:** FAIL
-
-**Literal source text:** While a rental contract is active: - Do not stop, inspect, modify, or interfere with renter containers because they appear idle.
-
-**Required proof:** Authoritative Documentation Citation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation policy-source reviewer; accountable Vast policy owner only for missing or ambiguous rules
-
-**Next:** Check the applicable Terms, Hosting Agreement or approved policy for this exact instruction and scope. Cite a matching clause. Ask the accountable policy owner to confirm or correct only a missing or unclear rule; retain that decision and its citation. Confirm the idle-rental noninterference scope; do not inspect or change renter containers to test the rule.
-
 ### [Host Responsibilities](http://127.0.0.1:4000/host/workload-policy#host-responsibilities) — `MCL-946580941143d9c9`
 
 **Status:** UNVALIDATED
@@ -21389,20 +21123,6 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Documentation authoritative-source reviewer
 
 **Next:** Verify the residual scope using canonical implementation or a scoped read-only/runtime observation as appropriate: Advertised performance/runtime compliance and rental boundaries remain separate. Do not use the agreement as evidence of actual compliance.
-
-### [Host Responsibilities](http://127.0.0.1:4000/host/workload-policy#host-responsibilities) — `MCL-af1c482a08b09316`
-
-**Status:** FAIL
-
-**Literal source text:** While a rental contract is active: - Do not run local gaming, mining, benchmarks, display workloads, or background GPU jobs.
-
-**Required proof:** Authoritative Documentation Citation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation policy-source reviewer; accountable Vast policy owner only for missing or ambiguous rules
-
-**Next:** Check the applicable Terms, Hosting Agreement or approved policy for this exact instruction and scope. Cite a matching clause. Ask the accountable policy owner to confirm or correct only a missing or unclear rule; retain that decision and its citation. Confirm whether the rule covers the whole machine or only rented resources.
 
 ### [Host Responsibilities](http://127.0.0.1:4000/host/workload-policy#host-responsibilities) — `MCL-d2898c17f7c44453`
 
@@ -21641,20 +21361,6 @@ Current dispositions: 2013 occurrences (319 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
 
 **Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [What To Do](http://127.0.0.1:4000/host/workload-policy#what-to-do) — `MCL-47b85b40f58091a2`
-
-**Status:** FAIL
-
-**Literal source text:** | Stop new rentals | Unlist the machine; existing contracts continue. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation, Authoritative Documentation Citation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation authoritative-source reviewer
-
-**Next:** Inspect the retained agreement Offer/Rental Contract/Operation and Maintenance clauses and any current published terms; bind only supported clauses. Inspect the corresponding offer/update/unlist/extension implementation and retained execution for actual system effects.
 
 ### [What To Do](http://127.0.0.1:4000/host/workload-policy#what-to-do) — `MCL-907bf683229f42ae`
 

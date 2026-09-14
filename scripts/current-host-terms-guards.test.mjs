@@ -1,3 +1,4 @@
+import {beforeClosure} from './closure_historical_test_sources.mjs';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -7,6 +8,7 @@ import test from 'node:test';
 import { pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const closureRead = beforeClosure(ref=>fs.readFileSync(path.join(ROOT,ref)));
 const TERMS_PATH = 'verification/current-host-terms-binding.json';
 const TERMS_SOURCE = 'host/workload-policy.mdx';
 const sha = value => crypto.createHash('sha256').update(value).digest('hex');
@@ -17,12 +19,13 @@ const current = () => JSON.parse(fs.readFileSync(path.join(ROOT, newer?.baseline
 // later sealed transition edits other pages. No production pin is replaced.
 const frozenSources = new Map((newer?.sources || []).map(source =>
   [source.path, fs.readFileSync(path.join(ROOT, source.before_artifact.path))]));
+frozenSources.set('host/payment.mdx', fs.readFileSync(path.join(ROOT, 'verification/evidence/2026-09-14-payout-provider-correction-attempt-01/pre-correction-payment.mdx')));
 const baseRegistry = () => JSON.parse(fs.readFileSync(path.join(ROOT, TERMS_PATH)));
 
 async function sealedFixture({registryMutate = value => value, sourceMutate = value => value} = {}) {
   const registry = registryMutate(baseRegistry());
   const registryBytes = Buffer.from(JSON.stringify(registry));
-  const source = Buffer.from(sourceMutate(fs.readFileSync(path.join(ROOT, TERMS_SOURCE), 'utf8')));
+  const source = Buffer.from(sourceMutate(closureRead(TERMS_SOURCE).toString('utf8')));
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'terms-guards-'));
   for (const name of ['current_host_authority_scan.mjs', 'current_host_clarification.mjs', 'current_host_terms_binding.mjs']) {
     const input = fs.readFileSync(path.join(ROOT, 'scripts', name), 'utf8');
@@ -32,7 +35,7 @@ async function sealedFixture({registryMutate = value => value, sourceMutate = va
     fs.writeFileSync(path.join(temp, name), output);
   }
   const module = await import(`${pathToFileURL(path.join(temp, 'current_host_terms_binding.mjs')).href}?${Math.random()}`);
-  const read = ref => ref === TERMS_PATH ? registryBytes : ref === TERMS_SOURCE ? source : frozenSources.get(ref) || fs.readFileSync(path.join(ROOT, ref));
+  const read = ref => ref === TERMS_PATH ? registryBytes : ref === TERMS_SOURCE ? source : frozenSources.get(ref) || closureRead(ref);
   const exists = ref => ref === TERMS_PATH || fs.existsSync(path.join(ROOT, ref));
   return { module, read, exists, model: current(), temp };
 }
@@ -62,12 +65,12 @@ test('Terms guard rejects an excerpt absent from its pinned Terms clause', async
 });
 
 test('Terms guard rejects a line-count expansion before projection', async () => {
-  await rejects(registry => { registry.source.after_sha256 = sha(Buffer.from(fs.readFileSync(path.join(ROOT, TERMS_SOURCE), 'utf8') + '\nextra source line')); return registry; }, /preserve line count/, source => source + '\nextra source line');
+  await rejects(registry => { registry.source.after_sha256 = sha(Buffer.from(closureRead(TERMS_SOURCE).toString('utf8') + '\nextra source line')); return registry; }, /preserve line count/, source => source + '\nextra source line');
 });
 
 test('Terms guard rejects a changed nonblank source line without a claim occurrence', async () => {
   await rejects(registry => {
-    const source = fs.readFileSync(path.join(ROOT, TERMS_SOURCE), 'utf8').replace('\n\n| Category |', '\nNew unclaimed policy prose.\n| Category |');
+    const source = closureRead(TERMS_SOURCE).toString('utf8').replace('\n\n| Category |', '\nNew unclaimed policy prose.\n| Category |');
     registry.source.after_sha256 = sha(Buffer.from(source));
     return registry;
   }, /changed nonblank Workload Policy source line lacks a claim occurrence/, source => source.replace('\n\n| Category |', '\nNew unclaimed policy prose.\n| Category |'));

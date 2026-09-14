@@ -1,0 +1,17 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+const worker=path.resolve('.orchestra/reviewer-handoff/worker');
+const git=args=>execFileSync('git',['-C',worker,...args],{encoding:'utf8',maxBuffer:8*1024*1024});
+const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
+const additions=git(['ls-files','--others','--exclude-standard','-z']).split('\0').filter(Boolean);
+const expected=['scripts/host-review-owner-questions.test.mjs','scripts/host_review_owner_questions.mjs','verification/current-host-owner-questions.json'];
+if(JSON.stringify(additions.sort())!==JSON.stringify(expected.sort()))throw Error('Unexpected untracked worker paths');
+const new_files=additions.map(ref=>{const bytes=fs.readFileSync(path.join(worker,ref));if(sha(bytes)!==sha(fs.readFileSync(ref)))throw Error('Root copy differs: '+ref);return{path:ref,sha256:sha(bytes),content:bytes.toString('utf8')};});
+const changed=git(['diff','--name-only']).trim().split('\n').filter(Boolean);
+if(changed.some(ref=>!['review-server.mjs','scripts/export_host_review_html.mjs','scripts/host_review_work_queue.mjs','scripts/templates/host-docs-review.html','scripts/current-host-jurisdiction-reader.test.mjs','scripts/current-host-jurisdiction.test.mjs','scripts/current-host-review-cleanup.test.mjs','scripts/current-host-terms-guards.test.mjs'].includes(ref)))throw Error('Unexpected tracked worker delta');
+const record={at:new Date().toISOString(),worker,base_commit:git(['rev-parse','HEAD']).trim(),tracked_patch:git(['diff','--binary']),changed_files:changed,new_files,reports:['worker-reviewer-handoff-initial.html','worker-reviewer-handoff-revised.html'],limits:'Task-owned worker recovery archive. Root adds small independently retested presentation refinements. This is implementation history, not Host evidence.'};
+const output='verification/evidence/2026-09-14-host-review-handoff-attempt-01/worker-archive.json';
+fs.writeFileSync(output,JSON.stringify(record,null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify({output,tracked:changed.length,verified_root_additions:new_files.length,sha256:sha(fs.readFileSync(output))}));

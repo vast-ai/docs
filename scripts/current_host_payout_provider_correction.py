@@ -75,8 +75,8 @@ def safe(root: Path, ref: str) -> Path:
     return path
 
 
-def pinned(root: Path, ref: str, wanted: str) -> bytes:
-    value = safe(root, ref).read_bytes()
+def pinned(root: Path, ref: str, wanted: str, frozen_source_overrides=None) -> bytes:
+    value = (frozen_source_overrides or {})[ref] if ref in (frozen_source_overrides or {}) else safe(root, ref).read_bytes()
     require(digest(value) == wanted, "digest drift " + ref)
     return value
 
@@ -90,22 +90,10 @@ def span(source: str, start: int, end: int, lines: list[str]) -> dict[str, Any]:
     return {"source_file": source, "start": start, "end": end, "text_sha256": digest(text.encode())}
 
 
-def predecessor(root: Path, baseline: dict[str, Any], before_source: bytes) -> None:
-    """Run every sealed predecessor gate against its exact old payment bytes."""
+def predecessor(root: Path, baseline: dict[str, Any], before_source: bytes, frozen_source_overrides=None) -> None:
+    """Replay the complete predecessor against its exact original source view."""
     cleanup = module("current_host_review_cleanup")
-
-    def validate_cleanup_prior(repo: Path, model: dict[str, Any]) -> None:
-        jurisdiction = module("current_host_jurisdiction")
-        original = jurisdiction.predecessor
-
-        def validate_jurisdiction_prior(inner_root: Path, inner_model: dict[str, Any], old: dict[str, bytes]) -> None:
-            original(inner_root, inner_model, {**old, SOURCE: before_source})
-
-        jurisdiction.predecessor = validate_jurisdiction_prior
-        jurisdiction.validate_model(model, repo)
-
-    cleanup.predecessor = validate_cleanup_prior
-    cleanup.validate_model(baseline, root)
+    cleanup.validate_model(baseline, root, {**(frozen_source_overrides or {}), SOURCE: before_source})
 
 
 def correction(after_source_sha256: str) -> dict[str, str]:
@@ -118,7 +106,7 @@ def correction(after_source_sha256: str) -> dict[str, str]:
     }
 
 
-def project(root: Path) -> dict[str, Any]:
+def project(root: Path, frozen_source_overrides=None) -> dict[str, Any]:
     root = root.resolve()
     registry = json.loads(pinned(root, REGISTRY, REGISTRY_SHA256))
     keys(registry, {"schema_version", "record_type", "generated_at", "baseline", "source", "static_check", "observation", "transitions"}, "registry")
@@ -133,7 +121,7 @@ def project(root: Path) -> dict[str, Any]:
     keys(registry["static_check"], {"path", "sha256"}, "static check")
     require(registry["static_check"] == {"path": STATIC_CHECK, "sha256": STATIC_CHECK_SHA256}, "static check substitution")
     before_source = pinned(root, BEFORE_SOURCE, BEFORE_SOURCE_SHA256)
-    after_source = pinned(root, SOURCE, registry["source"]["after_sha256"])
+    after_source = pinned(root, SOURCE, registry["source"]["after_sha256"], frozen_source_overrides)
     before_lines, after_lines = before_source.decode().splitlines(), after_source.decode().splitlines()
     require(len(before_lines) == len(after_lines), "line-stable source correction required")
     require({index + 1 for index, pair in enumerate(zip(before_lines, after_lines)) if pair[0] != pair[1]} == CHANGED_LINES, "source edits exceed exact approved lines")
@@ -151,7 +139,7 @@ def project(root: Path) -> dict[str, Any]:
     require(set(observed) == set(value[1] for value in IDS.values()), "UI observations differ from four bounded findings")
     require("Does not establish" in observed["PAYOUT-UI-DIRECT-01"].get("supports", ""), "bank-transfer limitation missing")
     baseline = json.loads(pinned(root, BASELINE, BASELINE_SHA256))
-    predecessor(root, baseline, before_source)
+    predecessor(root, baseline, before_source, frozen_source_overrides)
     before = {claim["id"]: claim for page in baseline["pages"] for claim in page["claims"]}
     require(len(before) == 2013 and set(IDS) <= set(before), "baseline claim inventory drift")
     keys_by_id = {}
@@ -211,8 +199,8 @@ def project(root: Path) -> dict[str, Any]:
     return result
 
 
-def validate_model(model: dict[str, Any], root: Path) -> None:
-    require(model == project(root), "whole model differs from payout-provider projection")
+def validate_model(model: dict[str, Any], root: Path, frozen_source_overrides=None) -> None:
+    require(model == project(root, frozen_source_overrides), "whole model differs from payout-provider projection")
 
 
 def load_payout_provider_correction(root: Path, model: dict[str, Any]) -> dict[str, Any] | None:

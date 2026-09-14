@@ -1,0 +1,28 @@
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+const dir='verification/evidence/2026-09-14-host-review-handoff-attempt-01';
+const name=process.argv[2];
+if(!/^[a-z0-9-]+$/.test(name||''))throw Error('Supply a unique result name');
+const output=dir+'/'+name+'.json';
+if(fs.existsSync(output))throw Error('Refuse overwrite');
+const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
+const baseline=JSON.parse(fs.readFileSync(dir+'/baseline.json'));
+const protectedFiles=baseline.files.filter(f=>f.path.startsWith('host/')||f.path.startsWith('verification/evidence/')||f.path==='verification/current-host-docs-review.json');
+const changes=[];
+for(const f of protectedFiles){try{const bytes=fs.readFileSync(f.path);if(sha(bytes)!==f.sha256)changes.push({path:f.path,reason:'hash changed'});}catch(e){changes.push({path:f.path,reason:e.code});}}
+const model=JSON.parse(fs.readFileSync('verification/current-host-docs-review.json'));
+const claims=model.pages.flatMap(p=>p.claims),counts={};
+for(const c of claims)counts[c.status]=(counts[c.status]||0)+1;
+const expected={PASS:319,FAIL:26,BLOCKED:23,NOT_APPLICABLE:87,UNVALIDATED:1558};
+const unchangedCounts=claims.length===2013&&model.pages.length===44&&Object.entries(expected).every(([k,v])=>counts[k]===v)&&Object.keys(counts).length===5;
+const priorExport=JSON.parse(execFileSync('git',['show',baseline.head+':verification/host-docs-review-export.json'],{encoding:'utf8',maxBuffer:4*1024*1024}));
+const currentExport=JSON.parse(fs.readFileSync('verification/host-docs-review-export.json'));
+const embeddedChanges=priorExport.embedded_files.filter(old=>!currentExport.embedded_files.some(now=>JSON.stringify(now)===JSON.stringify(old)));
+const embeddedAdded=currentExport.embedded_files.filter(now=>!priorExport.embedded_files.some(old=>old.ref===now.ref)).map(row=>row.ref);
+const embeddedPreserved=embeddedChanges.length===0&&JSON.stringify(embeddedAdded)===JSON.stringify(['verification/current-host-owner-questions.json']);
+const readers=['review-server.mjs','scripts/host_review_work_queue.mjs','scripts/host_review_reader_copy.mjs','scripts/host_review_owner_questions.mjs','scripts/templates/host-docs-review.html','scripts/export_host_review_html.mjs','verification/current-host-owner-questions.json','verification/host-docs-review.html','verification/host-docs-review-export.json'].map(p=>{try{const b=fs.readFileSync(p);return{path:p,sha256:sha(b),bytes:b.length};}catch(e){return{path:p,error:e.code};}});
+const result={at:new Date().toISOString(),result:!changes.length&&unchangedCounts&&embeddedPreserved&&readers.every(r=>!r.error)?'PASS':'FAIL',protected_files_checked:protectedFiles.length,historical_evidence_files:protectedFiles.filter(f=>f.path.startsWith('verification/evidence/')).length,changes,embedded_changes:embeddedChanges,embedded_added:embeddedAdded,prior_embedded_files_preserved:priorExport.embedded_files.length,pages:model.pages.length,claims:claims.length,counts,readers,head:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),working_tree_status:execFileSync('git',['status','--porcelain=v1','--untracked-files=all'],{encoding:'utf8'}),limits:'Integrity of retained files and exact claim totals only. Does not prove Host behavior, policy, review acceptance or publication.'};
+fs.writeFileSync(output,JSON.stringify(result,null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify({artifact:output,result:result.result,protected:protectedFiles.length,changes,pages:result.pages,claims:result.claims,counts}));
+process.exitCode=result.result==='PASS'?0:1;

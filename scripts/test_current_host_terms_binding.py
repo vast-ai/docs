@@ -2,13 +2,18 @@ import copy
 import importlib.util
 import json
 import unittest
-from unittest import mock
 from pathlib import Path
 from scripts.test_current_host_authority_scan import frozen_payout_payment
 
 REPO=Path(__file__).resolve().parents[1]
 SPEC=importlib.util.spec_from_file_location('current_host_terms_binding_test_target', REPO/'scripts/current_host_terms_binding.py')
 TERMS=importlib.util.module_from_spec(SPEC); assert SPEC.loader; SPEC.loader.exec_module(TERMS)
+
+def closure_before_sources():
+    """Replay this historical phase with the sealed pre-closure Host pages."""
+    registry = json.loads((REPO / 'verification/current-host-closure-correction.json').read_text())
+    return {source['path']: (REPO / source['before_artifact']['path']).read_bytes()
+            for source in registry['sources']}
 
 class CurrentHostTermsBindingTests(unittest.TestCase):
     def jurisdiction(self):
@@ -23,13 +28,11 @@ class CurrentHostTermsBindingTests(unittest.TestCase):
     def validate(self, model):
         # Exercise the unchanged Terms reader against its actual historical
         # model/page bytes. Newer source edits are not Terms fixture inputs.
-        latest=self.jurisdiction(); overrides={}
+        latest=self.jurisdiction(); overrides=closure_before_sources()
         for source in latest['sources'] if latest else []:
-            overrides[REPO/source['path']]=(REPO/source['before_artifact']['path']).read_bytes()
-        overrides[REPO/'host/payment.mdx']=frozen_payout_payment()
-        original=Path.read_bytes
-        with mock.patch.object(Path,'read_bytes',lambda path:overrides[path] if path in overrides else original(path)):
-            TERMS.validate_model(model, REPO)
+            overrides[source['path']]=(REPO/source['before_artifact']['path']).read_bytes()
+        overrides['host/payment.mdx']=frozen_payout_payment()
+        TERMS.validate_model(model, REPO, overrides)
 
     def test_sealed_projection_accepts_all_six_terms_claims(self):
         model=self.model()

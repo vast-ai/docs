@@ -1,0 +1,12 @@
+import fs from 'node:fs';
+import {spawnSync} from 'node:child_process';
+const [name,command,...args]=process.argv.slice(2);
+if(!/^[a-z0-9-]+$/.test(name||'')||!command)throw Error('Supply unique record name and command');
+const file='verification/evidence/2026-09-14-host-review-handoff-attempt-01/'+name+'.json';
+if(fs.existsSync(file))throw Error('Refuse overwrite');
+const started_at=new Date().toISOString();
+const r=spawnSync(command,args,{encoding:'utf8',timeout:300000,maxBuffer:32*1024*1024});
+const record={started_at,finished_at:new Date().toISOString(),command:[command,...args],exit_code:r.status,signal:r.signal,error:r.error?.message??null,stdout:r.stdout,stderr:r.stderr,limits:'Repository or local reviewer check only; does not establish Host behavior or owner acceptance.'};
+fs.writeFileSync(file,JSON.stringify(record,null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify({file,exit_code:r.status,error:record.error,stdout_tail:r.stdout?.slice(-2500),stderr_tail:r.stderr?.slice(-1000)}));
+process.exitCode=r.status??1;

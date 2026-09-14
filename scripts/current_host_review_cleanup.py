@@ -62,8 +62,8 @@ def safe(root: Path, ref: str) -> Path:
     return path
 
 
-def pinned(root: Path, ref: str, wanted: str) -> bytes:
-    value = safe(root, ref).read_bytes()
+def pinned(root: Path, ref: str, wanted: str, frozen_source_overrides=None) -> bytes:
+    value = (frozen_source_overrides or {})[ref] if ref in (frozen_source_overrides or {}) else safe(root, ref).read_bytes()
     require(digest(value) == wanted, 'digest drift ' + ref)
     return value
 
@@ -78,9 +78,9 @@ def keys(value: Any, expected: set[str]) -> None:
     require(isinstance(value, dict) and set(value) == expected, 'missing/unknown fields')
 
 
-def predecessor(root: Path, baseline: dict[str, Any]) -> None:
+def predecessor(root: Path, baseline: dict[str, Any], frozen_source_overrides=None) -> None:
     jurisdiction = module('current_host_jurisdiction')
-    jurisdiction.validate_model(baseline, root)
+    jurisdiction.validate_model(baseline, root, frozen_source_overrides)
 
 
 def correction(count: int) -> dict[str, str]:
@@ -93,7 +93,7 @@ def correction(count: int) -> dict[str, str]:
     }
 
 
-def project(root: Path) -> dict[str, Any]:
+def project(root: Path, frozen_source_overrides=None) -> dict[str, Any]:
     root = root.resolve()
     require(REGISTRY_SHA256, 'cleanup registry digest not sealed')
     registry_bytes = pinned(root, REGISTRY, REGISTRY_SHA256)
@@ -104,7 +104,7 @@ def project(root: Path) -> dict[str, Any]:
     require(registry['baseline'] == {'path': BASELINE, 'sha256': BASELINE_SHA256}, 'baseline substitution')
     require(isinstance(registry['result_ref'], str) and registry['result_ref'].startswith(ATTEMPT + '/') and safe(root, registry['result_ref']).is_file(), 'invalid result reference')
     baseline = decode(pinned(root, BASELINE, BASELINE_SHA256))
-    predecessor(root, baseline)
+    predecessor(root, baseline, frozen_source_overrides)
 
     artifacts: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {}
     for artifact in registry['artifacts']:
@@ -151,10 +151,10 @@ def project(root: Path) -> dict[str, Any]:
         require(prior['spans'] and all(span['source_file'] == prior['spans'][0]['source_file'] for span in prior['spans']), 'cleanup spans must be in one exact source file')
         source_file = prior['spans'][0]['source_file']
         require(observation['claim_id'] == cid and observation['before_sha256'] == entry['before_sha256'] and observation['text'] == prior['text'] and observation['text_sha256'] == digest(prior['text'].encode()), 'observation claim identity drift')
-        require(observation['source_file'] == source_file and observation['spans'] == prior['spans'] and observation['source_sha256'] == digest(safe(root, source_file).read_bytes()), 'observation source/span drift')
+        require(observation['source_file'] == source_file and observation['spans'] == prior['spans'] and observation['source_sha256'] == digest((frozen_source_overrides or {}).get(source_file, safe(root, source_file).read_bytes())), 'observation source/span drift')
         require(observation['method'] in METHODS and artifact['method'] == 'MIXED_REPOSITORY_LOCAL_EDITORIAL_CHECKS' and observation['finding'] == entry['review_rationale'] and observation['limits'] == entry['limits'], 'observation rationale/limits drift')
         require(observation['candidate_record'] == candidates.get(cid), 'raw candidate record substitution')
-        current_source = safe(root, source_file).read_text()
+        current_source = (frozen_source_overrides or {}).get(source_file, safe(root, source_file).read_bytes()).decode()
         require(isinstance(observation['context'], str) and observation['context'] in current_source and isinstance(observation['expected'], str) and observation['expected'].strip() and isinstance(observation['observed'], str) and observation['observed'].strip(), 'raw contextual expected/observed evidence missing')
         require(isinstance(observation['links'], list), 'navigation evidence must be a list')
         require(isinstance(entry['review_rationale'], str) and entry['review_rationale'].strip() and isinstance(entry['limits'], str) and entry['limits'].strip(), 'rationale/limits required')
@@ -181,8 +181,8 @@ def project(root: Path) -> dict[str, Any]:
     return result
 
 
-def validate_model(model: dict[str, Any], root: Path) -> None:
-    require(model == project(root), 'whole model differs from cleanup projection')
+def validate_model(model: dict[str, Any], root: Path, frozen_source_overrides=None) -> None:
+    require(model == project(root, frozen_source_overrides), 'whole model differs from cleanup projection')
 
 
 def load_cleanup(root: Path, model: dict[str, Any]) -> dict[str, Any] | None:

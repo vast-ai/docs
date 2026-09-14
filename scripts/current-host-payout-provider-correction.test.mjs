@@ -1,3 +1,4 @@
+import {beforeClosure} from './closure_historical_test_sources.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
@@ -5,7 +6,7 @@ import test from 'node:test';
 import {PAYOUT_OBSERVATION, PAYOUT_PATH, PAYOUT_SOURCE, loadPayoutProviderCorrection, projectPayoutProviderCorrection} from './current_host_payout_provider_correction.mjs';
 
 const root = new URL('../', import.meta.url);
-const read = ref => fs.readFileSync(new URL(ref, root));
+const read = beforeClosure(ref => fs.readFileSync(new URL(ref, root)));
 const frozenRead = ref => ref === PAYOUT_SOURCE ? read('verification/evidence/2026-09-14-payout-terms-correction-attempt-01/pre-correction-payment.mdx') : read(ref);
 const exists = ref => fs.existsSync(new URL(ref, root));
 const targets = new Set(['MCL-77f72f0e0ac77e54','MCL-a04f3ef2f5a7d5fd','MCL-cc62439b0f816902','MCL-9826b26393329d27']);

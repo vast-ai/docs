@@ -9,6 +9,55 @@ new-page review coverage are separate from the retained 40-page proof).
 
 Review PR: [vast-ai/docs#185](https://github.com/vast-ai/docs/pull/185)
 
+## Bounded closure reconciliation, 14 September 2026
+
+The current package contains **2,008 active claims across 44 Host pages: 335 PASS,
+11 FAIL, 21 BLOCKED, 87 NOT_APPLICABLE and 1,554 UNVALIDATED**. Ten supported
+corrections narrow the wording to its cited source. Five unsupported application
+checklist clauses are withdrawn into one existing application instruction; all
+five historical FAIL objects remain in that instruction's history and the frozen
+baseline. They have not become five product PASSes.
+
+The successor also binds six retained observations as partial support, changes
+two Volume records with missing evidence but no demonstrated unavailable
+prerequisite to UNVALIDATED, carries reviewed upstream PR948 verification and
+reliability guidance into the canonical pages, and adds the explicit Overview
+link to Machine Error Reference. The generated Self-Test Reference refreshes only
+its CLI source annotation against current-default source; its customer content
+and claim statuses are unchanged by that refresh.
+
+Eleven stronger tax and rental assertions remain unchanged and open. Eight owner
+questions identify the remaining decisions and source needs. This is a checked
+local integration candidate; review, acceptance and merge remain separate.
+
+[Bounded result and limits](verification/evidence/2026-09-14-host-closure-correction-attempt-01/result.md) ·
+[Exact transitions and retirements](verification/current-host-closure-correction.json) ·
+[Current owner questions](verification/current-host-owner-questions.json)
+
+## Earlier reviewer handoff, 14 September 2026
+
+Port4000 and the standalone report now show a whole-page status summary that
+claim filters cannot hide. Open checks appear first. **Show all page corrections**
+clears conflicting filters and opens the selected page's corrections. The Review
+badge distinguishes V&V checks, context blockers and actual reviewer notes.
+
+Six selected questions have their own handoff list: Datacenter supporting
+documents, certification requirements, the $20 payout rule, storage cleanup and
+secure erasure, personal workloads, and Vast-specific tax handling. Each names
+proposed teams and links current passages. They are **UNVALIDATED questions**, not
+new failed claims, assigned owners, product evidence or recorded approval.
+Published-source checks retain their original scope and source controls.
+
+All **2,013 claims across 44 Host pages** retain their text, status and evidence.
+Totals remain **319 PASS / 26 FAIL / 23 BLOCKED / 87 NOT_APPLICABLE / 1,558
+UNVALIDATED**. Host source pages and all historical evidence are unchanged.
+This is a local reviewer-interface update, not resolution of those open claims.
+It has not been committed, pushed, merged or accepted.
+
+[Short demo guide](verification/host-review-demo.md) ·
+[Standalone report](verification/host-docs-review.html) ·
+[Checks, failures and retests](verification/evidence/2026-09-14-host-review-handoff-attempt-01/result.md)
+
 ## Publication checkpoint, 14 September 2026
 
 The accumulated Host Docs corrections, offline review HTML and traceability

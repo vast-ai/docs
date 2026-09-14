@@ -10,10 +10,12 @@ import { TERMS_PATH, TERMS_ATTEMPT } from './current_host_terms_binding.mjs';
 import { JURISDICTION_PATH, JURISDICTION_ATTEMPT } from './current_host_jurisdiction.mjs';
 import { PAYOUT_PATH } from './current_host_payout_provider_correction.mjs';
 import { PAYOUT_TERMS_PATH } from './current_host_payout_terms_correction.mjs';
+import { CLOSURE_PATH } from './current_host_closure_correction.mjs';
 import { PAYOUT_INVOICE_PATH } from './current_host_payout_invoice_correction.mjs';
 import { loadCurrentHostReviewTransition } from './current_host_review_transition.mjs';
 import { hostReviewReaderCopy } from './host_review_reader_copy.mjs';
 import { buildHostReviewQueue, describeHostReview } from './host_review_work_queue.mjs';
+import { OWNER_QUESTIONS_PATH, requireHostReviewOwnerQuestions } from './host_review_owner_questions.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const inputPath = 'verification/current-host-docs-review.json';
@@ -329,8 +331,9 @@ function readonlyCommandProofs(claims, add) {
 export function buildReport() {
   const bytes = read(inputPath);
   const model = JSON.parse(bytes);
+  const ownerQuestions = requireHostReviewOwnerQuestions({ read, model, modelSha256: sha(bytes) });
   const authorityScan = loadCurrentHostReviewTransition({ read, model });
-  const selectedResult = authorityScan?.payoutInvoice ? payoutInvoiceResultPath : (authorityScan?.payoutTerms ? payoutTermsResultPath : (authorityScan?.payoutProvider ? payoutProviderResultPath : (authorityScan?.cleanup?.resultRef || (authorityScan?.jurisdiction ? `${JURISDICTION_ATTEMPT}/result.md` : authorityScan?.terms ? `${TERMS_ATTEMPT}/result.md` : authorityScan ? `${AUTHORITY_SCAN_ATTEMPT}/result.md` : currentResultPath))));
+  const selectedResult = authorityScan?.closure?.resultRef || (authorityScan?.payoutInvoice ? payoutInvoiceResultPath : (authorityScan?.payoutTerms ? payoutTermsResultPath : (authorityScan?.payoutProvider ? payoutProviderResultPath : (authorityScan?.cleanup?.resultRef || (authorityScan?.jurisdiction ? `${JURISDICTION_ATTEMPT}/result.md` : authorityScan?.terms ? `${TERMS_ATTEMPT}/result.md` : authorityScan ? `${AUTHORITY_SCAN_ATTEMPT}/result.md` : currentResultPath)))));
   const claims = model.pages.flatMap(page => page.claims.map(claim => ({ ...claim, route: page.route, page_title: page.title })));
   const ids = new Set(claims.map(c => c.id));
   if (ids.size !== claims.length || claims.length !== model.counts.claims) throw new Error('Claim inventory mismatch');
@@ -394,6 +397,7 @@ export function buildReport() {
     }
   }
   add(INSTALL_INTAKE_PATH);
+  add(OWNER_QUESTIONS_PATH);
   if (authorityScan?.cleanup) {
     const cleanup = authorityScan.cleanup;
     add('verification/current-host-review-cleanup.json', cleanup.registrySha256);
@@ -427,6 +431,14 @@ export function buildReport() {
     add(payoutInvoice.guidance, payoutInvoice.guidanceSha256);
     add(payoutInvoiceResultPath);
   }
+  if (authorityScan?.closure) {
+    const closure = authorityScan.closure;
+    add(CLOSURE_PATH, closure.registrySha256);
+    add(closure.baseline, closure.baselineSha256);
+    add(closure.resultRef);
+    for (const source of closure.registry.sources) add(source.before_artifact.path, source.before_artifact.sha256);
+    for (const artifact of closure.registry.artifacts) add(artifact.path, artifact.sha256);
+  }
   for (const ref of installationIntake.artifactRefs) add(ref);
   add(currentResultPath); add(currentAuthorityBaselinePath); add(claimCorrectionResultPath);
   for (const ref of currentAttemptArtifacts) add(ref);
@@ -455,6 +467,8 @@ export function buildReport() {
     input: { ref: inputPath, sha256: sha(bytes), revision: model.source.revision, tree: model.source.tree },
     counts: model.counts, current_result_ref: selectedResult, claim_correction_history_ref: claimCorrectionResultPath,
     work_queue: buildHostReviewQueue(claims),
+    owner_questions: JSON.parse(JSON.stringify({ registry_ref: ownerQuestions.registryRef, registry_sha256: ownerQuestions.registrySha256,
+      questions: ownerQuestions.questions }, (_, value) => typeof value === 'string' ? sanitize(value) : value)),
     cleanup_transition: authorityScan?.cleanup ? {registry_ref: 'verification/current-host-review-cleanup.json', registry_sha256: authorityScan.cleanup.registrySha256,
       baseline_ref: authorityScan.cleanup.baseline, baseline_sha256: authorityScan.cleanup.baselineSha256,
       result_ref: authorityScan.cleanup.resultRef, context_refs: [...authorityScan.contextHashes.keys()],
@@ -469,6 +483,11 @@ export function buildReport() {
       terms_ref: authorityScan.payoutTerms.terms, terms_sha256: authorityScan.payoutTerms.termsSha256,
       faq_ref: authorityScan.payoutTerms.faq, faq_sha256: authorityScan.payoutTerms.faqSha256,
       result_ref: payoutTermsResultPath, changed_claims: 2, limit: 'Published Terms text and attributed payout guidance only; no payout/provider adjudication, enforceability decision, Hosting Agreement priority, or independent backend/runtime absence is inferred.'} : null,
+    closure_transition: authorityScan?.closure ? {registry_ref:CLOSURE_PATH, registry_sha256:authorityScan.closure.registrySha256,
+      baseline_ref:authorityScan.closure.baseline, baseline_sha256:authorityScan.closure.baselineSha256,
+      result_ref:authorityScan.closure.resultRef, changed_claims:authorityScan.closure.registry.transitions.length,
+      retired_claims:authorityScan.closure.registry.retirements, original_findings:authorityScan.closure.registry.original_findings,
+      limit:authorityScan.closure.registry.limits} : null,
     payout_invoice_transition: authorityScan?.payoutInvoice ? {registry_ref: PAYOUT_INVOICE_PATH, registry_sha256: authorityScan.payoutInvoice.registrySha256,
       baseline_ref: authorityScan.payoutInvoice.baseline, baseline_sha256: authorityScan.payoutInvoice.baselineSha256,
       guidance_ref: authorityScan.payoutInvoice.guidance, guidance_sha256: authorityScan.payoutInvoice.guidanceSha256,

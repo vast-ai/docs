@@ -1,3 +1,4 @@
+import {beforeClosure} from './closure_historical_test_sources.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -7,13 +8,13 @@ import {PAYOUT_INVOICE_PATH} from './current_host_payout_invoice_correction.mjs'
 import {loadCurrentHostReviewTransition} from './current_host_review_transition.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-const read=ref=>fs.readFileSync(path.join(root,ref));
+const read=beforeClosure(ref=>fs.readFileSync(path.join(root,ref)));
 const exists=ref=>fs.existsSync(path.join(root,ref));
 const ids=['MCL-06956d724f70d2a3','MCL-9826b26393329d27'];
 const claims=model=>new Map(model.pages.flatMap(page=>page.claims).map(claim=>[claim.id,claim]));
 const source='host/payment.mdx',faq='verification/evidence/2026-09-14-payout-terms-correction-attempt-01/published-payout-faq-01.json';
 const frozenRead=ref=>ref===source?read('verification/evidence/2026-09-14-payout-invoice-correction-attempt-01/pre-correction-payment.mdx'):read(ref);
-const beforeInvoice=ref=>ref===PAYOUT_INVOICE_PATH?false:exists(ref);
+const beforeInvoice=ref=>[PAYOUT_INVOICE_PATH,'verification/current-host-closure-correction.json'].includes(ref)?false:exists(ref);
 
 const baseline=JSON.parse(read('verification/evidence/2026-09-14-payout-terms-correction-attempt-01/pre-correction-model.json'));
 assert.equal(claims(baseline).get(ids[0]).status,'FAIL');

@@ -102,6 +102,10 @@ async function copyInstallationIntakeModule(fixtureRoot) {
   await fs.mkdir(path.join(fixtureRoot, 'scripts'), { recursive: true });
   await fs.copyFile(path.join(ROOT, 'scripts', 'host_review_reader_copy.mjs'), path.join(fixtureRoot, 'scripts', 'host_review_reader_copy.mjs'));
   await fs.copyFile(path.join(ROOT, 'scripts', 'host_review_work_queue.mjs'), path.join(fixtureRoot, 'scripts', 'host_review_work_queue.mjs'));
+  await fs.copyFile(path.join(ROOT, 'scripts', 'host_review_owner_questions.mjs'), path.join(fixtureRoot, 'scripts', 'host_review_owner_questions.mjs'));
+  await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_payout_provider_correction.mjs'), path.join(fixtureRoot, 'scripts', 'current_host_payout_provider_correction.mjs'));
+  await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_payout_terms_correction.mjs'), path.join(fixtureRoot, 'scripts', 'current_host_payout_terms_correction.mjs'));
+  await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_payout_invoice_correction.mjs'), path.join(fixtureRoot, 'scripts', 'current_host_payout_invoice_correction.mjs'));
   await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_install_evidence_intake.mjs'),
     path.join(fixtureRoot, 'scripts', 'current_host_install_evidence_intake.mjs'));
   // The current server imports this adapter even when the isolated fixture
