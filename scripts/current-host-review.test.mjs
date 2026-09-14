@@ -10,7 +10,11 @@ import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PACKAGE = path.join(ROOT, 'verification', 'current-host-docs-review.json');
+// Preserve all pre-scan gate regressions against their immutable source/model
+// phase. Active scan behavior is covered separately, not by changing these
+// historical expected outcomes to match a new projection.
+const ACTIVE_SCAN = await fs.readFile(path.join(ROOT,'verification/current-host-authority-scan.json'),'utf8').then(JSON.parse).catch(error=>{if(error.code==='ENOENT')return null;throw error;});
+const PACKAGE = path.join(ROOT, ACTIVE_SCAN ? ACTIVE_SCAN.baseline.path : 'verification/current-host-docs-review.json');
 let target;
 let targetOrigin;
 function listen(server) {
@@ -28,7 +32,7 @@ async function freePort() {
 }
 
 async function externalSibling(name) {
-  let cursor = ROOT;
+  let cursor = process.env.VV_TEST_SOURCE_ROOT ? path.resolve(process.env.VV_TEST_SOURCE_ROOT, 'docs') : ROOT;
   for (;;) {
     const candidate = path.join(path.dirname(cursor), name);
     try { return await fs.realpath(candidate); } catch { /* walk toward the workspace root */ }
@@ -72,6 +76,22 @@ async function fixtureRoot() {
     path.join(ROOT, 'verification', 'current-host-editorial-classifications.json'),
     path.join(root, 'verification', 'current-host-editorial-classifications.json'),
   ).catch((error) => { if (error.code !== 'ENOENT') throw error; });
+  const authorityRef = 'verification/current-host-authority-adjudications.json';
+  const authorityText = await fs.readFile(path.join(ROOT, authorityRef), 'utf8').catch((error) => {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  });
+  if (authorityText !== null) {
+    await fs.copyFile(path.join(ROOT, authorityRef), path.join(root, authorityRef));
+    const authority = JSON.parse(authorityText);
+    const refs = [authority.baseline?.path, ...(authority.artifacts || []).map((row) => row.path),
+      'verification/evidence/2026-09-09-host-authority-correction-attempt-01/current-static-checks-01.json'].filter(Boolean);
+    for (const ref of new Set(refs)) {
+      const source = path.join(ROOT, ref); const destination = path.join(root, ref);
+      await fs.mkdir(path.dirname(destination), { recursive: true });
+      await fs.copyFile(source, destination);
+    }
+  }
   const connection = JSON.parse(await fs.readFile(path.join(ROOT, 'verification', 'current-host-connection-adjudications.json'), 'utf8'));
   for (const artifact of connection.artifacts) {
     const source = path.join(ROOT, artifact.path); const destination = path.join(root, artifact.path);
@@ -126,6 +146,24 @@ async function fixtureRoot() {
   await fs.mkdir(path.join(root, 'scripts'), { recursive: true });
   await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_install_evidence_intake.mjs'),
     path.join(root, 'scripts', 'current_host_install_evidence_intake.mjs'));
+  await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_authority_scan.mjs'), path.join(root, 'scripts', 'current_host_authority_scan.mjs'));
+  await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_terms_binding.mjs'), path.join(root, 'scripts', 'current_host_terms_binding.mjs'));
+  await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_jurisdiction.mjs'), path.join(root, 'scripts', 'current_host_jurisdiction.mjs'));
+  await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_review_cleanup.mjs'), path.join(root, 'scripts', 'current_host_review_cleanup.mjs')).catch(error => { if (error.code !== 'ENOENT') throw error; });
+  await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_review_transition.mjs'), path.join(root, 'scripts', 'current_host_review_transition.mjs'));
+  await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_payout_provider_correction.mjs'), path.join(root, 'scripts', 'current_host_payout_provider_correction.mjs'));
+  await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_clarification.mjs'), path.join(root, 'scripts', 'current_host_clarification.mjs'));
+  await fs.copyFile(path.join(ROOT, 'scripts', 'host_review_reader_copy.mjs'), path.join(root, 'scripts', 'host_review_reader_copy.mjs'));
+  await fs.copyFile(path.join(ROOT, 'scripts', 'host_review_work_queue.mjs'), path.join(root, 'scripts', 'host_review_work_queue.mjs'));
+  const scanPath = 'verification/current-host-authority-scan.json';
+  const scan = await fs.readFile(path.join(ROOT, scanPath), 'utf8').then(JSON.parse).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+  if (scan) {
+    const snapshot = JSON.parse(await fs.readFile(path.join(ROOT, scan.source_snapshot.path), 'utf8'));
+    for (const item of snapshot.records) {
+      const destination = path.join(root, item.path); await fs.mkdir(path.dirname(destination), {recursive: true}); await fs.copyFile(path.join(ROOT, item.snapshot), destination);
+    }
+    await fs.copyFile(path.join(ROOT, scan.baseline.path),path.join(root,'verification/current-host-docs-review.json'));
+  }
   await fs.copyFile(path.join(ROOT, 'verification', 'current-host-install-evidence-intake.json'),
     path.join(root, 'verification', 'current-host-install-evidence-intake.json'));
   await fs.mkdir(path.join(root, 'verification', 'evidence', '2026-09-08-h100x4-install-history-attempt-01'), { recursive: true });
@@ -169,7 +207,7 @@ async function fixtureRoot() {
     path.join(ROOT, 'verification', 'evidence', '2026-09-09-h100x4-direct-install-attempt-02', item),
     path.join(root, 'verification', 'evidence', '2026-09-09-h100x4-direct-install-attempt-02', item),
   );
-  const packageData = JSON.parse(await fs.readFile(path.join(ROOT, 'verification', 'current-host-docs-review.json'), 'utf8'));
+  const packageData = JSON.parse(await fs.readFile(PACKAGE, 'utf8'));
   const historicalArtifacts = new Set(packageData.pages.flatMap((page) => page.claims)
     .flatMap((claim) => claim.evidence_refs)
     .map((ref) => ref.artifact_ref)
@@ -195,6 +233,9 @@ async function startContextServer(root) {
     // A valid current package performs integrity checks over every retained
     // source/evidence reference before the server starts listening.
     for (let attempt = 0; attempt < 600; attempt += 1) {
+      if (child.exitCode !== null || child.signalCode !== null) {
+        throw new Error(`review server exited early (${child.exitCode ?? child.signalCode})\n${output}`);
+      }
       try {
         const response = await fetch(`http://127.0.0.1:${port}/__review__/api/context?path=${encodeURIComponent(route)}`);
         if (response.ok) return await response.json();
@@ -405,7 +446,7 @@ test('the VM correction remains a historical FAIL transition while the search re
 
 test('six hash-pinned connection rows expose only their bounded outcomes and direct evidence', async () => {
   const model = JSON.parse(await fs.readFile(PACKAGE, 'utf8'));
-  assert.deepEqual(model.counts.claim_statuses, { BLOCKED: 23, FAIL: 149, NOT_APPLICABLE: 4, PASS: 194, UNVALIDATED: 1635 });
+  assert.deepEqual(model.counts.claim_statuses, { BLOCKED: 23, FAIL: 151, NOT_APPLICABLE: 4, PASS: 204, UNVALIDATED: 1631 });
   await withFixture(async () => {}, '/host/first-24-hours', async (context) => {
     const expected = new Map([
       ['COR-01-MCL-323c8fb8180f5f62-REPLACEMENT', 'PASS'], ['MCL-4c49eaf437cfa29e', 'PASS'],
@@ -445,10 +486,87 @@ test('connection registry, bound artifact, and projected status tampering fail c
   }, '/host/first-24-hours', async (context) => assert.equal(context.currentReview.available, false));
 });
 
+test('authority transition admits only its exact agreement atoms and keeps partial citations failed', async () => {
+  await withFixture(async () => {}, '/host/hosting-agreement', async (context) => {
+    assert.equal(context.currentReview.available, true, context.currentReview.unavailableReason);
+    const atom = context.currentReview.page.claims.find((claim) => claim.id === 'AUTH-DATA-SECURITY-01');
+    const data = context.currentReview.page.claims.find((claim) => claim.id === 'MCL-f855ff5e92cfbec1');
+    assert.equal(atom.status, 'PASS');
+    assert.equal(data.status, 'PASS');
+    assert.equal(atom.sourceRefs[0].locator, 'INTELLECTUAL PROPERTY AND DATA SECURITY');
+  });
+  await withFixture(async () => {}, '/host/workload-policy', async (context) => {
+    const partial = context.currentReview.page.claims.find((claim) => claim.id === 'MCL-8fe2020c0e7efe26');
+    assert.equal(partial.status, 'FAIL');
+    assert.deepEqual(partial.requiredEvidenceTypes, [
+      'RUNTIME_OR_UI_OBSERVATION', 'ACCOUNTABLE_OWNER_CONFIRMATION', 'AUTHORITATIVE_DOCUMENTATION_CITATION',
+    ]);
+  });
+});
+
+test('authority predecessor proof opens with exact current context and rejects unbound claims', async () => {
+  const root = await fixtureRoot();
+  try {
+    const server = await startContextServer(root);
+    try {
+      const context = await server.context('/host/hosting-overview');
+      assert.equal(context.currentReview.available, true);
+      const ref = 'verification/evidence/2026-09-09-host-authority-correction-attempt-01/pre-authority-current-host-docs-review.json';
+      const url = new URL('/__review__/current-artifact', server.origin);
+      for (const [key, value] of Object.entries({ref, page: '/host/hosting-overview', claim: 'MCL-508003945b6ef934'})) url.searchParams.set(key, value);
+      const response = await fetch(url);
+      assert.equal(response.status, 200);
+      const html = await response.text();
+      assert.match(html, /<blockquote>- Minimum GPU count \(`min_chunk`\)\.<\/blockquote>/);
+      assert.match(html, /Frozen predecessor wording and status only/);
+      assert.match(html, /Minimum GPU size/);
+      url.searchParams.set('claim', 'NOT-AN-AUTHORITY-CLAIM');
+      assert.equal((await fetch(url)).status, 404);
+      url.searchParams.set('page', '/host/workload-policy');
+      url.searchParams.set('claim', 'MCL-508003945b6ef934');
+      assert.equal((await fetch(url)).status, 404);
+    } finally { await server.stop(); }
+  } finally { await fs.rm(fixtureContainer(root), {recursive: true, force: true}); }
+});
+
+test('authority registry and jointly altered captured agreement fail closed', async () => {
+  await withFixture(async (root) => {
+    const registryPath = path.join(root, 'verification/current-host-authority-adjudications.json');
+    const registry = JSON.parse(await fs.readFile(registryPath, 'utf8'));
+    const agreement = registry.artifacts.find((artifact) => artifact.id === 'agreement');
+    const agreementPath = path.join(root, agreement.path);
+    const capture = JSON.parse(await fs.readFile(agreementPath, 'utf8'));
+    capture.sections[0].text_sha256 = '0'.repeat(64);
+    const captureBytes = Buffer.from(JSON.stringify(capture));
+    agreement.sha256 = crypto.createHash('sha256').update(captureBytes).digest('hex');
+    await fs.writeFile(agreementPath, captureBytes);
+    await fs.writeFile(registryPath, JSON.stringify(registry));
+  }, '/host/hosting-agreement', async (context) => assert.equal(context.currentReview.available, false));
+});
+
+test('authority post-claim literal and agreement heading substitutions fail closed', async () => {
+  await withFixture(async (root) => {
+    const modelPath = path.join(root, 'verification/current-host-docs-review.json');
+    const model = JSON.parse(await fs.readFile(modelPath, 'utf8'));
+    const claim = model.pages.find((page) => page.route === '/host/hosting-agreement').claims
+      .find((item) => item.id === 'AUTH-DATA-SECURITY-01');
+    claim.text = claim.text.replace('reasonable safeguards', 'absolute safeguards');
+    await fs.writeFile(modelPath, JSON.stringify(model));
+  }, '/host/hosting-agreement', async (context) => assert.equal(context.currentReview.available, false));
+  await withFixture(async (root) => {
+    const modelPath = path.join(root, 'verification/current-host-docs-review.json');
+    const model = JSON.parse(await fs.readFile(modelPath, 'utf8'));
+    const claim = model.pages.find((page) => page.route === '/host/hosting-agreement').claims
+      .find((item) => item.id === 'MCL-f855ff5e92cfbec1');
+    claim.source_refs[0].locator = 'PERFORMANCE OF SERVICES';
+    await fs.writeFile(modelPath, JSON.stringify(model));
+  }, '/host/hosting-agreement', async (context) => assert.equal(context.currentReview.available, false));
+});
+
 test('current citation-lane FAIL records are counted independently of the legacy verification reader', async () => {
   await withFixture(async () => {}, '/host/guide-to-taxes', async (context) => {
     assert.equal(context.currentReview.available, true, context.currentReview.unavailableReason);
-    assert.equal(context.currentReview.citationDefects.total, 149);
+    assert.equal(context.currentReview.citationDefects.total, 149 - 4 + 6);
     const citation = context.currentReview.page.claims.filter((claim) => claim.status === 'FAIL' &&
       claim.requiredEvidenceTypes.includes('AUTHORITATIVE_DOCUMENTATION_CITATION'));
     assert.equal(citation.length, context.currentReview.citationDefects.page);
@@ -462,10 +580,10 @@ test('current citation-lane FAIL records are counted independently of the legacy
   });
 });
 
-test('the two-defect transition remains exact beneath the six-row connection projection and preserves 149 citation FAILs', async () => {
+test('the two-defect transition remains exact beneath connection and authority projections', async () => {
   await withFixture(async () => {}, '/host/first-24-hours', async (context) => {
     assert.equal(context.currentReview.available, true, context.currentReview.unavailableReason);
-    assert.equal(context.currentReview.citationDefects.total, 149);
+    assert.equal(context.currentReview.citationDefects.total, 151);
     const replacement = context.currentReview.page.claims.find((claim) => claim.id === 'COR-01-MCL-323c8fb8180f5f62-REPLACEMENT');
     assert.equal(replacement.status, 'PASS');
     assert.equal(replacement.history.carryDecision, 'CURRENT_HOST_CONNECTION_RUNTIME_ADJUDICATION');
@@ -532,7 +650,8 @@ test('the correction panel helper is in the shared overlay scope with a browser-
   const evidenceStart = source.indexOf('  function currentEvidenceRefs(refs, page, claim) {');
   assert.ok(helperStart > 0 && helperStart < evidenceStart && evidenceStart < currentReviewStart);
   const helper = source.slice(helperStart, evidenceStart);
-  assert.match(helper, /TWO_DEFECT_TRANSITION_ARTIFACT/);
+  assert.doesNotMatch(helper, /Original finding|Open frozen|Open bounded authority registry/);
+  assert.match(helper, /What the source proves/);
   assert.doesNotMatch(helper, /encodeURIComponent\(TWO_DEFECT_TRANSITION\)/);
   assert.match(source.slice(currentReviewStart), /sourceTransitionHtml\(sourceTransition, page, claim\)/);
   assert.match(source, /var TWO_DEFECT_TRANSITION_ARTIFACT = 'verification\/current-two-defect-transition\.json';/);
@@ -586,7 +705,8 @@ test('four direct post-install runtime claims open only their selected postcheck
         const html = await response.text();
         assert.match(html, new RegExp(`Selected runtime observation ${postcheck}`));
         assert.match(html, new RegExp(predicate));
-        assert.match(html, /Open runtime adjudication record/);
+        assert.doesNotMatch(html, /Open runtime adjudication record|Original finding/);
+        assert.match(html, /Selected post-install command output/);
       }
       const wrong = await fetch(`${server.origin}/__review__/current-artifact?ref=${encodeURIComponent('verification/evidence/2026-09-09-h100x4-direct-install-attempt-02/postcheck-02.json')}&page=/host/installing-host-software&claim=MCL-ead93c85c2ff4168&postcheck=POST-01`);
       assert.equal(wrong.status, 404);

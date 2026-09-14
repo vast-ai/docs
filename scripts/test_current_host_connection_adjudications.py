@@ -7,6 +7,7 @@ import json
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from scripts.test_current_host_authority_scan import frozen_source_reader
 
 
 HERE = Path(__file__).resolve().parent
@@ -19,6 +20,9 @@ SPEC.loader.exec_module(gate)
 class ConnectionAdjudicationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        fixture_read=patch.object(gate,'_read',side_effect=frozen_source_reader(gate._read))
+        fixture_read.start()
+        cls.addClassCleanup(fixture_read.stop)
         cls.registry = gate.validate()
         # The builder's output is intentionally post-binding.  Exercise the
         # importer against the registry's immutable pre-binding projection so

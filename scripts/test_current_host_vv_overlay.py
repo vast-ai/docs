@@ -8,6 +8,7 @@ import copy
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from scripts.test_current_host_authority_scan import historical_overlay
 
 
 SCRIPT = Path(__file__).with_name("build_current_host_vv_overlay.py")
@@ -20,6 +21,17 @@ SPEC.loader.exec_module(overlay)
 class CurrentHostReviewPackageTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        global overlay
+        overlay=historical_overlay()
+        # The dated producer fixture restores the phase-43 source population;
+        # it intentionally exercises the pre-Terms/pre-jurisdiction path and
+        # must not discover later registries against those frozen bytes.
+        (overlay.REPO/'verification/current-host-terms-binding.json').unlink(missing_ok=True)
+        (overlay.REPO/'verification/current-host-jurisdiction.json').unlink(missing_ok=True)
+        (overlay.REPO/'verification/current-host-review-cleanup.json').unlink(missing_ok=True)
+        (overlay.REPO/'verification/current-host-payout-provider-correction.json').unlink(missing_ok=True)
+        (overlay.REPO/'verification/current-host-payout-terms-correction.json').unlink(missing_ok=True)
+        (overlay.REPO/'verification/current-host-payout-invoice-correction.json').unlink(missing_ok=True)
         cls.package = overlay.build()
 
     def test_scope_and_support_layers_are_complete(self) -> None:
@@ -36,13 +48,21 @@ class CurrentHostReviewPackageTests(unittest.TestCase):
 
     def test_current_carry_forward_requires_exact_source_identity(self) -> None:
         pages = {page["route"]: page for page in self.package["pages"]}
-        self.assertEqual(pages["/host/hosting-overview"]["coverage_state"], "UNCHANGED_EXACT")
+        overview = pages["/host/hosting-overview"]
+        self.assertEqual(overview["coverage_state"], "CHANGED")
+        self.assertEqual(overview["source_sha256"], "3d64b0bcfba203133725d654d1bb4c462b7ab8cfb577e94fcba3c37ffcf80ec3")
+        authority = {item["scope"]: item for item in self.package["corrections"] if item["id"].startswith("AUTHORITY-")}
+        authority_claims = {claim["id"] for claim in overview["claims"]
+                            if claim["history"]["carry_decision"] == "CURRENT_HOST_AUTHORITY_SOURCE_TRANSITION"}
+        self.assertTrue({"MCL-508003945b6ef934", "MCL-c85a4e96752730ab", "MCL-437e58c77dcafecc", "MCL-943ba22ec56a356a",
+                         "MCL-805ef8a72833f2b8", "MCL-3cfe1a3c265f0223", "MCL-ed68c47bda19e986"} <= authority_claims)
+        self.assertEqual(authority["MCL-508003945b6ef934"]["current"], "PASS")
         self.assertEqual(pages["/host/guide-to-taxes"]["coverage_state"], "CHANGED")
         self.assertEqual(pages["/host/machine-metrics"]["coverage_state"], "NEW")
         for claim in pages["/host/guide-to-taxes"]["claims"]:
             self.assertNotEqual(claim["history"]["carry_decision"], "CARRIED_FORWARD_EXACT_SOURCE")
-        carried = pages["/host/hosting-overview"]["claims"]
-        self.assertTrue(any(item["history"]["carry_decision"] == "CARRIED_FORWARD_EXACT_SOURCE" for item in carried))
+        self.assertFalse(any(item["history"]["carry_decision"] == "CARRIED_FORWARD_EXACT_SOURCE"
+                             for item in overview["claims"]))
 
     def test_vol_c35_current_scope_is_composite_and_retested(self) -> None:
         volume = next(page for page in self.package["pages"] if page["route"] == "/host/volume-offers")

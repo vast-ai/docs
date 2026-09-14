@@ -1,0 +1,126 @@
+---
+title: "How to Self-Test"
+sidebarTitle: "How to Self-Test"
+createdAt: "Mon Nov 25 2025 00:00:00 GMT+0000 (Coordinated Universal Time)"
+updatedAt: "Mon Nov 25 2025 00:00:00 GMT+0000 (Coordinated Universal Time)"
+"canonical": "/host/how-to-self-test"
+personas:
+  - pro-operator
+  - headless-operator
+---
+
+<div className="persona-chips"><span className="persona-chip">Pro Operator</span><span className="persona-chip">Headless / DC</span></div>
+
+Self-test checks whether a listed host is ready for verification and temporary diagnostic rentals.
+
+<Note>
+Passing self-test makes a machine eligible for verification. It does not guarantee verification, search placement, or rentals.
+</Note>
+
+## Before You Run It
+
+- Install the [Vast CLI](https://cloud.vast.ai/cli/), then follow [CLI Hello World](/cli/hello-world) to authenticate and verify the installation. For host-oriented command guidance, see [Host CLI/API/SDK](/host/cli-api-sdk).
+- Set the API key for the host-enabled account that owns the machine. For host key guidance, see [Host Account Security](/host/account-security-for-hosts).
+- List the machine.
+- Make sure no client is actively renting it.
+- Run from outside the host LAN when testing ports, such as a cloud VM or mobile connection. Same-LAN tests can be confused by NAT hairpinning.
+
+```bash
+vastai set api-key <API_KEY>
+```
+
+<span id="what-the-self-test-checks" aria-hidden="true" />
+## What Self-Test Checks
+
+The CLI first checks listing requirements. If preflight passes, it rents a temporary diagnostic instance, starts the self-test image, polls progress, reports results, and destroys the instance.
+
+Before renting the temporary diagnostic instance, the CLI checks whether the machine can be tested at all:
+
+- The machine has a rentable offer.
+- The API key can inspect the machine and offer.
+- Reliability is greater than `0.90`.
+- CUDA compatibility is `>= 11.8`.
+- Direct ports are at least 3 ports per listed GPU.
+- PCIe bandwidth is greater than 2.85 GB/s.
+- Upload/download bandwidth meet the VRAM-scaled requirement.
+- GPU VRAM is greater than 7 GB per GPU.
+- System RAM is close to total GPU VRAM, capped around 2 TB for very high-VRAM machines.
+
+These are the same gates as the platform verification requirements. The canonical list lives in [Verification Stages: requirements](/host/verification-stages#additional-requirements-for-verification); if the numbers here ever differ, that page wins.
+
+Inside the temporary self-test image, checks include:
+
+- HTTPS progress endpoint reachability.
+- UDP echo on the mapped UDP port.
+- PyTorch/CUDA import and GPU visibility.
+- Each GPU has at least 98% free VRAM.
+- Enough host RAM is available.
+- At least one visible physical CPU core per visible GPU.
+- CUDA ResNet workload across all visible GPUs.
+- GPU memory allocation, including ECC-capable memory allocation checks where applicable.
+- NCCL initialization and synchronization across visible GPUs; see [`nccl_failed`](/host/self-test-reference#nccl-failed) if this stage fails.
+- `stress-ng` and `gpu-burn` running together for 60 seconds.
+
+Hyperthreads and logical CPUs do not count as physical cores.
+
+## Run The Test
+
+<Frame caption="The Machines list exposes the Test machine action for a listed host.">
+  ![Test machine action in the Machines list](/images/host-self-test-machine-menu.webp)
+</Frame>
+
+<Frame caption="Self-Test confirmation dialog before starting the diagnostic run.">
+  ![Self-Test confirmation dialog](/images/host-self-test-status.webp)
+</Frame>
+
+Run:
+
+```bash
+vastai self-test machine <machine_id>
+```
+
+To choose where failure bundles are saved:
+
+```bash
+vastai self-test machine <machine_id> \
+  --support-bundle-dir /path/to/output
+```
+
+Do not paste API keys or account-specific commands into public channels.
+
+If the test passes, the CLI reports success.
+
+If it fails, look up the exact error in the [Self-Test Reference](/host/self-test-reference), fix the cause, and rerun.
+
+## Machine Not Found Or Not Rentable
+
+Check:
+
+- The machine is listed.
+- There are active offers.
+- The account owns the machine.
+- Reliability is above the gate unless using diagnostic mode.
+- The Machines page has no red errors.
+- Upload speed, download speed, RAM, and ports are populated.
+
+See [Self-Test Reference: machine not rentable](/host/self-test-reference#machine-not-rentable).
+
+## Fresh Install Self-Test
+
+The installer can start self-test automatically after the daemon comes online. On a fresh host, it may wait about 10 minutes before listing the machine and starting the temporary diagnostic instance.
+
+On the host, watch only for the planned self-test window; press `Ctrl+C` when the self-test ends and confirm that `tail` exits:
+
+```bash
+sudo tail -f /var/lib/vastai_kaalia/self_test.log
+```
+
+If reliability is still `<= 0.90`, the installer may run with `--ignore-requirements` as a diagnostic. That does not qualify the machine for verification.
+
+## Ignore Requirements Mode
+
+Use `--ignore-requirements` only to diagnose rentability or runtime behavior. A pass in this mode does not mean the machine meets verification requirements.
+
+<Warning>
+Even with `--ignore-requirements`, the machine still needs at least three direct open ports or self-test can fail.
+</Warning>

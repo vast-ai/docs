@@ -29,6 +29,7 @@ RUNTIME_REGISTER = REPO / "verification/current-runtime-operator-blockers.md"
 OWNER_REGISTER = REPO / "verification/current-source-owner-blockers.md"
 STATIC_EVIDENCE = REPO / "verification/evidence/2026-09-07-host-current-vv-attempt-01/current-static-checks.json"
 TWO_DEFECT_STATIC_EVIDENCE = REPO / "verification/evidence/2026-09-09-host-two-defects-citation-review-attempt-01/current-static-transition-checks-01.json"
+AUTHORITY_STATIC_EVIDENCE = REPO / "verification/evidence/2026-09-09-host-authority-correction-attempt-01/current-static-checks-01.json"
 CORRECTION_INPUT = REPO / "verification/current-host-claim-corrections.json"
 EDITORIAL_INPUT = REPO / "verification/current-host-editorial-classifications.json"
 LIVE_ADJUDICATION_INPUT = REPO / "verification/current-host-live-adjudications.json"
@@ -723,6 +724,10 @@ def support_layers() -> list[dict[str, Any]]:
 
 
 def worklist(package: dict[str, Any]) -> tuple[str, str, str]:
+    source_first = bool(package.get('history', {}).get('authority_scan'))
+    cleanup_active = any(item.get('id') == 'HOST-REVIEW-CLEANUP-01' for item in package.get('corrections', []))
+    cleanup_handover = ('[Cleanup review result](evidence/2026-09-11-host-review-cleanup-attempt-01/result.md) records the bounded repository-local editorial checks; it does not add product proof.\n\n'
+                       if cleanup_active else '')
     pairs = [(page, claim) for page in package["pages"] for claim in page["claims"]]
     unresolved = [(page, claim) for page, claim in pairs if claim["status"] not in {"PASS", "NOT_APPLICABLE"}]
     table = ["# Current Host Docs claim worklist", "", "Current-source claims requiring proof or correction. Historical evidence is carried only where exact source identity is recorded.", "",
@@ -744,27 +749,37 @@ def worklist(package: dict[str, Any]) -> tuple[str, str, str]:
             table.extend([f"### [{heading}](http://127.0.0.1:4000{page['route']}{anchor}) — `{claim['id']}`", "",
                           f"**Status:** {claim['status']}", "", f"**Literal source text:** {quote}", "",
                           f"**Required proof:** {proof}", "", f"**Existing proof / limit:** {refs}", "",
-                          f"**Owner:** {claim['owner_role']}", "", f"**Next:** {claim['next_action']}", ""])
-    runtime = ["# Current runtime/operator blockers", "", "Only claims requiring an authorized runtime or UI observation are listed. Status headings are dispositions, not a claim that every row is blocked.", ""]
-    owners = ["# Current source-owner blockers", "", "Claims requiring source or accountable-owner evidence are listed. Status headings are dispositions, not a claim that every row is blocked.", ""]
+                          f"**{'Responsible role' if source_first else 'Owner'}:** {claim['owner_role']}", "", f"**Next:** {claim['next_action']}", ""])
+    runtime = ["# Runtime/operator review work", "", cleanup_handover.rstrip(), "Only claims requiring an authorized runtime or UI observation are listed. Status headings are dispositions, not a claim that every row is blocked.", ""]
+    owners = ["# Source/citation review work", "", cleanup_handover.rstrip(), "Claims requiring source or accountable-owner evidence are listed. Status headings are dispositions, not a claim that every row is blocked.", ""]
+    if source_first:
+        owners = ['# Source/citation review work', '',
+                  'Inspect available canonical implementation, configuration, captured UI and applicable published authority first. Missing evidence is not proof that an owner or source is unavailable. A fresh owner decision is reserved for an actual unavailable source, ambiguity, conflict or new decision.', '',
+                  'Existing-source review and genuine decision requirements are separated below. Status headings are claim dispositions; they do not make every source review a blocker.', '']
     for status in ("BLOCKED", "FAIL", "UNVALIDATED"):
         runtime_rows: list[str] = []
         owner_rows: list[str] = []
+        decision_rows: list[str] = []
         for page, claim in unresolved:
             if claim["status"] != status:
                 continue
             quote = claim["text"].replace("\n", " ")
             heading = claim["headings"][0] if claim["headings"] else "Introduction"
             anchor = "" if heading == "Introduction" else "#" + re.sub(r"[^a-z0-9]+", "-", heading.casefold()).strip("-")
-            row = f"- [{page['title']} — {heading}](http://127.0.0.1:4000{page['route']}{anchor}) — `{claim['id']}` — “{quote}” — **Owner:** {claim['owner_role']}. **Required:** {', '.join(claim['required_evidence_types'])}. **Next:** {claim['next_action']}"
+            row = f"- [{page['title']} — {heading}](http://127.0.0.1:4000{page['route']}{anchor}) — `{claim['id']}` — “{quote}” — **{'Responsible role' if source_first else 'Owner'}:** {claim['owner_role']}. **Required:** {', '.join(claim['required_evidence_types'])}. **Next:** {claim['next_action']}"
             if "RUNTIME_OR_UI_OBSERVATION" in claim["required_evidence_types"]:
                 runtime_rows.append(row)
-            if any(item in claim["required_evidence_types"] for item in ("CANONICAL_IMPLEMENTATION_SOURCE", "ACCOUNTABLE_OWNER_CONFIRMATION", "AUTHORITATIVE_DOCUMENTATION_CITATION")):
+            if source_first and 'ACCOUNTABLE_OWNER_CONFIRMATION' in claim['required_evidence_types']:
+                decision_rows.append(row)
+            elif any(item in claim["required_evidence_types"] for item in ("CANONICAL_IMPLEMENTATION_SOURCE", "ACCOUNTABLE_OWNER_CONFIRMATION", "AUTHORITATIVE_DOCUMENTATION_CITATION")):
                 owner_rows.append(row)
+        label = "Prerequisite unavailable" if status == "BLOCKED" else status
         if runtime_rows:
-            runtime.extend([f"## {status}", *runtime_rows, ""])
+            runtime.extend([f"## {label}", *runtime_rows, ""])
         if owner_rows:
-            owners.extend([f"## {status}", *owner_rows, ""])
+            owners.extend([f"## {label}" + (' — Existing-source review' if source_first else ''), *owner_rows, ""])
+        if decision_rows:
+            owners.extend([f'## {label} — Explicit decision or unresolved authority gap', *decision_rows, ''])
     return "\n".join(table).rstrip() + "\n", "\n".join(runtime).rstrip() + "\n", "\n".join(owners).rstrip() + "\n"
 
 
@@ -869,6 +884,14 @@ def _build_with_transition_projection() -> tuple[dict[str, Any], list[dict[str, 
         pages.append({"route": route, "title": title, "source_file": source_file, "source_sha256": source_hash,
                       "dependencies": deps, "coverage_state": coverage, "claims": claims, "procedures": procedures})
     apply_live_endpoint_adjudications(pages)
+    # This transition is source-scoped to four reviewed pages.  It restores
+    # exact unchanged literals from the frozen pre-authority projection before
+    # any downstream adjudication needs their stable claim identity.
+    authority_spec = importlib.util.spec_from_file_location("current_host_authority_adjudications",
+        Path(__file__).with_name("current_host_authority_adjudications.py"))
+    authority_module = importlib.util.module_from_spec(authority_spec)
+    authority_spec.loader.exec_module(authority_module)
+    correction_summaries.extend(authority_module.apply_current_host_authority_adjudications(pages, REPO))
     product_spec = importlib.util.spec_from_file_location("current_host_product_publications",
         Path(__file__).with_name("current_host_product_publications.py"))
     product_module = importlib.util.module_from_spec(product_spec)
@@ -948,11 +971,201 @@ def build() -> dict[str, Any]:
     The transition projection is an internal output-only snapshot: it must not
     change this established builder API or leak into the public JSON package.
     """
+    payout_invoice = payout_invoice_module()
+    if (REPO / payout_invoice.REGISTRY).exists():
+        return payout_invoice.project(REPO)
+    payout_terms = payout_terms_module()
+    if (REPO / payout_terms.REGISTRY).exists():
+        return payout_terms.project(REPO)
+    payout = payout_provider_module()
+    if (REPO / payout.REGISTRY).exists():
+        return payout.project(REPO)
+    cleanup = cleanup_module()
+    if (REPO / cleanup.REGISTRY).exists():
+        return cleanup.project(REPO)
+    jurisdiction = jurisdiction_module()
+    if (REPO / jurisdiction.REGISTRY).exists():
+        return jurisdiction.project(REPO)
+    terms = terms_module()
+    if (REPO / terms.REGISTRY).exists():
+        return terms.project(REPO)
+    scan = authority_scan_module()
+    predecessor = scan.project(REPO) if (REPO / scan.REGISTRY).exists() else None
+    clarification = clarification_module()
+    if (REPO / clarification.REGISTRY).exists():
+        return clarification.project(REPO)
+    if predecessor is not None:
+        return predecessor
     package, _ = _build_with_transition_projection()
     return package
 
 
+def authority_scan_module() -> Any:
+    """Load the additive adapter without changing historical phase validators."""
+    spec = importlib.util.spec_from_file_location('current_host_authority_scan',
+        Path(__file__).with_name('current_host_authority_scan.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def clarification_module() -> Any:
+    """Load the additive clarification reader; its project re-validates phase 43."""
+    spec = importlib.util.spec_from_file_location('current_host_clarification',
+        Path(__file__).with_name('current_host_clarification.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def terms_module() -> Any:
+    spec = importlib.util.spec_from_file_location('current_host_terms_binding',
+        Path(__file__).with_name('current_host_terms_binding.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def jurisdiction_module() -> Any:
+    spec = importlib.util.spec_from_file_location('current_host_jurisdiction',
+        Path(__file__).with_name('current_host_jurisdiction.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def cleanup_module() -> Any:
+    """Load the newest fail-closed editorial cleanup projection."""
+    spec = importlib.util.spec_from_file_location('current_host_review_cleanup',
+        Path(__file__).with_name('current_host_review_cleanup.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def payout_provider_module() -> Any:
+    """Load the latest hash-bound Payout Account correction above cleanup."""
+    spec = importlib.util.spec_from_file_location('current_host_payout_provider_correction',
+        Path(__file__).with_name('current_host_payout_provider_correction.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+def payout_terms_module() -> Any:
+    spec = importlib.util.spec_from_file_location('current_host_payout_terms_correction',
+        Path(__file__).with_name('current_host_payout_terms_correction.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+def payout_invoice_module() -> Any:
+    spec = importlib.util.spec_from_file_location('current_host_payout_invoice_correction',
+        Path(__file__).with_name('current_host_payout_invoice_correction.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def classify_literal_source_first(source_file: str, text: str) -> tuple[str, list[str], bool]:
+    """Exact reviewed current classifier shared with repository reconciliation."""
+    payout_invoice = payout_invoice_module()
+    if (REPO / payout_invoice.REGISTRY).exists():
+        model = payout_invoice.project(REPO)
+        matches = [claim for page in model['pages'] for claim in page['claims'] if claim['text'] == text and any(span['source_file'] == source_file for span in claim['spans'])]
+        if not matches: raise ValueError('payout/invoice correction classification has no exact reviewed occurrence')
+        values = {(claim['classification'], tuple(claim['required_evidence_types'])) for claim in matches}
+        if len(values) != 1: raise ValueError('same literal has differing payout/invoice classifications; select exact claim ID')
+        classification, lanes = next(iter(values)); return classification, list(lanes), 'AUTHORITATIVE_DOCUMENTATION_CITATION' in lanes
+    payout_terms = payout_terms_module()
+    if (REPO / payout_terms.REGISTRY).exists():
+        model = payout_terms.project(REPO)
+        matches = [claim for page in model['pages'] for claim in page['claims'] if claim['text'] == text and any(span['source_file'] == source_file for span in claim['spans'])]
+        if not matches: raise ValueError('payout Terms correction classification has no exact reviewed occurrence')
+        values = {(claim['classification'], tuple(claim['required_evidence_types'])) for claim in matches}
+        if len(values) != 1: raise ValueError('same literal has differing payout Terms classifications; select exact claim ID')
+        classification, lanes = next(iter(values)); return classification, list(lanes), 'AUTHORITATIVE_DOCUMENTATION_CITATION' in lanes
+    payout = payout_provider_module()
+    if (REPO / payout.REGISTRY).exists():
+        model = payout.project(REPO)
+        matches = [claim for page in model['pages'] for claim in page['claims'] if claim['text'] == text and any(span['source_file'] == source_file for span in claim['spans'])]
+        if not matches: raise ValueError('payout correction classification has no exact reviewed occurrence')
+        values = {(claim['classification'], tuple(claim['required_evidence_types'])) for claim in matches}
+        if len(values) != 1: raise ValueError('same literal has differing payout classifications; select exact claim ID')
+        classification, lanes = next(iter(values)); return classification, list(lanes), 'AUTHORITATIVE_DOCUMENTATION_CITATION' in lanes
+    cleanup = cleanup_module()
+    if (REPO / cleanup.REGISTRY).exists():
+        model = cleanup.project(REPO)
+        matches = [claim for page in model['pages'] for claim in page['claims'] if claim['text'] == text and any(span['source_file'] == source_file for span in claim['spans'])]
+        if not matches: raise ValueError('cleanup classification has no exact reviewed occurrence')
+        values = {(claim['classification'], tuple(claim['required_evidence_types'])) for claim in matches}
+        if len(values) != 1: raise ValueError('same literal has differing cleanup classifications; select exact claim ID')
+        classification, lanes = next(iter(values)); return classification, list(lanes), 'AUTHORITATIVE_DOCUMENTATION_CITATION' in lanes
+    jurisdiction = jurisdiction_module()
+    if (REPO / jurisdiction.REGISTRY).exists():
+        model = jurisdiction.project(REPO)
+        matches = [claim for page in model['pages'] for claim in page['claims'] if claim['text'] == text and any(span['source_file'] == source_file for span in claim['spans'])]
+        if not matches: raise ValueError('jurisdiction classification has no exact reviewed occurrence')
+        values = {(claim['classification'], tuple(claim['required_evidence_types'])) for claim in matches}
+        if len(values) != 1: raise ValueError('same literal has differing jurisdiction classifications; select exact claim ID')
+        classification, lanes = next(iter(values)); return classification, list(lanes), 'AUTHORITATIVE_DOCUMENTATION_CITATION' in lanes
+    terms = terms_module()
+    if (REPO / terms.REGISTRY).exists():
+        model = terms.project(REPO)
+        matches = [claim for page in model['pages'] for claim in page['claims'] if claim['text'] == text and any(span['source_file'] == source_file for span in claim['spans'])]
+        if not matches: raise ValueError('Terms classification has no exact reviewed occurrence')
+        values = {(claim['classification'], tuple(claim['required_evidence_types'])) for claim in matches}
+        if len(values) != 1: raise ValueError('same literal has differing Terms classifications; select exact claim ID')
+        classification, lanes = next(iter(values)); return classification, list(lanes), 'AUTHORITATIVE_DOCUMENTATION_CITATION' in lanes
+    clarification = clarification_module()
+    if (REPO / clarification.REGISTRY).exists():
+        model = clarification.project(REPO)
+        matches = [claim for page in model['pages'] for claim in page['claims']
+                   if claim['text'] == text and any(span['source_file'] == source_file for span in claim['spans'])]
+        if not matches:
+            raise ValueError('clarification classification has no exact reviewed occurrence')
+        values = {(claim['classification'], tuple(claim['required_evidence_types'])) for claim in matches}
+        if len(values) != 1:
+            raise ValueError('same literal has differing clarification classifications; select exact claim ID')
+        classification, lanes = next(iter(values))
+        return classification, list(lanes), 'AUTHORITATIVE_DOCUMENTATION_CITATION' in lanes
+    return authority_scan_module().classify_occurrence(REPO, source_file, text)
+
+
 def outputs() -> dict[Path, bytes]:
+    payout_invoice = payout_invoice_module()
+    if (REPO / payout_invoice.REGISTRY).exists():
+        package=payout_invoice.project(REPO); worklist_md,runtime_md,owner_md=worklist(package)
+        return {OUT:(json.dumps(package,indent=2,ensure_ascii=False)+'\n').encode(),WORKLIST:worklist_md.encode(),RUNTIME_REGISTER:runtime_md.encode(),OWNER_REGISTER:owner_md.encode()}
+    payout_terms = payout_terms_module()
+    if (REPO / payout_terms.REGISTRY).exists():
+        package=payout_terms.project(REPO); worklist_md,runtime_md,owner_md=worklist(package)
+        return {OUT:(json.dumps(package,indent=2,ensure_ascii=False)+'\n').encode(),WORKLIST:worklist_md.encode(),RUNTIME_REGISTER:runtime_md.encode(),OWNER_REGISTER:owner_md.encode()}
+    payout = payout_provider_module()
+    if (REPO / payout.REGISTRY).exists():
+        package = payout.project(REPO); worklist_md, runtime_md, owner_md = worklist(package)
+        return {OUT:(json.dumps(package,indent=2,ensure_ascii=False)+'\n').encode(),WORKLIST:worklist_md.encode(),RUNTIME_REGISTER:runtime_md.encode(),OWNER_REGISTER:owner_md.encode()}
+    cleanup = cleanup_module()
+    if (REPO / cleanup.REGISTRY).exists():
+        package = cleanup.project(REPO); worklist_md, runtime_md, owner_md = worklist(package)
+        return {OUT:(json.dumps(package,indent=2,ensure_ascii=False)+'\n').encode(),WORKLIST:worklist_md.encode(),RUNTIME_REGISTER:runtime_md.encode(),OWNER_REGISTER:owner_md.encode()}
+    jurisdiction = jurisdiction_module()
+    if (REPO / jurisdiction.REGISTRY).exists():
+        package = jurisdiction.project(REPO); worklist_md, runtime_md, owner_md = worklist(package)
+        return {OUT:(json.dumps(package,indent=2,ensure_ascii=False)+'\n').encode(),WORKLIST:worklist_md.encode(),RUNTIME_REGISTER:runtime_md.encode(),OWNER_REGISTER:owner_md.encode()}
+    terms = terms_module()
+    if (REPO / terms.REGISTRY).exists():
+        package = terms.project(REPO); worklist_md, runtime_md, owner_md = worklist(package)
+        return {OUT:(json.dumps(package,indent=2,ensure_ascii=False)+'\n').encode(),WORKLIST:worklist_md.encode(),RUNTIME_REGISTER:runtime_md.encode(),OWNER_REGISTER:owner_md.encode()}
+    scan = authority_scan_module()
+    clarification = clarification_module()
+    if (REPO / clarification.REGISTRY).exists() or (REPO / scan.REGISTRY).exists():
+        package = clarification.project(REPO) if (REPO / clarification.REGISTRY).exists() else scan.project(REPO)
+        worklist_md, runtime_md, owner_md = worklist(package)
+        # Prior attempt artifacts belong to the prior target. A scan transition
+        # writes only current views; its independently retained tests stay frozen.
+        return {OUT:(json.dumps(package,indent=2,ensure_ascii=False)+'\n').encode(),
+                WORKLIST:worklist_md.encode(),RUNTIME_REGISTER:runtime_md.encode(),
+                OWNER_REGISTER:owner_md.encode()}
     package, transition_output_pages = _build_with_transition_projection()
     # Do not churn an evidence timestamp when the complete review identity is
     # unchanged.  A changed package receives its actual UTC generation time.
@@ -971,14 +1184,12 @@ def outputs() -> dict[Path, bytes]:
     for page in package["pages"]:
         for claim in page["claims"]:
             for evidence in claim["evidence_refs"]:
-                evidence.setdefault("artifact_ref", (
-                    "verification/host-docs-test-results.json"
-                    if evidence["role"] == "HISTORICAL_CARRY_FORWARD_EXACT_SOURCE"
-                    else "verification/current-host-docs-review.json"
-                ))
+                if not isinstance(evidence.get('artifact_ref'),str):
+                    raise ValueError('Missing artifact_ref; current model cannot substitute for retained evidence')
     for support in package["support_layers"]:
         for evidence in support["evidence_refs"]:
-            evidence.setdefault("artifact_ref", "verification/current-host-docs-review.json")
+            if not isinstance(evidence.get('artifact_ref'),str):
+                raise ValueError('Missing support artifact_ref; current model is not evidence')
     worklist_md, runtime_md, owner_md = worklist(package)
     static_record = static_evidence(package)
     frozen_static_bytes: bytes | None = None
@@ -994,20 +1205,16 @@ def outputs() -> dict[Path, bytes]:
         Path(__file__).with_name("current_two_defect_transition.py"))
     transition_module = importlib.util.module_from_spec(transition_spec)
     transition_spec.loader.exec_module(transition_module)
-    transition_static_record = static_evidence(package)
-    if TWO_DEFECT_STATIC_EVIDENCE.is_file():
-        prior_transition_static = json_load(TWO_DEFECT_STATIC_EVIDENCE)
-        # Package/evidence metadata may change without changing this static
-        # navigation/support inspection.  Freeze its original timestamp before
-        # comparison, while rejecting a changed inspection body.
-        transition_static_record["generated_at"] = prior_transition_static.get("generated_at")
-        if transition_static_record != prior_transition_static:
-            raise ValueError("Two-defect static evidence differs: create a new attempt, do not overwrite history")
-    two_defect_static_bytes = (json.dumps(transition_static_record, indent=2, ensure_ascii=False) + "\n").encode()
+    # The authority edits change four primary-source hashes.  Keep every prior
+    # static record byte-identical and retain this fresh deterministic check in
+    # the new correction attempt rather than relabelling an older inspection.
+    authority_static_bytes = (json.dumps(static_evidence(package), indent=2, ensure_ascii=False) + "\n").encode()
+    if AUTHORITY_STATIC_EVIDENCE.is_file() and AUTHORITY_STATIC_EVIDENCE.read_bytes() != authority_static_bytes:
+        raise ValueError("Authority static evidence differs; do not overwrite the retained correction-attempt record")
     return {OUT: (json.dumps(package, indent=2, ensure_ascii=False) + "\n").encode(), WORKLIST: worklist_md.encode(),
             RUNTIME_REGISTER: runtime_md.encode(), OWNER_REGISTER: owner_md.encode(),
             STATIC_EVIDENCE: frozen_static_bytes or (json.dumps(static_record, indent=2, ensure_ascii=False) + "\n").encode(),
-            TWO_DEFECT_STATIC_EVIDENCE: two_defect_static_bytes,
+            AUTHORITY_STATIC_EVIDENCE: authority_static_bytes,
             REPO / transition_module.REGISTRY: transition_module.output_bytes(transition_output_pages, REPO)}
 
 

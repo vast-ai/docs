@@ -1,0 +1,17 @@
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+const dir='verification/evidence/2026-09-14-calculator-proof-clarity-attempt-01';
+const b=JSON.parse(fs.readFileSync(dir+'/baseline.json'));
+const sha=p=>crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
+const allowed=new Set(['review-server.mjs','scripts/host-review-html.test.mjs','scripts/host-review-reader-copy.test.mjs','scripts/host_review_reader_copy.mjs','scripts/templates/host-docs-review.html','task_plan.md','progress.md','findings.md','REVIEW-TRACEABILITY.md','verification/HOST-DOCS-PROGRESS.md','verification/host-docs-review-export.json','verification/host-docs-review.html']);
+const changed=b.files.filter(f=>!f.deleted&&f.kind==='file'&&(!fs.existsSync(f.path)||sha(f.path)!==f.sha256)).map(f=>f.path);
+assert.deepEqual(changed.filter(p=>!allowed.has(p)),[]);
+const protectedFiles=b.files.filter(f=>f.path.startsWith('verification/evidence/')||f.path.startsWith('host/')||/^verification\/current-.*\.json$/.test(f.path));
+assert.deepEqual(protectedFiles.filter(f=>!f.deleted&&(!fs.existsSync(f.path)||sha(f.path)!==f.sha256)),[]);
+const index=execFileSync('git',['rev-parse','--git-path','index'],{encoding:'utf8'}).trim();
+assert.equal(sha(index),b.indexSha256);
+assert.equal(execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),b.head);
+const model=JSON.parse(fs.readFileSync('verification/current-host-docs-review.json'));
+console.log(JSON.stringify({status:'PASS',changed,protectedFilesUnchanged:protectedFiles.length,head:b.head,indexUnchanged:true,modelSha256:sha('verification/current-host-docs-review.json'),counts:model.counts.claim_statuses,limits:'Git-visible baseline files only; presentation changes do not validate the calculator.'},null,2));

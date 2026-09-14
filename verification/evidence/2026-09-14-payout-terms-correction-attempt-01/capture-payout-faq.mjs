@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+const dir='verification/evidence/2026-09-14-payout-terms-correction-attempt-01';
+const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
+const expression=`(()=>{const id='can-vast-ai-send-my-payout-via-direct-bank-transfer-ach-swift-wire-transfer-etc-',h=document.getElementById(id);if(!h)throw Error('Published FAQ heading not found');const headings=[...document.querySelectorAll('h1,h2,h3,h4')],next=headings[headings.indexOf(h)+1];if(!next)throw Error('Next heading missing');const range=document.createRange();range.setStartAfter(h);range.setEndBefore(next);const el=document.createElement('div');el.append(range.cloneContents());return {url:location.href,title:document.title,heading:h.innerText.replace('Navigate to header','').trim(),heading_id:h.id,text:el.innerText||el.textContent,suggest_edits:[...document.querySelectorAll('a')].find(a=>a.textContent.includes('Suggest edits'))?.href}})()`;
+const observed=JSON.parse(execFileSync('agent-browser',['--session','payout-faq-source','eval','-b',Buffer.from(expression).toString('base64')],{encoding:'utf8',maxBuffer:1024*1024}));
+if(!observed.text.includes('SWIFT payments are not available'))throw Error('Expected explicit restriction missing');
+const record={recorded_at:new Date().toISOString(),method:'Unauthenticated public browser navigation and exact FAQ DOM extraction',...observed,text_sha256:hash(observed.text),limitations:'Evidence of the published guidance and its exact wording, not independent product implementation or runtime absence of bank transfers. The publication links to the same documentation repository; shared ancestry is not independent corroboration. Does not establish transfer completion, provider fees, or a specific account entitlement.'};
+const path=dir+'/published-payout-faq-01.json';fs.writeFileSync(path,JSON.stringify(record,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({path,sha256:hash(fs.readFileSync(path)),...record}));

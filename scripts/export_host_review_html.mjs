@@ -5,6 +5,15 @@ import crypto from 'node:crypto';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { INSTALL_INTAKE_PATH, loadInstallEvidenceIntake } from './current_host_install_evidence_intake.mjs';
+import { AUTHORITY_SCAN_PATH, AUTHORITY_SCAN_ATTEMPT } from './current_host_authority_scan.mjs';
+import { TERMS_PATH, TERMS_ATTEMPT } from './current_host_terms_binding.mjs';
+import { JURISDICTION_PATH, JURISDICTION_ATTEMPT } from './current_host_jurisdiction.mjs';
+import { PAYOUT_PATH } from './current_host_payout_provider_correction.mjs';
+import { PAYOUT_TERMS_PATH } from './current_host_payout_terms_correction.mjs';
+import { PAYOUT_INVOICE_PATH } from './current_host_payout_invoice_correction.mjs';
+import { loadCurrentHostReviewTransition } from './current_host_review_transition.mjs';
+import { hostReviewReaderCopy } from './host_review_reader_copy.mjs';
+import { buildHostReviewQueue, describeHostReview } from './host_review_work_queue.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const inputPath = 'verification/current-host-docs-review.json';
@@ -16,7 +25,17 @@ const currentMapPath = `${currentAttempt}/check-to-claim-map.json`;
 // Explicit current-attempt selection, not an assertion that integration or
 // sealing is complete. The retained result states its own scope and status.
 const currentConnectionAttempt = 'verification/evidence/2026-09-09-host-ssh-jupyter-selftest-attempt-01';
-const currentResultPath = `${currentConnectionAttempt}/result.md`;
+const currentAuthorityAttempt = 'verification/evidence/2026-09-09-host-authority-correction-attempt-01';
+const currentResultPath = `${currentAuthorityAttempt}/result.md`;
+const payoutTermsResultPath = 'verification/evidence/2026-09-14-payout-terms-correction-attempt-01/result.md';
+const payoutInvoiceResultPath = 'verification/evidence/2026-09-14-payout-invoice-correction-attempt-01/result.md';
+const payoutProviderResultPath = 'verification/evidence/2026-09-14-payout-provider-correction-attempt-01/result.md';
+const currentAuthorityBaselinePath = `${currentAuthorityAttempt}/pre-authority-current-host-docs-review.json`;
+// These are regenerated alongside the current review projection.  Older
+// authority-attempt registers remain embedded below as historical context,
+// never as the current operational or source-review queue.
+const currentRuntimeRegisterPath = 'verification/current-runtime-operator-blockers.md';
+const currentSourceRegisterPath = 'verification/current-source-owner-blockers.md';
 // Share the reviewed operational summary and the two separate open-work
 // registers. Do not recursively embed private captures or the final seal:
 // the final validation artifacts hash this generated HTML independently.
@@ -51,7 +70,7 @@ const earlierBaselineSummaryPath = 'verification/evidence/2026-09-07-host-curren
 const priorityPath = 'verification/HOST-DOCS-CLAIMS-TO-RESOLVE.md';
 const sha = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 const read = (ref) => {
-  if (!/^(verification|host|snippets|cli|python)\//.test(ref) || ref.split('/').includes('..')) throw new Error(`Unsafe export path: ${ref}`);
+  if (!/^(verification|host|snippets|cli|sdk|python)\//.test(ref) || ref.split('/').includes('..')) throw new Error(`Unsafe export path: ${ref}`);
   const resolved = fs.realpathSync(path.join(root, ref));
   if (!resolved.startsWith(root + path.sep)) throw new Error('Export symlink escapes repository');
   return fs.readFileSync(resolved);
@@ -123,6 +142,24 @@ function supplementalCoverage(coverage) {
   return { level: 'PARTIAL', label: 'Partial or related observation only; it is not whole-claim proof.' };
 }
 
+function productSourceTransition(record, claim, page) {
+  return record.id === 'MCL-e12ac9f6be2ce502' && claim && page &&
+    page.route === '/host/hosting-overview' &&
+    page.source_sha256 === '3d64b0bcfba203133725d654d1bb4c462b7ab8cfb577e94fcba3c37ffcf80ec3' &&
+    claim.status === 'PASS' && claim.classification === 'PRODUCT_DESCRIPTION' &&
+    sameJson(claim.required_evidence_types, ['PRODUCT_PUBLICATION_SOURCE']) &&
+    claim.history?.carry_decision === 'CURRENT_PRODUCT_PUBLICATION_ADJUDICATION' &&
+    record.text === claim.text && sameJson(record.headings, claim.headings) && sameJson(record.spans, claim.spans);
+}
+
+function authorityExactLiteralTransition(record, claim, page) {
+  return claim && page && claim.history?.carry_decision === 'CURRENT_HOST_AUTHORITY_SOURCE_TRANSITION' &&
+    claim.history?.baseline_claim_id === record.id && record.route === page.route && record.title === page.title &&
+    record.text === claim.text && sameJson(record.headings, claim.headings) && sameJson(record.spans, claim.spans) &&
+    record.status === claim.status && sameJson(record.required_evidence_types, claim.required_evidence_types) &&
+    record.owner_role === claim.owner_role;
+}
+
 function supplementalLiveChecks(claims, pages, add) {
   const map = JSON.parse(read(supplementalMapPath));
   if (map.record_type !== 'SUPPLEMENTAL_LIVE_CHECK_TO_CLAIM_MAP' || !Array.isArray(map.records) || typeof map.recorded_at !== 'string') {
@@ -147,7 +184,9 @@ function supplementalLiveChecks(claims, pages, add) {
     const exactCurrentSource = claim && page && record.title === page.title && record.page_sha256 === page.source_sha256 &&
       record.text === claim.text && sameJson(record.headings, claim.headings) && sameJson(record.spans, claim.spans);
     const exactTransitionHistory = !exactCurrentSource && claim && page && record.title === page.title && transitionUnmodifiedHistory(record, claim, page);
-    if ((!exactCurrentSource && !exactTransitionHistory) ||
+    const exactProductTransition = !exactCurrentSource && !exactTransitionHistory && productSourceTransition(record, claim, page);
+    const exactAuthorityTransition = !exactCurrentSource && !exactTransitionHistory && !exactProductTransition && authorityExactLiteralTransition(record, claim, page);
+    if ((!exactCurrentSource && !exactTransitionHistory && !exactProductTransition && !exactAuthorityTransition) ||
       !Array.isArray(record.checks) || !Array.isArray(record.evidence) || record.checks.length !== record.evidence.length ||
       typeof record.coverage !== 'string' || typeof record.limit !== 'string' || typeof record.next !== 'string') {
       throw new Error(`Supplemental source text/span drift: ${record.id}`);
@@ -259,9 +298,39 @@ function currentReadonlyChecks(claims, pages, add) {
     summary: map.summary || 'Current read-only follow-up observations are selected check proof, not a blanket status promotion.'};
 }
 
+function readonlyCommandProofs(claims, add) {
+  const ref = 'verification/current-host-readonly-adjudications.json';
+  const bytes = read(ref);
+  if (sha(bytes) !== '06c00cb9482d3911df398c2b39841f52e998d304054f0016fc27c779763d5073') throw new Error('Readonly proof registry hash drift');
+  const registry = JSON.parse(bytes), artifacts = new Map(registry.artifacts.map(item => [item.kind, item]));
+  return registry.adjudications.flatMap(entry => {
+    const claim = claims.find(item => item.id === entry.claim_id);
+    if (!claim || claim.status !== 'PASS' || !claim.evidence_refs.some(item => item.artifact_ref === ref)) return [];
+    if (claim.text !== entry.literal || claim.route !== entry.route || !claim.evidence_refs.some(item =>
+      item.artifact_ref === ref && item.id === entry.id && item.role === 'CURRENT_HOST_READONLY_COMMAND_ADJUDICATION' && item.limit === entry.limits)) throw new Error('Readonly proof current claim drift');
+    const checks = entry.checks.map(binding => {
+      const artifact = artifacts.get(({ D: 'batch_d', E: 'batch_e', N: 'new_cli', S: 'new_search' })[binding.batch]);
+      if (!artifact) throw new Error('Readonly proof batch drift');
+      const raw = read(artifact.path);
+      if (sha(raw) !== artifact.sha256) throw new Error('Readonly proof observation hash drift');
+      const record = JSON.parse(raw).records?.find(item => item.check_id === binding.check_id);
+      if (!record || record.exit_code !== 0 || record.observation_status !== 'PASS' || !sameJson(record.argv, binding.argv)) throw new Error('Readonly proof selected observation drift');
+      add(artifact.path, artifact.sha256);
+      return { id: binding.check_id, artifact_ref: artifact.path, command: record.command || 'vastai ' + binding.argv.join(' '),
+        result: 'PASS', recorded_at: record.started_at || record.timestamp || '2026-09-08', limit: entry.limits };
+    });
+    const sourceOnly = entry.required_evidence_types.length === 1;
+    return [{ claim_id: claim.id, route: claim.route, page_title: claim.page_title, headings: claim.headings,
+      coverage: { level: sourceOnly ? 'SOURCE_ONLY' : 'EXACT', label: sourceOnly ? 'Bound command source; execution is related context only.' : 'Exact registered command forms and observed output shape only.' },
+      limit: entry.limits, next: claim.next_action, recorded_at: [...new Set(checks.map(check => check.recorded_at))].join('; '), checks }];
+  });
+}
+
 export function buildReport() {
   const bytes = read(inputPath);
   const model = JSON.parse(bytes);
+  const authorityScan = loadCurrentHostReviewTransition({ read, model });
+  const selectedResult = authorityScan?.payoutInvoice ? payoutInvoiceResultPath : (authorityScan?.payoutTerms ? payoutTermsResultPath : (authorityScan?.payoutProvider ? payoutProviderResultPath : (authorityScan?.cleanup?.resultRef || (authorityScan?.jurisdiction ? `${JURISDICTION_ATTEMPT}/result.md` : authorityScan?.terms ? `${TERMS_ATTEMPT}/result.md` : authorityScan ? `${AUTHORITY_SCAN_ATTEMPT}/result.md` : currentResultPath))));
   const claims = model.pages.flatMap(page => page.claims.map(claim => ({ ...claim, route: page.route, page_title: page.title })));
   const ids = new Set(claims.map(c => c.id));
   if (ids.size !== claims.length || claims.length !== model.counts.claims) throw new Error('Claim inventory mismatch');
@@ -281,12 +350,85 @@ export function buildReport() {
     for (const d of p.dependencies || []) add(d.source_file, d.source_sha256);
   }
   for (const c of claims) for (const e of c.evidence_refs || []) if (e.artifact_ref) add(e.artifact_ref);
-  const supplementalLive = supplementalLiveChecks(claims, model.pages, add);
-  const currentReadonly = currentReadonlyChecks(claims, model.pages, add);
-  const installationIntake = loadInstallEvidenceIntake({ read, model });
+  const historyModel = authorityScan?.baseline || model;
+  const historicalClaims = historyModel.pages.flatMap(page => page.claims.map(claim => ({ ...claim, route: page.route, page_title: page.title })));
+  const supplementalLive = supplementalLiveChecks(historicalClaims, historyModel.pages, add);
+  const currentReadonly = currentReadonlyChecks(historicalClaims, historyModel.pages, add);
+  const readonlyCommands = readonlyCommandProofs(claims, add);
+  const installationIntake = loadInstallEvidenceIntake({ read, model: historyModel });
+  if (authorityScan) {
+    for (const record of currentReadonly.mapped_claims) record.history_scope = 'Retained pre-scan observation bound to the frozen predecessor; current status and remaining action are shown separately.';
+    for (const ref of [AUTHORITY_SCAN_PATH, authorityScan.registry.baseline.path, ...authorityScan.registry.artifacts.map(item => item.path)]) add(ref, authorityScan.artifactHashes.get(ref));
+    for (const name of ['result.md', 'runtime-operator-register.md', 'source-owner-register.md']) add(`${AUTHORITY_SCAN_ATTEMPT}/${name}`);
+    add(currentRuntimeRegisterPath);
+    add(currentSourceRegisterPath);
+    if (authorityScan.clarification) {
+      add(authorityScan.clarification.registry_ref || 'verification/current-host-clarification.json', authorityScan.clarification.registrySha256);
+      add('verification/evidence/2026-09-10-host-clarification-sweep-attempt-01/before-review.json', authorityScan.clarification.contextHashes.get('verification/evidence/2026-09-10-host-clarification-sweep-attempt-01/before-review.json'));
+    }
+    if (authorityScan.terms) {
+      add(TERMS_PATH, authorityScan.terms.registrySha256);
+      add(authorityScan.terms.baseline, authorityScan.terms.baselineSha256);
+      add(authorityScan.terms.source.before_artifact.path, authorityScan.terms.source.before_artifact.sha256);
+      for (const artifact of authorityScan.terms.artifacts.values()) add(artifact.path, artifact.sha256);
+      add(`${TERMS_ATTEMPT}/result.md`);
+    }
+    if (authorityScan.jurisdiction) {
+      const transition = authorityScan.jurisdiction;
+      add(JURISDICTION_PATH, transition.registrySha256);
+      add(transition.baseline, transition.baselineSha256);
+      for (const source of transition.registry.sources) add(source.before_artifact.path, source.before_artifact.sha256);
+      for (const artifact of transition.artifacts.values()) add(artifact.path, artifact.sha256);
+      for (const artifact of transition.registry.retained_raw_sources) add(artifact.path, artifact.sha256);
+      add(`${JURISDICTION_ATTEMPT}/result.md`);
+      // Scan context stays available for review; these extra captures do not
+      // become proof for the eight adjudications merely by being embedded.
+      for (const name of ['source-scan.md', 'scan-inventory-01.json',
+        'irs-gig-source-01.json', 'irs-1099k-source-01.json', 'ftb-gig-source-01.json',
+        'irs-backup-source-01.json', 'irs-abroad-source-01.json', 'irs-w9-source-01.json',
+        'eu-vat-source-01.json', 'eu-place-taxation-source-01.json', 'hmrc-platform-source-01.json',
+        'vast-datacenter-source-01.json', 'vast-legacy-hosting-source-01.json', 'vast-legacy-faq-source-01.json',
+        'contextual-advice-review-01.json', 'proposal-01-registry.json', 'proposal-01-scope-defect.json']) {
+        add(`${JURISDICTION_ATTEMPT}/${name}`);
+      }
+    }
+  }
   add(INSTALL_INTAKE_PATH);
+  if (authorityScan?.cleanup) {
+    const cleanup = authorityScan.cleanup;
+    add('verification/current-host-review-cleanup.json', cleanup.registrySha256);
+    add(cleanup.baseline, cleanup.baselineSha256);
+    for (const [ref, hash] of authorityScan.contextHashes) add(ref, hash);
+    add(cleanup.resultRef);
+  }
+  if (authorityScan?.payoutProvider) {
+    const payout = authorityScan.payoutProvider;
+    add(PAYOUT_PATH, payout.registrySha256);
+    add(payout.baseline, payout.baselineSha256);
+    add('verification/evidence/2026-09-14-payout-provider-correction-attempt-01/pre-correction-payment.mdx');
+    add(payout.observation, payout.observationSha256);
+    add(payout.staticCheck, payout.staticCheckSha256);
+    add(payoutProviderResultPath);
+  }
+  if (authorityScan?.payoutTerms) {
+    const payoutTerms = authorityScan.payoutTerms;
+    add(PAYOUT_TERMS_PATH, payoutTerms.registrySha256);
+    add(payoutTerms.baseline, payoutTerms.baselineSha256);
+    add('verification/evidence/2026-09-14-payout-terms-correction-attempt-01/pre-correction-payment.mdx');
+    add(payoutTerms.terms, payoutTerms.termsSha256);
+    add(payoutTerms.faq, payoutTerms.faqSha256);
+    add(payoutTermsResultPath);
+  }
+  if (authorityScan?.payoutInvoice) {
+    const payoutInvoice = authorityScan.payoutInvoice;
+    add(PAYOUT_INVOICE_PATH, payoutInvoice.registrySha256);
+    add(payoutInvoice.baseline, payoutInvoice.baselineSha256);
+    add('verification/evidence/2026-09-14-payout-invoice-correction-attempt-01/pre-correction-payment.mdx');
+    add(payoutInvoice.guidance, payoutInvoice.guidanceSha256);
+    add(payoutInvoiceResultPath);
+  }
   for (const ref of installationIntake.artifactRefs) add(ref);
-  add(currentResultPath); add(claimCorrectionResultPath);
+  add(currentResultPath); add(currentAuthorityBaselinePath); add(claimCorrectionResultPath);
   for (const ref of currentAttemptArtifacts) add(ref);
   for (const ref of claimCorrectionArtifacts) add(ref);
   for (const ref of Object.values(repositoryReconciliation)) add(ref);
@@ -304,18 +446,73 @@ export function buildReport() {
   const displayClaims = claims.map(c => {
     const out = JSON.parse(JSON.stringify(c, (_, v) => typeof v === 'string' ? sanitize(v) : v));
     out.display_masked = out.text !== c.text;
+    out.reader_copy = hostReviewReaderCopy(out);
+    out.review_work = describeHostReview(c);
     return out;
   });
   const payload = {
-    export_version: 1, snapshot_at: model.generated_at, export_date: '2026-09-09',
+    export_version: 1, snapshot_at: model.generated_at, export_date: authorityScan?.jurisdiction ? '2026-09-11' : '2026-09-10',
     input: { ref: inputPath, sha256: sha(bytes), revision: model.source.revision, tree: model.source.tree },
-    counts: model.counts, current_result_ref: currentResultPath, claim_correction_history_ref: claimCorrectionResultPath,
+    counts: model.counts, current_result_ref: selectedResult, claim_correction_history_ref: claimCorrectionResultPath,
+    work_queue: buildHostReviewQueue(claims),
+    cleanup_transition: authorityScan?.cleanup ? {registry_ref: 'verification/current-host-review-cleanup.json', registry_sha256: authorityScan.cleanup.registrySha256,
+      baseline_ref: authorityScan.cleanup.baseline, baseline_sha256: authorityScan.cleanup.baselineSha256,
+      result_ref: authorityScan.cleanup.resultRef, context_refs: [...authorityScan.contextHashes.keys()],
+      limit: 'Claim-appropriate local review only. No runtime outcome, publication or human acceptance is implied.'} : null,
+    payout_provider_transition: authorityScan?.payoutProvider ? {registry_ref: PAYOUT_PATH, registry_sha256: authorityScan.payoutProvider.registrySha256,
+      baseline_ref: authorityScan.payoutProvider.baseline, baseline_sha256: authorityScan.payoutProvider.baselineSha256,
+      observation_ref: authorityScan.payoutProvider.observation, observation_sha256: authorityScan.payoutProvider.observationSha256,
+      static_check_ref: authorityScan.payoutProvider.staticCheck, static_check_sha256: authorityScan.payoutProvider.staticCheckSha256,
+      result_ref: payoutProviderResultPath, changed_claims: 4, limit: 'User-supplied Payout Account UI plus exact source-link check support the displayed provider choices only; no financial-authority, payment, account-state, fee, eligibility, or bank-route conclusion.'} : null,
+    payout_terms_transition: authorityScan?.payoutTerms ? {registry_ref: PAYOUT_TERMS_PATH, registry_sha256: authorityScan.payoutTerms.registrySha256,
+      baseline_ref: authorityScan.payoutTerms.baseline, baseline_sha256: authorityScan.payoutTerms.baselineSha256,
+      terms_ref: authorityScan.payoutTerms.terms, terms_sha256: authorityScan.payoutTerms.termsSha256,
+      faq_ref: authorityScan.payoutTerms.faq, faq_sha256: authorityScan.payoutTerms.faqSha256,
+      result_ref: payoutTermsResultPath, changed_claims: 2, limit: 'Published Terms text and attributed payout guidance only; no payout/provider adjudication, enforceability decision, Hosting Agreement priority, or independent backend/runtime absence is inferred.'} : null,
+    payout_invoice_transition: authorityScan?.payoutInvoice ? {registry_ref: PAYOUT_INVOICE_PATH, registry_sha256: authorityScan.payoutInvoice.registrySha256,
+      baseline_ref: authorityScan.payoutInvoice.baseline, baseline_sha256: authorityScan.payoutInvoice.baselineSha256,
+      guidance_ref: authorityScan.payoutInvoice.guidance, guidance_sha256: authorityScan.payoutInvoice.guidanceSha256,
+      result_ref: payoutInvoiceResultPath, changed_claims: 6, limit: 'Published guidance checked. This checks what Vast publishes. It does not test invoice generation or payment processing.'} : null,
+    authority_scan: authorityScan ? JSON.parse(JSON.stringify({ registry_ref: AUTHORITY_SCAN_PATH, registry_sha256: authorityScan.registrySha256,
+      baseline_ref: authorityScan.registry.baseline.path, original_result_ref: currentResultPath,
+      runtime_register_ref: currentRuntimeRegisterPath, runtime_register_sha256: files.get(currentRuntimeRegisterPath).sha256,
+      source_register_ref: currentSourceRegisterPath, source_register_sha256: files.get(currentSourceRegisterPath).sha256,
+      historical_runtime_register_ref: `${AUTHORITY_SCAN_ATTEMPT}/runtime-operator-register.md`,
+      historical_source_register_ref: `${AUTHORITY_SCAN_ATTEMPT}/source-owner-register.md`,
+      transitions: Object.fromEntries(authorityScan.presentation) }, (_, value) => typeof value === 'string' ? sanitize(value) : value)) : null,
+    clarification_transition: authorityScan?.clarification ? { registry_ref: 'verification/current-host-clarification.json', registry_sha256: authorityScan.clarification.registrySha256,
+      baseline_ref: 'verification/evidence/2026-09-10-host-clarification-sweep-attempt-01/before-review.json', baseline_sha256: authorityScan.clarification.contextHashes.get('verification/evidence/2026-09-10-host-clarification-sweep-attempt-01/before-review.json'),
+      changed_claims: authorityScan.clarification.registry.claims.length, changed_nodes: authorityScan.clarification.registry.nodes.length,
+      limit: 'Pinned review-method/action provenance only; not product evidence or a status transition.' } : null,
+    terms_transition: authorityScan?.terms ? { registry_ref: TERMS_PATH, registry_sha256: authorityScan.terms.registrySha256,
+      baseline_ref: authorityScan.terms.baseline, baseline_sha256: authorityScan.terms.baselineSha256,
+      source_before_ref: authorityScan.terms.source.before_artifact.path, source_before_sha256: authorityScan.terms.source.before_artifact.sha256,
+      source_path: authorityScan.terms.source.path, source_after_sha256: authorityScan.terms.source.after_sha256,
+      capture_refs: [...authorityScan.terms.artifacts.values()].map(artifact => artifact.path), result_ref: `${TERMS_ATTEMPT}/result.md`,
+      changed_claims: authorityScan.terms.registry.transitions.length,
+      limit: 'Pinned published-Terms source binding only; no runtime enforcement, monitoring, escalation, acceptance, or operational outcome is established.' } : null,
+    jurisdiction_transition: authorityScan?.jurisdiction ? {
+      registry_ref: JURISDICTION_PATH, registry_sha256: authorityScan.jurisdiction.registrySha256,
+      baseline_ref: authorityScan.jurisdiction.baseline, baseline_sha256: authorityScan.jurisdiction.baselineSha256,
+      sources: authorityScan.jurisdiction.registry.sources,
+      capture_refs: [...authorityScan.jurisdiction.artifacts.values()].map(artifact => artifact.path),
+      result_ref: `${JURISDICTION_ATTEMPT}/result.md`, changed_claims: authorityScan.jurisdiction.registry.transitions.length,
+      scan_context_refs: ['source-scan.md', 'scan-inventory-01.json', 'irs-gig-source-01.json',
+        'irs-1099k-source-01.json', 'ftb-gig-source-01.json', 'irs-backup-source-01.json',
+        'irs-abroad-source-01.json', 'irs-w9-source-01.json', 'eu-vat-source-01.json',
+        'eu-place-taxation-source-01.json', 'hmrc-platform-source-01.json', 'vast-datacenter-source-01.json',
+        'vast-legacy-hosting-source-01.json', 'vast-legacy-faq-source-01.json'].map(name => `${JURISDICTION_ATTEMPT}/${name}`),
+      prior_attempt_refs: ['contextual-advice-review-01.json', 'proposal-01-registry.json',
+        'proposal-01-scope-defect.json'].map(name => `${JURISDICTION_ATTEMPT}/${name}`),
+      limit: 'Contextual advice, existing Agreement rule and published program source only; no tax determination, runtime outcome, certification, procedure completion or human acceptance.'
+    } : null,
     historical_summary_ref: historicalSummaryPath, earlier_baseline_summary_ref: earlierBaselineSummaryPath, priority_ref: priorityPath,
     repository_reconciliation: repositoryReconciliation,
     pages: model.pages.map(({ claims: ignoredClaims, procedures: ignoredProcedures, ...p }) => p),
     claims: displayClaims,
     supplemental_live_checks: JSON.parse(JSON.stringify(supplementalLive, (_, value) => typeof value === 'string' ? sanitize(value) : value)),
     current_readonly_checks: JSON.parse(JSON.stringify(currentReadonly, (_, value) => typeof value === 'string' ? sanitize(value) : value)),
+    readonly_command_proofs: JSON.parse(JSON.stringify(readonlyCommands, (_, value) => typeof value === 'string' ? sanitize(value) : value)),
     installation_evidence_intake: JSON.parse(JSON.stringify(installationIntake, (_, value) => typeof value === 'string' ? sanitize(value) : value)),
     support_layers: model.support_layers,
     files: Object.fromEntries(files),

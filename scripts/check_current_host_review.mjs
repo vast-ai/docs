@@ -67,6 +67,15 @@ try {
           filters.push({ heading: option.value, expected: expected.length, actual: actual.length, pass: JSON.stringify(expected) === JSON.stringify(actual) });
         }
         filter.value = ''; filter.dispatchEvent(new Event('change', { bubbles: true }));
+        const queue=current.workQueue, queueFilters=[];
+        if(!queue||queue.total!==current.page.claims.length||queue.buckets.reduce((sum,b)=>sum+b.count,0)!==queue.total)throw new Error('Incomplete page-local queue');
+        for(const bucket of queue.buckets){const control=section.querySelector('#current-work-filter');control.value=bucket.id;control.dispatchEvent(new Event('change',{bubbles:true}));
+          const actual=[...section.querySelectorAll('[data-current-claim]:not([hidden])')].map(el=>el.dataset.currentClaim);
+          const expected=current.page.claims.filter(claim=>claim.reviewWork.bucket===bucket.id).map(claim=>claim.id);
+          queueFilters.push({category:bucket.id,count:bucket.count,pass:bucket.count===actual.length&&JSON.stringify(actual)===JSON.stringify(expected)});}
+        const workFilter=section.querySelector('#current-work-filter');workFilter.value='';workFilter.dispatchEvent(new Event('change',{bubbles:true}));
+        const grouped=queue.groups.flatMap(group=>group.occurrenceIds);
+        if(grouped.length!==queue.total||new Set(grouped).size!==queue.total)throw new Error('Shared-wording index lost passages');
         const claims = [];
         for (const claim of current.page.claims) {
           const card = [...section.querySelectorAll('[data-current-claim]')].find(el => el.dataset.currentClaim === claim.id);
@@ -81,23 +90,31 @@ try {
           });
           claims.push({ id: claim.id, headings: claim.headings, status: claim.status,
             cardStatus: card?.querySelector('[data-status]')?.dataset.status,
+            readerCopyMatches: !!claim.readerCopy && card?.querySelector('.vv-reader-finding')?.textContent === claim.readerCopy.label + ': ' + claim.readerCopy.finding && card?.querySelector('.vv-reader-next')?.textContent === 'Next step: ' + claim.readerCopy.nextStep &&
+              (!claim.readerCopy.statusLabel || card?.textContent.includes(claim.readerCopy.statusLabel)) &&
+              card?.querySelector('.vv-reading-status')?.textContent === claim.reviewWork?.statusLabel &&
+              card?.textContent.includes('Review type: ' + claim.reviewWork?.type) &&
+              (!claim.readerCopy.pendingNote || card?.querySelector('.vv-policy-pending')?.textContent.includes(claim.readerCopy.pendingNote)) &&
+              !!card?.querySelector('.vv-reading-audit')?.textContent.includes('Recorded status: ' + claim.status),
+            checkingSummaryCount: card?.querySelectorAll('.vv-checking').length,
             passages: [...(card?.querySelectorAll('blockquote') || [])].map(el => el.textContent),
             ranges, notice: notice?.textContent || '', masked: !!claim.sourcePassages?.some(p => p.redacted), links,
             hasButton: !!card?.querySelector('[data-show-current-claim]'),
             evidenceLinks: [...(card?.querySelectorAll('a[href*="/__review__/evidence"],a[href*="/__review__/current-artifact"]') || [])].map(a => a.getAttribute('href')) });
         }
-        return { route: location.pathname, currentAvailable: current.available, claims, filters,
+        return { route: location.pathname, currentAvailable: current.available, claims, filters, queueFilters, queue,
           cardCount: section.querySelectorAll('[data-current-claim]').length,
           emptyControls: [...section.querySelectorAll('button,a,select')].filter(el => !el.textContent.trim() && !el.getAttribute('aria-label')).length };
       })()`);
       save(route.split('/').at(-1) + '.json', observation);
-      const failed = observation.claims.filter(claim => !claim.hasButton || claim.status !== claim.cardStatus ||
+      const failed = observation.claims.filter(claim => !claim.hasButton || !claim.readerCopyMatches || claim.status !== claim.cardStatus ||
+        (claim.id === 'MCL-790d76c6e2bea8fa' && claim.checkingSummaryCount !== 0) ||
         !claim.links.length || claim.links.some(link => !link.exists) ||
         (!claim.ranges.length && !(claim.masked && /mask/i.test(claim.notice))));
       const row = { route, claims: observation.claims.length, located: observation.claims.filter(c => c.ranges.length).length,
         maskedFallback: observation.claims.filter(c => !c.ranges.length && c.masked && /mask/i.test(c.notice)).length,
         failed: failed.map(c => ({ id: c.id, notice: c.notice, links: c.links })),
-        pass: !failed.length && observation.filters.every(f => f.pass) && !observation.emptyControls && observation.cardCount === observation.claims.length };
+        pass: !failed.length && observation.filters.every(f => f.pass) && observation.queueFilters.every(f => f.pass) && !observation.emptyControls && observation.cardCount === observation.claims.length };
       results.push(row); console.log(JSON.stringify(row));
     } catch (error) {
       const row = { route, pass: false, error: String(error.message).slice(0, 1500) };

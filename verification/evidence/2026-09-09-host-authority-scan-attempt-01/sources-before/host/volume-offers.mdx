@@ -1,0 +1,118 @@
+---
+title: "Volume Offers"
+sidebarTitle: "Volume Offers"
+description: "How hosts advertise local persistent storage, how renters use it, and how volume allocations affect machine capacity."
+"canonical": "/host/volume-offers"
+personas:
+  - pro-operator
+  - headless-operator
+  - business-owner
+  - hobbyist
+---
+
+<div className="persona-chips"><span className="persona-chip">All host personas</span></div>
+
+A local volume is persistent storage backed by one physical host machine. It is separate from an instance's container disk: a renter can destroy an instance, keep the volume, and attach it to another Docker instance on the same machine.
+
+For hosts, the important distinction is between a **volume offer** and a **volume**:
+
+- You publish a **volume offer** that advertises how much local storage renters may rent and its price.
+- A renter accepts some of that capacity to create an owned **volume** (also called a volume contract in the CLI and API).
+- The renter mounts that volume inside a Docker instance at a chosen path.
+
+<Note>
+  This page covers **local volume offers**. `vastai create volume` is a renter command that accepts an existing offer; hosts publish capacity with `vastai list volume` or the volume options on `vastai list machine`.
+</Note>
+
+## Identifiers And Values
+
+These identifiers and values refer to different parts of the lifecycle and are not interchangeable.
+
+| Identifier or value | What it represents | Where it is used |
+| --- | --- | --- |
+| Machine ID | The physical host and its local storage pool. | A host passes it to `vastai list volume`. |
+| Volume-offer ID | A host's advertised storage capacity and price. | Renters find it with `vastai search volumes`; a host passes it to `vastai unlist volume`. |
+| Owned-volume ID | The fixed-size storage allocation a renter created from an offer. | Renters find it with `vastai show volumes`, link it during instance creation, clone it to another volume offer, or delete it. |
+| Mount path | The directory where the volume appears inside a renter's container. | A renter supplies it with `--mount-path` when creating the instance. |
+
+## Volume Lifecycle
+
+1. **Prepare host storage.** Put Docker's data root on fast SSD or NVMe storage using XFS project quotas. See [Storage Setup](/host/storage-setup).
+2. **Publish a volume offer.** Create it with the machine listing or list storage separately. This advertises a maximum rentable capacity; it does not create a renter volume.
+3. **A renter creates a volume.** The renter searches offers and chooses a fixed size. That allocation persists independently of any one instance.
+4. **The renter attaches it to an instance.** A new or existing volume is linked while a Docker instance is created and appears at the selected mount path.
+5. **The renter reuses or deletes it.** Destroying the instance leaves the volume intact. To delete the volume permanently, the renter must first destroy every instance using it.
+6. **The host unlists the offer when needed.** Unlisting stops advertising that offer. It is different from the renter deleting an owned volume.
+
+For the renter's console and CLI workflow, see [Volumes](/guides/instances/storage/volumes).
+
+## Publish Local Storage
+
+You can publish GPU and volume offers together:
+
+```bash
+vastai list machine <machine-id> \
+  --vol_size <capacity-gb> \
+  --vol_price <usd-per-gb-month> \
+  --end_date <date>
+```
+
+Set `--vol_size 0` when you do not want the machine listing to include a volume offer. Pass an explicit size and price so the advertised capacity is intentional.
+
+You can also publish storage separately:
+
+```bash
+vastai list volume <machine-id> \
+  --size <capacity-gb> \
+  --price_disk <usd-per-gb-month> \
+  --end_date <date>
+```
+
+Use [`vastai list volumes`](/cli/reference/list-volumes) to apply the same settings to several machines. `--end_date` sets the volume offer's expiration; review the date before publishing.
+
+## Shared Disk Capacity
+
+Local volume allocations use the same machine storage pool as renter instance disks. Stopped instances, cached images, and other allocated storage also need space in that pool.
+
+The capacity in a volume offer is the maximum amount renters may allocate; publishing the offer does not itself create a renter volume. When a renter creates a volume, its requested size is allocated from that offer and must be included when you plan the shared disk pool.
+
+For example, if you advertise a 500 GB offer and a renter creates a 200 GB volume, include that 200 GB allocation in your storage plan. Keep enough headroom for active volume contracts and new instance creation.
+
+<Warning>
+  Do not remove renter files or edit Docker's storage directories manually to reclaim space. Use the normal offer, instance, and volume lifecycle. If the platform's available-capacity figures do not reconcile, collect the machine and offer output before contacting support.
+</Warning>
+
+## Local Volume Limits
+
+A local volume:
+
+- Stays on the physical machine where the renter created it.
+- Can attach only to instances scheduled on that same machine.
+- Has a fixed size after creation.
+- Works with Docker instances, not VM instances.
+- Is persistent storage, but is not an off-machine backup.
+
+For the storage-maintenance workflow, see [Maintenance Windows](/host/maintenance-windows).
+
+## Command Map
+
+| Role | Task | Command reference |
+| --- | --- | --- |
+| Host | Publish a volume offer with the machine offer | [`vastai list machine`](/cli/reference/list-machine) |
+| Host | Publish one machine's storage separately | [`vastai list volume`](/cli/reference/list-volume) |
+| Host | Publish storage on several machines | [`vastai list volumes`](/cli/reference/list-volumes) |
+| Host | Stop advertising a volume offer | [`vastai unlist volume`](/cli/reference/unlist-volume) |
+| Renter | Find volume offers | [`vastai search volumes`](/cli/reference/search-volumes) |
+| Renter | Create an owned volume from an offer | [`vastai create volume`](/cli/reference/create-volume) |
+| Renter | Inspect owned volumes | [`vastai show volumes`](/cli/reference/show-volumes) |
+| Renter | Link a new or existing volume to a container | [`vastai create instance`](/cli/reference/create-instance) |
+| Renter | Permanently remove an unattached volume | [`vastai delete volume`](/cli/reference/delete-volume) |
+
+## Related Pages
+
+| Topic | Read next |
+| --- | --- |
+| Prepare the host disk and quotas | [Storage Setup](/host/storage-setup) |
+| Set storage and compute prices | [Pricing Your Listing](/host/pricing-your-listing) |
+| Understand offers and rental contracts | [Hosting Overview](/host/hosting-overview) |
+| Use a volume as a renter | [Volumes](/guides/instances/storage/volumes) |

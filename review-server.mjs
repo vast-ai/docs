@@ -32,6 +32,13 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { INSTALL_INTAKE_PATH, INSTALL_INTAKE_ARTIFACTS, loadInstallEvidenceIntake } from './scripts/current_host_install_evidence_intake.mjs';
+import { AUTHORITY_SCAN_PATH, AUTHORITY_SCAN_DECISION, AUTHORITY_SCAN_RELOCATION, AUTHORITY_SCAN_SOURCE_CHANGED } from './scripts/current_host_authority_scan.mjs';
+import { loadCurrentHostReviewTransition } from './scripts/current_host_review_transition.mjs';
+import { hostReviewReaderCopy } from './scripts/host_review_reader_copy.mjs';
+import { buildHostReviewQueue, describeHostReview } from './scripts/host_review_work_queue.mjs';
+let CURRENT_AUTHORITY_SCAN = null;
+let AUTHORITY_SCAN_HISTORICAL_SOURCES = null;
+let AUTHORITY_SCAN_HISTORICAL_READS = null;
 
 // The audit runner uses this runtime identity to reject a stale review-server
 // process whose injected overlay does not match the file being assessed.
@@ -254,14 +261,67 @@ const CURRENT_CONNECTION_TARGETS = new Set([
   'MCL-1ebb3e6e2b370757', 'MCL-3fb43d8a410371df', 'MCL-da591d84b7d08317',
   'MCL-eeaf6da83da9eca7',
 ]);
+const CURRENT_AUTHORITY_ADJUDICATION = 'verification/current-host-authority-adjudications.json';
+const CURRENT_AUTHORITY_ADJUDICATION_SHA256 = '6f500300b5953823ce34fd456773c924bd5bed4adcdd4077d57a5ecfed9fa66d';
+const CURRENT_AUTHORITY_STATIC_EVIDENCE = 'verification/evidence/2026-09-09-host-authority-correction-attempt-01/current-static-checks-01.json';
+const CURRENT_AUTHORITY_STATIC_EVIDENCE_SHA256 = '3d05bbadd175c55c52e147940d9895c03fcc092a3bed4afdf22e61bd9524c8a3';
+const CURRENT_AUTHORITY_DECISION = 'CURRENT_HOST_AUTHORITY_SOURCE_TRANSITION';
+const CURRENT_AUTHORITY_TECHNICAL = new Set(['MCL-508003945b6ef934', 'MCL-c85a4e96752730ab', 'MCL-437e58c77dcafecc', 'MCL-943ba22ec56a356a']);
+const CURRENT_AUTHORITY_AGREEMENT_PASS = new Set(['MCL-805ef8a72833f2b8', 'MCL-3cfe1a3c265f0223', 'MCL-1a4146b033bd9b88', 'MCL-f855ff5e92cfbec1', 'MCL-181b0127498ba639', 'AUTH-DATA-SECURITY-01']);
+const CURRENT_AUTHORITY_PARTIAL = new Set(['MCL-ed68c47bda19e986', 'MCL-8fe2020c0e7efe26', 'MCL-399798a3c4946b5f']);
+const CURRENT_AUTHORITY_PAGES = new Map([
+  ['/host/hosting-overview', '3d64b0bcfba203133725d654d1bb4c462b7ab8cfb577e94fcba3c37ffcf80ec3'],
+  ['/host/workload-policy', '9fa484d51b1988d68ce1618767d15a3d9d5d7123c98d1a4baf8cd7e27d0b661d'],
+  ['/host/hosting-agreement', 'f7742a02b08626e474464d85a850903d436c1c3e1db18fb19764471ba5123c1b'],
+  ['/host/community', '6c0132ee35c6ad5d9324b3eaf6d1def8862db27752acd8a884903caaf7e58022'],
+]);
+const CURRENT_AUTHORITY_POST = new Map([
+  ['MCL-508003945b6ef934', 'aa2ac7b18aad60491f2f10f993c0cb2d9dbde7490bf0f7c50cf3a98414b05008'],
+  ['MCL-c85a4e96752730ab', '44041196d20f2b4e4b9c7741ccfef9977fa1e1f5f35df9ecc14b6c5b076fcd59'],
+  ['MCL-437e58c77dcafecc', 'd6e43b1db8f5855cdb4030a5c1760fd5623d4d4754c365f5d36d617ce80a1051'],
+  ['MCL-943ba22ec56a356a', 'b389b25fc2301ef8e13bbd9bb08b1dd232e84a8cf0fef93a9ab3bbf828c75ce0'],
+  ['MCL-805ef8a72833f2b8', '8798e85a6ae37de8de0db916a7e2e928773170e8da89f8ab5e25e486175f7890'],
+  ['MCL-3cfe1a3c265f0223', '06eaccfe6711828eadc2244d1e930aad1cca110f8e6baab658315ed6c6a54a4d'],
+  ['MCL-1a4146b033bd9b88', 'e47f52dc43542d769e314888608b3ec29e315f40fa7898603b747cabfc5bd8cf'],
+  ['MCL-f855ff5e92cfbec1', '7dac320c51b0e43bf759f80aaf2a2aa857c079485314d610b97aef55ba5605ad'],
+  ['MCL-181b0127498ba639', '687a97d2a906c9e1ae82e19ed0c05d46d752f1651c571d146360c7b598149fba'],
+  ['AUTH-DATA-SECURITY-01', 'feb0235aca0be7375bd3a40fcb9c77ee92d8b853b47f2e613cd47b2fccf13586'],
+]);
+const CURRENT_AUTHORITY_PARTIAL_POST = new Map([
+  ['MCL-ed68c47bda19e986', '710540bdf755ddcc422d99e5922e7e9fc91e9f0cb02d681cb2507c338b859404'],
+  ['MCL-8fe2020c0e7efe26', '0019f66c4eec3b8ffe3dcaae9e53c3e9d67058e1d0942b08e2fb743e0a25e14d'],
+  ['MCL-399798a3c4946b5f', '37b8dd3199b5fa02bb32ff380a0f6fab6c0f1977ae610e3153b41c5a9358f7f8'],
+]);
+const CURRENT_AUTHORITY_AGREEMENT_HEADINGS = new Map([
+  ['MCL-805ef8a72833f2b8', 'PERFORMANCE OF SERVICES'],
+  ['MCL-3cfe1a3c265f0223', 'PERFORMANCE OF SERVICES'],
+  ['MCL-1a4146b033bd9b88', 'OPERATION AND MAINTENANCE'],
+  ['MCL-f855ff5e92cfbec1', 'OPERATION AND MAINTENANCE'],
+  ['MCL-181b0127498ba639', 'PERFORMANCE OF SERVICES'],
+  ['AUTH-DATA-SECURITY-01', 'INTELLECTUAL PROPERTY AND DATA SECURITY'],
+  ['MCL-ed68c47bda19e986', 'OPERATION AND MAINTENANCE'],
+  ['MCL-8fe2020c0e7efe26', 'OPERATION AND MAINTENANCE'],
+  ['MCL-399798a3c4946b5f', 'OPERATION AND MAINTENANCE'],
+]);
 const CURRENT_HOST_REVIEW_CARRY = new Set([
   'CARRIED_FORWARD_EXACT_SOURCE', 'NOT_CARRIED_SOURCE_CHANGED', 'NOT_CARRIED_NEW', 'CURRENT_STATIC_RETEST',
   'NO_HISTORICAL_PASS_TRANSFER', 'CURRENT_LIVE_ENDPOINT_ADJUDICATION',
   'CURRENT_HOST_READONLY_COMMAND_ADJUDICATION', 'CURRENT_HOST_READONLY_SOURCE_ADJUDICATION',
   'CURRENT_HOST_READONLY_FAIL_ADJUDICATION', 'CURRENT_H100X4_DIRECT_POSTINSTALL_RUNTIME_ADJUDICATION',
   'CURRENT_H100X4_LISTING_RENTAL_RUNTIME_ADJUDICATION', 'CURRENT_H100X4_LISTING_RENTAL_RUNTIME_ADJUDICATION_PARTIAL',
-  CURRENT_CONNECTION_DECISION,
+  CURRENT_CONNECTION_DECISION, CURRENT_AUTHORITY_DECISION,
   TWO_DEFECT_REPLACEMENT_DECISION, TWO_DEFECT_LITERAL_DECISION,
+  'CURRENT_HOST_TERMS_BINDING',
+  'CURRENT_HOST_JURISDICTION',
+]);
+const CURRENT_TERMS_RELOCATION = 'CURRENT_HOST_TERMS_BINDING_RELOCATION';
+const CURRENT_TERMS_SOURCE_CHANGED = 'CURRENT_HOST_TERMS_BINDING_SOURCE_CHANGED';
+const CURRENT_REVIEW_RELOCATIONS = new Set([
+  AUTHORITY_SCAN_RELOCATION, AUTHORITY_SCAN_SOURCE_CHANGED,
+  CURRENT_TERMS_RELOCATION, CURRENT_TERMS_SOURCE_CHANGED,
+  'CURRENT_HOST_JURISDICTION_SOURCE_CHANGED',
+  'CURRENT_HOST_PAYOUT_PROVIDER_UI_CORRECTION_SOURCE_CHANGED',
+  'CURRENT_HOST_PAYOUT_TERMS_CORRECTION_SOURCE_CHANGED',
 ]);
 const CURRENT_HOST_REVIEW_ARTIFACTS = new Set([
   'verification/host-docs-test-results.json', 'verification/current-host-docs-review.json',
@@ -278,6 +338,10 @@ const CURRENT_HOST_REVIEW_ARTIFACTS = new Set([
   'verification/current-h100x4-direct-postinstall-adjudications.json',
   'verification/evidence/2026-09-09-h100x4-direct-install-attempt-02/postcheck-02.json',
   'verification/current-h100x4-rental-adjudications.json',
+  CURRENT_AUTHORITY_ADJUDICATION,
+  'verification/evidence/2026-09-09-host-authority-correction-attempt-01/pre-authority-current-host-docs-review.json',
+  'verification/evidence/2026-09-09-host-authority-correction-attempt-01/agreement-source-01.json',
+  'verification/evidence/2026-09-09-host-authority-correction-attempt-01/cli-listing-source-01.json',
   TWO_DEFECT_TRANSITION,
   'verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/rate-001/listing-request-01.json',
   'verification/evidence/2026-09-09-h100x4-listing-rental-attempt-02/rate-001/listing-response-01.json',
@@ -332,7 +396,7 @@ const CURRENT_HOST_READONLY_BLOCKER_RATIONALE = 'CURRENT PREREQUISITE: The prese
 // generator cannot expand this gate without a deliberate reviewer-code change.
 const CURRENT_PRODUCT_CLAIM_ID = 'MCL-e12ac9f6be2ce502';
 const CURRENT_PRODUCT_DECISION = 'CURRENT_PRODUCT_PUBLICATION_ADJUDICATION';
-const CURRENT_PRODUCT_CLAIM_SHA256 = 'd650479165238c24f4582a7176c0d36600728edbcac0853084cdb4530f87c066';
+const CURRENT_PRODUCT_CLAIM_SHA256 = 'db08fba542604fe57b73527aa66a8fb5fe7fa1a160dce3f340ace92e2f183e62';
 const CURRENT_PRODUCT_ARTIFACTS = new Map([
   ['verification/current-host-product-publications.json', 'e85ee279fb2b76aaf485210c177523f325b0631e7c496d0906fc4869f4a74af3'],
   ['verification/evidence/2026-09-08-host-live-readonly-attempt-01/product-source-capture-02.json', '50402fe4c97a54f9ac89d2f003b1c42329f708162a4691de214a3aa6bd3eac12'],
@@ -585,7 +649,9 @@ function vvRepositoryFile(relativePath, message = 'invalid V&V repository file')
     relativeRealPath.startsWith(`..${path.sep}`) || path.isAbsolute(relativeRealPath)) {
     throw new Error(message);
   }
-  return { fileUrl, bytes: fs.readFileSync(fileUrl), realPath };
+  const actualBytes = fs.readFileSync(fileUrl);
+  if (AUTHORITY_SCAN_HISTORICAL_READS && !AUTHORITY_SCAN_HISTORICAL_SOURCES?.has(relativePath)) AUTHORITY_SCAN_HISTORICAL_READS.set(relativePath, vvHash(actualBytes));
+  return { fileUrl, bytes: AUTHORITY_SCAN_HISTORICAL_SOURCES?.get(relativePath) || actualBytes, realPath };
 }
 function vvCitationRefKind(href) {
   if (href.startsWith('/') || href.startsWith('#')) return 'LOCAL_DOCUMENTATION';
@@ -1821,10 +1887,82 @@ function currentTwoDefectTransitionPage(page, message) {
   const actual = page.claims.map((claim) => claim.id).sort();
   if (JSON.stringify(actual) !== JSON.stringify([...expected].sort())) throw new Error(message);
 }
+let CURRENT_HOST_AUTHORITY;
+function currentHostAuthority(message) {
+  if (CURRENT_HOST_AUTHORITY) return CURRENT_HOST_AUTHORITY;
+  const bytes = vvRepositoryFile(CURRENT_AUTHORITY_ADJUDICATION, message).bytes;
+  if (vvHash(bytes) !== CURRENT_AUTHORITY_ADJUDICATION_SHA256) throw new Error(message);
+  const value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+  vvExactKeys(value, ['schema_version', 'artifact_type', 'purpose', 'baseline', 'artifacts'], message);
+  if (value.schema_version !== 1 || value.artifact_type !== 'CURRENT_HOST_AUTHORITY_ADJUDICATION_INPUT' ||
+    value.baseline?.path !== 'verification/evidence/2026-09-09-host-authority-correction-attempt-01/pre-authority-current-host-docs-review.json' ||
+    value.baseline?.sha256 !== '8b24aad067b2d98d41cd1824a31a831fa88f9a9cfaa8cb39379c6c37839bdaf9' ||
+    vvHash(vvRepositoryFile(value.baseline.path, message).bytes) !== value.baseline.sha256) throw new Error(message);
+  const artifacts = new Map();
+  for (const row of vvArray(value.artifacts)) {
+    vvExactKeys(row, ['id', 'path', 'sha256'], message);
+    const path = vvSafeRepositoryPath(row.path, message);
+    if (artifacts.has(row.id) || vvHash(vvRepositoryFile(path, message).bytes) !== currentReviewHash(row.sha256, message)) throw new Error(message);
+    artifacts.set(row.id, path);
+  }
+  if (JSON.stringify([...artifacts.keys()]) !== JSON.stringify(['agreement', 'cli', 'request', 'response', 'readback', 'verification'])) throw new Error(message);
+  const baseline = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(vvRepositoryFile(value.baseline.path, message).bytes));
+  const baselineClaims = new Map(vvArray(baseline.pages).flatMap((page) => vvArray(page.claims).map((claim) => [claim.id, claim])));
+  const baselineRoutes = new Map(vvArray(baseline.pages).flatMap((page) => vvArray(page.claims).map((claim) => [claim.id, page.route])));
+  CURRENT_HOST_AUTHORITY = { artifacts, baselineClaims, baselineRoutes };
+  return CURRENT_HOST_AUTHORITY;
+}
+function currentHostAuthorityPass(value, page, history, evidenceRefs, sourceRefs, message) {
+  if (history.carryDecision !== CURRENT_AUTHORITY_DECISION) return false;
+  const authority = currentHostAuthority(message);
+  if (page.sourceSha256 !== CURRENT_AUTHORITY_PAGES.get(page.route)) throw new Error(message);
+  const boundedRecord = CURRENT_AUTHORITY_POST.has(value.id) || CURRENT_AUTHORITY_PARTIAL.has(value.id);
+  if (boundedRecord && !evidenceRefs.some((ref) => ref.artifactRef === CURRENT_AUTHORITY_ADJUDICATION && ref.role === CURRENT_AUTHORITY_DECISION)) throw new Error(message);
+  const canonical = (item) => Array.isArray(item) ? item.map(canonical) : item && typeof item === 'object'
+    ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, canonical(item[key])])) : item;
+  if (CURRENT_AUTHORITY_POST.has(value.id) && vvHash(Buffer.from(JSON.stringify(canonical(value)), 'utf8')) !== CURRENT_AUTHORITY_POST.get(value.id)) throw new Error(message);
+  if (CURRENT_AUTHORITY_TECHNICAL.has(value.id)) {
+    return value.status === 'PASS' && page.route === '/host/hosting-overview' && value.classification === 'IMPLEMENTATION_OR_CONCEPT' &&
+      JSON.stringify(value.required_evidence_types) === JSON.stringify(['CANONICAL_IMPLEMENTATION_SOURCE']) &&
+      sourceRefs.length === 1 && sourceRefs[0].repository === 'vast-ai/vast-cli' && sourceRefs[0].revision === 'ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd' &&
+      evidenceRefs.length === 6 && evidenceRefs.some((ref) => ref.artifactRef === authority.artifacts.get('cli') && ref.role === 'CANONICAL_IMPLEMENTATION_SOURCE') &&
+      ['request', 'response', 'readback', 'verification'].every((id) => evidenceRefs.some((ref) => ref.artifactRef === authority.artifacts.get(id) && ref.role === 'RETAINED_LISTING_READBACK'));
+  }
+  if (CURRENT_AUTHORITY_AGREEMENT_PASS.has(value.id)) {
+    return value.status === 'PASS' && value.classification === 'POLICY_OR_COMMERCIAL' &&
+      JSON.stringify(value.required_evidence_types) === JSON.stringify(['AUTHORITATIVE_DOCUMENTATION_CITATION']) &&
+      sourceRefs.length === 1 && sourceRefs[0].repository === 'vast-ai/hosting-agreement' && sourceRefs[0].path === 'https://cloud.vast.ai/host/agreement' &&
+      sourceRefs[0].locator === CURRENT_AUTHORITY_AGREEMENT_HEADINGS.get(value.id) && evidenceRefs.length === 2 &&
+      evidenceRefs.some((ref) => ref.artifactRef === authority.artifacts.get('agreement') && ref.role === 'AUTHORITATIVE_DOCUMENTATION_CITATION');
+  }
+  if (CURRENT_AUTHORITY_PARTIAL.has(value.id)) {
+    if (value.status !== 'FAIL' || vvHash(Buffer.from(JSON.stringify(canonical(value)), 'utf8')) !== CURRENT_AUTHORITY_PARTIAL_POST.get(value.id) ||
+      sourceRefs.length !== 1 || sourceRefs[0].repository !== 'vast-ai/hosting-agreement' ||
+      sourceRefs[0].locator !== CURRENT_AUTHORITY_AGREEMENT_HEADINGS.get(value.id) || evidenceRefs.length !== 2 ||
+      !evidenceRefs.some((ref) => ref.artifactRef === authority.artifacts.get('agreement') && ref.role === 'AUTHORITATIVE_DOCUMENTATION_CITATION')) throw new Error(message);
+    return false;
+  }
+  const prior = authority.baselineClaims.get(value.id);
+  if (!prior || authority.baselineRoutes.get(value.id) !== page.route || value.coverage_state !== 'CHANGED' || value.text !== prior.text ||
+    JSON.stringify(value.headings) !== JSON.stringify(prior.headings) || value.status !== prior.status ||
+    value.classification !== prior.classification || JSON.stringify(value.required_evidence_types) !== JSON.stringify(prior.required_evidence_types) ||
+    value.owner_role !== prior.owner_role || value.rationale !== prior.rationale || value.next_action !== prior.next_action ||
+    JSON.stringify(value.evidence_refs) !== JSON.stringify(prior.evidence_refs) || JSON.stringify(value.source_refs) !== JSON.stringify(prior.source_refs) ||
+    value.history.baseline_claim_id !== prior.history.baseline_claim_id || value.history.baseline_source_text_sha256 !== prior.history.baseline_source_text_sha256 ||
+    !value.history.reason.endsWith(' Exact unchanged literal was rebound through the authority transition; no whole-page PASS transfer occurred.')) throw new Error(message);
+  return true;
+}
 function currentReviewRefs(value, message, claimId) {
   return currentReviewExactArray(value, message).map((item) => {
     vvExactKeys(item, ['id', 'role', 'limit', 'artifact_ref'], message);
     const artifactRef = vvSafeRepositoryPath(item.artifact_ref, message);
+    if (CURRENT_AUTHORITY_SCAN) {
+      // The whole claim/support record and all referenced bytes have already
+      // been independently projected from fixed before and registry digests.
+      const wanted = CURRENT_AUTHORITY_SCAN.artifactHashes.get(artifactRef);
+      if (!wanted || vvHash(vvRepositoryFile(artifactRef, message).bytes) !== wanted) throw new Error(message);
+      return { id: vvIdentifier(item.id), role: vvIdentifier(item.role), limit: currentReviewText(item.limit, message), artifactRef, artifactSha256: wanted };
+    }
     let artifactBytes;
     let retainedHistoricalArtifact = false;
     const liveAdjudicationArtifact = artifactRef === 'verification/evidence/2026-09-08-host-live-readonly-attempt-01/market-api-01.json' &&
@@ -1834,10 +1972,14 @@ function currentReviewRefs(value, message, claimId) {
     const connection = currentHostConnectionAdjudications(message).get(claimId);
     const connectionArtifact = Boolean(connection && ([CURRENT_CONNECTION_ADJUDICATION, ...connection.artifact_ids.map((id) => connection.artifacts.get(id).path)].includes(artifactRef)));
     const rentalArtifact = artifactRef === H100_RENTAL_ADJUDICATION || [...H100_RENTAL_ARTIFACTS.values()].some(([path]) => path === artifactRef);
+    const authorityListingArtifact = CURRENT_AUTHORITY_TECHNICAL.has(claimId) &&
+      ['LISTING_REQUEST', 'LISTING_RESPONSE', 'LISTING_READBACK', 'LISTING_VERIFICATION']
+        .some((id) => H100_RENTAL_ARTIFACTS.get(id)?.[0] === artifactRef) &&
+      item.role === 'RETAINED_LISTING_READBACK';
     const transitionCandidate = artifactRef === TWO_DEFECT_TRANSITION || artifactRef.startsWith(TWO_DEFECT_TRANSITION_PREFIX);
     const transitionArtifact = transitionCandidate ? currentTwoDefectTransition(message).artifacts.get(artifactRef) : null;
     if (transitionCandidate && !transitionArtifact) throw new Error(message);
-    if (rentalArtifact) {
+    if (rentalArtifact && !authorityListingArtifact) {
       const wanted = currentH100RentalAdjudications(message).get(claimId)?.refs.find((ref) => ref.artifactRef === artifactRef);
       if (!wanted || item.id !== wanted.id || item.role !== wanted.role || item.limit !== wanted.limit) throw new Error(message);
     }
@@ -1949,7 +2091,13 @@ function currentHostReadonlyAdjudications(message) {
     }
     result.set(entry.claim_id, { id: entry.id, route: entry.route, sourceFile: entry.source_file, sourceSha256: entry.source_sha256,
       headings: entry.headings, span: entry.span, literal: entry.literal, priorHash: entry.previous_claim_sha256,
-      lanes, limits: entry.limits, sourceOnly, sourceRefs: bindings.map((row) => ({ repository: 'vast-ai/vast-cli', revision, path: row.path, locator: row.url, sourceKind: 'CANONICAL_CLI_SOURCE' })) });
+      lanes, limits: entry.limits, sourceOnly, sourceRefs: bindings.map((row) => ({ repository: 'vast-ai/vast-cli', revision, path: row.path, locator: row.url, sourceKind: 'CANONICAL_CLI_SOURCE' })),
+      observations: entry.checks.map(check => {
+        const artifact = input.artifacts.find(row => row.kind === ({ D: 'batch_d', E: 'batch_e', N: 'new_cli', S: 'new_search' })[check.batch]);
+        const record = records[check.batch].get(check.check_id);
+        return { id: check.check_id, artifactRef: artifact.path, artifactSha256: artifact.sha256,
+          command: vvText(record.command || 'vastai ' + check.argv.join(' ')), recordedAt: record.started_at || record.timestamp || '2026-09-08' };
+      }) });
   }
   if (expected.size || result.size !== 10) throw new Error(message);
   const blockers = new Map();
@@ -1963,6 +2111,14 @@ function currentHostReadonlyAdjudications(message) {
   if (blockers.size !== 2) throw new Error(message);
   CURRENT_HOST_READONLY_ADJUDICATIONS = { result, blockers };
   return CURRENT_HOST_READONLY_ADJUDICATIONS;
+}
+function currentReadonlyProof(claim) {
+  if (!claim || claim.status !== 'PASS') return null;
+  const entry = currentHostReadonlyAdjudications('invalid current readonly proof').result.get(claim.id);
+  if (!entry || claim.text !== entry.literal || !claim.evidenceRefs.some(ref =>
+    ref.artifactRef === CURRENT_HOST_READONLY_ADJUDICATION_INPUT && ref.id === entry.id &&
+    ref.role === 'CURRENT_HOST_READONLY_COMMAND_ADJUDICATION' && ref.limit === entry.limits)) return null;
+  return { sourceOnly: entry.sourceOnly, limit: vvText(entry.limits), checks: entry.observations };
 }
 let CURRENT_LIVE_ENDPOINT_ADJUDICATIONS;
 function currentLiveEndpointAdjudications(message) {
@@ -2023,7 +2179,7 @@ function currentLiveEndpointAdjudications(message) {
   CURRENT_LIVE_ENDPOINT_ADJUDICATIONS = records;
   return records;
 }
-function currentReviewSourceRefs(value, message) {
+function currentReviewSourceRefs(value, message, claimId) {
   return currentReviewExactArray(value, message).map((item) => {
     vvExactKeys(item, ['repository', 'revision', 'path', 'locator', 'source_kind'], message);
     const repository = currentReviewText(item.repository, message);
@@ -2032,6 +2188,32 @@ function currentReviewSourceRefs(value, message) {
         !CURRENT_PRODUCT_SOURCES.has(item.path) || CURRENT_PRODUCT_SOURCES.get(item.path) !== item.revision) throw new Error(message);
       return { repository, revision: item.revision, path: item.path,
         locator: currentReviewText(item.locator, message), sourceKind: item.source_kind };
+    }
+    if (repository === 'vast-ai/hosting-agreement') {
+      if (item.path !== 'https://cloud.vast.ai/host/agreement' ||
+        item.revision !== 'sha256:1b04ae5bb85fdbdb687cf8fb331e2d7b56f061ffb0a6edf05751a79e4aff689c' ||
+        item.source_kind !== 'AUTHORITATIVE_DOCUMENTATION_CITATION' ||
+        !['PERFORMANCE OF SERVICES', 'OPERATION AND MAINTENANCE', 'INTELLECTUAL PROPERTY AND DATA SECURITY'].includes(item.locator)) throw new Error(message);
+      return { repository, revision: item.revision, path: item.path,
+        locator: currentReviewText(item.locator, message), sourceKind: item.source_kind };
+    }
+    if (repository === 'official-publication') {
+      const locator = currentReviewText(item.locator, message);
+      const revision = currentReviewText(item.revision, message);
+      const projected = CURRENT_AUTHORITY_SCAN?.matches.get(claimId)?.claim.source_refs || [];
+      const exact = projected.some((source) => source.repository === repository && source.revision === revision &&
+        source.path === item.path && source.locator === locator && source.source_kind === item.source_kind);
+      if (!exact || item.source_kind !== 'AUTHORITATIVE_DOCUMENTATION_CITATION') throw new Error(message);
+      if (item.path === 'https://vast.ai/terms') {
+        const pointers = locator.split('; ');
+        const termsBasis = CURRENT_AUTHORITY_SCAN.presentation.get(claimId)?.basis.filter((basis) =>
+          basis.sourceUrl === 'https://vast.ai/terms' && `sha256:${CURRENT_AUTHORITY_SCAN.artifactHashes.get(basis.artifactRef)}` === revision) || [];
+        const exactPointers = pointers.length && new Set(pointers).size === pointers.length && pointers.every((pointer) =>
+          /^\/sections\/[012]\/(?:text|items\/[0-8]\/text)$/.test(pointer) &&
+          termsBasis.some((basis) => basis.text_pointer === pointer));
+        if (!exactPointers) throw new Error(message);
+      }
+      return { repository, revision: item.revision, path: item.path, locator, sourceKind: item.source_kind };
     }
     if (!new Set(['vast-ai/docs', 'vast-ai/vast-cli', 'vast-ai/self-test']).has(repository)) throw new Error(message);
     const revision = currentReviewText(item.revision, message);
@@ -2045,7 +2227,7 @@ function currentReviewSourceRefs(value, message) {
 function currentReviewHistory(value, coverageState, message, claimId) {
   vvExactKeys(value, ['baseline_claim_id', 'baseline_source_text_sha256', 'carry_decision', 'reason'], message);
   if (!CURRENT_HOST_REVIEW_CARRY.has(value.carry_decision) && !(claimId === CURRENT_PRODUCT_CLAIM_ID &&
-    coverageState === 'UNCHANGED_EXACT' && value.carry_decision === CURRENT_PRODUCT_DECISION)) throw new Error(message);
+    value.carry_decision === CURRENT_PRODUCT_DECISION)) throw new Error(message);
   if ([TWO_DEFECT_REPLACEMENT_DECISION, TWO_DEFECT_LITERAL_DECISION].includes(value.carry_decision) &&
     !currentTwoDefectTransition(message).replacements.has(claimId) && !currentTwoDefectTransition(message).inventory.has(claimId)) throw new Error(message);
   if (coverageState === 'UNCHANGED_EXACT' && value.baseline_claim_id === null) throw new Error(message);
@@ -2073,8 +2255,7 @@ function currentStaticCheckPassed(evidenceId, message) {
   const source = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(
     vvRepositoryFile('verification/evidence/2026-09-07-host-current-vv-attempt-01/current-static-checks.json', message).bytes,
   ));
-  const check = vvArray(source.checks).find((item) => item?.id === evidenceId);
-  return check?.result === 'PASS' && Array.isArray(check.hrefs) && check.hrefs.length > 0 &&
+  const currentRowsPass = (check) => check?.result === 'PASS' && Array.isArray(check.hrefs) && check.hrefs.length > 0 &&
     check.hrefs.every((row) => row.result === 'PASS' && typeof row.href === 'string' &&
       (() => {
         const sourceFile = vvSafeRepositoryPath(row.source_file, message);
@@ -2089,6 +2270,44 @@ function currentStaticCheckPassed(evidenceId, message) {
         return [...transition.changedPages.values()].some((page) =>
           page.sourceFile === sourceFile && page.snapshotSha256 === recorded && page.sourceSha256 === actual);
       })());
+  if (currentRowsPass(vvArray(source.checks).find((item) => item?.id === evidenceId))) return true;
+  const authorityBytes = vvRepositoryFile(CURRENT_AUTHORITY_STATIC_EVIDENCE, message).bytes;
+  if (vvHash(authorityBytes) !== CURRENT_AUTHORITY_STATIC_EVIDENCE_SHA256) return false;
+  const authority = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(authorityBytes));
+  if (authority.schema_version !== '1.0' || authority.record_type !== 'HOST_DOCS_CURRENT_STATIC_CHECKS' ||
+    authority.generated_at !== '2026-09-09T17:05:39Z' || !Array.isArray(authority.checks)) return false;
+  const authorityCheck = vvArray(authority.checks).find((item) => item?.id === evidenceId);
+  const authorityRows = new Map(vvArray(authorityCheck?.hrefs).map((row) => [`${row.source_file}\0${row.href}`, row]));
+  const authorityBaselinePages = new Map([
+    ['host/hosting-overview.mdx', '0893d15921f55e4fae9a0aef5110336877d63d2698fe4c418bb4456fae686c7e'],
+    ['host/workload-policy.mdx', '7b2f881680eba85e9cdc99cf93fd572e610bff601886f9d119b4f01cef99e5e0'],
+    ['host/hosting-agreement.mdx', 'db7809efb75dcfd740a89f65eef4777dbe578f14cafab9cdec2e66b245d86f36'],
+    ['host/community.mdx', '00b8811e0279d2d112032c3559324095c435379ed4f0bbfa25ad9f5892b715c4'],
+  ]);
+  const authorityCurrentPages = new Map([
+    ['host/hosting-overview.mdx', CURRENT_AUTHORITY_PAGES.get('/host/hosting-overview')],
+    ['host/workload-policy.mdx', CURRENT_AUTHORITY_PAGES.get('/host/workload-policy')],
+    ['host/hosting-agreement.mdx', CURRENT_AUTHORITY_PAGES.get('/host/hosting-agreement')],
+    ['host/community.mdx', CURRENT_AUTHORITY_PAGES.get('/host/community')],
+  ]);
+  const legacyCheck = vvArray(source.checks).find((item) => item?.id === evidenceId);
+  const authorityTransitionRows = legacyCheck?.result === 'PASS' && vvArray(legacyCheck.hrefs).every((row) => {
+    if (row?.result !== 'PASS' || typeof row.href !== 'string') return false;
+    const sourceFile = vvSafeRepositoryPath(row.source_file, message);
+    const recorded = currentReviewHash(row.source_sha256, message);
+    const actual = vvHash(vvCurrentSourceFile(sourceFile, message).bytes);
+    if (actual === recorded) return true;
+    const transition = currentTwoDefectTransition(message);
+    if ([...transition.changedPages.values()].some((page) =>
+      page.sourceFile === sourceFile && page.snapshotSha256 === recorded && page.sourceSha256 === actual)) return true;
+    const authorityRow = authorityRows.get(`${sourceFile}\0${row.href}`);
+    return authorityBaselinePages.get(sourceFile) === recorded && authorityCurrentPages.get(sourceFile) === actual &&
+      authorityRow?.result === 'PASS' && authorityRow.source_sha256 === actual;
+  });
+  // The frozen authority-specific static retest verifies every current href
+  // after exactly four citation-only pages changed. It does not create product
+  // or runtime proof, and its bytes are independently pinned above.
+  return Boolean(authorityTransitionRows && authorityCheck?.result === 'PASS');
 }
 function currentProductPublicationPass(value, page, message) {
   // The canonical claim pin covers every field, including exact source/evidence
@@ -2098,7 +2317,7 @@ function currentProductPublicationPass(value, page, message) {
     ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, canonical(item[key])])) : item;
   if (value.id !== CURRENT_PRODUCT_CLAIM_ID || page.route !== '/host/hosting-overview' ||
     page.sourceFile !== 'host/hosting-overview.mdx' ||
-    page.sourceSha256 !== '0893d15921f55e4fae9a0aef5110336877d63d2698fe4c418bb4456fae686c7e' ||
+    !['0893d15921f55e4fae9a0aef5110336877d63d2698fe4c418bb4456fae686c7e', '3d64b0bcfba203133725d654d1bb4c462b7ab8cfb577e94fcba3c37ffcf80ec3'].includes(page.sourceSha256) ||
     vvHash(Buffer.from(JSON.stringify(canonical(value)), 'utf8')) !== CURRENT_PRODUCT_CLAIM_SHA256) return false;
   for (const [artifact, digest] of CURRENT_PRODUCT_ARTIFACTS) {
     if (vvHash(vvRepositoryFile(artifact, message).bytes) !== digest) throw new Error(message);
@@ -2110,7 +2329,7 @@ function currentReviewClaim(value, page, sourceCache, message) {
     'rationale', 'next_action', 'evidence_refs', 'source_refs', 'history', 'classification', 'coverage_state'], message);
   const coverageState = currentReviewCoverage(value.coverage_state, message);
   const id = vvIdentifier(value.id);
-  if (coverageState !== page.coverageState) throw new Error(message);
+  if (!CURRENT_AUTHORITY_SCAN && coverageState !== page.coverageState) throw new Error(message);
   const allowedFiles = new Set([page.sourceFile, ...page.dependencies.map((dependency) => dependency.sourceFile)]);
   const spans = currentReviewExactArray(value.spans, message).map((span) => currentReviewSpan(span, allowedFiles, sourceCache, message));
   if (!spans.length) throw new Error(message);
@@ -2123,11 +2342,39 @@ function currentReviewClaim(value, page, sourceCache, message) {
   }));
   const headings = currentReviewHeadings(value.headings, sourceIndexes, spans, message);
   const status = currentReviewStatus(value.status, message);
+  if (CURRENT_AUTHORITY_SCAN) {
+    const matched = CURRENT_AUTHORITY_SCAN.matches.get(id);
+    if (!matched || JSON.stringify(matched.claim) !== JSON.stringify(value)) throw new Error(message);
+    const sourcePassages = spans.map(span => {
+      const source = sourceCache.get(span.sourceFile), raw = currentReviewLines(source).slice(span.start - 1, span.end).join('\n').trim();
+      const displayed = vvText(raw), index = sourceIndexes.get(span.sourceFile), section = vvSectionAtLine(index, span.start);
+      const repeats = []; for (let start = 1; start <= index.lines.length - (span.end - span.start); start++) {
+        if (vvSectionAtLine(index, start) === section && index.lines.slice(start - 1, start + span.end - span.start).join('\n').trim() === raw) repeats.push(start);
+      }
+      return { sourceFile: span.sourceFile, start: span.start, end: span.end, text: displayed, redacted: displayed !== raw, section,
+        occurrence: displayed !== raw ? 0 : repeats.indexOf(span.start), occurrences: displayed !== raw ? 1 : repeats.length };
+    });
+    const sourceRefs = value.source_refs.map(item => {
+      vvExactKeys(item, ['repository', 'revision', 'path', 'locator', 'source_kind'], message);
+      return { repository: currentReviewText(item.repository, message), revision: currentReviewText(item.revision, message),
+        path: currentReviewText(item.path, message), locator: currentReviewText(item.locator, message), sourceKind: vvIdentifier(item.source_kind) };
+    });
+    return { id, text: currentReviewText(value.text, message), headings, spans, status, requiredEvidenceTypes: value.required_evidence_types,
+      ownerRole: currentReviewText(value.owner_role, message), rationale: currentReviewText(value.rationale, message), nextAction: currentReviewText(value.next_action, message),
+      evidenceRefs: currentReviewRefs(value.evidence_refs, message, id), sourceRefs,
+      history: { baselineClaimId: value.history.baseline_claim_id, baselineSourceTextSha256: value.history.baseline_source_text_sha256,
+        carryDecision: value.history.carry_decision, reason: currentReviewText(value.history.reason, message) },
+      sourcePassages, sourceLocation: { file: page.sourceFile, spans: spans.map(span => ({start: span.start, end: span.end})) },
+      classification: vvIdentifier(value.classification), coverageState, sourceTransition: null,
+      authorityScan: CURRENT_AUTHORITY_SCAN.presentation.has(id) ? JSON.parse(JSON.stringify(CURRENT_AUTHORITY_SCAN.presentation.get(id),
+        (key, item) => typeof item === 'string' && ['text','rationale','next_action','reason','reviewRationale','remaining','excerpt','support_rationale','sourceLabel','sourceLocator','owner_role','limit'].includes(key) ? vvText(item) : item)) : null };
+  }
   const connection = currentHostConnectionAdjudications(message).get(id) || null;
   const history = currentReviewHistory(value.history, coverageState, message, id);
   const evidenceRefs = currentReviewRefs(value.evidence_refs, message, id);
-  const sourceRefs = currentReviewSourceRefs(value.source_refs, message);
+  const sourceRefs = currentReviewSourceRefs(value.source_refs, message, id);
   const connectionPass = connection ? currentHostConnectionClaim(value, page, connection, message) : false;
+  const authorityPass = currentHostAuthorityPass(value, page, history, evidenceRefs, sourceRefs, message);
   const sourceTransition = !connection && coverageState === 'CHANGED' && ['/host/first-24-hours', '/host/vms'].includes(page.route)
     ? currentTwoDefectTransitionClaim(value, page, message) : null;
   if ([TWO_DEFECT_REPLACEMENT_DECISION, TWO_DEFECT_LITERAL_DECISION].includes(history.carryDecision) && !sourceTransition) throw new Error(message);
@@ -2211,7 +2458,7 @@ function currentReviewClaim(value, page, sourceCache, message) {
   if (productTagged && !productPublicationPass) throw new Error(message);
   if (connection && history.carryDecision !== CURRENT_CONNECTION_DECISION) throw new Error(message);
   if (status === 'PASS' && !((coverageState === 'UNCHANGED_EXACT' && history.carryDecision === 'CARRIED_FORWARD_EXACT_SOURCE') ||
-    staticNavigationPass || liveEndpointPass || readonlyPass || directPostinstallPass || rentalRuntime || rentalTransitionRuntime || transitionLiteralPass || productPublicationPass || connectionPass)) throw new Error(message);
+    staticNavigationPass || liveEndpointPass || readonlyPass || directPostinstallPass || rentalRuntime || rentalTransitionRuntime || transitionLiteralPass || productPublicationPass || connectionPass || authorityPass)) throw new Error(message);
   const passageSpans = spans.flatMap((span) => {
     const index = sourceIndexes.get(span.sourceFile);
     const contained = vvGenericMaterialClaims({ sourceIndex: index, sourceFile: span.sourceFile, route: page.route })
@@ -2246,7 +2493,7 @@ function currentReviewClaim(value, page, sourceCache, message) {
 function currentReviewProcedure(value, page, sourceCache, message) {
   vvExactKeys(value, ['id', 'title', 'coverage_state', 'status', 'headings', 'spans', 'limits', 'history', 'nodes'], message);
   const coverageState = currentReviewCoverage(value.coverage_state, message);
-  if (coverageState !== page.coverageState) throw new Error(message);
+  if (!CURRENT_AUTHORITY_SCAN && coverageState !== page.coverageState) throw new Error(message);
   const allowedFiles = new Set([page.sourceFile, ...page.dependencies.map((dependency) => dependency.sourceFile)]);
   const spans = currentReviewExactArray(value.spans, message).map((span) => currentReviewSpan(span, allowedFiles, sourceCache, message));
   const sourceText = sourceCache.get(page.sourceFile) || currentReviewSourceText(page.sourceFile, message);
@@ -2258,9 +2505,9 @@ function currentReviewProcedure(value, page, sourceCache, message) {
   }));
   const headings = currentReviewHeadings(value.headings, sourceIndexes, spans, message, { allowIntroduction: true, allowOutsideHeadings: true });
   vvExactKeys(value.history, ['baseline_test_set_id', 'carry_decision', 'reason'], message);
-  if (!CURRENT_HOST_REVIEW_CARRY.has(value.history.carry_decision) ||
+  if ((!CURRENT_HOST_REVIEW_CARRY.has(value.history.carry_decision) && !(CURRENT_AUTHORITY_SCAN && CURRENT_REVIEW_RELOCATIONS.has(value.history.carry_decision))) ||
     [TWO_DEFECT_REPLACEMENT_DECISION, TWO_DEFECT_LITERAL_DECISION].includes(value.history.carry_decision) ||
-    (coverageState === 'NEW') !== (value.history.baseline_test_set_id === null)) throw new Error(message);
+    (!CURRENT_AUTHORITY_SCAN && (coverageState === 'NEW') !== (value.history.baseline_test_set_id === null))) throw new Error(message);
   if (value.history.baseline_test_set_id !== null) vvIdentifier(value.history.baseline_test_set_id);
   const nodes = currentReviewExactArray(value.nodes, message).map((node) => {
     try {
@@ -2269,9 +2516,10 @@ function currentReviewProcedure(value, page, sourceCache, message) {
     if (!CURRENT_HOST_REVIEW_NODE_KINDS.has(node.kind) || typeof node.required !== 'boolean') throw new Error(message);
     const nodeCoverage = currentReviewCoverage(node.coverage_state, message);
     const nodeSpans = currentReviewExactArray(node.spans, message).map((span) => currentReviewSpan(span, allowedFiles, sourceCache, message));
-    if (!nodeSpans.length && !(nodeCoverage === 'CHANGED' && node.status === 'STALE' && node.history && node.history.baseline_target)) throw new Error(message);
+    if (!nodeSpans.length && !(nodeCoverage === 'CHANGED' && node.status === 'STALE' && node.history && (node.history.baseline_target ||
+      (CURRENT_AUTHORITY_SCAN && CURRENT_REVIEW_RELOCATIONS.has(node.history.carry_decision))))) throw new Error(message);
     vvExactKeys(node.history, ['baseline_level', 'baseline_target', 'baseline_status', 'carry_decision'], message);
-    if (!CURRENT_HOST_REVIEW_CARRY.has(node.history.carry_decision) ||
+    if ((!CURRENT_HOST_REVIEW_CARRY.has(node.history.carry_decision) && !(CURRENT_AUTHORITY_SCAN && CURRENT_REVIEW_RELOCATIONS.has(node.history.carry_decision))) ||
       [TWO_DEFECT_REPLACEMENT_DECISION, TWO_DEFECT_LITERAL_DECISION].includes(node.history.carry_decision)) throw new Error(message);
     const nodeSourceFile = currentReviewPath(node.source_file, message);
     if (!allowedFiles.has(nodeSourceFile)) throw new Error(message);
@@ -2291,11 +2539,42 @@ function currentReviewProcedure(value, page, sourceCache, message) {
     history: { baselineTestSetId: value.history.baseline_test_set_id, carryDecision: value.history.carry_decision,
       reason: currentReviewText(value.history.reason, message) }, nodes };
 }
+function validateAuthorityScanPredecessors(scan) {
+  // Re-run the existing evidence/producer-specific gates against the fixed
+  // pre-scan source bytes. The scan cannot weaken or replace these historical
+  // proof checks merely because its current prose moved. These old statuses
+  // remain historical; only the separately validated projection is displayed.
+  CURRENT_AUTHORITY_SCAN = null;
+  AUTHORITY_SCAN_HISTORICAL_SOURCES = scan.oldSources;
+  AUTHORITY_SCAN_HISTORICAL_READS = new Map();
+  try {
+    const cache = new Map([...scan.oldSources].map(([ref, bytes]) => [ref, bytes.toString('utf8')]));
+    for (const row of scan.baseline.pages) {
+      const page = { route: row.route, title: row.title, sourceFile: row.source_file, sourceSha256: row.source_sha256,
+        coverageState: row.coverage_state, dependencies: row.dependencies.map(item => ({sourceFile:item.source_file,sourceSha256:item.source_sha256})) };
+      page.claims = row.claims.map(claim => currentReviewClaim(claim, page, cache, 'invalid preserved pre-scan claim proof'));
+      page.procedures = row.procedures.map(procedure => currentReviewProcedure(procedure, page, cache, 'invalid preserved pre-scan procedure'));
+      if (['/host/first-24-hours','/host/vms'].includes(page.route) && page.coverageState === 'CHANGED') currentTwoDefectTransitionPage(page, 'invalid preserved two-defect history');
+    }
+    for (const support of scan.baseline.support_layers) currentReviewRefs(support.evidence_refs, 'invalid preserved support evidence');
+    for (const [ref, digest] of AUTHORITY_SCAN_HISTORICAL_READS) {
+      const pinned = scan.artifactHashes.get(ref);
+      if (pinned && pinned !== digest) throw new Error('conflicting preserved evidence digest');
+      scan.artifactHashes.set(ref, digest);
+    }
+  } finally {
+    AUTHORITY_SCAN_HISTORICAL_SOURCES = null;
+    AUTHORITY_SCAN_HISTORICAL_READS = null;
+    CURRENT_AUTHORITY_SCAN = scan;
+  }
+}
 function loadCurrentHostDocsReview() {
   try {
     const packageBytes = vvRepositoryFile(CURRENT_HOST_REVIEW_FILE, 'invalid current Host review package').bytes;
     if (!packageBytes.length || packageBytes.length > VV_MAX_HISTORICAL_SOURCE_BYTES || packageBytes.includes(0)) throw new Error('invalid current Host review package');
     const data = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(packageBytes));
+    CURRENT_AUTHORITY_SCAN = loadCurrentHostReviewTransition({ read: ref => vvRepositoryFile(ref, 'invalid authority scan input').bytes, model: data });
+    if (CURRENT_AUTHORITY_SCAN) validateAuthorityScanPredecessors(CURRENT_AUTHORITY_SCAN);
     vvExactKeys(data, ['schema_version', 'record_type', 'generated_at', 'source', 'history', 'pages', 'support_layers', 'counts', 'corrections'], 'invalid current Host review package');
     if (data.schema_version !== '1.0' || data.record_type !== 'HOST_DOCS_CURRENT_REVIEW' || !/^\d{4}-\d\d-\d\dT/.test(data.generated_at)) throw new Error('invalid current Host review package');
     vvExactKeys(data.source, ['repository', 'revision', 'tree', 'primary_route_count', 'cli_support_layer_count', 'sdk_support_layer_count', 'source_manifest'], 'invalid current Host review source');
@@ -2304,7 +2583,7 @@ function loadCurrentHostDocsReview() {
       data.source.cli_support_layer_count !== 18 || data.source.sdk_support_layer_count !== 15) throw new Error('invalid current Host review source');
     const expectedTree = execFileSync('git', ['-C', VV_REPOSITORY_ROOT, 'rev-parse', `${CURRENT_HOST_REVIEW_REVISION}^{tree}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     if (data.source.tree !== expectedTree) throw new Error('stale current Host review source tree');
-    vvExactKeys(data.history, ['source_revision', 'packages'], 'invalid current Host review history');
+    vvExactKeys(data.history, ['source_revision', 'packages', ...(CURRENT_AUTHORITY_SCAN ? ['authority_scan'] : [])], 'invalid current Host review history');
     if (data.history.source_revision !== VV_REVIEWED_SOURCE_REVISION) throw new Error('invalid current Host review history');
     const historicalPackages = currentReviewExactArray(data.history.packages, 'invalid current Host review history').map((item) => {
       vvExactKeys(item, ['path', 'sha256'], 'invalid current Host review history');
@@ -2402,7 +2681,7 @@ function loadCurrentHostDocsReview() {
       new Set(allNodes.map((node) => node.id)).size !== allNodes.length ||
       allNodes.some((node) => node.parentId !== null && !allNodes.some((candidate) => candidate.id === node.parentId))) throw new Error('invalid current Host review identifiers');
     const twoDefectPages = pages.filter((page) => ['/host/first-24-hours', '/host/vms'].includes(page.route) && page.coverageState === 'CHANGED');
-    if (twoDefectPages.length) {
+    if (twoDefectPages.length && !CURRENT_AUTHORITY_SCAN) {
       if (twoDefectPages.length !== 2) throw new Error('invalid two-defect transition page set');
       for (const page of twoDefectPages) currentTwoDefectTransitionPage(page, 'invalid two-defect transition page inventory');
     }
@@ -2420,7 +2699,10 @@ function loadCurrentHostDocsReview() {
       vvExactKeys(row, ['id', 'scope', 'history', 'current', 'reason'], 'invalid current Host review corrections');
       return { id: vvIdentifier(row.id), scope: currentReviewText(row.scope, 'invalid current Host review corrections'), history: currentReviewText(row.history, 'invalid current Host review corrections'), current: currentReviewText(row.current, 'invalid current Host review corrections'), reason: currentReviewText(row.reason, 'invalid current Host review corrections') };
     });
-    const artifactHashes = new Map();
+    const artifactHashes = new Map(CURRENT_AUTHORITY_SCAN?.artifactHashes || []);
+    for (const claim of allClaims) for (const check of currentReadonlyProof(claim)?.checks || []) {
+      artifactHashes.set(check.artifactRef, check.artifactSha256);
+    }
     for (const ref of [...pages.flatMap((page) => page.claims.flatMap((claim) => claim.evidenceRefs)), ...supportLayers.flatMap((layer) => layer.evidenceRefs)]) {
       const previous = artifactHashes.get(ref.artifactRef);
       if (previous && previous !== ref.artifactSha256) throw new Error('conflicting current Host review artifact');
@@ -2441,7 +2723,7 @@ function currentInstallEvidenceIntake() {
     ));
     return { available: true, ...loadInstallEvidenceIntake({
       read: (ref) => vvRepositoryFile(ref, 'invalid installation evidence intake').bytes,
-      model,
+      model: CURRENT_AUTHORITY_SCAN?.baseline || model,
     }) };
   } catch (error) {
     return { available: false, unavailableReason: vvText(error.message) };
@@ -2495,7 +2777,7 @@ function currentReviewForPath(pathname) {
   const installationEvidenceIntake = currentInstallEvidenceIntake();
   const citationDefect = (claim) => claim.status === 'FAIL' &&
     claim.requiredEvidenceTypes.includes('AUTHORITATIVE_DOCUMENTATION_CITATION');
-  return { available: true, page, corrections: CURRENT_HOST_DOCS_REVIEW.corrections.filter((row) => row.scope === page.route || row.scope === 'ALL'),
+  return { available: true, workQueue: buildHostReviewQueue(page.claims), page: { ...page, claims: page.claims.map(claim => ({ ...claim, reviewWork: describeHostReview(claim), readerCopy: hostReviewReaderCopy(claim), readonlyProof: currentReadonlyProof(claim) })) }, corrections: CURRENT_HOST_DOCS_REVIEW.corrections.filter((row) => row.scope === page.route || row.scope === 'ALL'),
     installationEvidenceIntake, citationDefects: {
       total: CURRENT_HOST_DOCS_REVIEW.pages.flatMap((row) => row.claims).filter(citationDefect).length,
       page: page.claims.filter(citationDefect).length,
@@ -6487,6 +6769,7 @@ const OVERLAY_JS = String.raw`
     '.vv-reading-status[data-status="PASS"]{background:#e4f4eb;color:#175637}.vv-reading-status[data-status="FAIL"]{background:#ffe9e5;color:#982d20}' +
     '.vv-citation-defect{margin:10px 0;padding:8px 9px;border-left:4px solid #9b2c63;background:#fff0f7;color:#65203f;font-size:12px;line-height:1.45}' +
     '.vv-citation-defect b{color:#7d1749}' +
+    '.vv-source-partial{margin:10px 0;padding:10px;border-left:4px solid #63717b;background:#f1f3f5;color:#263442;font-size:12px;line-height:1.45}.vv-source-partial>summary{cursor:pointer;font-weight:700}.vv-related-finding button{cursor:pointer;padding:7px;border:1px solid #8290a2;border-radius:5px;background:#fff;color:#273951}.vv-related-finding small{color:#4a5872}' +
     '.vv-source-transition{margin:10px 0;padding:10px;border-left:4px solid #356b9b;background:#eef6fc;color:#1d405f;font-size:12px;line-height:1.45}.vv-source-transition blockquote{margin:8px 0;padding:8px 10px;background:#fff;border-left:3px solid #79a6cb;white-space:pre-wrap}' +
     '.vv-reading-actions{display:flex;align-items:center;gap:12px;margin:10px 0}.vv-reading-actions button{background:#3548c5;color:#fff;border:0;border-radius:6px;padding:7px 10px;cursor:pointer;font-size:12px;font-weight:700}' +
     '.vv-reading a{color:#3045bd;text-decoration:underline;text-underline-offset:2px}.vv-reading button:focus-visible,.vv-reading a:focus-visible,.vv-reading select:focus-visible,.vv-reading summary:focus-visible{outline:2px solid #3045bd;outline-offset:3px}' +
@@ -6726,9 +7009,9 @@ const OVERLAY_JS = String.raw`
       .replace(/\s+/g, ' ').trim();
   }
   function readableStatus(status) {
-    return { PASS: 'Supported by evidence', UNVALIDATED: 'Needs evidence',
+    return { PASS: 'Supported by evidence', UNVALIDATED: 'Review pending',
       FAIL: 'Correction needed', BLOCKED: 'Waiting on a prerequisite',
-      STALE: 'Needs a fresh check', NOT_APPLICABLE: 'Not applicable' }[status] || 'Needs evidence';
+      STALE: 'Needs a fresh check', NOT_APPLICABLE: 'Not applicable' }[status] || 'Needs triage';
   }
   function citationDefect(claim) {
     return Boolean(claim && claim.current && claim.current.status === 'FAIL' &&
@@ -6771,7 +7054,15 @@ const OVERLAY_JS = String.raw`
     // Preserve inline-code bytes while normalizing typography in the prose
     // around them. MDX smart punctuation can turn a bare prose double hyphen into an
     // em dash, but command options and identifiers must remain literal.
-    var inline = [];
+    var inline = [], fenced = {};
+    // Composite source spans can contain prose around a fenced command. Fence
+    // delimiters and the language label are Markdown, not rendered wording.
+    // Protect the body before prose/inline normalization, retaining strict code.
+    text = text.replace(/(^|\n)[ \t]*(\x60{3,}|~{3,})[^\n]*\n([\s\S]*?)\n[ \t]*\2[ \t]*(?=\n|$)/g, function (_, prefix, delimiter, body) {
+      fenced[inline.length] = true;
+      inline.push(body);
+      return prefix + '\uE000INLINE' + (inline.length - 1) + '\uE001';
+    });
     text = text.replace(/\x60([^\x60]+)\x60/g, function (_, literal) {
       inline.push(decodeReviewEntities(literal));
       return '\uE000INLINE' + (inline.length - 1) + '\uE001';
@@ -6786,16 +7077,18 @@ const OVERLAY_JS = String.raw`
     var restoreInline = function (value) {
       return value.replace(/\uE000INLINE(\d+)\uE001/g, function (_, index) { return inline[Number(index)]; });
     };
-    var comparable = '', last = 0, marker;
+    var comparable = '', last = 0, marker, fencedSegments = [];
     var comparableText = cleaned.replace(/ · /g, '');
     var markerPattern = /\uE000INLINE(\d+)\uE001/g;
     while ((marker = markerPattern.exec(comparableText))) {
       comparable += comparableWording(comparableText.slice(last, marker.index), true);
-      comparable += comparableWording(inline[Number(marker[1])], false);
+      var literal = comparableWording(inline[Number(marker[1])], false);
+      if (fenced[Number(marker[1])]) fencedSegments.push({ start: comparable.length, text: literal });
+      comparable += literal;
       last = marker.index + marker[0].length;
     }
     comparable += comparableWording(comparableText.slice(last), true);
-    return { text: restoreInline(cleaned), code: false, comparison: comparable };
+    return { text: restoreInline(cleaned), code: false, comparison: comparable, fences: fencedSegments };
   }
   function comparableChar(c, foldTypography) {
     if (!foldTypography) return c;
@@ -6868,6 +7161,12 @@ const OVERLAY_JS = String.raw`
       comparableWording(codeClaim ? wording.text : wording.text.replace(/ · /g, ''), !codeClaim);
     var hits = [], at = -1;
     while (needle && (at = chars.indexOf(needle, at + 1)) !== -1) {
+      if ((wording.fences || []).some(function (segment) {
+        var start = offsets[at + segment.start], end = offsets[at + segment.start + segment.text.length - 1];
+        var block = start && start.node.parentElement.closest('pre');
+        return !block || !end || end.node.parentElement.closest('pre') !== block ||
+          comparableWording(block.textContent, false) !== segment.text;
+      })) continue;
       var range = document.createRange(), start = offsets[at], end = offsets[at + needle.length - 1];
       range.setStart(start.node, start.offset);
       range.setEnd(end.node, end.offset + 1);
@@ -6896,6 +7195,8 @@ const OVERLAY_JS = String.raw`
   var citationDefectFilter = 'ALL';
   var currentClaimSectionFilter = null;
   var currentCitationDefectFilter = 'ALL';
+  var currentWorkFilter = '';
+  var currentStatusFilter = 'ALL';
   var focusedReviewClaim = null;
   function clearClaimFocus() {
     focusedReviewClaim = null;
@@ -7753,19 +8054,36 @@ const OVERLAY_JS = String.raw`
   function currentClaimLocator(page, claim) {
     return {
       id: 'current-' + claim.id,
-      claim: { text: claim.text },
+      claim: { text: claim.readerCopy?.statementText || claim.text },
       checkedContent: { route: page.route, pageTitle: page.title, sections: claim.headings },
       sourceLocation: claim.sourceLocation,
-      sourcePassages: claim.sourcePassages,
+      sourcePassages: claim.readerCopy?.statementText && claim.sourcePassages?.[claim.readerCopy.statementSpanIndex]?.text === claim.readerCopy.statementText
+        ? [claim.sourcePassages[claim.readerCopy.statementSpanIndex]] : claim.sourcePassages,
     };
   }
   function currentSourceLinks(refs) {
     return (refs || []).map(function (ref) {
+      if (ref.repository === 'official-publication' && ref.sourceKind === 'AUTHORITATIVE_DOCUMENTATION_CITATION' &&
+          /^sha256:[a-f0-9]{64}$/.test(ref.revision || '') &&
+          ['https://cloud.vast.ai/host/agreement', 'https://docs.stripe.com/connect/express-dashboard-taxes',
+            'https://www.paypal.com/us/cshelp/article/how-do-i-get-a-paper-copy-of-my-tax-form-help672',
+            'https://vast.ai/compliance', 'https://vast.ai/article/Navigating-Data-Center-Compliance',
+            'https://vast.ai/article/security-and-compliance-at-vast-ai', 'https://vast.ai/terms'].includes(ref.path)) {
+        var sourceLabel = ref.path === 'https://vast.ai/terms' ? 'Vast Terms' : 'Open published source';
+        return '<a class="vv-source-link" href="' + esc(ref.path) + '" target="_blank" rel="noopener noreferrer">' + sourceLabel + '</a> <span class="vv-subject">(see the exact bound excerpt and scope above; live publication may change)</span>';
+      }
       if (ref.repository === 'vast-ai/public-website' && ref.sourceKind === 'PRODUCT_PUBLICATION_SOURCE' &&
           /^sha256:[a-f0-9]{64}$/.test(ref.revision || '') &&
           ['https://vast.ai/article/vast-ai-startup-program', 'https://vast.ai/hosting', 'https://vast.ai/products/gpu-cloud'].includes(ref.path)) {
         return '<a class="vv-source-link" href="' + esc(ref.path) + '" target="_blank" rel="noopener noreferrer">Published product source: ' +
           esc(ref.path) + '</a> <span class="vv-subject">(' + esc(ref.locator) + '; live page may change; retained excerpt is the citation)</span>';
+      }
+      if (ref.repository === 'vast-ai/hosting-agreement' && ref.sourceKind === 'AUTHORITATIVE_DOCUMENTATION_CITATION' &&
+          ref.revision === 'sha256:1b04ae5bb85fdbdb687cf8fb331e2d7b56f061ffb0a6edf05751a79e4aff689c' &&
+          ref.path === 'https://cloud.vast.ai/host/agreement' &&
+          ['PERFORMANCE OF SERVICES', 'OPERATION AND MAINTENANCE', 'INTELLECTUAL PROPERTY AND DATA SECURITY'].includes(ref.locator)) {
+        return '<a class="vv-source-link" href="' + esc(ref.path) + '" target="_blank" rel="noopener noreferrer">Hosting Agreement: ' +
+          esc(ref.locator) + '</a> <span class="vv-subject">(captured section is hash-pinned; the live agreement may change)</span>';
       }
       if (!/^vast-ai\/(?:docs|vast-cli|self-test)$/.test(ref.repository || '') ||
           !/^[a-f0-9]{40}$/.test(ref.revision || '') || !/^[A-Za-z0-9._/-]+$/.test(ref.path || '') ||
@@ -7776,17 +8094,33 @@ const OVERLAY_JS = String.raw`
     }).filter(Boolean).join('<br>');
   }
   function sourceTransitionHtml(transition, page, claim) {
-    if (!transition || !transition.oldFailClaim) return '';
-    var old = transition.oldFailClaim;
-    var href = '/__review__/current-artifact?ref=' + encodeURIComponent(TWO_DEFECT_TRANSITION_ARTIFACT) +
-      '&page=' + encodeURIComponent(page.route) + '&claim=' + encodeURIComponent(claim.id);
-    return '<div class="vv-source-transition"><b>Wording corrected; further evidence needed.</b><br>' +
-      'This current replacement is <b>UNVALIDATED</b>; it was not silently reclassified from the earlier finding.' +
-      '<br><b>Original finding history (FAIL):</b> ' + esc(old.rationale) +
-      '<blockquote>' + esc(old.text) + '</blockquote>' +
-      '<a class="vv-evidence-link" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">Open immutable transition record and original finding</a>' +
-      '<br><b>Current proof limits:</b> ' + esc((claim.evidenceRefs || []).map(function (ref) { return ref.limit; }).filter(Boolean).join('; ')) +
-      '</div>';
+    return '';
+  }
+  function authorityTransitionHtml(page, claim) {
+    if (claim.authorityScan) {
+      var scan = claim.authorityScan;
+      var hrefFor = function (ref) { return '/__review__/current-artifact?ref=' + encodeURIComponent(ref) + '&page=' + encodeURIComponent(page.route) + '&claim=' + encodeURIComponent(claim.id); };
+      if (scan.cleanup) return '<section class="vv-source-partial documentation-check"><p><b>Documentation check</b></p>' + scan.basis.map(function (basis, index) {
+        return '<p>' + esc(claim.readerCopy?.documentationCheck?.finding || basis.excerpt || scan.cleanup.reviewRationale) + '</p><a class="vv-evidence-link" href="' + esc(hrefFor(basis.artifactRef) + '&basis=' + index) +
+          '" target="_blank" rel="noopener noreferrer">Open exact documentation check ' + esc(basis.observationId) + '</a><p><b>Review scope:</b> ' + esc(claim.readerCopy?.documentationCheck?.scope || basis.support_rationale || scan.cleanup.remaining) + '</p>';
+      }).join('') + '<p>This is a local review record, not an independent product source or a runtime result.</p></section>';
+      var proofs = [], notes = [];
+      scan.basis.forEach(function (basis, index) {
+        var note = basis.kind === 'CONTEXT_REVIEW';
+        var card = '<p><b>' + esc(basis.sourceLabel) + ' — ' + esc(basis.sourceLocator) + '</b><br><a class="vv-evidence-link" href="' + esc(hrefFor(basis.artifactRef) + '&basis=' + index) + '" target="_blank" rel="noopener noreferrer">' +
+          (note ? 'Open exact review note' : 'Open exact bound source excerpt') + '</a><br><b>' +
+          (note ? 'Review scope' : claim.readerCopy?.sourceContextLabel ? 'Source scope' : 'What the source proves') + ':</b> ' + esc(basis.support_rationale) + '</p>';
+        (note ? notes : proofs).push(card);
+      });
+      var sources = proofs.length ? claim.readerCopy?.sourceContextLabel
+        ? '<details class="vv-source-partial"><summary>' + esc(claim.readerCopy.sourceContextLabel) + '</summary>' + proofs.join('') + '</details>'
+        : '<section class="vv-source-transition">' + proofs.join('') + '</section>' : '';
+      return sources + (notes.length ? '<details class="vv-source-partial review-note"><summary>Review note — not an independent source</summary>' + notes.join('') + '</details>' : '');
+    }
+    return '';
+  }
+  function bookkeepingEvidence(ref) {
+    return /^verification\/current-[^/]+\.json$|(?:^|\/)(?:before-|pre-authority-).*review\.json$|(?:^|\/)(?:check-to-claim-map|source-snapshot-[0-9]+|reconciliation[^/]*)\.json$/.test(ref.artifactRef || '') || /TAXONOMY|CLASSIFICATION|SOURCE_TRANSITION|RECONCILIATION|HISTORICAL_CONTEXT|AUDIT_CONTEXT/.test(ref.role || '');
   }
   function currentEvidenceRefs(refs, page, claim) {
     return (refs || []).map(function (ref) {
@@ -7795,22 +8129,30 @@ const OVERLAY_JS = String.raw`
       if (direct) {
         var selectedHref = '/__review__/current-artifact?ref=' + encodeURIComponent(H100_DIRECT_POSTCHECK_ARTIFACT) +
           '&page=' + encodeURIComponent(page.route) + '&claim=' + encodeURIComponent(claim.id) + '&postcheck=' + encodeURIComponent(direct.observationId);
-        var registryHref = '/__review__/current-artifact?ref=' + encodeURIComponent(ref.artifactRef) +
-          '&page=' + encodeURIComponent(page.route) + '&claim=' + encodeURIComponent(claim.id);
         return '<a class="vv-evidence-link" href="' + esc(selectedHref) + '" target="_blank" rel="noopener noreferrer">' + esc(direct.label) +
-          '</a> · selected observation <code>' + esc(direct.observationId) + '</code> · <code>' + esc(direct.predicate) + '</code><br><a class="vv-evidence-link" href="' + esc(registryHref) +
-          '" target="_blank" rel="noopener noreferrer">Open runtime adjudication record</a> · ' + esc(ref.limit);
+          '</a> · selected observation <code>' + esc(direct.observationId) + '</code> · <code>' + esc(direct.predicate) + '</code> · ' + esc(ref.limit);
       }
+      if (bookkeepingEvidence(ref) || claim.authorityScan && claim.authorityScan.basis.some(function (basis) { return basis.artifactRef === ref.artifactRef; })) return '';
       var href = '/__review__/current-artifact?ref=' + encodeURIComponent(ref.artifactRef || '') +
         '&page=' + encodeURIComponent(page.route) + '&claim=' + encodeURIComponent(claim.id);
-      var role = /HISTORICAL|CARRY/i.test(ref.role) ? 'Earlier retained check' :
+      var role = /AUTHORITATIVE_DOCUMENTATION_CITATION/i.test(ref.role) ? 'Captured authoritative source' :
+        /HISTORICAL|CARRY/i.test(ref.role) ? 'Earlier retained check' :
         /PRODUCT_PUBLICATION/i.test(ref.role) ? 'Published product description only' :
         /TAXONOMY/i.test(ref.role) ? 'Classification review' :
           /SOURCE|INSPECTION/i.test(ref.role) ? 'Client source only' :
             /NAVIGATION|STATIC/i.test(ref.role) ? 'Link check' : 'Retained check';
       return '<a class="vv-evidence-link" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">Open retained artifact</a> · <code>' +
         esc(ref.id) + '</code> · ' + esc(role) + ' · ' + esc(ref.limit);
-    }).join('<br>');
+    }).filter(Boolean).join('<br>');
+  }
+  function readonlyProofHtml(page, claim) {
+    var proof = claim.readonlyProof;
+    if (!proof) return '';
+    return '<section class="vv-source-transition"><b>' + (proof.sourceOnly ? 'Bound command source and related observation' : 'Selected retained command observations') + '</b><p><b>Scope limit:</b> ' + esc(proof.limit) + '</p>' +
+      proof.checks.map(function (check) {
+        var href = '/__review__/current-artifact?ref=' + encodeURIComponent(check.artifactRef) + '&page=' + encodeURIComponent(page.route) + '&claim=' + encodeURIComponent(claim.id) + '&readonly=' + encodeURIComponent(check.id);
+        return '<p><a class="vv-evidence-link" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">Open selected observation ' + esc(check.id) + '</a><br><code>' + esc(check.command) + '</code><br>Recorded: ' + esc(check.recordedAt) + '</p>';
+      }).join('') + '</section>';
   }
   function installationIntakeRecord(intake, page, claim) {
     if (!intake || !intake.available || page.route !== '/host/installing-host-software') return '';
@@ -7845,8 +8187,11 @@ const OVERLAY_JS = String.raw`
         '<p><b>Proof limits:</b> ' + esc((support.evidenceRefs || []).map(function (item) { return item.limit; }).join('; ')) + '</p></section>';
     }
     var page = currentReview.page;
-    var installationIntake = currentReview.installationEvidenceIntake;
+    var installationIntake = null;
     var claims = Array.isArray(page.claims) ? page.claims : [];
+    var queue = currentReview.workQueue;
+    var workFilter = typeof currentWorkFilter === 'string' ? currentWorkFilter : '';
+    var statusFilter = typeof currentStatusFilter === 'string' ? currentStatusFilter : 'ALL';
     var currentCitationDefects = claims.filter(currentCitationDefect);
     var citationSummary = currentReview.citationDefects || { total: currentCitationDefects.length, page: currentCitationDefects.length };
     var locators = claims.map(function (claim) { return currentClaimLocator(page, claim); });
@@ -7854,7 +8199,31 @@ const OVERLAY_JS = String.raw`
     var selected = currentClaimSectionFilter === null ? sectionFromHash(locators) : currentClaimSectionFilter;
     var html = '<section class="vv-reading vv-current-reading" aria-label="Current documentation review"><h3>Current documentation review</h3>' +
       '<p><b>' + esc(page.title) + '</b>.</p>' +
-      '<p>These are the current-source records for this page. The retained V&amp;V material below is historical context only.</p>';
+      '<p>Review the current wording, its bound sources, limits, and next action.</p>' +
+      '<p class="vv-review-summary">' + (queue ? esc(queue.total) + ' ' + (queue.total === 1 ? 'passage' : 'passages') + ' on this page. Use the category and completion filters to narrow them.' : 'Use the section and completion filters to narrow this page.') + '</p>' +
+      '<details class="vv-reading-audit vv-review-guide"><summary>How the review chooses evidence</summary><p>Basic product descriptions can use official Vast sources. Policy instructions need an approved rule, not a test rental. If that rule is unclear, its owner should confirm or correct it. Claims about system behavior still need technical evidence.</p></details>';
+    if (queue) {
+      html += '<section class="vv-work-queue" aria-label="Review work on this page"><h4>Review work on this page</h4><p>' + esc(queue.total) +
+        ' passages. Counts are not unique questions; support layers are separate.</p>' +
+        '<label class="vv-section-label" for="current-work-filter">Review work</label><select id="current-work-filter"><option value="">All categories</option>' +
+        queue.buckets.map(function (bucket) { return '<option value="' + esc(bucket.id) + '"' + (workFilter === bucket.id ? ' selected' : '') + '>' + esc(bucket.label) + ' (' + esc(bucket.count) + ')</option>'; }).join('') + '</select>' +
+        '<label class="vv-section-label" for="current-status-filter">Completion status</label><select id="current-status-filter"><option value="ALL">All statuses</option>' +
+        Object.keys(queue.statuses).map(function (status) { return '<option value="' + esc(status) + '"' + (statusFilter === status ? ' selected' : '') + '>' + esc(queue.statusLabels[status] || 'Needs triage') + ' (' + esc(queue.statuses[status]) + ')</option>'; }).join('') + '</select>' +
+        '<details class="vv-reading-audit vv-work-queue-details"><summary>Category descriptions and shared wording</summary>' +
+        '<p>Counts are passages, not unique questions. The category buttons below set the same visible filter.</p>' +
+        queue.buckets.filter(function (bucket) { return bucket.count || bucket.id !== 'triage'; }).map(function (bucket) {
+          return '<p><button type="button" data-current-work-category="' + esc(bucket.id) + '">' + esc(bucket.label) + ': ' + esc(bucket.count) +
+            ' passages</button><br><small>' + esc(bucket.description) + '</small></p>';
+        }).join('') +
+        '<details><summary>Shared wording on this page: ' + esc(queue.sharedWordingGroups) + ' compatible groups / ' + esc(queue.sharedWordingOccurrences) + ' passages</summary>' +
+        '<p>Shared wording is not one proven fact or a unique issue count. Each occurrence below opens its own passage and proof controls. This page-wide index is independent of the filters.</p>' +
+        queue.groups.filter(function (group) { return group.occurrenceIds.length > 1; }).map(function (group) {
+          return '<details><summary>Shared wording: ' + esc(group.occurrenceIds.length) + ' passages / ' + esc(group.type) + '</summary>' +
+            group.occurrenceIds.map(function (id) { var item = claims.find(function (claim) { return claim.id === id; });
+              return '<p><button type="button" data-current-queue-claim="' + esc(id) + '">Open passage and proof: ' + esc(item.headings.join(' / ')) + '</button><br>' + esc(item.text) + '</p>';
+            }).join('') + '</details>';
+        }).join('') + '</details></details></section>';
+    } else html += '<p><b>Review queue unavailable. Needs triage.</b> Individual records remain below; no category or shared-work count is inferred.</p>';
     if (!claims.length) html += '<p>No current statement record is present. Review the page-level procedure record and add a current statement before treating this page as verified.</p>';
     html += '<label class="vv-section-label" for="current-section-filter">Review section</label>' +
       '<select id="current-section-filter"><option value=""' + (!selected ? ' selected' : '') + '>All sections (' + claims.length + ')</option>' +
@@ -7867,49 +8236,84 @@ const OVERLAY_JS = String.raw`
         '>All current statements (' + claims.length + ')</option><option value="CITATION"' + (currentCitationDefectFilter === 'CITATION' ? ' selected' : '') +
         '>Missing authoritative citation on this page (' + currentCitationDefects.length + ')</option></select>' +
       '<p class="vv-reading-counts"><b>Current Host review:</b> ' + esc(citationSummary.total) +
-        ' missing authoritative citations across Host pages; ' + esc(citationSummary.page) + ' on this page. These are documentation/source defects, not failed runtime checks.</p>' +
+        ' missing authoritative citations across Host pages; ' + esc(citationSummary.page) + ' on this page. Link the required official sources for these statements.</p>' +
       '<p id="current-location-notice" role="status" aria-live="polite"></p>';
     claims.forEach(function (claim) {
       var locator = currentClaimLocator(page, claim);
       var claimId = esc(locator.id);
       var heading = claim.headings.length === 1 ? claim.headings[0] : claim.headings.join(' / ');
       var citationMissing = currentCitationDefect(claim);
+      var work = claim.reviewWork || {type: 'Needs triage', bucket: 'triage', statusLabel: readableStatus(claim.status)};
       var sourceTransition = claim.sourceTransition;
       var intakeRecord = installationIntakeRecord(installationIntake, page, claim);
-      var limits = Array.from(new Set((claim.evidenceRefs || []).map(function (item) { return item.limit; }).filter(Boolean)));
-      var redacted = (claim.sourcePassages || []).some(function (passage) { return passage.redacted; });
-      var passages = redacted ? [] : (claim.sourcePassages || []).map(passageWording);
+      var hasBoundSources = !!(claim.authorityScan && claim.authorityScan.basis.length);
+      var jurisdiction = claim.authorityScan && (claim.authorityScan.cleanup || claim.authorityScan.jurisdiction);
+      var priorRefs = jurisdiction ? claim.authorityScan.previous.evidence_refs || [] : [];
+      var historicalRefs = jurisdiction ? (claim.evidenceRefs || []).filter(function (ref) {
+        return priorRefs.some(function (prior) {
+          return ref.id === prior.id && ref.role === prior.role && ref.artifactRef === prior.artifact_ref && ref.limit === prior.limit;
+        }) || ref.role === 'HISTORICAL_PREDECESSOR' && ref.artifactRef === claim.authorityScan.baselineRef;
+      }) : [];
+      var currentRefs = (claim.evidenceRefs || []).filter(function (ref) { return historicalRefs.indexOf(ref) === -1; });
+      var limits = jurisdiction ? [jurisdiction.remaining] : Array.from(new Set(currentRefs.map(function (item) { return item.limit; }).filter(Boolean)));
+      var historicalEvidence = historicalRefs.length ? '<details class="vv-reading-history"><summary>Historical evidence and earlier limits</summary>' +
+        '<p>These records preserve the earlier review. Their limits describe that earlier evidence, not the current bounded finding above.</p>' +
+        historicalRefs.map(function (ref) {
+          var href = '/__review__/current-artifact?ref=' + encodeURIComponent(ref.artifactRef) +
+            '&page=' + encodeURIComponent(page.route) + '&claim=' + encodeURIComponent(claim.id);
+          return '<p><a class="vv-evidence-link" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">Earlier record: ' + esc(ref.id) +
+            '</a><br><b>Historical limit:</b> ' + esc(ref.limit) + '</p>';
+        }).join('') + '</details>' : '';
+      var redacted = (locator.sourcePassages || []).some(function (passage) { return passage.redacted; });
+      var passages = redacted ? [] : (locator.sourcePassages || []).map(passageWording);
       var literal = redacted
         ? '<p class="vv-checking"><b>Current source passage is masked in review data.</b> The checking summary below is not a quote.</p>'
         : passages.map(function (passage) { return '<blockquote' + (passage.code ? ' class="vv-code-quote"' : '') + '>' + esc(passage.text) + '</blockquote>'; }).join('');
       var sourceSummary = passages.map(function (passage) { return passage.text; }).join(' ');
-      var summary = redacted || comparableWording(sourceSummary) !== comparableWording(claim.text)
-        ? '<p class="vv-checking"><b>Checking summary:</b> ' + esc(claimWording(claim.text)) + '</p>' : '';
+      var checkingText = passageWording({ text: locator.claim.text }).text;
+      // Do not erase word boundaries or command punctuation when deciding
+      // whether a checking summary adds information to the displayed passage.
+      var summary = redacted || sourceSummary.trim() !== checkingText.trim()
+        ? '<p class="vv-checking"><b>Checking summary:</b> ' + esc(claimWording(locator.claim.text)) + '</p>' : '';
+      var copy = claim.readerCopy || { label: 'Current finding', finding: claim.rationale, nextStep: claim.nextAction };
       html += '<article class="vv-reading-card" data-review-claim="' + claimId + '" data-current-claim="' + esc(claim.id) + '" data-current-review-section="' + esc(heading) + '"' +
         ' data-current-review-sections="' + esc(JSON.stringify(claim.headings)) + '"' +
         ' data-current-citation-defect="' + (citationMissing ? 'true' : 'false') + '"' +
-        ((selected && claim.headings.indexOf(selected) === -1) || (currentCitationDefectFilter === 'CITATION' && !citationMissing) ? ' hidden' : '') + '>' +
+        ' data-current-work-bucket="' + esc(work.bucket) + '" data-current-status="' + esc(claim.status) + '"' +
+        ((selected && claim.headings.indexOf(selected) === -1) || (currentCitationDefectFilter === 'CITATION' && !citationMissing) || (workFilter && work.bucket !== workFilter) || (statusFilter !== 'ALL' && claim.status !== statusFilter) ? ' hidden' : '') + '>' +
         '<div class="vv-reading-location"><b>Page heading:</b> ' + esc(heading) + '</div>' +
         literal + summary +
-        '<span class="vv-reading-status" data-status="' + esc(claim.status) + '">' + esc(citationMissing ? 'Missing authoritative citation' : readableStatus(claim.status)) + '</span>' +
+        '<p><b>Review type:</b> ' + esc(work.type) + (copy.statusLabel || work.scopeLabel ? ' / ' + esc(copy.statusLabel || work.scopeLabel) : '') + '</p>' +
+        '<p><b>Status:</b> <span class="vv-reading-status" data-status="' + esc(claim.status) + '">' + esc(work.statusLabel) + '</span> <small>' + esc(claim.status) + '</small></p>' +
+        '<p class="vv-reader-finding"><b>' + esc(copy.label) + ':</b> ' + esc(copy.finding) + '</p>' +
+        '<p class="vv-reader-next"><b>Next step:</b> ' + esc(copy.nextStep) + '</p>' +
+        (copy.proofGuide ? '<details class="proof-guide"><summary>' + esc(copy.proofGuide.title) + '</summary>' + copy.proofGuide.items.map(function (item) {
+          return '<p><b>' + esc(item.label) + ':</b> ' + esc(item.text) + '</p>';
+        }).join('') + '<p>' + esc(copy.proofGuide.limit) + '</p></details>' : '') +
         '<div class="vv-reading-actions"><button type="button" data-show-current-claim="' + claimId + '">Show on page</button>' +
           claim.headings.map(function (item) { return '<a href="' + esc(checkedContentLink(locator.checkedContent, item).href) + '">' +
             (item === 'Introduction' ? 'Open introduction' : 'Open heading') + '</a>'; }).join(' ') + '</div>' +
+        (copy.relatedClaimId && page.claims.some(function (other) { return other.id === copy.relatedClaimId && other.status === 'PASS'; })
+          ? '<p class="vv-related-finding"><button type="button" data-related-current-claim="' + esc(copy.relatedClaimId) + '">View separate pricing-guidance finding</button><br><small>Source guidance only. It does not close the question above.</small></p>' : '') +
         sourceTransitionHtml(sourceTransition, page, claim) +
-        (citationMissing ? '<div class="vv-citation-defect"><b>Missing authoritative citation</b><br><b>Why:</b> ' + esc(claim.rationale.replace(/^CONFIRMED_CITATION_DEFECT:\s*/, '')) +
-          '<br><b>Responsible role:</b> ' + esc(claim.ownerRole) + '<br><b>Next:</b> Obtain the authoritative source for this wording from the recorded owner, add its citation, and retain a source/link retest.' +
-          '<br><span>This is a documentation/source defect, not a failed runtime check.</span></div>' : '') +
+        authorityTransitionHtml(page, claim) +
+        (copy.pendingNote ? '<div class="vv-citation-defect vv-policy-pending"><b>Still to resolve</b><br><span>' + esc(copy.pendingNote) + '</span></div>' :
+          citationMissing ? '<div class="vv-citation-defect"><b>Missing authoritative citation</b><br><span>The required source citation is missing or incomplete. Link the official source for this statement.</span></div>' : '') +
         (claim.evidenceRefs && claim.evidenceRefs.length
-          ? '<p><b>Proof limits:</b> ' + esc(limits.join('; ')) + '</p>'
+          ? '<p><b>' + (jurisdiction ? 'Current proof limits:' : 'Proof limits:') + '</b> ' + esc(copy.documentationCheck?.scope || limits.join('; ')) + '</p>'
           : intakeRecord ? '<p><b>Proof:</b> No complete or adjudicated proof is attached. The historical and installation-context records below do not change this statement status.</p>'
-            : '<p><b>Proof:</b> No supporting proof is attached.</p>') +
-        '<p><b>Owner:</b> ' + esc(claim.ownerRole) + '<br><b>Next:</b> ' + esc(claim.nextAction) + '</p>' +
-        '<p><b>Recorded evidence:</b><br>' + (currentEvidenceRefs(claim.evidenceRefs, page, claim) ||
-          (intakeRecord ? 'No adjudicated current-model artifact is linked; separate historical and installation-context records are shown below.' : 'No retained artifact reference is linked by this record.')) + '</p>' +
+            : hasBoundSources ? '<p><b>Proof:</b> See exact bound sources above.</p>' : '') +
+        historicalEvidence +
+        '<p><b>Responsible team:</b> ' + esc(claim.ownerRole) + '</p>' +
+        (currentEvidenceRefs(currentRefs, page, claim) ? '<p><b>Recorded evidence:</b><br>' + currentEvidenceRefs(currentRefs, page, claim) + '</p>' : '') +
+        readonlyProofHtml(page, claim) +
         installationIntakeHtml(installationIntake, page, claim) +
-        '<p><b>Authority sources:</b><br>' + (currentSourceLinks(claim.sourceRefs) || (intakeRecord ? 'No adjudicated current-model source pin is recorded; historical and installation-context records above are partial context only.' : 'No source pin is recorded.')) + '</p>' +
+        (currentSourceLinks(claim.sourceRefs) ? '<p><b>Supporting sources:</b><br>' + currentSourceLinks(claim.sourceRefs) + '</p>' : '') +
         '<details class="vv-reading-audit"><summary>Current record details</summary><p>Tracking ID: <code>' + esc(claim.id) +
-          '</code> · source coverage <code>' + esc(claim.coverageState) + '</code></p><p>' + esc(claim.rationale) + '</p>' +
+          '</code> · source coverage <code>' + esc(claim.coverageState) + '</code></p><p><b>Recorded status:</b> ' + esc(claim.status) + '</p><p>' + esc(claim.rationale) + '</p>' +
+          '<p><b>Recorded next action:</b> ' + esc(claim.nextAction) + '</p>' +
+          (copy.statementText ? '<p><b>Full recorded wording, including pricing context:</b></p><pre>' + esc(claim.text) + '</pre>' : '') +
+          (claim.authorityScan ? '<p><b>Recorded source gap:</b> ' + esc(claim.authorityScan.remaining) + '</p>' : '') +
           '<p>Source lines: ' + esc(claim.spans.map(function (span) { return span.sourceFile + ':' + span.start + '–' + span.end; }).join(', ')) + '</p></details></article>';
     });
     return html + '</section>';
@@ -7932,8 +8336,13 @@ const OVERLAY_JS = String.raw`
       return;
     }
     var html = hostPage ? currentReviewHtml(currentReview) : '';
-    if (hostPage) html += '<details class="vv-history"><summary>Historical V&amp;V context (not current validation)</summary>' + verificationHtml(verification) + '</details>';
-    else html += verificationHtml(verification);
+    if (hostPage && currentReview.available) {
+      count.hidden = true;
+      box.innerHTML = html;
+      box.hidden = false;
+      return;
+    }
+    if (!hostPage) html += verificationHtml(verification);
     html += '<details class="vv-history"><summary>Jira context for this page</summary><div class="jira-title"><span><a href="/review-questions">review inputs</a> &middot; <a href="${TRACEABILITY_URL}" target="_blank" rel="noopener noreferrer">traceability</a></span></div>';
     html += '<div class="jira-links">';
     epics.forEach(function (issue) { html += jiraLinkHtml(issue, true); });
@@ -7960,23 +8369,19 @@ const OVERLAY_JS = String.raw`
     box.hidden = false;
   }
   $('jiraContext').addEventListener('change', function (event) {
-    if (event.target.id === 'current-section-filter') {
-      currentClaimSectionFilter = event.target.value;
+    if (['current-section-filter','current-citation-filter','current-work-filter','current-status-filter'].includes(event.target.id)) {
+      if (event.target.id === 'current-section-filter') currentClaimSectionFilter = event.target.value;
+      if (event.target.id === 'current-citation-filter') currentCitationDefectFilter = event.target.value;
+      if (event.target.id === 'current-work-filter') currentWorkFilter = event.target.value;
+      if (event.target.id === 'current-status-filter') currentStatusFilter = event.target.value;
       clearClaimFocus();
       shadow.querySelectorAll('[data-current-review-sections]').forEach(function (card) {
         var sections = JSON.parse(card.getAttribute('data-current-review-sections'));
-        card.hidden = (!!currentClaimSectionFilter && sections.indexOf(currentClaimSectionFilter) === -1) ||
-          (currentCitationDefectFilter === 'CITATION' && card.getAttribute('data-current-citation-defect') !== 'true');
-      });
-      return;
-    }
-    if (event.target.id === 'current-citation-filter') {
-      currentCitationDefectFilter = event.target.value;
-      clearClaimFocus();
-      shadow.querySelectorAll('[data-current-review-sections]').forEach(function (card) {
-        var sections = JSON.parse(card.getAttribute('data-current-review-sections'));
-        card.hidden = (!!currentClaimSectionFilter && sections.indexOf(currentClaimSectionFilter) === -1) ||
-          (currentCitationDefectFilter === 'CITATION' && card.getAttribute('data-current-citation-defect') !== 'true');
+        var selectedSection = $('current-section-filter').value;
+        card.hidden = (!!selectedSection && sections.indexOf(selectedSection) === -1) ||
+          (currentCitationDefectFilter === 'CITATION' && card.getAttribute('data-current-citation-defect') !== 'true') ||
+          (!!currentWorkFilter && card.getAttribute('data-current-work-bucket') !== currentWorkFilter) ||
+          (currentStatusFilter !== 'ALL' && card.getAttribute('data-current-status') !== currentStatusFilter);
       });
       return;
     }
@@ -7992,6 +8397,34 @@ const OVERLAY_JS = String.raw`
     if ($('vv-location-notice')) $('vv-location-notice').textContent = '';
   });
   $('jiraContext').addEventListener('click', function (event) {
+    var relatedButton = event.target.closest('[data-related-current-claim]');
+    if (relatedButton) {
+      var relatedId = relatedButton.getAttribute('data-related-current-claim');
+      var relatedCard = Array.from(shadow.querySelectorAll('[data-current-claim]')).find(function (card) { return card.getAttribute('data-current-claim') === relatedId; });
+      if (!relatedCard) return;
+      ['current-section-filter', 'current-citation-filter', 'current-work-filter', 'current-status-filter'].forEach(function (id) {
+        var filter = $(id); filter.value = id === 'current-citation-filter' || id === 'current-status-filter' ? 'ALL' : '';
+        filter.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      relatedCard.scrollIntoView({ block: 'start' });
+      var targetButton = relatedCard.querySelector('[data-show-current-claim]');
+      targetButton.focus(); targetButton.click();
+      return;
+    }
+    var workButton = event.target.closest('[data-current-work-category]');
+    if (workButton) {
+      currentWorkFilter = workButton.getAttribute('data-current-work-category'); currentStatusFilter = 'ALL'; currentClaimSectionFilter = ''; currentCitationDefectFilter = 'ALL';
+      renderPageContext(); return;
+    }
+    var queueButton = event.target.closest('[data-current-queue-claim]');
+    if (queueButton) {
+      var queueId = queueButton.getAttribute('data-current-queue-claim');
+      currentWorkFilter = ''; currentStatusFilter = 'ALL'; currentClaimSectionFilter = ''; currentCitationDefectFilter = 'ALL';
+      renderPageContext();
+      var queueCard = Array.from(shadow.querySelectorAll('[data-current-claim]')).find(function (card) { return card.getAttribute('data-current-claim') === queueId; });
+      if (queueCard) { queueCard.scrollIntoView({block: 'start'}); var action = queueCard.querySelector('[data-show-current-claim]'); action.focus(); action.click(); }
+      return;
+    }
     var currentButton = event.target.closest('[data-show-current-claim]');
     if (currentButton) {
       var current = pageContext && pageContext.currentReview;
@@ -8294,6 +8727,8 @@ const OVERLAY_JS = String.raw`
     currentClaimSectionFilter = null;
     citationDefectFilter = 'ALL';
     currentCitationDefectFilter = 'ALL';
+    currentWorkFilter = '';
+    currentStatusFilter = 'ALL';
     clearClaimFocus();
     clearSelectionDraft();
     pageContext = { epics: [], issues: [], blockers: [] };
@@ -8312,6 +8747,8 @@ const OVERLAY_JS = String.raw`
     currentClaimSectionFilter = null;
     citationDefectFilter = 'ALL';
     currentCitationDefectFilter = 'ALL';
+    currentWorkFilter = '';
+    currentStatusFilter = 'ALL';
     clearClaimFocus();
     renderPageContext();
   });
@@ -8520,11 +8957,20 @@ async function handleReviewRoute(req, res, url) {
     const ref = url.searchParams.get('ref') || '';
     const installationIntake = currentInstallEvidenceIntake();
     const directClaimId = url.searchParams.get('claim') || '';
+    const authorityPage = CURRENT_HOST_DOCS_REVIEW.pages?.find((item) => item.route === url.searchParams.get('page'));
+    const authorityClaim = authorityPage?.claims.find((item) => item.id === directClaimId);
+    const authorityHistoryRef = Boolean(authorityClaim && authorityClaim.history?.carryDecision === CURRENT_AUTHORITY_DECISION &&
+      [CURRENT_AUTHORITY_ADJUDICATION, 'verification/evidence/2026-09-09-host-authority-correction-attempt-01/pre-authority-current-host-docs-review.json'].includes(ref));
+    const scan = authorityClaim?.authorityScan;
+    const readonlyProof = currentReadonlyProof(authorityClaim);
+    const readonlyCheck = url.searchParams.has('readonly') ? readonlyProof?.checks.find(check => check.id === url.searchParams.get('readonly') && check.artifactRef === ref) : null;
+    const scanHistoryRef = Boolean(scan && [scan.registryRef, scan.baselineRef, ...scan.basis.map(item => item.artifactRef)].includes(ref));
     const directPostcheck = ref === H100_DIRECT_POSTCHECK_ARTIFACT && url.searchParams.has('postcheck')
       ? H100_DIRECT_POSTCHECK_BY_CLAIM.get(directClaimId) : null;
     const expectedHash = CURRENT_HOST_DOCS_REVIEW.artifactHashes?.get(ref) ||
+      (authorityHistoryRef ? (ref === CURRENT_AUTHORITY_ADJUDICATION ? CURRENT_AUTHORITY_ADJUDICATION_SHA256 : '8b24aad067b2d98d41cd1824a31a831fa88f9a9cfaa8cb39379c6c37839bdaf9') : null) ||
       (installationIntake.available ? INSTALL_INTAKE_ARTIFACTS.get(ref) : null) ||
-      (directPostcheck ? H100_DIRECT_POSTCHECK_SHA256 : null);
+      (directPostcheck ? H100_DIRECT_POSTCHECK_SHA256 : null) || readonlyCheck?.artifactSha256;
     if (!CURRENT_HOST_DOCS_REVIEW.available || !currentReviewStillFresh(CURRENT_HOST_DOCS_REVIEW) || !expectedHash) {
       res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
       res.end('Current review artifact not found.');
@@ -8543,7 +8989,40 @@ async function handleReviewRoute(req, res, url) {
           ? installationIntake.records.find((item) => item.claimId === claim.id) : null;
         const intakeEvidence = intakeRecord && [...intakeRecord.checks, ...intakeRecord.sourceLinks]
           .find((item) => item.artifactRef === ref);
-        if (!page || !claim || (!evidence && !intakeEvidence && !directRegistryEvidence) || !currentReviewPageStillFresh(page)) throw new Error('unbound current artifact');
+        if (!page || !claim || (!evidence && !intakeEvidence && !directRegistryEvidence && !authorityHistoryRef && !scanHistoryRef && !readonlyCheck) || !currentReviewPageStillFresh(page)) throw new Error('unbound current artifact');
+        if (url.searchParams.has('readonly')) {
+          if (!readonlyCheck || !readonlyProof || vvHash(bytes) !== readonlyCheck.artifactSha256) throw new Error('unbound readonly observation');
+          const selected = JSON.parse(bytes).records?.find(record => record.check_id === readonlyCheck.id);
+          if (!selected || selected.exit_code !== 0 || selected.observation_status !== 'PASS') throw new Error('readonly observation drift');
+          res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff',
+            'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'" });
+          res.end('<!doctype html><html lang="en"><meta charset="utf-8"><title>Selected retained observation</title><main style="max-width:1000px;margin:2rem auto;font:16px/1.5 system-ui;padding:1rem"><h1>Selected observation ' + esc(readonlyCheck.id) + '</h1>' +
+            '<p><b>Current passage:</b></p><blockquote>' + esc(claim.text) + '</blockquote><p><b>Current status:</b> ' + esc(claim.status) + '</p><p><b>Command:</b> ' + esc(readonlyCheck.command) + '<br><b>Recorded:</b> ' + esc(readonlyCheck.recordedAt) + '</p><p><b>Scope limit:</b> ' + esc(readonlyProof.limit) + '</p><p><b>Next action:</b> ' + esc(claim.nextAction) + '</p>' +
+            '<pre style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(evidenceTextForDisplay(Buffer.from(JSON.stringify(selected, null, 2)))) + '</pre><details><summary>Source fingerprint</summary><p>SHA-256: ' + esc(readonlyCheck.artifactSha256) + '</p></details></main></html>');
+          return;
+        }
+        if (url.searchParams.has('basis')) {
+          const selector = url.searchParams.get('basis');
+          if (!scan || !/^(?:0|[1-9][0-9]*)$/.test(selector)) throw new Error('invalid bound source selector');
+          const basis = scan.basis[Number(selector)];
+          if (!basis || basis.artifactRef !== ref) throw new Error('source selector not bound to current claim');
+          const sourceUrl = basis.sourceUrl;
+          const reviewNote = basis.kind === 'CONTEXT_REVIEW';
+          const documentationCheck = Boolean(scan.cleanup);
+          const readerCopy = hostReviewReaderCopy(claim);
+          const documentationCopy = documentationCheck && readerCopy.documentationCheck;
+          res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store',
+            'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'" });
+          res.end('<!doctype html><html lang="en"><meta charset="utf-8"><title>' + (documentationCheck ? 'Documentation check' : reviewNote ? 'Review note' : 'Bound source') + ' — ' + esc(claim.id) + '</title><main style="max-width:1000px;margin:2rem auto;font:16px/1.5 system-ui;padding:1rem">' +
+            '<h1>' + (documentationCheck ? 'Exact documentation check' : reviewNote ? 'Review note — not an independent source' : 'Exact source binding') + '</h1>' + (hostReviewReaderCopy(claim).sourceContextLabel ? '<p><b>' + esc(hostReviewReaderCopy(claim).sourceContextLabel) + '</b></p>' : '') + '<p><b>Current passage:</b></p><blockquote>' + esc(hostReviewReaderCopy(claim).statementText || claim.text) + '</blockquote><p><b>Current status:</b> ' + esc(claim.status) + '</p>' +
+            '<p><b>' + (documentationCheck ? 'Documentation check' : reviewNote ? 'Review note' : 'Source') + ':</b> ' + esc(basis.sourceLabel) + ' — ' + esc(basis.sourceLocator) + (sourceUrl ? ' · <a href="' + esc(sourceUrl) + '" target="_blank" rel="noopener noreferrer">' + (basis.kind === 'USER_SUPPLIED_UI_OBSERVATION' ? 'Open Earnings page' : 'Open canonical source') + '</a>' : '') + '</p>' +
+            (documentationCopy ? '<p>' + esc(documentationCopy.finding) + '</p>' : '<blockquote>' + esc(basis.excerpt || 'This static retest is bounded to the exact claim text and source hashes; it does not establish product behavior.') + '</blockquote>') +
+            '<p><b>' + (documentationCheck || reviewNote ? 'Review scope' : 'What this source proves') + ':</b> ' + esc(documentationCopy?.scope || basis.support_rationale) + '</p><p><b>What remains:</b> ' + esc(documentationCopy ? readerCopy.nextStep : scan.remaining) + '</p>' +
+            '<details><summary>Whole retained ' + (documentationCheck ? 'documentation check' : reviewNote ? 'review note' : 'source') + ' and audit binding</summary><p><b>Full recorded wording:</b> ' + esc(claim.text) + '</p><p>JSON pointer: ' + esc(basis.text_pointer || 'Exact static check') + '<br>SHA-256: ' + esc(expectedHash) + '</p><pre style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(evidenceTextForDisplay(bytes)) + '</pre></details>' +
+            '</main></html>');
+          return;
+        }
+        if (authorityHistoryRef) currentHostAuthority('invalid authority history artifact');
         if (directPostcheck) {
           if (url.searchParams.get('postcheck') !== directPostcheck.observationId) throw new Error('invalid direct post-install selector');
           const postcheck = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
@@ -8559,11 +9038,12 @@ async function handleReviewRoute(req, res, url) {
             '<p><a href="' + esc(page.route) + '">Back to the documentation page</a></p><p><b>Section:</b> ' + esc(claim.headings.join(' / ')) + '</p>' +
             '<blockquote>' + esc(claim.text) + '</blockquote><p><b>Statement status:</b> ' + esc(claim.status) + '</p><p><b>Bound predicate:</b> ' + esc(directPostcheck.predicate) +
             '</p><p><b>Scope limit:</b> Modified direct-route snapshot only; not stock setup-page command/download/TUI, driver/libvirt, persistence/reboot, NAT, account/listing, automatic self-test, workload/rental readiness, or general host health. A transient bandwidth-test diagnostic container was running.</p>' +
-            '<p><a href="' + esc(registryHref) + '" target="_blank" rel="noopener noreferrer">Open runtime adjudication record</a></p><details open><summary>Selected post-install command output</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(JSON.stringify(observation, null, 2)) + '</pre></details></main></html>');
+            '<details open><summary>Selected post-install command output</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(JSON.stringify(observation, null, 2)) + '</pre></details></main></html>');
           return;
         }
         const intakeSelected = intakeEvidence?.observation || intakeEvidence?.finding;
-        const intakeLimit = intakeEvidence ? (intakeEvidence.scope || intakeEvidence.label || intakeRecord.limit) : evidence.limit;
+        const intakeLimit = intakeEvidence ? (intakeEvidence.scope || intakeEvidence.label || intakeRecord.limit) :
+          (evidence?.limit || (authorityHistoryRef ? 'Frozen predecessor wording and status only; historical findings do not establish the corrected statement or runtime behavior.' : ''));
         const intakeNext = intakeEvidence ? intakeRecord.remainingAction : claim.nextAction;
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store',
           'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'" });

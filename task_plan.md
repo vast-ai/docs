@@ -7,6 +7,203 @@ reviewable procedure, step, claim, attempt, correction, and retest evidence.
 
 ## Current Phase
 
+Phase 56: commit and update existing PR185, in progress 2026-09-14.
+Plan: verification/evidence/2026-09-14-host-docs-publish-attempt-01/plan.md.
+Publication scope is the accumulated Host Docs task changes, including the
+current offline HTML and traceability. Check privacy, dependencies and generated
+consistency before staging; push to the existing fork branch without force.
+No merge or acceptance. Source/runtime gaps remain open.
+
+Phase 55: payout and invoice correction, completed locally 2026-09-14.
+Plan: verification/evidence/2026-09-14-payout-invoice-correction-attempt-01/plan.md.
+Exact baseline: 4,958 files; 313 PASS / 30 FAIL / 23 BLOCKED / 87 N/A / 1,560
+UNVALIDATED. Inspect four invoice-rule citation defects and repeated timing;
+retain public authority, correct bounded wording and refresh both reviewers.
+No financial/account/Host action, publication or acceptance.
+Six exact source descriptions are integrated: four former citation FAILs and
+two repeated timing records. Current totals: 319 PASS / 26 FAIL / 23 BLOCKED /
+87 N/A / 1,558 UNVALIDATED. Root retests: 93 Python, 68 JavaScript and all 38
+Payment locators pass. Both readers retain separate published-guidance and
+Agreement controls. The visible disclosure and both source dialogs pass on the
+root HTML. Exactly 2,007 other claims and 3,822 prior evidence files are unchanged.
+The final report/export is refreshed; external workstreams remain open. Result:
+verification/evidence/2026-09-14-payout-invoice-correction-attempt-01/result.md.
+
+Phase 54: payout Terms and published bank-transfer FAQ correction, completed locally 2026-09-14.
+Plan: verification/evidence/2026-09-14-payout-terms-correction-attempt-01/plan.md.
+Inspect exact existing authority, narrow supported wording and bind its source.
+Retain prior findings, preserve unrelated claims and refresh both reviewers.
+No live account, Host, payment or publication action.
+The user challenged the earlier bank-transfer deletion. Fresh published payout
+docs explicitly state that direct ACH, wire and SWIFT payouts are unavailable.
+No evidence establishes that they are supported. Restore an attributed description
+of the published restriction, retaining the publication's shared-source limitation.
+Two exact claims changed; integration and both reviewer retests passed. Current
+counts: 313 PASS / 30 FAIL / 23 BLOCKED / 87 N/A / 1,560 UNVALIDATED.
+The other 2,011 claim records and all 3,767 prior evidence files are unchanged.
+Final regression: 91 Python / 39 JavaScript tests passed; all 38 Payment locators
+passed. External work, the remaining claims, publication and acceptance are not complete.
+
+Phase 53: approved payout-provider correction, completed locally 2026-09-14.
+Plan: verification/evidence/2026-09-14-payout-provider-correction-attempt-01/plan.md.
+Applied the supplied UI evidence to the three provider options and replaced the
+unsupported bank-transfer prohibition with provider setup guidance. Four scoped
+PASS records; 31 corrections remain. Other 2,009 claims unchanged. Both reviewers
+checked, with exact passage/proof links; no live account action or publication.
+Result: verification/evidence/2026-09-14-payout-provider-correction-attempt-01/result.md.
+
+Phase 52: correction-queue walkthrough, prepared 2026-09-14.
+Plan: verification/host-corrections-walkthrough.md.
+All 35 current FAIL passages are mapped once into eight source-first review
+groups across 12 pages. Start with four payout-method/bank-transfer statements;
+then work through the remaining groups with the user. Planning only: no finding
+is resolved, no evidence is promoted, and no new account or Host action is taken.
+Implementation, exact-source adjudications and reviewer refresh remain to do.
+
+Phase 51: calculator proof wording, completed locally 2026-09-14.
+Explain the exact pending external-link check separately from calculation and
+market-data validation. Presentation only; preserve statuses and evidence.
+Plan: verification/evidence/2026-09-14-calculator-proof-clarity-attempt-01/plan.md.
+Result: verification/evidence/2026-09-14-calculator-proof-clarity-attempt-01/result.md.
+Both views updated; 64 focused tests and final targeted browser/API checks pass.
+The calculator link remains UNVALIDATED, with its exact next check explained.
+
+Phase 50: bounded reviewer handover cleanup, completed locally 2026-09-11.
+Plan: verification/evidence/2026-09-11-host-review-cleanup-attempt-01/plan.md.
+Correct non-claim classifications, complete safe editorial/navigation checks,
+separate source review from operational tests, and group compatible open work
+while retaining every exact passage and genuine gap. Refresh both reviewer views,
+traceability and separate external registers. No Host operation or publication.
+151 exact contextual decisions resolve 141 pending entries: 67 bounded local
+checks and 74 non-claims; 10 selected entries remain pending. All 44 pages and
+2,013 passages remain visible, with 35 corrections and 23 blockers unchanged.
+237 Python tests, all 204 JavaScript cases across full/focused runs, 44 localhost
+page checks and 16 offline browser groups have passing coverage. The failed full
+JavaScript run remains a failure with a linked focused retest, not overwritten.
+The two external workstreams and the remaining documentation queue are open.
+This does not declare every possible safe source check exhausted. Result:
+verification/evidence/2026-09-11-host-review-cleanup-attempt-01/result.md.
+
+Phase 49: official jurisdiction-source scan and eight bounded corrections, completed locally 2026-09-11.
+Plan and exact pre-edit baseline: verification/evidence/2026-09-11-host-jurisdiction-authority-attempt-01/.
+Scan all current Host claims for applicable US, California and international authority,
+correct obvious advice/source mismatches, refresh both reviewer surfaces and verify
+exact source support without promoting Vast-specific practices from general law.
+No Host operation, publication or human acceptance.
+Eight findings now have appropriate advice/published-source support; citation
+defects fall from 41 to 35. All 2,005 other claim records remain unchanged.
+The broader source/runtime workstreams remain open. Result and final evidence:
+verification/evidence/2026-09-11-host-jurisdiction-authority-attempt-01/result.md.
+
+Phase 48: split mixed rental review cards, completed locally 2026-09-10.
+Presentation only: retain the existing pricing source PASS separately from four
+open child findings. Keep exact full audit records and evidence unchanged.
+Plan and baseline: verification/evidence/2026-09-10-host-split-review-attempt-01/.
+Both views now show each exact bullet separately, link the existing pricing
+finding and label partial sources neutrally. All 44 pages, 15 offline check
+groups and the four-card browser checks pass. All 172 unique JavaScript cases
+pass across the suite and focused retest of the corrected integration fixture.
+Result: verification/evidence/2026-09-10-host-split-review-attempt-01/result.md.
+
+Phase 47 — published Terms source binding, completed locally 2026-09-10.
+Apply the user-approved bounded Terms citation check to Workload Policy. Preserve
+the exact baseline and prior evidence, retain the official source, distinguish
+governing rules from technical behavior and escalation advice, and refresh both
+reviewer views. No live Host work, publication or human acceptance.
+Plan: verification/evidence/2026-09-10-host-terms-binding-attempt-01/plan.md.
+
+Six exact Workload Policy statements now have published-rule support with Terms
+section/item citations. Counts: 233 PASS / 41 FAIL / 23 BLOCKED / 13 N/A /
+1,703 UNVALIDATED. All 2,007 other claim records, 33 support layers and 3,115
+earlier evidence artifacts are unchanged. Final checks pass: 226 Python tests,
+171 JavaScript tests, 44 localhost pages / 2,013 cards, and 15 offline HTML
+groups. The final HTML is deterministic and the local reviewer is refreshed.
+Terms establish the bounded rules, not runtime enforcement or acceptance.
+Both external registers remain open; no Host operation or publication occurred.
+Result: verification/evidence/2026-09-10-host-terms-binding-attempt-01/result.md.
+
+Phase 46 — whole-Host clarification sweep, completed locally 2026-09-10.
+Apply the recent source-first, policy-acknowledgement, instruction/advice and
+runtime-proof distinctions to the complete current V&V inventory. Exact tree
+baseline and plan: verification/evidence/2026-09-10-host-clarification-sweep-attempt-01/.
+Preserve prior evidence, do not infer acceptance, and perform no new Host/paid
+work or publication. Use independent read-only audits, reconcile every item,
+apply bounded corrections and retest HTML/localhost4000 and traceability.
+
+All 44 pages / 2,013 claims are accounted; 701 method-only claim corrections
+(including 58 pure-advice records) and 651 node next-action corrections are
+applied. Final 224 Python tests, 160 JavaScript tests, all 44 localhost pages
+and 15 offline HTML check groups pass. Statuses and existing proof remain
+unchanged; the 978-claim runtime cohort retains its method without individual
+truth re-adjudication or execution. External registers and human acceptance
+remain open. Result and preservation seal:
+verification/evidence/2026-09-10-host-clarification-sweep-attempt-01/result.md.
+
+Phase 45 — policy acknowledgement wording, completed locally 2026-09-10.
+Presentation-only change to distinguish policy-owner confirmation from runtime
+proof and basic product descriptions. Freeze exact selected claims before
+editing, preserve all prior evidence and the claim model, and retest both
+reviewer surfaces. No acknowledgement, policy authority, product PASS or human
+acceptance is recorded on anyone's behalf. No live operation, push or merge.
+Baseline and checks: verification/evidence/2026-09-10-host-policy-acknowledgement-attempt-01/.
+
+Five exact policy requests, one policy-reference exception and one supported
+product-description explanation now render consistently. Final46tests,
+15offline check groups and44live pages/2,013claims pass within presentation
+scope. The local Mint preview was restored with existing Node24 after the
+shell Node26 launch failed; interrupted runs and the successful retest remain
+separate. Final-integrity records preserve the model and all earlier evidence.
+
+Phase 44 — plain-language reviewer presentation, completed locally 2026-09-09.
+Plan and exact dirty-tree baseline: verification/evidence/2026-09-09-host-review-plain-language-attempt-01/.
+Simplify current findings and next steps in the live and standalone reviewers,
+remove duplicate passage summaries, and retain exact proof links and limitations.
+Presentation only: keep all current claim statuses, source documents, authority
+records and earlier evidence unchanged. Verify representative wording and both
+renderers, then refresh localhost4000 and the standalone HTML. No live Host
+operations, publication, merge or human acceptance.
+
+Final interface checks pass for all44pages/2,013claims and14offline check
+groups. The final42-test focused/integration suite passes; the earlier102-test
+reviewer suite is retained separately. Model and prior evidence integrity are
+recorded in this attempt’s final-integrity-01.json. External proof gaps remain.
+
+Phase43 — whole-Host authority-first and circularity scan, authorized2026-09-09.
+Plan and frozen full inventory: verification/evidence/2026-09-09-host-authority-scan-attempt-01/.
+Inspect every current claim and outstanding finding, use existing applicable
+authority before owner escalation, correct individually justified defects,
+retest reviewer/HTML, and refresh derived claim-source graph navigation.
+Prior dirty work and evidence are preserved. No new Host/live/paid operation,
+publication, merge or human acceptance is authorized by this scan.
+
+Current source/model work is integrated: all 2,013 IDs and 33 support layers
+remain; counts 227 PASS / 47 FAIL / 23 BLOCKED / 13 N/A / 1,703 UNVALIDATED.
+215 Python checks and the strict model/source guards pass. The user clarified
+that reviewer-facing views should show only the final finding, not history.
+That display amendment is implemented and retested: 135 reviewer tests and all
+44 rendered pages pass, including exact observation links and mixed prose/code
+locators. Final HTML regeneration and package integrity close out this local
+phase; runtime/operator and source-owner work remains separately open.
+Graphify has an explicitly derived index for all 44 pages and 2,013 claims.
+
+Phase 42 — source-authority correction, authorized 2026-09-09. Implemented locally;
+final artifact seal follows the recorded checks, without external acceptance.
+Frozen AUTH-01–09: `verification/evidence/2026-09-09-host-authority-correction-attempt-01/plan.md`.
+Correct overbroad offer-setting taxonomy, bind existing technical observations,
+cite exact applicable Hosting Agreement clauses, and regenerate/retest the
+reviewer and HTML with full historical preservation. Starting tracked tree/index
+clean at 4fa6fbb. No further live operation, push, merge or acceptance authorized.
+Ten bounded statements now have support: four controls and six agreement atoms.
+Three partial citations remain FAIL and six unsupported residual clauses remain
+explicit. Current counts204/151/23/4/1631 across2013claims. Root195Python/102JS
+tests,44contexts/57prooflinks and166passagecontrols pass; final24HTML tests and
+post-export browser checks are recorded separately in the current result.
+All2247old evidence artifacts and staged content are preserved; Git index
+metadata bytes changed, so byte-identity is not claimed for the index itself.
+Phase41 produced local commit4fa6fbb; public push was not executed because the
+publication disclosure approval remains unresolved. The earlier publication
+plan below is not evidence of a completed push or new authority to retry it.
+
 Phase 41 — user authorizes publishing the completed Host Docs progress to the
 existing PR185 branch, without merging. Frozen publication plan and exact
 pre-action tree/index baseline:

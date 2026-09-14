@@ -1,0 +1,6 @@
+import fs from 'node:fs';import crypto from 'node:crypto';import{execFileSync}from'node:child_process';
+const dir='verification/evidence/2026-09-14-host-docs-publish-attempt-01',sha=b=>crypto.createHash('sha256').update(b).digest('hex'),git=args=>execFileSync('git',args,{maxBuffer:256*1024*1024});
+const dest=dir+'/baseline.json';if(fs.existsSync(dest))throw Error('Refuse overwrite');
+const rows=git(['status','--porcelain=v1','-z','--untracked-files=all']).toString().split('\0').filter(Boolean).map(s=>({status:s.slice(0,2),path:s.slice(3)}));
+const files=rows.filter(r=>!r.path.startsWith(dir+'/')).map(r=>{const stat=fs.lstatSync(r.path);if(!stat.isFile())throw Error('Unexpected non-file '+r.path);return{...r,bytes:stat.size,sha256:sha(fs.readFileSync(r.path))}});
+const data={recorded_at:new Date().toISOString(),head:git(['rev-parse','HEAD']).toString().trim(),branch:git(['branch','--show-current']).toString().trim(),index_diff_sha256:sha(git(['diff','--cached','--binary'])),working_diff_sha256:sha(git(['diff','--binary'])),files};fs.writeFileSync(dest,JSON.stringify(data,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({artifact:dest,head:data.head,files:files.length,bytes:files.reduce((n,f)=>n+f.bytes,0)}));

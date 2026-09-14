@@ -12,6 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "verification/current-host-editorial-classifications.json"
+CURRENT_REVIEW = ROOT / "verification/current-host-docs-review.json"
 BASELINE = "bfa926c9421521767fa7411718bd31ea38b38528"
 PREAMBLES = {
     "MCL-6875ca55bab20f5f",
@@ -37,6 +38,11 @@ class EditorialClassificationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.data = json.loads(CONFIG.read_text(encoding="utf-8"))
+        cls.current_claims = {
+            claim["id"]: claim
+            for page in json.loads(CURRENT_REVIEW.read_text(encoding="utf-8"))["pages"]
+            for claim in page["claims"]
+        }
 
     def test_schema_and_narrow_id_allowlist(self) -> None:
         self.assertEqual(self.data["schema_version"], "1.0")
@@ -46,18 +52,24 @@ class EditorialClassificationTests(unittest.TestCase):
         self.assertEqual({row["id"] for row in rows}, PREAMBLES | NAVIGATION)
         self.assertEqual(len(rows), 10)
 
-    def test_every_literal_matches_the_baseline_and_live_source(self) -> None:
+    def test_every_literal_matches_the_baseline_and_exact_current_claim_span(self) -> None:
         for row in self.data["classifications"]:
             baseline = subprocess.check_output(
                 ["git", "show", f"{BASELINE}:{row['source_file']}"], cwd=ROOT, text=True
             )
             expected = span_text(baseline, row["start"], row["end"])
-            live = span_text((ROOT / row["source_file"]).read_text(encoding="utf-8"), row["start"], row["end"])
+            claim = self.current_claims[row["id"]]
+            spans = [span for span in claim["spans"] if span["source_file"] == row["source_file"]]
+            self.assertEqual(len(spans), 1, row["id"])
+            span = spans[0]
+            live = span_text((ROOT / row["source_file"]).read_text(encoding="utf-8"), span["start"], span["end"])
             self.assertEqual(row["literal"], expected, row["id"])
             self.assertEqual(live, expected, row["id"])
+            self.assertEqual(claim["text"], expected, row["id"])
             self.assertEqual(
                 row["literal_sha256"], hashlib.sha256(expected.encode("utf-8")).hexdigest(), row["id"]
             )
+            self.assertEqual(span["text_sha256"], row["literal_sha256"], row["id"])
 
     def test_only_preambles_are_not_applicable_and_links_remain_unvalidated(self) -> None:
         for row in self.data["classifications"]:

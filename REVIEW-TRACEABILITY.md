@@ -9,6 +9,323 @@ new-page review coverage are separate from the retained 40-page proof).
 
 Review PR: [vast-ai/docs#185](https://github.com/vast-ai/docs/pull/185)
 
+## Current payout and invoice guidance correction, 14 September 2026
+
+Four citation corrections and two repeated timing passages now cite the exact
+published guidance. The unsupported noon-Pacific time is removed. First-payout
+estimates retain their provider/region qualifications; the Agreement's billing
+clock has its own source control. Both reviewers say "Published guidance checked"
+and explain that this does not test invoice generation or payment processing.
+The publication shares this docs repository: it supports the attributed description,
+not independent backend behavior. No Finance or Legal approval is inferred.
+
+Current totals: **319 PASS, 26 FAIL, 23 BLOCKED, 87 NOT_APPLICABLE and 1,558
+UNVALIDATED**. Six complete claim records changed; 2,007 others and all 3,822
+prior evidence files are unchanged. The 44 Host pages and 33 support layers remain.
+The review queue now recognizes 11 supported payout findings instead of calling
+them "Needs triage". That display correction changes no claim status or evidence.
+
+Regression retests passed **93 Python and 68 JavaScript tests**. All 38 Payment
+passage locators pass, with six exact current source mappings checked in both
+reviewer views. Initial failures remain linked to corrected retests.
+
+[Current result and source limits](verification/evidence/2026-09-14-payout-invoice-correction-attempt-01/result.md)
+· [Correction walkthrough: 26 remain](verification/host-corrections-walkthrough.md)
+· [Runtime/operator work — open](verification/current-runtime-operator-blockers.md)
+· [Source/owner confirmation — open](verification/current-source-owner-blockers.md)
+
+This completes the selected repository correction, not all Host Docs V&V.
+No payment, Host operation, push, merge or human acceptance was performed.
+
+## Earlier payout citations and FAQ correction, 14 September 2026
+
+The bank-transfer FAQ now reports Vast's published restriction on direct bank
+transfers, ACH, wire and SWIFT. The Payout Account note describes three named
+Terms sections with their reasonable-control and state-law qualifications.
+
+Exactly two claim records changed: MCL-9826b26393329d27 and
+MCL-06956d724f70d2a3. The current totals are 313 PASS, 30 FAIL, 23 BLOCKED,
+87 NOT_APPLICABLE and 1,560 UNVALIDATED. The other 2,011 claims and all
+3,767 prior evidence files are unchanged. These checks establish the published
+wording, not a completed payment, bank-route implementation or legal acceptance.
+
+Both exact passages and their source controls pass in the localhost and offline
+reviewers. All 38 payout-page claim locators pass. The final regression retest
+passed 91 Python and 39 JavaScript tests; the retained result below records the
+initial failures and their corrections separately.
+
+[Current result and exact source limits](verification/evidence/2026-09-14-payout-terms-correction-attempt-01/result.md)
+· [Integrity check](verification/evidence/2026-09-14-payout-terms-correction-attempt-01/final-audit-01.json)
+· [38 rendered claim checks](verification/evidence/2026-09-14-payout-terms-correction-attempt-01/rendered-payment-01/summary.json)
+
+## Earlier payout options correction, 14 September 2026
+
+Four Host Payouts passages now have bounded support: PayPal, Stripe and Wise as
+shown under Earnings > Payout Account, plus the replacement setup instruction.
+The universal ACH/wire/SWIFT exclusion was withdrawn, not verified.
+The supplied screenshot has a user-attributed URL and unknown capture time; it
+does not establish successful payments, fees, eligibility, active account state
+or bank-transfer rules. The documentation link check is separate from the UI proof.
+
+Current totals: **312 PASS, 31 FAIL, 23 BLOCKED, 87 NOT_APPLICABLE and 1,560
+UNVALIDATED**, across the same 2,013 occurrences. All 2,009 other claim records are
+unchanged. The 44 Host pages and 33 central-reference support layers are unchanged.
+Only four Payment source lines changed; both old FAQ fragments remain available.
+
+The standalone HTML and localhost reviewer show the exact revised passages and
+their evidence. Root checks include 88 Python tests, 38 JavaScript tests, all 38
+Payment passage locators, and the four proof-link/dialog checks.
+Earlier failures and old wording remain in audit records, not the current finding.
+See the [correction result and retests](verification/evidence/2026-09-14-payout-provider-correction-attempt-01/result.md)
+and [31 remaining corrections](verification/host-corrections-walkthrough.md).
+No account action, payment, publication or human acceptance was performed.
+
+## Calculator proof guidance, 14 September 2026
+
+MCL-18f04c2ae7ee95b4, Earnings & Pricing Model / Market Data, now explains
+what closes its link check: confirm the intended calculator opens and attach
+the final URL, date/time, screenshot and outcome. Calculation accuracy and
+historical-data sourcing have separate, conditional instructions. Neither is
+required to close this navigation entry. Both reviewer views retain the original
+record; the entry remains UNVALIDATED. No claim or evidence was promoted.
+See the [bounded presentation result](verification/evidence/2026-09-14-calculator-proof-clarity-attempt-01/result.md).
+
+## Current handover cleanup — 11 September 2026
+
+The review now separates **what kind of check is needed** from **whether it is
+finished**. “Review pending” does not mean a failed test or an external blocker.
+All 2,013 passages remain traceable across 44 Host pages. The 18 CLI and 15 SDK
+references remain support layers, not extra Host workflows.
+
+151 selected occurrences were reviewed in context. **67 documentation checks
+passed within their scope; 74 labels, introductions or hypothetical inputs were
+classified as non-claims; 10 selected items remain pending.** The 1,862 other
+complete claim records, all 3,498 prior evidence files and all 77 Host source
+files are unchanged. No customer-facing statement was removed to reduce a count.
+
+| Current work queue | Passages |
+| --- | ---: |
+| Documentation checks | 10 |
+| Source/citation checks | 534 |
+| Technical verification | 1,016 |
+| Prerequisite unavailable | 23 |
+| Correction needed | 35 |
+| Checked within scope or not applicable | 395 |
+
+These are passage counts, not unique questions. The underlying statuses are
+**308 PASS / 87 N/A / 1,560 UNVALIDATED / 35 FAIL / 23 BLOCKED**. Every passage
+keeps its own source context, evidence limits and next action. Exact compatible
+shared wording can be grouped, but that does not merge proof or decisions.
+
+The HTML and localhost reviewer use the same categories. The localhost panel
+keeps explanations collapsed so the filters and passages are easier to reach.
+Documentation checks are shown as local review records, not product proof.
+
+Current checks cover 237 Python tests, all 44 localhost pages / 2,013 cards,
+and 16 offline browser groups with 289 bound source/check controls. The live
+passage check includes 1,994 exact highlights and 19 explicit masked fallbacks.
+All 204 JavaScript cases have passing coverage across the full run (203 pass)
+and the remaining case's focused retest; the failed full run remains recorded.
+Regression-fixture failures and their linked retests are retained in the result.
+The graph/index is navigation only; it is not another source of product proof.
+
+[Current result and retained checks](verification/evidence/2026-09-11-host-review-cleanup-attempt-01/result.md)
+· [Shareable review and local setup instructions](verification/host-docs-review.html)
+· [Runtime/operator work](verification/current-runtime-operator-blockers.md)
+· [Source/citation work](verification/current-source-owner-blockers.md)
+
+The two evidence workstreams remain open. No new Host/API/SSH access, credentials,
+paid operation, reboot, commit, push, merge, external posting or human acceptance
+is included in this cleanup.
+
+## Earlier source finding — 11 September 2026
+
+Eight bounded source/advice findings are now supported: three Tax Guide
+instructions, one Workload Policy instruction/rule, and four Datacenter program
+statements. Exact government, provider, Agreement and Vast program citations are
+bound to the relevant wording. Secure Cloud audits and Certified Data Center
+requirements are attributed separately. Advice review is not proof of personal
+tax compliance, actual program eligibility or platform enforcement.
+
+Current inventory: **44 primary Host pages / 2,013 claims: 241 PASS / 35 FAIL /
+23 BLOCKED / 13 N/A / 1,701 UNVALIDATED**. Six citation defects and two
+unvalidated findings were resolved. The other **2,005 complete claim records**
+and all **3,329 prior evidence files** remain unchanged. CLI/SDK wrappers remain
+18/15 reference-support layers, not extra Host workflows.
+
+The [official-source scan](verification/evidence/2026-09-11-host-jurisdiction-authority-attempt-01/source-scan.md)
+covers US, California, UK and EU authority and names remaining gaps. General law
+does not establish Vast's withholding, VAT, international-document or payout
+practices. Older Vast pages also conflict with the draft on ACH and unused-GPU
+scope; those questions remain open.
+
+The report and localhost reviewer show current findings first, with plain next
+steps, exact passage links and official source excerpts. Citation-only tax cards
+no longer discuss failed runtime tests. Earlier limits and our review notes are
+separate from independent source proof. Historical records are retained without
+being shown as current gaps.
+
+Broad checks pass: **232 Python tests, 187 JavaScript tests, all 44 localhost
+pages / 2,013 cards, and 15 offline browser groups with 138 source controls**.
+Final presentation-specific retests and export hashes are recorded in the result.
+The source mismatch guards remain strict; initial fixture failures are preserved.
+
+[Current result and checks](verification/evidence/2026-09-11-host-jurisdiction-authority-attempt-01/result.md)
+· [Shareable review](verification/host-docs-review.html)
+· [Runtime/operator work](verification/current-runtime-operator-blockers.md)
+· [Source/owner gaps](verification/current-source-owner-blockers.md)
+· [Current derived index](verification/current-host-authority-index.md)
+
+This is a local, bounded repository/source review. No new Host/API/SSH, credentials,
+paid run, reboot, commit, push, merge, Jira post or human acceptance occurred.
+The runtime/operator and source-owner workstreams are not complete.
+
+## Dated predecessor — 10 September 2026
+
+The following retains the earlier state and counts; it is not today's result.
+
+### Reviewer presentation: separate rental questions
+
+The four mixed **Hosting Overview / The Rental Contract** cards now show only
+their own statement: pricing behavior, offer end dates, unlisting or required
+availability. Each links to the existing, separate pricing-guidance finding.
+Related or partial sources use a neutral, collapsed section; their presence
+does not imply that the open statement passed. Page controls highlight only
+the relevant bullet. Full recorded wording and source bindings remain in the
+audit details. No claim status, customer-facing text or evidence was changed.
+Both views pass the four-card interaction check. The broader checks cover all
+44 Host pages / 2,013 cards and 15 offline groups. All 172 unique JavaScript
+cases pass across the suite and a focused integration-fixture retest; the
+initial failure and correction remain linked in the result below.
+
+[Split-card checks and result](verification/evidence/2026-09-10-host-split-review-attempt-01/result.md)
+
+### Published Terms findings
+
+Six statements in **Workload Policy / Restricted Activity** now cite the
+applicable clauses of the published Vast Terms (version 10 November 2025).
+The current inventory is **44 primary Host pages / 2,013 claims: 233 PASS /
+41 FAIL / 23 BLOCKED / 13 N/A / 1,703 UNVALIDATED**. The 18 CLI and 15 SDK
+wrappers remain reference-support layers. All other 2,007 claim records are
+unchanged.
+
+These six findings establish what the published rules say, not whether the
+platform enforces them or a host complies. Mining wording retains the Terms'
+credit-card condition; no blanket ban is inferred. Existing Agreement citations
+remain separate. Reviewers can follow the exact page passage and retained
+section/item excerpt. Current findings lead; historical attempts stay in the
+audit records.
+
+Final checks pass: **226 Python tests, 171 JavaScript tests, all 44 localhost
+pages / 2,013 claim cards, and 15 offline HTML check groups**. The final export
+is deterministic. These checks establish source bindings and reviewer integrity,
+not runtime behavior or human acceptance.
+
+[Terms source-binding result and checks](verification/evidence/2026-09-10-host-terms-binding-attempt-01/result.md)
+· [Shareable review](verification/host-docs-review.html)
+· [Runtime/operator work](verification/current-runtime-operator-blockers.md)
+· [Source and owner gaps](verification/current-source-owner-blockers.md)
+· [Derived claim/source index](verification/current-host-authority-index.md)
+
+This correction is local. No new Host/API/SSH work, rental, human acceptance,
+commit, push, merge or Jira post is included. The separate external workstreams
+remain open; this is not full Host readiness.
+
+## Dated predecessor — clarification sweep, 10 September 2026
+
+The following describes the earlier same-day state, not the current counts.
+
+The clarification sweep accounts for all **44 primary Host pages and 2,013
+claims**. It makes **701 claim-method-only corrections**, including **58 pure
+advice** records, and corrects next actions for **651 unresolved or STALE
+procedure nodes**. Claim statuses remain **227 PASS / 47 FAIL / 23 BLOCKED / 13
+N/A / 1,703 UNVALIDATED**. Existing authority and source bases are preserved.
+
+This is not a new truth re-adjudication of every statement: the 29 scoped
+runtime exceptions were screened, while the remaining 978-claim runtime cohort
+retains its current method. It creates no product proof, acknowledgement,
+acceptance, Host/API/SSH/paid action, or status change. The separate
+[runtime/operator](verification/current-runtime-operator-blockers.md) and
+[source/owner](verification/current-source-owner-blockers.md) registers remain
+current. The [clarification-sweep result](verification/evidence/2026-09-10-host-clarification-sweep-attempt-01/result.md)
+records the bounded handoff. Final checks passed: 224 Python tests, 160
+JavaScript tests, all 44 localhost pages and 15 offline HTML check groups.
+These verify repository integrity and reviewer behavior, not product truth.
+
+Five workload instructions now lead with **Needs policy acknowledgement**.
+Use existing approved policy first; ask the responsible owner to confirm or
+correct only what is missing or unclear, then cite the source or decision.
+No rental test is needed to establish a rule. The Fleet Operations policy link
+does not require a new approval. The basic marketplace introduction already has
+official-publication support and needs no test rental. These are review requests,
+not recorded acknowledgements; claim statuses and missing citations are unchanged.
+See the [policy-review presentation result](verification/evidence/2026-09-10-host-policy-acknowledgement-attempt-01/result.md).
+
+The local reviewer and standalone HTML now use shorter explanations of what
+is missing and what to check next. Repeated passage summaries and empty proof
+messages are removed. Exact source links, limits and recorded details remain
+available. This is a presentation change, not new evidence or a status change.
+See the [plain-language review result](verification/evidence/2026-09-09-host-review-plain-language-attempt-01/result.md).
+
+The complete authority-first scan covers **44 Host pages and 2,013 statements**:
+**227 PASS / 47 FAIL / 23 BLOCKED / 13 N/A / 1,703 UNVALIDATED**.
+The 18 CLI and 15 SDK wrappers remain reference-support layers, not additional
+Host workflows. The localhost reviewer and shared HTML present the current
+passage, its proof and limitations, and any remaining action—not superseded
+findings or correction history.
+
+Existing canonical CLI declarations and applicable agreement/publication
+sections are used first. Agreement clauses support matching obligations; they
+do not prove runtime compliance or uncovered rental guarantees. Owner
+clarification is reserved for actual gaps, ambiguity or conflicting sources.
+Thirty additional statements have independently reviewed, source-only support;
+no new runtime PASS is claimed. Circularity checks reject documentation,
+registries, the current review model and Graphify as terminal product proof.
+
+[Clarification-sweep handoff](verification/evidence/2026-09-10-host-clarification-sweep-attempt-01/result.md)
+· [Prior authority-first result and checks](verification/evidence/2026-09-09-host-authority-scan-attempt-01/result.md)
+· [Shareable review](verification/host-docs-review.html)
+· [Runtime/operator work](verification/current-runtime-operator-blockers.md)
+· [Source and owner gaps](verification/current-source-owner-blockers.md)
+· [Derived claim/source index](verification/current-host-authority-index.md)
+
+This correction remains local: no new Host/API/SSH operation, rental, commit,
+push, merge, Jira post or human acceptance. It does not establish full Host
+readiness.
+
+## Internal dated audit context
+
+The entries below retain earlier snapshots and are not the current finding.
+Use the current review links above for manager and customer-document review.
+
+Source-authority correction — **2026-09-09** (local, not published):
+Four Hosting Overview offer controls now use implementation evidence rather than
+blanket policy classification. Pinned Vast CLI source and retained listing
+request/readback support the exposed settings, not server enforcement or contract
+guarantees. Five narrowed statements and one new bounded security statement cite
+the exact applicable section of the public Hosting Agreement. The agreement is
+authority for those obligations, not proof of compliance or all product behavior.
+
+Current inventory: **2,013 claims — 204 PASS / 151 FAIL / 23 BLOCKED / 4 N/A /
+1,631 UNVALIDATED**. The citation count increases from149 to151 because four
+findings close while six unsupported residual clauses are separately retained;
+three partially cited statements remain FAIL. All2,005 predecessor IDs remain,
+with1,993 untouched proof/status records. The old112procedure records remain
+auditable; eight changed-source carriers are STALE, and four new source-only
+section reviews add25nodes. These are not new executed Host workflows.
+
+See the [exact source correction and retest result](verification/evidence/2026-09-09-host-authority-correction-attempt-01/result.md),
+[source guide](verification/evidence/2026-09-09-host-authority-correction-attempt-01/source-guide.md),
+and [updated HTML review](verification/host-docs-review.html).
+The [runtime/operator register](verification/current-runtime-operator-blockers.md)
+and [source-owner/citation register](verification/current-source-owner-blockers.md)
+remain separate and open. All2,247 prior evidence artifacts are byte-identical.
+Git index metadata bytes changed, but every staged path, mode and object ID and
+the staged diff match the initial clean state; no index restoration was performed.
+No new Host/API/SSH, paid operation, commit, push, merge, Jira post or human
+acceptance is included. Earlier publication and operational notes below are dated
+history, not a claim that this local correction has reached the PR.
+
 Publication handoff — **2026-09-09**: the user authorizes committing and pushing
 the completed Host Docs progress to the existing PR branch, without merging.
 Start with the [short progress and next-actions guide](verification/HOST-DOCS-PROGRESS.md).

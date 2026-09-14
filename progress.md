@@ -1,5 +1,362 @@
 # Progress Log: Host Docs verification inventory
 
+## September 14: approved payout-provider correction completed locally
+
+- Four scoped corrected PASS records; 31 FAIL remain. All other 2,009 complete
+  claim records preserved. Only four Payment source lines changed.
+- Root retests: 88 Python tests and 38 JavaScript tests pass; all 38 live Payment
+  passage locators and four exact payout proof/dialog checks pass.
+- Fixed integration failures in live claim matching, source freshness and
+  procedure-history compatibility; aligned historical fixtures without removing
+  their tamper gates. Original failed runs remain in the attempt directory.
+- Updated HTML, localhost reviewer, traceability and correction walkthrough.
+  Temporary worker checkout removed after all 27 deltas were archived and
+  byte-verified. No commit, push, merge, account action or human acceptance.
+
+- Frozen 4,837 pre-existing Git-visible files, exact current model and Payment
+  source before editing; one isolated worker owns the coupled implementation.
+- Baseline generator and all 38 Payment-page passage locators pass.
+- Corrected-UI regression fails against the actual old page as expected: old
+  wording, missing citations and four old FAIL statuses are still visible.
+- The first browser launch needed sandbox access; the local-only retry passed.
+  A custom check initially used the blank page left after the existing checker
+  closed its session; explicitly opening the page fixed that helper error.
+- Independent source review supports only the three displayed providers and
+  setup navigation; original attachment hash matches. No new account activity.
+
+## September 14: payout screenshot received
+
+- Retained a sanitized visual-inspection record and original attachment hash for
+  the user's Payout Account screenshot; no account email copied into evidence.
+- Stripe, PayPal and Wise are visible. Prior use of all three is separate user
+  testimony; no transaction, fee, active-account or universal availability proof.
+- No direct-transfer option is visible in this crop. The blanket ACH/wire/SWIFT
+  exclusion remains unsupported by it.
+- Result: verification/evidence/2026-09-14-payout-ui-intake-attempt-01/result.md.
+  Intake only: four exact findings mapped, no MDX/model/reviewer status changes,
+  no account action and no publication. Citation edits and retests remain next.
+
+## September 14: walkthrough of the 35 corrections
+
+- Read the current model and mapped all 35 unique FAIL occurrences into eight
+  review groups, with exact source-line and page-heading links.
+- Independent read-only review confirmed the grouping, including the unlisting
+  passage on Workload Policy that belongs with rental lifecycle.
+- Prepared verification/host-corrections-walkthrough.md; begin with payout
+  methods and the direct-transfer/provider-mediated bank payout distinction.
+- Planning only. Customer MDX, model statuses, retained evidence and reviewer
+  output are unchanged. No new external check, account operation or publication.
+
+## September 14: calculator evidence wording
+
+- Preserved the exact Git-visible pre-edit baseline, index and original evidence.
+- Added guarded, shared copy for the one Earnings / Market Data calculator link.
+  Both reviewers now distinguish link checking from calculator-output validation.
+- Kept UNVALIDATED, all other claims, customer MDX and raw records unchanged.
+- The first HTML test used a one-line function extractor; the modal is now
+  multiline. Updated the extractor and added a calculator-modal regression.
+- The first browser capture helper had an undefined ID in the evaluated script;
+  corrected the helper and retained a separate successful retry.
+- Result and scoped checks: verification/evidence/2026-09-14-calculator-proof-clarity-attempt-01/result.md.
+  No Host work, public calculator validation, commit, push or acceptance.
+
+## September 11: reviewer handover cleanup
+
+- User approved correcting the overbroad backlog and preparing handover.
+- Recorded the exact pre-edit Git-visible tree/index baseline and full current
+  model; frozen CLEAN-01 through CLEAN-06 before validation.
+- Current starting counts: 241 PASS / 35 FAIL / 23 BLOCKED / 13 N/A /
+  1,701 UNVALIDATED across 44 pages and 2,013 occurrences.
+- Scope is repository/loopback only, with no publication or Host activity.
+- Baseline generator passes. Baseline browser's first attempt could not access
+  the sandbox-excluded browser socket; the approved local-only retry passes on
+  122 cards across Self-Test, Hosting Overview and Tax Guide. Both attempts remain.
+- Three isolated workers own model integration, contextual review and interface
+  changes. Customer MDX and the original 35 FAIL / 23 BLOCKED findings are protected.
+- Root inspected the 71 current advice/calculation candidates and a page-wise
+  runtime sample. Preambles, link rows and UI captions need different treatment;
+  a caption that asserts a real UI state is not automatically non-applicable.
+- Baseline-nonclaim-regression-01 reproduces the incorrect runtime request for
+  literal "Check:". The deterministic export baseline passes. Await new exact
+  inspection decisions before any status promotion; no percentage target set.
+- Final contextual inspection 04 supplies 151 bounded decisions: 67 local
+  documentation PASS, 74 non-claim N/A and 10 still UNVALIDATED. Its exact raw
+  captures and independent root recheck are bound to the frozen source/model.
+  The invalid earlier timestamp and malformed draft are preserved as history.
+- Current counts are 308 PASS / 87 N/A / 1,560 UNVALIDATED / 35 FAIL / 23 BLOCKED.
+  All 1,862 other complete claim records, 3,498 prior evidence files, 77 Host
+  sources and the index remain unchanged. Two literal "Check:" regressions pass.
+- Both interfaces use one disjoint work-queue implementation, separate work type
+  from completion, and keep exact individual source/proof controls when grouping
+  shared wording. Guidance starts collapsed in the localhost panel.
+- Root checks pass: 237 Python tests, all 44 localhost pages / 2,013 cards
+  (1,994 exact highlights and 19 explicit masked fallbacks), and 16 offline
+  browser groups including 289 bound source/check controls. Final JavaScript
+  coverage is 204 cases across the full run (203 pass) and one focused passing
+  integration retest. Initial failures remain, including loopback denial and
+  exact predecessor-set/basis expectations. No production guard was weakened.
+- The AST graph and exact-current derived index were refreshed without treating
+  graph edges as proof. Non-code AST omissions and the oversized graph.html
+  skip remain stated limitations.
+- Final desktop screenshots were visually inspected; the isolated test-browser
+  sessions were closed. Three task-created detached workers were archived and
+  verified (13,914 files/links), then removed. The recovery archive remains local.
+- Handover documents distinguish pending review, confirmed correction and an
+  unavailable prerequisite. Neither external workstream is marked complete;
+  there was no Host access, credential use, paid run, reboot or publication.
+
+## September 11: jurisdiction authority scan
+
+- Recorded the exact starting tree/index and frozen current review/Tax Guide before edits.
+- Planned JUR-01 through JUR-06: complete inventory scan, applicable official sources,
+  bounded corrections, plain reviewer copy, retests and independent integrity review.
+- Graph navigation located tax/citation records; graph and review text are not proof.
+- Retained twelve public source responses. The initial four-finding assertion
+  fails as expected and preserves the original classifications and reviewer warning.
+- Expanded the selected correction set to eight before implementation, based on
+  the current datacenter application. Paused and rebriefed the isolated worker;
+  no existing attempt is overwritten. Old FAQ payout/workload conflicts remain open.
+- Baseline browser check passes on all77cards across Tax Guide, Workload Policy
+  and Datacenter Status, including exact highlights. This records the original
+  view and does not resolve its overbroad classifications.
+- Complete inventory/status triage retained: 44pages, 2,013claims, 336candidates,
+  eight selected corrections. Source-scan report distinguishes targeted inspection
+  from unreviewed product/runtime truth. No full-inventory PASS is inferred.
+- Independent review caught an initial Datacenter sentence joining Secure Cloud
+  audits with Certified Data Center applicant requirements. The first proposal
+  remains retained; the corrected source and contextual review separate them.
+- OpenAPI validation and pinned CLI-signature checks pass (204 occurrences).
+  The volume contract check first lacked its required source-checkout argument;
+  that invocation failure is retained. Retest with pinned CLI ecf32efa passes.
+- Read-only tooling issues: an early shell glob matched no not-yet-created worker
+  files; a log lookup included a PNG and was rerun with a JSON-only filter. A fresh
+  agent follow-up hit the thread limit; an existing idle reviewer was used instead.
+  These are research-tool issues, not new product findings.
+- Integrated eight exact corrections: 241 PASS / 35 FAIL / 23 BLOCKED /
+  13 N/A / 1,701 UNVALIDATED; 2,005 other complete claim records and 3,329 old
+  evidence files are byte-identical. All 12 public captures are embedded offline.
+- Full retests pass: 232 Python and 187 JavaScript cases. First failures were
+  historical fixtures using later source selectors or omitting the new imported
+  module. Corrected the fixtures without weakening production integrity checks.
+- All 44 localhost pages pass: 2,013 cards, 1,994 exact highlights and 19 explicit
+  masked fallbacks. Offline 15-group browser check covers 138 exact source controls.
+  Current-versus-historical limit separation passes a focused regression.
+- Refreshed the AST graph and exact claim/source index. Non-code AST omissions
+  and oversized-visualization skip are recorded limitations, not source proof.
+- Archived and verified 4,549 task-worker files/links, then removed only that
+  integrated worktree. Recovery archive remains private under .orchestra.
+  Initial archive verification was corrected for retained macOS AppleDouble metadata.
+- Final source-card presentation correction separates contextual review notes
+  from official sources. All 51 affected regression tests, 77 final affected-page
+  cards and 15 final offline browser groups pass. An outdated dialog-title
+  assertion and its retests are retained. Root inspected the final screenshots.
+  Final result and REVIEW-TRACEABILITY now describe the bounded completion and
+  both unfinished external workstreams, without recording publication/acceptance.
+
+## Session: September 10, split rental review cards
+
+- Retained the exact 4,362-file working-tree baseline before code edits.
+- Separated four child statements from the existing pricing-guidance PASS in
+  the offline HTML and localhost reviewer. Added clear remaining questions,
+  neutral partial-source context, parent-finding controls and exact highlights.
+- Preserved the model, customer-facing Host text, all prior evidence and both
+  external registers. This is presentation work, not claim closure.
+- Retained the initial failing split regression, sandbox-limited server tests,
+  the checker allowlist mismatch and corrected retests. The first offline
+  screenshot caught scrolling in progress; the second capture shows the card.
+- Bounded checks/result: verification/evidence/2026-09-10-host-split-review-attempt-01/.
+- Final coverage: 44 localhost pages / 2,013 cards (1,994 exact highlights,
+  19 explicit masked fallbacks), 15 offline groups and four split cards in both
+  views. The 158-case suite passed 157 cases; its outdated integration mock was
+  replaced with the production locator and passed the focused retest. The
+  remaining 14 support tests pass: 172 unique JavaScript cases with final PASS.
+  No Python or runtime/Host tests were needed for this presentation-only change.
+
+
+## Session: September 10 — published Terms binding
+
+- Recorded the exact dirty tree (4,217 Git-visible files) and froze the current
+  model and Workload Policy source before edits.
+- Scoped the source check and citation corrections in the new attempt plan.
+  Expanded the initial four candidates to six exact statements before edits.
+- Bound the official Terms (10 November 2025 version) to those six narrowed
+  Workload Policy statements. Missing-citation findings fall from 47 to 41;
+  233 claims now have scoped PASS. The other 2,007 claim records and all 3,115
+  prior evidence artifacts remain byte-identical.
+- Refreshed the current model, worklist, two separate external registers,
+  shareable HTML, localhost4000, traceability and derived claim/source index.
+  Current findings lead; audit history is preserved, not presented as a current
+  failure. Terms are rule authority, not runtime enforcement proof.
+- Final tests pass: 226 Python, 171 JavaScript, all 44 local pages / 2,013 cards
+  (1,994 exact highlights and 19 explicit masked fallbacks), and all 15 offline
+  HTML check groups. Final export drift check passes; desktop/mobile screenshots
+  show the correct 10 September evidence date.
+- Initial invocation, historical-fixture, freshness-map and concurrent-export
+  failures are retained with linked corrections and clean retests. The final
+  JavaScript run used frozen files and changed none. Candidate worktree source
+  files were hash-compared with root before temporary checkouts were removed.
+- No new Host/API/SSH access, rental, reboot, acknowledgement, acceptance,
+  commit, push, merge or Jira post. See
+  [Terms source-binding handoff](verification/evidence/2026-09-10-host-terms-binding-attempt-01/result.md).
+
+## Session: September 10 — clarification sweep handoff (bounded local checks complete)
+
+- Accounted for all 44 primary Host pages and 2,013 claims. Applied 701
+  claim-method-only corrections, including 58 pure-advice records, and corrected
+  next actions for 651 unresolved or STALE procedure nodes. Statuses remain 227 PASS
+  / 47 FAIL / 23 BLOCKED / 13 N/A / 1,703 UNVALIDATED.
+- This is a clarification of what to review, not a complete truth
+  re-adjudication: 29 scoped runtime exceptions were screened and the remaining 978
+  runtime-cohort claims retain their current method. Existing authority/source
+  bases, evidence, spans and histories are preserved.
+- No new product proof, acknowledgement, acceptance, Host/API/SSH/paid action or
+  status change was recorded. The runtime/operator and source/owner registers
+  remain separate. The [clarification-sweep handoff](verification/evidence/2026-09-10-host-clarification-sweep-attempt-01/result.md)
+  is retained. Final checks pass: 224 Python tests, 160 JavaScript tests,
+  all 44 localhost pages / 2,013 cards, and 15 offline HTML check groups.
+- Two outdated regression assertions were corrected and retested without
+  changing product proof or predecessor history. Original failures are retained.
+  A separate optional screenshot request hit a browser-daemon failure; it is
+  not claimed as a successful capture. Current model/export checks pass.
+
+## Session: September 10 — policy acknowledgement presentation
+
+- Captured 4,018 Git-visible files and froze the seven-occurrence display scope
+  before implementation. The 2,013-claim model and prior evidence are unchanged.
+- Shared wording distinguishes five pending policy-owner requests, a reference
+  to existing policy, and an already-supported basic marketplace description.
+  No acknowledgement or approval is recorded. Missing citations remain open.
+- The 46-test focused/integration suite and 15 offline check groups pass. Exact
+  source links, status totals and recorded raw details remain available.
+- Retained initial date-assertion failure, interrupted browser attempts and
+  local-preview startup limits separately. No Host, API or paid action occurred.
+- Full local reviewer retest and final integrity are recorded in
+  verification/evidence/2026-09-10-host-policy-acknowledgement-attempt-01/.
+- Final live check passes44pages and2,013cards:1,994exact highlights and19
+  explicit privacy-masked section fallbacks. Restored the missing localhost
+  preview using installed Node24; only local documentation services changed.
+
+## Session: September 9 — plain-language reviewer
+
+- Captured the exact existing dirty tree before task changes, including all
+  3,900 Git-visible files. The first capture exceeded the diff buffer; the
+  successful retry preceded task edits.
+- Shared reader-only copy simplifies 1,816 findings and 1,679 next steps.
+  The Quickstart account requirement is attributed to the page, not presented
+  as proven Vast policy or enforcement. Exact records remain in details.
+- Both interfaces retain current statuses, source bindings and proof limits.
+  Removed duplicate passage summaries and repeated empty-evidence messages.
+  The final regression and browser results are retained in
+  verification/evidence/2026-09-09-host-review-plain-language-attempt-01/.
+- No Host, API, paid, privileged or external publication action was performed.
+
+## Session: September9 — whole-Host authority-first scan
+
+- Read current plans and skills; exact dirty starting tree/model/inventory frozen
+  before new corrections. Graph query found classification, citation and owner
+  rules; graph results are navigation, not authority or proof.
+- SCAN-01–08 covers the complete44-page/current-claim population, source-first
+  escalation and circularity. Earlier source/legal/runtime limits remain binding.
+- Integrated 384 explicit transitions, 16 MDX corrections and 85 pinned source
+  artifacts. Independent audit verified every old evidence hash (2,386), every
+  claim ID and all support payloads. Thirty new PASS are source-only; seven
+  overbroad Volume PASS retain narrow partial proof as UNVALIDATED.
+- Current counts are 227 PASS / 47 FAIL / 23 BLOCKED / 13 N/A / 1,703
+  UNVALIDATED. The whole source/model suite passes 215 Python tests; signatures,
+  OpenAPI, anchors, persona and rendered generated-route checks pass within
+  their scopes. The full-site linter still has 74 missing-alt findings outside
+  Host and 99 generated-route static findings reconciled against 85 actual routes.
+- User requested final findings only in reviewer-facing views. Dated summaries,
+  original classifications and history controls are hidden without removing
+  immutable audit inputs or weakening evidence gates. Independent display review
+  found ten supported read-only command proof links hidden by that filter;
+  exact selected-observation replacements now pass. The two mixed prose/code
+  Volume locators are corrected without relaxing complete-command matching.
+- Final 135-test reviewer suite and all 44 live pages pass. Every one of the
+  2,013 controls is accounted for: 1,994 exact highlights and 19 explicit masked
+  section fallbacks. Offline checks cover 113 bound-source controls, 87 selected
+  command checks, 56 direct-evidence dialogs, and responsive/accessibility basics.
+  No historical observation is described as newly executed.
+- Graphify AST update completed safely; a typed append-only index now connects
+  all 44 pages and 2,013 claims to sources/evidence. It is navigation, not proof.
+- REVIEW-TRACEABILITY and the short handoff now lead with current findings and
+  separate source versus runtime registers. The shared report contains no visible
+  superseded findings or dated test summaries. No new live action, commit, push,
+  merge, external post or human acceptance occurred.
+
+## Session: September 9 — source-authority correction
+
+- Integrated correction supports four technical controls and six exact agreement
+  statements. Counts204PASS/151FAIL/23BLOCKED/4N/A/1631UNVALIDATED; four old citation
+  findings close, six unsupported residual clauses become explicit. Three partial
+  citations remain FAIL. Source support does not prove runtime or compliance.
+- Root retests pass195Python and102reviewer tests,44current contexts,
+  14cards/57contextual proof links and166passage controls on fivepages.
+  Final visual inspection caught a stale count/operational label in the HTML;
+  corrected the template and its stale expected-label test, with separate final
+  export/browser retests. All first failures remain retained.
+- History proof-link404 was an absent evidence.limit on the separately admitted
+  frozen predecessor. Guarded scope text and an exact-context/negative binding
+  test fix it. All2247historical artifacts remain byte-identical. Index metadata
+  bytes changed, but independent stage-zero path/mode/object IDs and staged diff
+  exactly match the initial clean HEAD. No index restoration or staging occurred.
+- Updated REVIEW-TRACEABILITY and handoff. Runtime/operator and source-owner
+  registers remain separately open. No new Host/API/SSH/paid operation, commit,
+  push, merge, Jira post or human acceptance occurred. Current result indexes
+  the final checks and exact artifact seal.
+
+- Frozen AUTH-01–09 before validation; exact clean tracked baseline at4fa6fbb
+  retains3330 source hashes. Public publication remains unexecuted.
+- Classifier correction is isolated from evidence bindings; all Host/API/SSH,
+  paid operations and account acceptance are out of scope.
+- The initial multi-file planning patch failed context validation and changed
+  nothing; corrected to exact observed heading contexts before continuing.
+- Fresh public rendered agreement and pinned canonical CLI source captured;
+  exact17-occurrence inventory frozen across5pages. The agreement offers no
+  version/heading-anchor IDs, so citations will name observed sections.
+- Baseline generator and186Python tests pass. Baseline reviewer test attempt01
+  failed because sandbox loopback-listen permission was denied; unchanged code
+  is being retested with that permission. Baseline rendered check passes for
+  all158statement cards across5pages. No proof-status changes made yet.
+- Classifier candidate01 found four-only deltas but retained runtime heuristics
+  forbarefields and lacked correctedidentifier/pinnedtestbaseline handling;
+  returned for a bounded second candidate before integration.
+- Root reproduced the original classifier failure (4 tests / 5 failed
+  assertions), integrated the exact-four-control correction, and retained a
+  fresh 4-test PASS. Coverage uses all 44 current pages; Volume Offers keeps its
+  separate parser. Real obligations still require authority.
+- Baseline reviewer retest passed 97 tests with loopback permission. Independent
+  clause review caught stronger-than-source support wording and an unsupported
+  legacy data-access exception; narrowed wording and residual findings are
+  being preserved in the source-binding candidate before integration.
+- Root independently checked the candidate's 1,993 untouched claim proof/status
+  records and all 2,005 predecessor IDs. Candidate review then removed four
+  presentation-only markup claims and retained required-citation findings on
+  split residual obligations instead of silently downgrading them.
+- A proposed omission of four automatically added source-section review records
+  was rejected by the patch guard. No bypass or alternate deletion was used.
+  Keep that review coverage: these are source-only section inspections, not new
+  Host/operator workflows. Original procedures remain in the frozen predecessor;
+  changed-source carriers are explicitly STALE rather than silently reusing PASS.
+- Integrated the bounded source/doc adapter and retained the exact predecessor
+  model from Git. Root scope check passes: 1,993 untouched claims, 12 corrected
+  prior occurrences, 8 explicit added/split occurrences. All 2,247 historical
+  evidence artifacts and the index remain unchanged.
+- First full integration run: 195 Python tests with 5 failures in old source-line,
+  coverage/count expectations and the new static-record immutability gate.
+  These are being corrected with scoped tests, not skipped. The first reviewer
+  run and actual localhost context fail closed while source-transition admission
+  is repaired. Initial debug captures identify the rejected exact claims.
+- Root review found and corrected candidate integration gaps around unchanged
+  proof carries, browser-scope constants, exact historical listing-ref admission,
+  product-description carry, and current navigation source hashes. Each original
+  failed check is retained; no blocked interface is represented as a PASS.
+- CLI signature metadata became stale after source lines moved. Retained the
+  failure, regenerated the current check outputs, and retested all 204 invocations.
+  Persona/frontmatter and named-anchor checks pass. Offline HTML passes 23 focused
+  tests and shows exact predecessor wording/status; final browser validation is
+  still pending.
+
 ## Session: September 9 — publish verified progress
 
 - User explicitly requests commit/push so the existing PR shows progress. PR185 is OPEN/DRAFT on jjziets/docs:CON-1584-host-cli-api-sdk, remote head bfa926c; required review remains open. Captured the exact 1,932-path pending baseline before staging or publication. Publication verification and privacy/scope review follow the frozen plan; no new Host operation, merge or acceptance.
@@ -1867,3 +2224,44 @@
   archived/readback-verified; only task-created disposable copies were removed.
 - AST-only graph refresh completed with excluded/zero-node/large-visualization
   limitations retained. No Host/API/SSH/rental, reboot, publication or acceptance.
+# 14 September 2026: payout wording clarification
+
+Fresh Terms source inspection selected one narrow liability-summary correction.
+It remains isolated and unintegrated after the user's published-payout-docs
+challenge. Root's existing 88 Python / 38 JS baseline tests pass; the before-page
+check records the old finding. No new claim PASS or reviewer refresh is claimed.
+
+Corrected verification/host-corrections-walkthrough.md to state the published
+direct ACH/wire/SWIFT restriction, separate provider-card proof, and flag FAQ
+restoration as pending. Its five scoped wording assertions pass; the first
+overbroad assertion matched a different section and is retained with the retest.
+Root status remains 312 PASS / 31 FAIL / 23 BLOCKED / 87 N/A / 1560 UNVALIDATED.
+No account, payment, Host operation, push, merge or human acceptance occurred.
+## 2026-09-14: payout Terms and bank-transfer FAQ completed locally
+
+Two exact claims changed. The liability note now describes the cited Terms
+sections with their qualifications. The FAQ reports Vast's published restriction
+on direct bank transfers, ACH, wire and SWIFT. Source descriptions are not
+payment execution or individual liability decisions. Both reviewer views,
+38 Payment locators, 91 Python tests and 39 JavaScript tests passed. Initial
+fixture, sandbox and punctuation-check failures remain linked to retests in
+verification/evidence/2026-09-14-payout-terms-correction-attempt-01/result.md.
+Current counts: 313 PASS, 30 FAIL, 23 BLOCKED, 87 N/A, 1,560 UNVALIDATED.
+No account changes, Host operations, push, merge or acceptance.
+
+## 2026-09-14: payout and invoice correction completed locally
+
+Completed four citation corrections and updated two repeated payout-timing
+passages. Both reviewers show exact published-guidance citations, qualified
+timing and a separate Agreement source control. The offline HTML is regenerated
+with the current result. Current counts: 319 PASS / 26 FAIL / 23 BLOCKED / 87 N/A /
+1,558 UNVALIDATED. All 2,007 other claims and 3,822 prior evidence files remain
+unchanged; HEAD/index are unchanged. Root regression: 93 Python and 68 JavaScript
+tests; all 38 Payment locators and six-card source/passages checks pass. Earlier
+fixture, URL-fragment and display-classification failures retain exact retests.
+Removed only the hash-verified, archived task worker; the main tree is preserved.
+AST-only graph refresh completed: 13,129 nodes / 16,672 edges / 1,074 communities.
+It does not semantically recheck documents; 2,571 files produced no nodes and
+HTML graph visualization was skipped due to size. No payment, account, Host,
+push, merge or human acceptance action. Remaining corrections and both external
+workstreams are open. Result: verification/evidence/2026-09-14-payout-invoice-correction-attempt-01/result.md.

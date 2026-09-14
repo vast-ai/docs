@@ -1,0 +1,17 @@
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import {spawnSync,execFileSync} from 'node:child_process';
+const dir='verification/evidence/2026-09-14-calculator-proof-clarity-attempt-01';
+const [name,command,...args]=process.argv.slice(2);
+if(!/^[a-z0-9-]+$/.test(name||'')||!command)throw Error('Unique name and command required');
+const ref=dir+'/'+name+'.json';if(fs.existsSync(ref))throw Error('Previous record exists');
+const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
+const clean=s=>String(s||'').replaceAll(process.cwd(),'<DOCS_REPO>').replaceAll('/Users/hanneszietsman','<USER>');
+const refs=['scripts/host_review_reader_copy.mjs','scripts/host-review-reader-copy.test.mjs','scripts/export_host_review_html.mjs','scripts/templates/host-docs-review.html','review-server.mjs','verification/current-host-review-cleanup.json','verification/current-host-docs-review.json'];
+const hashes=()=>Object.fromEntries(refs.map(f=>[f,sha(fs.readFileSync(f))]));
+const before=hashes(),started=new Date().toISOString();
+const r=spawnSync(command,args,{encoding:'utf8',timeout:600000,maxBuffer:128e6});
+const record={started,finished:new Date().toISOString(),command:[command,...args].map(clean),head:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),source_hashes_before:before,source_hashes_after:hashes(),exit_code:r.status,signal:r.signal,error:r.error?clean(r.error.message):null,stdout:clean(r.stdout),stderr:clean(r.stderr),limits:'Presentation/repository/loopback check only. No calculator destination or calculation validation, product result, approval or publication.'};
+fs.writeFileSync(ref,JSON.stringify(record,null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify({ref,exit_code:r.status,error:record.error,stdout_tail:record.stdout.slice(-2300),stderr_tail:record.stderr.slice(-2300)}));
+process.exitCode=r.status===0&&!r.error?0:1;

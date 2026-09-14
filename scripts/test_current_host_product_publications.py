@@ -7,6 +7,7 @@ import json
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from scripts.test_current_host_authority_scan import frozen_source_reader
 
 import current_host_product_publications as product
 
@@ -17,6 +18,9 @@ REPO = Path(__file__).resolve().parents[1]
 class ProductPublicationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        fixture_read=patch.object(product,'_read_bytes',side_effect=frozen_source_reader(product._read_bytes))
+        fixture_read.start()
+        cls.addClassCleanup(fixture_read.stop)
         cls.registry = product.validate_product_publications(REPO)
         cls.capture = json.loads((REPO / product.CAPTURE_PATH).read_bytes())
         cls.page = {"route": product.ROUTE, "source_file": product.SOURCE_FILE,

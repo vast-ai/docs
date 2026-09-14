@@ -20,9 +20,23 @@ CLAIM_ID = "MCL-e12ac9f6be2ce502"
 CLAIM_TEXT = "Vast is a GPU marketplace. Hosts provide machines; renters run workloads on them."
 ROUTE = "/host/hosting-overview"
 SOURCE_FILE = "host/hosting-overview.mdx"
+# Historical public API retained for existing focused tests and the preserved
+# registry occurrence.  The authority transition adds one separately pinned
+# current page hash below.
 SOURCE_SHA256 = "0893d15921f55e4fae9a0aef5110336877d63d2698fe4c418bb4456fae686c7e"
+# The authority-binding transition changes other, independently reviewed
+# occurrences on this page.  It preserves this line byte-for-byte and pins the
+# complete changed-page transition separately; this bounded adjudication never
+# accepts an arbitrary third page revision.
+SOURCE_SHA256S = {
+    SOURCE_SHA256,
+    "3d64b0bcfba203133725d654d1bb4c462b7ab8cfb577e94fcba3c37ffcf80ec3",
+}
 TEXT_SHA256 = "954df89cf6ab91b44b2ba20337c482bc6fa1a60f5ee6a252791e9102da7c7934"
 PRIOR_CLAIM_SHA256 = "c9724dc3aa583b87d695e1eba6ba3b693e52d6e3315958adb34754f806887a24"
+# The exact post-publication record from the frozen authority-transition input.
+# It is not a generic already-PASS exception.
+AUTHORITY_TRANSITION_CLAIM_SHA256 = "db08fba542604fe57b73527aa66a8fb5fe7fa1a160dce3f340ace92e2f183e62"
 REGISTRY_PATH = "verification/current-host-product-publications.json"
 CAPTURE_PATH = "verification/evidence/2026-09-08-host-live-readonly-attempt-01/product-source-capture-02.json"
 CAPTURE_SHA256 = "50402fe4c97a54f9ac89d2f003b1c42329f708162a4691de214a3aa6bd3eac12"
@@ -131,7 +145,7 @@ def validate_product_publications(repo: Path) -> dict[str, Any]:
              and registry["adjudication_id"] == "PRODUCT-PUBLICATION-MCL-e12ac9f6be2ce502-01"
              and registry["claim_id"] == CLAIM_ID, "only the exact approved claim is supported")
     _require(registry["occurrence"] == {"route": ROUTE, "source_file": SOURCE_FILE,
-                                       "source_sha256": SOURCE_SHA256, "start": 16, "end": 16,
+                                       "source_sha256": "0893d15921f55e4fae9a0aef5110336877d63d2698fe4c418bb4456fae686c7e", "start": 16, "end": 16,
                                        "text_sha256": TEXT_SHA256, "text": CLAIM_TEXT,
                                        "headings": ["Introduction"]}, "approved occurrence changed")
     _require(registry["previous_claim_sha256"] == PRIOR_CLAIM_SHA256
@@ -145,7 +159,7 @@ def validate_product_publications(repo: Path) -> dict[str, Any]:
              "capture artifact or digest changed")
     _require(registry["sources"] == _sources(), "exact three public source parts required")
     source = _read_bytes(repo, SOURCE_FILE)
-    _require(_sha(source) == SOURCE_SHA256, "current source file drift")
+    _require(_sha(source) in SOURCE_SHA256S, "current source file drift")
     lines = source.decode("utf-8").splitlines()
     _require(len(lines) >= 16 and lines[15] == CLAIM_TEXT
              and _sha(lines[15].encode()) == TEXT_SHA256, "current occurrence drift")
@@ -167,7 +181,15 @@ def apply_product_publications(pages: list[dict[str, Any]], repo: Path) -> dict[
     _require(len(matches) == 1, "exactly one current target claim required")
     page, claim = matches[0]
     _require(page["route"] == ROUTE and page["source_file"] == SOURCE_FILE
-             and page["source_sha256"] == SOURCE_SHA256, "target page identity changed")
+             and page["source_sha256"] in SOURCE_SHA256S, "target page identity changed")
+    if page["source_sha256"] != "0893d15921f55e4fae9a0aef5110336877d63d2698fe4c418bb4456fae686c7e":
+        _require(_canonical_sha(claim) == AUTHORITY_TRANSITION_CLAIM_SHA256
+                 and claim["history"].get("carry_decision") == "CURRENT_PRODUCT_PUBLICATION_ADJUDICATION",
+                 "authority-transition product claim drift")
+        return {"id": registry["adjudication_id"], "scope": CLAIM_ID,
+                "history": "The exact pre-existing post-publication record was source-transition rebound.",
+                "current": "PASS / PRODUCT_DESCRIPTION / PRODUCT_PUBLICATION_SOURCE (published description only).",
+                "reason": f"{REASON} {LIMITS}"}
     _require(claim == registry["previous_claim"], "current claim differs from preserved original assessment")
     updated = copy.deepcopy(claim)
     updated.update({

@@ -100,8 +100,25 @@ async function materializeReviewedSourceFixture(fixtureRoot) {
 
 async function copyInstallationIntakeModule(fixtureRoot) {
   await fs.mkdir(path.join(fixtureRoot, 'scripts'), { recursive: true });
+  await fs.copyFile(path.join(ROOT, 'scripts', 'host_review_reader_copy.mjs'), path.join(fixtureRoot, 'scripts', 'host_review_reader_copy.mjs'));
+  await fs.copyFile(path.join(ROOT, 'scripts', 'host_review_work_queue.mjs'), path.join(fixtureRoot, 'scripts', 'host_review_work_queue.mjs'));
   await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_install_evidence_intake.mjs'),
     path.join(fixtureRoot, 'scripts', 'current_host_install_evidence_intake.mjs'));
+  // The current server imports this adapter even when the isolated fixture
+  // intentionally contains only the historical inventory. Copy the module,
+  // not the current registry/model: historical admission remains independent.
+  await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_authority_scan.mjs'),
+    path.join(fixtureRoot, 'scripts', 'current_host_authority_scan.mjs'));
+  await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_clarification.mjs'),
+    path.join(fixtureRoot, 'scripts', 'current_host_clarification.mjs'));
+  await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_terms_binding.mjs'),
+    path.join(fixtureRoot, 'scripts', 'current_host_terms_binding.mjs'));
+  await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_jurisdiction.mjs'),
+    path.join(fixtureRoot, 'scripts', 'current_host_jurisdiction.mjs'));
+  await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_review_cleanup.mjs'),
+    path.join(fixtureRoot, 'scripts', 'current_host_review_cleanup.mjs')).catch(error => { if (error.code !== 'ENOENT') throw error; });
+  await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_review_transition.mjs'),
+    path.join(fixtureRoot, 'scripts', 'current_host_review_transition.mjs'));
 }
 
 function sourceLiteral(lines, { start, end }) {

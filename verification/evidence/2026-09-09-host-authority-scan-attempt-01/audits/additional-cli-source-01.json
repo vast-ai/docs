@@ -1,0 +1,75 @@
+[
+  {
+    "repository": "vast-ai/vast-cli",
+    "revision": "ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd",
+    "path": "vastai/cli/commands/price_increase.py",
+    "url": "https://github.com/vast-ai/vast-cli/blob/ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd/vastai/cli/commands/price_increase.py",
+    "body_sha256": "4618c7764dc6ef9d5a91b07ebfc945359af2830c721104a57ba04f84445604b7",
+    "matches_git_blob": true,
+    "recorded_at": "2026-09-09T17:52:13.633Z",
+    "excerpts": [
+      {
+        "start": 123,
+        "end": 145,
+        "text": "# show pending-price-increases\n# ---------------------------------------------------------------------------\n\n\n@parser.command(\n    argument(\"-q\", \"--quiet\", action=\"store_true\",\n             help=\"print only pending_price_increase_id values, one per line\"),\n    usage=\"vastai show pending-price-increases [OPTIONS]\",\n    help=\"List pending price-increase challenges for the authenticated user\",\n    epilog=deindent(\"\"\"\n        Lists every pending price-increase challenge the backend has open for\n        you. Each row shows the per-resource old -> new prices and the cutover\n        boundary: the new rate applies only after each contract's current\n        end_date — your remaining time on the current term is billed at the\n        original price.\n\n        Pipe the pending IDs to `vastai accept price-increase` or\n        `vastai reject price-increase` (use --quiet for one ID per line):\n\n            vastai show pending-price-increases --quiet\n    \"\"\"),\n)\ndef show__pending_price_increases(args):"
+      },
+      {
+        "start": 339,
+        "end": 375,
+        "text": "# accept price-increase\n# ---------------------------------------------------------------------------\n\n\n@parser.command(\n    argument(\"ids\", help=\"instance IDs to accept (one or more).\", type=int, nargs=\"+\"),\n    argument(\"--yes\", \"-y\", action=\"store_true\",\n             help=\"skip the interactive prompt; required when stdin is not a TTY\"),\n    usage=\"vastai accept price-increase ID [ID ...] [--yes]\",\n    help=\"Accept one or more pending host price increases\",\n    epilog=deindent(\"\"\"\n        Review pending price increases with `vastai show pending-price-increases`\n        before accepting. The CLI fans out one PUT per instance ID (no batch\n        endpoint exists on the backend), and the new rate applies only after\n        each contract's current end_date — your remaining time on the current\n        term is billed at the original price.\n\n        Examples:\n            vastai accept price-increase 123 --yes\n            vastai accept price-increase 1 2 3 --yes\n\n        Exit codes:\n            0 — every requested row was accepted\n            1 — at least one row failed (non-stale)\n            2 — at least one row was stale (re-run `show pending-price-increases`)\n    \"\"\"),\n)\ndef accept__price_increase(args):\n    \"\"\"Per-row accept for pending price-increase challenges.\"\"\"\n    return _run_per_row(\n        args,\n        route_verb=\"accept\",\n        api_call=price_increase_api.accept,\n        present_imperative=\"Accept\",\n        past_tense=\"Accepted\",\n        cutover_note=\"New rate applies after each contract's current end_date.\",\n    )"
+      }
+    ],
+    "limit": "Pinned implementation and published help; no backend, payment-policy, permission-enforcement, or runtime proof."
+  },
+  {
+    "repository": "vast-ai/vast-cli",
+    "revision": "ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd",
+    "path": "vastai/cli/commands/teams.py",
+    "url": "https://github.com/vast-ai/vast-cli/blob/ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd/vastai/cli/commands/teams.py",
+    "body_sha256": "95243c2f0ed31b790454ebf126ce52e6e94667ddb9d85a6667f1fd295e3d7259",
+    "matches_git_blob": true,
+    "recorded_at": "2026-09-09T17:52:13.640Z",
+    "excerpts": [
+      {
+        "start": 1,
+        "end": 90,
+        "text": "\"\"\"CLI commands for managing teams.\"\"\"\n\nimport json\n\nfrom vastai.cli.parser import argument\nfrom vastai.cli.display import deindent\nfrom vastai.api import teams as teams_api\n\n\nfrom vastai.cli.utils import get_parser as _get_parser, get_client  # noqa: F401\n\n\nparser = _get_parser()\n\n\n# ---------------------------------------------------------------------------\n# create / destroy team\n# ---------------------------------------------------------------------------\n\n@parser.command(\n    argument(\"--team-name\", help=\"name of the team\", type=str),\n    argument(\"--transfer-credit\", help=\"amount of personal credit to transfer to the new team\", type=float, default=0),\n    usage=\"vastai create-team --team-name TEAM_NAME [--transfer-credit AMOUNT]\",\n    help=\"Create a new team\",\n    epilog=deindent(\"\"\"\n         Creates a new team under your account.\n\n        Unlike legacy teams, this command does NOT convert your personal account into a team.\n        Each team is created as a separate account, and you can be a member of multiple teams.\n\n        When you create a team:\n          - You become the team owner.\n          - The team starts as an independent account with its own billing, credits, and resources.\n          - Default roles (owner, manager, member) are automatically created.\n          - You can invite others, assign roles, and manage resources within the team.\n\n        Optional:\n          You can transfer a portion of your existing personal credits to the team by using\n          the `--transfer-credit` flag. Example:\n              vastai create-team --team-name myteam --transfer-credit 25\n\n        Notes:\n          - You cannot create a team from within another team account.\n\n        For more details, see:\n        https://vast.ai/docs/teams-quickstart\n    \"\"\"),\n)\ndef create__team(args):\n    \"\"\"Create a new team.\"\"\"\n    client = get_client(args)\n    result = teams_api.create_team(client, team_name=args.team_name, transfer_credit=args.transfer_credit)\n    print(result)\n\n\n@parser.command(\n    usage=\"vastai destroy team\",\n    help=\"Destroy your team\",\n)\ndef destroy__team(args):\n    \"\"\"Destroy your team.\"\"\"\n    client = get_client(args)\n    result = teams_api.destroy_team(client)\n    print(result)\n\n\n# ---------------------------------------------------------------------------\n# team roles\n# ---------------------------------------------------------------------------\n\n@parser.command(\n    argument(\"--name\", help=\"name of the role\", type=str),\n    argument(\"--permissions\", help=\"file path for json encoded permissions, look in the docs for more information\", type=str),\n    usage=\"vastai create team-role --name NAME --permissions PERMISSIONS\",\n    help=\"Add a new role to your team\",\n    epilog=deindent(\"\"\"\n        Creating a new team role involves understanding how permissions must be sent via json format.\n        You can find more information about permissions here: https://vast.ai/docs/cli/roles-and-permissions\n    \"\"\")\n)\ndef create__team_role(args):\n    \"\"\"Create a new team role.\"\"\"\n    from vastai.cli.util import load_permissions_from_file\n    client = get_client(args)\n    permissions = load_permissions_from_file(args.permissions)\n    result = teams_api.create_team_role(client, name=args.name, permissions=permissions)\n    print(result)\n\n\n@parser.command("
+      }
+    ],
+    "limit": "Pinned implementation and published help; no backend, payment-policy, permission-enforcement, or runtime proof."
+  },
+  {
+    "repository": "vast-ai/vast-cli",
+    "revision": "ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd",
+    "path": "vastai/cli/commands/billing.py",
+    "url": "https://github.com/vast-ai/vast-cli/blob/ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd/vastai/cli/commands/billing.py",
+    "body_sha256": "92d66d4b2247f847aec3e7866c557e192109aaf03ac2746ea2cdbdb644f695f9",
+    "matches_git_blob": true,
+    "recorded_at": "2026-09-09T17:52:13.648Z",
+    "excerpts": [
+      {
+        "start": 143,
+        "end": 163,
+        "text": "    return {\"rows\": rows, \"header_text\": header_text, \"pdf_filename\": filename}\n\n\n# ---------------------------------------------------------------------------\n# Invoices-v1 helpers (rich formatting)\n# ---------------------------------------------------------------------------\n\ncharge_types = ['instance', 'volume', 'serverless', 'i', 'v', 's']\ninvoice_types = {\n    \"transfers\": \"transfer\",\n    \"stripe\": \"stripe_payments\",\n    \"bitpay\": \"bitpay\",\n    \"coinbase\": \"coinbase\",\n    \"crypto.com\": \"crypto.com\",\n    \"reserved\": \"instance_prepay\",\n    \"payout_paypal\": \"paypal_manual\",\n    \"payout_wise\": \"wise_manual\",\n}\n\n\ndef format_invoices_charges_results(args, results):"
+      }
+    ],
+    "limit": "Pinned implementation and published help; no backend, payment-policy, permission-enforcement, or runtime proof."
+  },
+  {
+    "repository": "vast-ai/vast-cli",
+    "revision": "ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd",
+    "path": "vastai/api/teams.py",
+    "url": "https://github.com/vast-ai/vast-cli/blob/ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd/vastai/api/teams.py",
+    "body_sha256": "927e939dc69e53f968063944cb2b33ee0f867070ae065f2ec23e9b2c0af7405b",
+    "matches_git_blob": true,
+    "recorded_at": "2026-09-09T17:52:13.655Z",
+    "excerpts": [
+      {
+        "start": 1,
+        "end": 110,
+        "text": "\"\"\"Team CRUD operations, members, and roles.\"\"\"\nfrom vastai.api.client import VastClient\n\n\ndef create_team(client: VastClient, team_name: str, transfer_credit: float = 0) -> dict:\n    \"\"\"Create a new team.\n\n    Args:\n        client: VastClient instance.\n        team_name: Name of the team to create.\n        transfer_credit: Amount of personal credit to transfer to the new team.\n\n    Returns:\n        Response dict with team info.\n    \"\"\"\n    json_data = {\"team_name\": team_name, \"transfer_credit\": transfer_credit}\n    r = client.post(\"/team/\", json_data=json_data)\n    r.raise_for_status()\n    return r.json()\n\n\ndef destroy_team(client: VastClient) -> dict:\n    \"\"\"Destroy the current team.\n\n    Args:\n        client: VastClient instance.\n\n    Returns:\n        Response dict.\n    \"\"\"\n    r = client.delete(\"/team/\")\n    r.raise_for_status()\n    return r.json()\n\n\ndef show_members(client: VastClient) -> dict:\n    \"\"\"Show members of the current team.\n\n    Args:\n        client: VastClient instance.\n\n    Returns:\n        Response dict with member info.\n    \"\"\"\n    r = client.get(\"/team/members/\")\n    r.raise_for_status()\n    return r.json()\n\n\ndef invite_member(client: VastClient, email: str, role: str) -> dict:\n    \"\"\"Invite a member to the current team.\n\n    Args:\n        client: VastClient instance.\n        email: Email address of the member to invite.\n        role: Role to assign to the invited member.\n\n    Returns:\n        Response dict.\n    \"\"\"\n    r = client.post(\"/team/invite/\", query_args={\"email\": email, \"role\": role})\n    r.raise_for_status()\n    return r.json()\n\n\ndef remove_member(client: VastClient, id: int) -> dict:\n    \"\"\"Remove a member from the current team.\n\n    Args:\n        client: VastClient instance.\n        id: Member ID to remove.\n\n    Returns:\n        Response dict.\n    \"\"\"\n    r = client.delete(f\"/team/members/{id}/\")\n    r.raise_for_status()\n    return r.json()\n\n\ndef create_team_role(client: VastClient, name: str, permissions: dict) -> dict:\n    \"\"\"Add a new role to the current team.\n\n    Args:\n        client: VastClient instance.\n        name: Name of the role.\n        permissions: Dict of permissions for the role.\n\n    Returns:\n        Response dict.\n    \"\"\"\n    r = client.post(\"/team/roles/\", json_data={\"name\": name, \"permissions\": permissions})\n    r.raise_for_status()\n    return r.json()\n\n\ndef show_team_role(client: VastClient, name: str) -> dict:\n    \"\"\"Show details of a specific team role.\n\n    Args:\n        client: VastClient instance.\n        name: Name of the role.\n\n    Returns:\n        Role details dict.\n    \"\"\"\n    r = client.get(f\"/team/roles/{name}/\")\n    r.raise_for_status()\n    return r.json()\n"
+      }
+    ],
+    "limit": "Pinned implementation and published help; no backend, payment-policy, permission-enforcement, or runtime proof."
+  }
+]

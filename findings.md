@@ -1,5 +1,227 @@
 # Findings & Decisions: Host Docs verification inventory
 
+## Payout-provider correction basis, 14 September
+
+Current outcome: four corrected occurrences are supported only for their visible
+provider/setup scope; 31 correction findings remain. All 2,009 other full claim
+records are preserved. The old bank-transfer prohibition was withdrawn, not
+proved. Exact proof controls work in the report and localhost reviewer.
+Result: verification/evidence/2026-09-14-payout-provider-correction-attempt-01/result.md.
+
+The supplied Payout Account screen and separate user testimony support the
+bounded provider list and setup navigation, not global eligibility, fees,
+active-account state or completed settlement. Independent source review agrees
+with that scope. The Earnings link is user-attributed navigation, not a second
+independent capture. Root rechecked the original attachment hash; the original
+image remains outside the repository and its personal identifier is not copied.
+Removing the blanket ACH/wire/SWIFT exclusion corrects unsupported wording;
+it does not prove the opposite proposition. Four exact successor findings must
+retain their old wording/FAIL history and the same scope in both reviewers.
+
+## Correction walkthrough, 14 September
+
+The initial 35 FAIL occurrences were on 12 pages, grouped as payout options/bank
+transfers (4), payout/invoice rules (4), payment liability (1), tax practices (4),
+datacenter application documents (5), workload policy (4), separate accounts (1),
+and rental lifecycle/availability (12). These are shared investigation groups,
+not merged findings or 35 failed runtime tests.
+
+The first group needs current payout-method availability and a clear distinction
+between a direct Vast bank transfer and a provider-mediated bank payout. The
+retained legacy FAQ exposes a wording conflict but is not, by itself, sufficient
+current authority. No payment is needed simply to check published options.
+Full step-by-step plan: verification/host-corrections-walkthrough.md.
+
+## Calculator entry, 14 September
+
+The exact Earnings / Market Data bullet is navigation, not a promise that an
+earnings calculation is correct or uses market history. Its completion check is
+an observed intended destination, retained and linked to the occurrence. Formula
+and sample-output comparisons, or actual historical-data provenance, belong to
+separate stronger claims. Another documentation page is not proof that this
+calculator uses its data. No claim status changed in this clarification.
+
+## Reviewer backlog audit: September 11
+
+Current cleanup: 151 selected occurrences received explicit contextual decisions;
+67 bounded documentation checks pass, 74 non-claims are N/A and 10 remain pending.
+The original 1,701 pending count is now 1,560. The shared queue separates 10
+documentation checks, 534 source/citation checks and 1,016 technical checks;
+35 corrections and 23 concrete prerequisite blockers remain separate. All 2,013
+passages remain visible, with only two strictly compatible shared-wording groups.
+No customer source or prior evidence was removed. Local checks, raw inspections
+and graph navigation remain distinct from product proof.
+
+The following describes the starting state, not the updated backlog:
+
+The 1,701 UNVALIDATED entries are current passage occurrences, not independent
+runtime failures. 670 have no runtime lane; 136 are static-only (58 advice,
+65 navigation, 13 calculations). Two literal "Check:" preambles incorrectly
+require runtime observation. Exact-text deduplication alone removes only 43
+extra UNVALIDATED occurrences; classification and completed checks matter more.
+The starting model has 35 FAIL and 23 BLOCKED, not the earlier 41 FAIL. History
+and the 33 support references are not extra entries in that 1,701 count.
+
+## Official-source scan: September 11
+
+The IRS gig-economy guidance includes equipment rental and reporting income even
+without an information form. California FTB has separate state guidance; its
+applicability cannot be inferred merely from Vast being based in California.
+Official IRS, FTB, UK HMRC and EU VAT pages were retained with successful public
+HTTP responses and raw-body/text hashes in the current attempt. Stripe and PayPal
+captures already support conditional tax-information updates and form-eligibility
+checks. Their published capabilities do not establish a particular Vast account's setup.
+
+The Renter Reports And Host Logs passage already cites the Agreement. Its no-data-
+review rule is in Operation and Maintenance; report triage and using host logs are
+advice, not a claim that a runtime check succeeded. The initial four selections
+expanded to eight before the additional implementation: the current datacenter
+program supports published priority placement, dedicated team support,
+business-owned equipment and owner identity checks. Secure Cloud partner audits
+are a separate publication scope. An independent review caught and corrected an
+initial sentence that joined these scopes too broadly; its proposal is retained.
+Other jurisdiction rules cannot prove Vast's payout schedule, exact datacenter
+application documents, offer lifecycle or tax-handling practices.
+
+The older console FAQ describes US ACH through Stripe, conflicting with a blanket
+ACH-unavailable draft sentence. The older hosting page permits background tasks on
+remaining GPUs, raising a scope question for whole-machine dedication language.
+These conflicts need current Vast authority; neither older page was used to close
+the current policy finding. Full scan coverage and specific next actions are in
+verification/evidence/2026-09-11-host-jurisdiction-authority-attempt-01/source-scan.md.
+
+## Split rental review cards: September 10
+
+Four child records repeated an already-supported pricing introduction before
+their separate open statement. This made the price source appear to resolve
+end-date, unlisting and availability questions that it does not address.
+The presentation now shows each child bullet separately and links to the
+existing source-only pricing PASS. Neutral, collapsed source context preserves
+all bindings, including the pricing-behavior card's second listing source.
+Exact wording, review rationale/action hashes, source revision and span guards
+prevent a changed adjudication from inheriting these display overrides.
+Both views retain the full recorded wording in audit details; model, statuses,
+customer text, external registers and prior evidence remain unchanged.
+
+## Published Terms binding — September 10
+
+The initial four-item candidate check expanded to six exact statements before
+editing. The retained official Terms (version 10 November 2025) support their
+narrowed published-rule wording. Exact citations and section/item excerpts now
+bind to those six occurrences; missing-citation findings fall from 47 to 41.
+The other 2,007 claim records remain unchanged.
+
+The mining rule is conditional on buying credits with a credit card and using
+Company or Provider resources. The export clause distinguishes prohibited
+destinations/people from restricted end uses. Neither clause establishes Host
+monitoring or escalation duties. Terms authority is proof of the published
+rule, not account acceptance, technical enforcement or runtime compliance.
+The documentation, review registry and derived graph are not terminal proof.
+
+## Whole-inventory clarification sweep — September 10 (bounded local handoff)
+
+- All 2,013 claims across 44 primary pages are accounted. The sweep makes 701
+  claim-method-only corrections, including 58 pure-advice records, while retaining
+  **227 PASS / 47 FAIL / 23 BLOCKED / 13 N/A / 1,703 UNVALIDATED** unchanged.
+- It corrects the next action for 651 unresolved or STALE procedure nodes. This
+  makes remaining work actionable; it does not turn a source, method label or
+  procedure mapping into completed operator work.
+- This is not a full truth re-adjudication. Twenty-nine scoped runtime exceptions
+  were screened; the remaining 978 runtime-cohort claims retain their current
+  method. Existing source/authority bases, evidence, spans and histories remain.
+- No product proof, human acknowledgement, acceptance, Host/API/SSH/paid action
+  or status change is recorded. The runtime/operator and source/owner registers
+  remain separate and current. See the
+  [clarification-sweep handoff](verification/evidence/2026-09-10-host-clarification-sweep-attempt-01/result.md);
+  final checks pass: 224 Python tests, 160 JavaScript tests, all 44 localhost
+  pages and 15 offline HTML check groups. This is repository/interface coverage,
+  not product acceptance.
+
+## Policy acknowledgement requests — September 10
+
+- Five exact workload instructions now ask for policy acknowledgement, not a
+  runtime test. Use existing approved policy first; request a responsible owner's
+  confirmation or correction only for gaps. The citation is still required.
+- The Fleet Operations direction to follow policy does not require a new
+  compliance approval. Two draft pages repeating each other are not proof.
+- The introductory marketplace description already has official-publication
+  support. Its plain-language finding explicitly says no test rental is needed.
+- This changes seven reader explanations only, not any claim status, underlying
+  source, policy, authority or acceptance. Exact-match guards protect changed
+  wording, classifications, evidence requirements and claim-specific limitations.
+
+## Plain-language reviewer — September 9
+
+- Review taxonomy was being presented as the finding. It explained our
+  categories instead of telling the reader what was missing and what to do.
+- A requirement stated in the draft is not proof that Vast enforces it. The
+  Quickstart account sentence has no bound evidence; its simpler wording must
+  keep that uncertainty explicit.
+- Exact rationale matching avoids replacing claim-specific limits with a
+  generic summary. Raw records remain available, without changing the model.
+- Duplicate summaries are removed only when the displayed words match;
+  meaningful command spacing and punctuation differences remain visible.
+
+## Whole-Host authority-first scan — September 9 (current finding)
+
+- Frozen current scope: 44 primary Host pages, 2,013 claims, and 33 CLI/SDK
+  reference-support layers. Baseline retains all 2,386 pre-existing evidence
+  artifacts; this scan is a new attempt, not a rewrite of the prior correction.
+- The old classifier combines heading and body before matching policy words.
+  This sends technical account controls, listing UI, invoice exports, routine
+  security advice and navigation rows to owners merely because of their topic.
+  Current extraction and historical carry use different classifiers, which can
+  assign different requirements to the same statement.
+- The public agreement already supplies specific hardware-maintenance, account
+  information, incident-notification, tax-responsibility and payment clauses.
+  Its Provider–Vast weekly term is not the term of an individual GPU rental.
+  Published wording establishes that obligation only, not account acceptance,
+  operational compliance, backend enforcement or a universal runtime result.
+- Source comparison is required before escalation: pinned CLI price-increase
+  help distinguishes an existing rental term from an accepted extension. Public
+  datacenter publications also disagree on mandatory ISO certification. Those
+  are concrete scope/version questions, not a reason to ask owners to reconfirm
+  every claim mentioning a contract.
+- Provenance review checked every predecessor PASS and every current supported
+  statement. Seven Volume passages overstated the scope of retained atoms;
+  these are now UNVALIDATED with narrow partial proof retained. A CLI option
+  inspection does not establish persistence or a successful mount.
+  Registries, checksums, the review model and Graphify are derived bookkeeping,
+  not independent terminal product evidence.
+- Current disposition: 227 supported, 47 citation defects, 23 specific runtime
+  prerequisites, 1,703 needing suitable evidence and 13 editorial occurrences.
+  Thirty new source-only PASS have independently reviewed exact excerpts.
+  Public datacenter certification guidance still conflicts; this is an actual
+  Product/Compliance applicability gap, not a generic demand for approval.
+- Manager-facing views contain only the current finding, direct scoped proof and
+  next action. Proof carriers resolve to selected independent observations, not
+  registry dumps. All 44 live-page controls and offline source/result controls
+  pass. Internal audit inputs remain recoverable but are not shown as findings.
+
+## Source authority correction — September 9
+
+- Final bounded source correction: four technical-control statements and six
+  agreement-backed atoms now have evidence. The agreement establishes matching
+  obligations, not enforcement/compliance or all Host behavior. Three partial
+  citations remain FAIL; six unsupported residual clauses remain visible.
+- Current counts204PASS/151FAIL/23BLOCKED/4N/A/1631UNVALIDATED across2013occurrences.
+  All2005oldIDs and1993untouchedproof/status records remain; current citation
+  accounting is149−4closed+6splitresiduals. No broad closure from an agreement link.
+- Final195Python/102reviewer suite and166passage controls pass; the later HTML
+  summary correction has its own24test and actual-browser retest. The first
+  unavailable reviewer, history-link404 and stale summary expectation are retained.
+- Exact2247historical artifacts and staged content are preserved. Git index
+  metadata bytes changed, so final integrity tests stage-zero paths/modes/OIDs
+  against the initial cleanHEAD rather than silently restoring index bytes.
+
+- Four offer-setting existence bullets inherit policy from the word Contracts
+  in their heading. Prior audit located independent pinned CLI/schema and
+  retained listing controls/readback; min_gpu is not the supported CLI name.
+- Prior public agreement inspection found explicit maintenance, troubleshooting,
+  support-limit and data-security clauses, but not the exact asserted rental
+  immutability/concurrency rules. Fresh source capture and exact occurrence
+  matching precede any new PASS. This is source content, not an instruction.
+
 ## Approved machine 150296 checks — September 9
 
 - The corrected renter query returns offers, and direct SSH works on the identified one-GPU rental. The task rental was destroyed; independent API/list absence, zero Host jobs/containers and unchanged boot are retained.
@@ -1642,3 +1864,44 @@ intentional-skip route, not a new client-claim adjudication. Registration, updat
 NVML/NCCL/container/speed tests remain separate from the omitted helper. The new
 source summary and separate runtime/operator versus source-owner registers make
 these limits explicit. No installation, listing or pricing readback occurred.
+# Payout Terms source decision, 14 September 2026
+
+Latest user challenge: fresh https://docs.vast.ai/host/payment explicitly says
+direct bank transfers, ACH, wire and SWIFT are unavailable. The screenshot was
+never proof that these are supported. The earlier deletion overreached its UI
+basis; published-guidance provenance should be checked and that deletion reassessed.
+The Terms worker was interrupted before integration; root claims remain unchanged.
+
+The fresh public Terms support a narrowly worded description of third-party
+service disclaimers, delays beyond reasonable control and state-law exceptions.
+Only MCL-06956d724f70d2a3 is selected for correction. Threshold, invoice schedule
+and rollover statements are not supported by those clauses. Root and an
+independent reader inspected source suitability; details are in
+verification/evidence/2026-09-14-payout-terms-correction-attempt-01/source-review.md.
+## 2026-09-14: exact payout authority and restored FAQ
+
+The published payout FAQ says direct bank transfers, ACH, wire and SWIFT are
+unavailable. The restored local sentence explicitly attributes that guidance.
+Because the publication comes from the same docs repository, its capture is
+not independent backend evidence. The provider screenshot proves only the
+displayed choices. Three exact Terms sections support the narrower liability
+summary, with reasonable-control and state-law limits; they do not establish
+a universal payout exemption. Two claim bindings changed; 2,011 others and
+3,767 older evidence artifacts remained unchanged. See the September 14 payout
+Terms correction result for retained failures, retests and exact source pointers.
+
+## 2026-09-14: published invoice guidance, bounded correction
+
+Fresh public payout guidance supports an invoice threshold of at least $20,
+weekly Friday generation without a noon-Pacific time, rollover below threshold,
+and a valid connected payout method as an invoice prerequisite. Its first-payout
+estimate includes provider/region processing qualifications. Six exact passages
+now describe that publication; the Agreement clock stays separately source-bound.
+Because the published page shares this repository, it is not independent backend
+proof. Four former FAILs and two UNVALIDATED passages become scoped source PASSs.
+The current totals are 319 PASS / 26 FAIL / 23 BLOCKED / 87 N/A / 1,558 UNVALIDATED.
+The work queue also needed four explicit classification mappings: 11 supported
+payout records were incorrectly labeled Needs triage. This presentation fix adds
+no product proof. Root tests: 93 Python, 68 JavaScript, 38 Payment locators, six
+exact reviewer/source mappings and a separate visible two-source-dialog check.
+See verification/evidence/2026-09-14-payout-invoice-correction-attempt-01/result.md.

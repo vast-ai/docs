@@ -1,0 +1,38 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {PAYOUT_TERMS_PATH, projectPayoutTermsCorrection, loadPayoutTermsCorrection} from './current_host_payout_terms_correction.mjs';
+import {PAYOUT_INVOICE_PATH} from './current_host_payout_invoice_correction.mjs';
+import {loadCurrentHostReviewTransition} from './current_host_review_transition.mjs';
+
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const read=ref=>fs.readFileSync(path.join(root,ref));
+const exists=ref=>fs.existsSync(path.join(root,ref));
+const ids=['MCL-06956d724f70d2a3','MCL-9826b26393329d27'];
+const claims=model=>new Map(model.pages.flatMap(page=>page.claims).map(claim=>[claim.id,claim]));
+const source='host/payment.mdx',faq='verification/evidence/2026-09-14-payout-terms-correction-attempt-01/published-payout-faq-01.json';
+const frozenRead=ref=>ref===source?read('verification/evidence/2026-09-14-payout-invoice-correction-attempt-01/pre-correction-payment.mdx'):read(ref);
+const beforeInvoice=ref=>ref===PAYOUT_INVOICE_PATH?false:exists(ref);
+
+const baseline=JSON.parse(read('verification/evidence/2026-09-14-payout-terms-correction-attempt-01/pre-correction-model.json'));
+assert.equal(claims(baseline).get(ids[0]).status,'FAIL');
+assert.equal(claims(baseline).get(ids[1]).status,'PASS');
+const projected=projectPayoutTermsCorrection({read:frozenRead,exists}),current=claims(projected.model);
+assert.equal(current.get(ids[0]).status,'PASS');
+assert.equal(current.get(ids[1]).classification,'PUBLICATION_DESCRIPTION');
+assert.match(current.get(ids[1]).text,/direct bank transfers, including ACH, wire and SWIFT, are unavailable/);
+assert.deepEqual(projected.model.counts.claim_statuses,{BLOCKED:23,FAIL:30,NOT_APPLICABLE:87,PASS:313,UNVALIDATED:1560});
+assert.deepEqual([...current].filter(([id,claim])=>!ids.includes(id)&&JSON.stringify(claim)!==JSON.stringify(claims(baseline).get(id))),[],'all 2011 non-target claim records retain bytes');
+assert.equal(projected.matches.get(ids[0]).claim.text,current.get(ids[0]).text);
+assert.equal(projected.matches.get(ids[1]).claim.text,current.get(ids[1]).text);
+assert.equal(projected.artifactHashes.get(source),'6171ba7c1575be13bdbed837c9ea941c2a3314971c726dcd27f6fb2fd3932442');
+assert.equal(current.get(ids[1]).source_refs[0].locator,'/text');
+assert.equal(loadPayoutTermsCorrection({read:frozenRead,model:projected.model,exists}).payoutTerms.faq,faq);
+assert.equal(loadCurrentHostReviewTransition({read:frozenRead,model:projected.model,exists:beforeInvoice}).payoutTerms.registry.record_type,'HOST_PAYOUT_TERMS_CORRECTION');
+assert.equal(loadPayoutTermsCorrection({read:frozenRead,model:baseline,exists:ref=>ref===PAYOUT_TERMS_PATH?false:exists(ref)}),null);
+assert.throws(()=>projectPayoutTermsCorrection({read:ref=>ref===faq?Buffer.from('{}'):frozenRead(ref),exists}),/digest drift .*published-payout-faq/);
+assert.throws(()=>projectPayoutTermsCorrection({read:ref=>ref===source?Buffer.from('tamper'):frozenRead(ref),exists}),/digest drift host\/payment.mdx/);
+const stale=structuredClone(projected.model);stale.pages.flatMap(page=>page.claims).find(claim=>claim.id===ids[1]).status='FAIL';
+assert.throws(()=>loadCurrentHostReviewTransition({read:frozenRead,model:stale,exists:beforeInvoice}),/whole model differs/);
+assert.equal(new Set([...read(source).toString().matchAll(/id="([^"]+)"/g)].map(match=>match[1])).size,[...read(source).toString().matchAll(/id="([^"]+)"/g)].length,'no duplicate explicit anchors');

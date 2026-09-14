@@ -1319,21 +1319,54 @@ def classify_claim(source_file: str, heading: str, text: str, raw: str) -> tuple
         source_file == "host/hosting-overview.mdx"
         and body_lower.startswith("after signup, use this docs path ")
     )
-    policy = not navigation and not page_scope_statement and not docs_routing_statement and (
+    # A heading is context, not an assertion. In particular, an Offers/Rental
+    # Contracts heading must not make a bare UI/API control label into a legal
+    # or commercial promise. Match both the raw list item and normalized claim
+    # text: a contextual preamble such as "Hosts are responsible for ..." must
+    # remain policy even if its final source line is an otherwise bare label.
+    # This intentionally admits only exact current technical controls; verbs,
+    # allowed values, guarantees, immutable terms, rights, and enforcement
+    # language continue through the policy classifier below.
+    technical_offer_control_label = bool(re.fullmatch(
+        r"(?:minimum gpu (?:size|count)\s*\(`min_(?:gpu|chunk)`\)|"
+        r"interruptible minimum bid|reserved discount settings|"
+        r"maximum prepaid discount\s*\(`discount_rate`\)|offer end date)\.?",
+        body_lower.strip(),
+        flags=re.IGNORECASE,
+    ))
+    technical_offer_control_existence = bool(
+        re.fullmatch(
+            r"\s*[-*+]\s+(?:minimum gpu (?:size|count)\s*\(`min_(?:gpu|chunk)`\)|"
+            r"interruptible minimum bid|reserved discount settings|"
+            r"maximum prepaid discount\s*\(`discount_rate`\)|offer end date)\.?\s*",
+            raw,
+            flags=re.IGNORECASE,
+        )
+        and technical_offer_control_label
+        and re.search(r"\boffers?\b", heading, flags=re.IGNORECASE)
+        and re.search(r"\b(?:rental\s+)?contracts?\b", heading, flags=re.IGNORECASE)
+    )
+    policy = (
+        not navigation
+        and not page_scope_statement
+        and not docs_routing_statement
+        and not technical_offer_control_existence
+        and (
         bool(re.search(
-            r"\b(?:agreement|contracts?|commitment|legal|policy|terms of service|tax(?:es|ation)?|"
-            r"payouts?|payment|invoices?|billing|earnings?|pricing|prices?|fee|responsib(?:le|ility|ilities)|"
-            r"must not|prohibited|permitted|allowed|account status|provider policy)\b",
-            policy_lower,
-        ))
-        or workload_policy_subject
-        or commercial_contract_subject
-        or rental_dedication_subject
-        or datacenter_program_requirement
-        or datacenter_program_benefit
-        or dedicated_host_account_policy
-        or account_security_guidance
-        or revenue_component_subject
+                r"\b(?:agreement|contracts?|commitment|legal|policy|terms of service|tax(?:es|ation)?|"
+                r"payouts?|payment|invoices?|billing|earnings?|pricing|prices?|fee|responsib(?:le|ility|ilities)|"
+                r"must not|prohibited|permitted|allowed|account status|provider policy)\b",
+                policy_lower,
+            ))
+            or workload_policy_subject
+            or commercial_contract_subject
+            or rental_dedication_subject
+            or datacenter_program_requirement
+            or datacenter_program_benefit
+            or dedicated_host_account_policy
+            or account_security_guidance
+            or revenue_component_subject
+        )
     )
     citation_required = policy and not account_security_guidance and (
         bool(re.search(
@@ -1395,6 +1428,12 @@ def classify_claim(source_file: str, heading: str, text: str, raw: str) -> tuple
         or live_action_path
         or bool(re.search(r"\b(?:run|returns?|appears?|creates?|deletes?|mount|attach|install|restart|reboot|rent|workload|network|port|gpu|machine|instance|volume|verify|fails?|passes?)\b", lower))
     )
+    if technical_offer_control_existence:
+        # Existence of a declared control is source-verifiable. A later listing
+        # readback is useful supplemental runtime evidence, not a prerequisite
+        # inherited from words such as "GPU" or "settings" in the control name.
+        implementation = True
+        runtime = False
     if navigation:
         return "NAVIGATION_CONTRACT", ["REPOSITORY_STATIC_CHECK"], False
     if implementation:
@@ -1409,6 +1448,21 @@ def classify_claim(source_file: str, heading: str, text: str, raw: str) -> tuple
         lanes.append("CANONICAL_IMPLEMENTATION_SOURCE")
     kind = "POLICY_OR_COMMERCIAL" if policy else "RUNTIME_BEHAVIOR" if runtime else "IMPLEMENTATION_OR_CONCEPT"
     return kind, list(dict.fromkeys(lanes)), citation_required
+
+
+def classify_claim_source_first(source_file: str, heading: str, text: str, raw: str) -> tuple[str, list[str], bool]:
+    """Use the current exact reviewed taxonomy without rewriting old phases.
+
+    ``classify_claim`` remains the historical extraction classifier needed by
+    immutable phase audits. Both current producer entry points use this shared
+    source-bound transition classifier; heading vocabulary is not a new rule.
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('current_host_vv_overlay',
+        Path(__file__).with_name('build_current_host_vv_overlay.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.classify_literal_source_first(source_file,text)
 
 
 def owner_for(source_file: str, kind: str) -> str:

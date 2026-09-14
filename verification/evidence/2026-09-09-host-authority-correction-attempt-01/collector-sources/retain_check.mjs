@@ -1,0 +1,17 @@
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import {spawnSync} from 'node:child_process';
+const [name,command,...args]=process.argv.slice(2);
+if(!/^[a-z0-9-]+$/.test(name||'')||!command)throw Error('Unique check name and safe command required');
+const output='verification/evidence/2026-09-09-host-authority-correction-attempt-01/'+name+'.json';
+if(fs.existsSync(output))throw Error('Prior attempt exists');
+const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
+const files=['review-server.mjs','docs.json','package.json','scripts/templates/host-docs-review.html','host-docs-cli-command-check.json','HOST-DOCS-CLI-COMMAND-CHECK.md','verification/current-host-docs-review.json','verification/host-docs-review.html',...fs.readdirSync('scripts').filter(f=>/\.(?:py|mjs)$/.test(f)).map(f=>'scripts/'+f),...fs.readdirSync('verification').filter(f=>/^current-.*\.json$/.test(f)).map(f=>'verification/'+f),...fs.readdirSync('host').filter(f=>f.endsWith('.mdx')).map(f=>'host/'+f)];
+const sources=()=>Object.fromEntries(files.filter(p=>fs.existsSync(p)).map(p=>[p,sha(fs.readFileSync(p))]));
+const before=sources(),started=new Date().toISOString();
+const r=spawnSync(command,args,{encoding:'utf8',timeout:600000,maxBuffer:64e6});
+const after=sources();
+const clean=s=>String(s||'').replaceAll(process.cwd(),'<DOCS_REPO>').replaceAll('/Users/hanneszietsman','<USER>');
+const record={started,finished:new Date().toISOString(),command:[command,...args].map(clean),source_hashes_before:before,source_hashes_after:after,source_identity_unchanged:JSON.stringify(before)===JSON.stringify(after),exit_code:r.status,signal:r.signal,error:r.error?clean(r.error.message):null,stdout:clean(r.stdout),stderr:clean(r.stderr),stdout_sha256:sha(r.stdout||''),stderr_sha256:sha(r.stderr||''),limitations:'Repository/source/reviewer check only; does not establish new Host runtime behavior or human acceptance.'};
+fs.writeFileSync(output,JSON.stringify(record,null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify({output,exit_code:r.status,source_identity_unchanged:record.source_identity_unchanged,stdout_tail:record.stdout.slice(-1800),stderr_tail:record.stderr.slice(-1800)}));process.exitCode=r.status===0&&!r.error?0:1;

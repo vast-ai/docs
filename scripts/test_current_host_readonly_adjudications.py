@@ -6,6 +6,7 @@ import importlib.util
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from scripts.test_current_host_authority_scan import frozen_before_model, frozen_source_reader
 
 SCRIPT = Path(__file__).with_name("current_host_readonly_adjudications.py")
 SPEC = importlib.util.spec_from_file_location("readonly_adjudications", SCRIPT)
@@ -17,6 +18,9 @@ SPEC.loader.exec_module(gate)
 class ReadonlyAdjudicationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        fixture_read=patch.object(gate,'_read',side_effect=frozen_source_reader(gate._read))
+        fixture_read.start()
+        cls.addClassCleanup(fixture_read.stop)
         cls.registry = gate.validate()
         overlay_spec = importlib.util.spec_from_file_location("overlay", Path(__file__).with_name("build_current_host_vv_overlay.py"))
         assert overlay_spec and overlay_spec.loader
@@ -33,7 +37,7 @@ class ReadonlyAdjudicationTests(unittest.TestCase):
             gate.validate()
 
     def test_exact_ten_passes_and_the_unaffected_blocker_refresh_remain_strict(self) -> None:
-        package = self.overlay.build()
+        package = frozen_before_model()
         claims = {claim["id"]: claim for page in package["pages"] for claim in page["claims"]}
         passing = {"CUR-142629d88fb18726", "CUR-705da5057d7f3360", "CUR-2c04f5e4d6ef0b20", "MCL-f0b9b724554ce68a", "MCL-aa735864a1cb734d", "MCL-96ee15f730e698d8", "MCL-728ef13be833d21e", "MCL-a54378e7f20b92e9", "MCL-e7db8b5148b63289", "MCL-50f964a1bb6a2e95"}
         self.assertTrue(all(claims[item]["status"] == "PASS" for item in passing))

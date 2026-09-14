@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+import {spawnSync} from 'node:child_process';
+const [name,command,...args]=process.argv.slice(2),dir='verification/evidence/2026-09-14-payout-invoice-correction-attempt-01';
+if(!/^[a-z0-9-]+$/.test(name)||!command)throw Error('Name and command required');
+const file=dir+'/'+name+'.json';if(fs.existsSync(file))throw Error('Refuse overwrite');
+const started_at=new Date().toISOString();
+const r=spawnSync(command,args,{encoding:'utf8',maxBuffer:32*1024*1024,timeout:300000});
+const record={started_at,finished_at:new Date().toISOString(),command:[command,...args],exit_code:r.status,signal:r.signal,error:r.error?.message||null,stdout:r.stdout,stderr:r.stderr};
+fs.writeFileSync(file,JSON.stringify(record,null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify({artifact:file,exit_code:r.status,error:record.error,tail:(r.stdout+'\n'+r.stderr).slice(-1800)}));process.exitCode=r.status??1;

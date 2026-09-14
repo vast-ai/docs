@@ -10,6 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from scripts.test_current_host_authority_scan import frozen_before_model, frozen_source_reader
 
 
 SCRIPT = Path(__file__).with_name("current_h100x4_direct_postinstall_adjudications.py")
@@ -22,6 +23,9 @@ SPEC.loader.exec_module(gate)
 class H100x4PostinstallAdjudicationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        fixture_read=patch.object(gate,'_read',side_effect=frozen_source_reader(gate._read))
+        fixture_read.start()
+        cls.addClassCleanup(fixture_read.stop)
         cls.registry = gate.validate()
         overlay_spec = importlib.util.spec_from_file_location("overlay", Path(__file__).with_name("build_current_host_vv_overlay.py"))
         assert overlay_spec and overlay_spec.loader
@@ -38,7 +42,7 @@ class H100x4PostinstallAdjudicationTests(unittest.TestCase):
             gate.validate()
 
     def test_exact_four_runtime_claims_pass_without_source_proof(self) -> None:
-        package = self.overlay.build()
+        package = frozen_before_model()
         claims = {claim["id"]: claim for page in package["pages"] for claim in page["claims"]}
         self.assertEqual(set(gate.TARGETS), {row["claim_id"] for row in self.registry["adjudications"]})
         for claim_id in gate.TARGETS:
