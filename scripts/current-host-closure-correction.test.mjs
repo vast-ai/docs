@@ -15,7 +15,7 @@ async function withRegistry(change){const edited=structuredClone(registry);chang
 test('Python/JavaScript project the same newest model and preserve original finding accounting',()=>{
  assert.deepEqual(projected.model,model);assert.deepEqual(loadCurrentHostReviewTransition({read,model,exists}).model,model);
  const py=JSON.parse(execFileSync('python3',['-c',"import json,sys;from pathlib import Path;sys.path.insert(0,'scripts');import current_host_closure_correction as m;print(json.dumps(m.project(Path.cwd())))"],{cwd:new URL('../',import.meta.url),maxBuffer:16*1024*1024}));assert.deepEqual(py,model);
- assert.equal(claims.size,2008);assert.deepEqual(model.counts.claim_statuses,{BLOCKED:21,FAIL:11,NOT_APPLICABLE:87,PASS:335,UNVALIDATED:1554});assert.equal(registry.original_findings.length,26);assert.equal(new Set(registry.original_findings.map(f=>f.claim_id)).size,26);
+ assert.equal(claims.size,2008);assert.deepEqual(model.counts.claim_statuses,{BLOCKED:21,FAIL:2,NOT_APPLICABLE:87,PASS:345,UNVALIDATED:1553});assert.equal(registry.original_findings.length,26);assert.equal(new Set(registry.original_findings.map(f=>f.claim_id)).size,26);
  for(const item of registry.original_findings.filter(f=>f.disposition!=='CORRECT_NOW'))assert.deepEqual(claims.get(item.claim_id),before.get(item.claim_id));
 });
 test('five application failures retire into one existing navigation instruction, retaining historical failures',()=>{
@@ -55,4 +55,49 @@ test('mixed public-observation artifact keeps each selected canonical destinatio
  assert.ok(claims.get('MCL-0ae9c2fd5ac2ef9a').source_refs.some(ref=>ref.path===application.sourceUrl&&ref.locator==='/observations/1/excerpt'));
  const run=await withRegistry(r=>{const t=r.transitions.find(t=>t.claim_id==='MCL-0ae9c2fd5ac2ef9a');t.basis[0].sourceUrl=account.sourceUrl;t.after.source_refs[0].path=account.sourceUrl;});
  assert.throws(run,/selected observation canonical URL drift/);
+});
+
+test('nine withdrawn rental assertions retain FAIL history and exact bounded replacement evidence',()=>{
+ const attempt='verification/evidence/2026-09-14-host-closure-correction-attempt-02';
+ const change=JSON.parse(read(attempt+'/change-map.json')),previous=index(JSON.parse(read(attempt+'/pre-narrowing-model.json')));
+ assert.equal(change.original_fail_corrections.length,9);assert.equal(new Set(change.original_fail_corrections).size,9);
+ for(const id of change.original_fail_corrections){
+  const claim=claims.get(id),entry=registry.transitions.find(t=>t.claim_id===id),mapping=change.changes.find(c=>c.claim_id===id);
+  assert.equal(previous.get(id).status,'FAIL');assert.equal(claim.status,'PASS');assert.equal(claim.text,mapping.after);
+  assert.equal(claim.history.predecessor.status,'FAIL');assert.equal(claim.history.predecessor.text,mapping.before);
+  assert.deepEqual(projected.presentation.get(id).previous,previous.get(id));
+  for(const evidence of previous.get(id).evidence_refs)assert.ok(claim.evidence_refs.some(e=>JSON.stringify(e)===JSON.stringify(evidence)));
+  assert.equal(entry.method,'WITHDRAW_UNSUPPORTED_RENTAL_RULE_RETAIN_SCOPED_GUIDANCE');
+  assert.match(claim.rationale,/remain unresolved/);assert.match(claim.next_action,/HQ-RENTAL-DATES.*HQ-RENTAL-AVAILABILITY/);
+ }
+ for(const id of ['MCL-9cfc73236e4c395a','MCL-250a0c0aa31550a1']){
+  const basis=projected.presentation.get(id).basis.find(b=>b.kind==='CANONICAL_IMPLEMENTATION_SOURCE');
+  assert.match(basis.sourceUrl,/ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd\/vastai\/cli\/commands\/machines.py#L240$/);
+  assert.match(basis.excerpt,/contract offer expiration - the available until date/);
+ }
+ for(const id of change.unchanged_tax_failures)assert.deepEqual(claims.get(id),previous.get(id));
+ const changedIds=new Set([...change.original_fail_corrections,...change.adjacent_edits]);
+ for(const [id,claim]of claims)if(!changedIds.has(id))assert.deepEqual(claim,previous.get(id),`unrelated claim changed: ${id}`);
+ const owners=loadHostReviewOwnerQuestions({read,model,modelSha256:sha(read('verification/current-host-docs-review.json'))});
+ for(const id of ['HQ-RENTAL-DATES','HQ-RENTAL-AVAILABILITY']){const q=owners.questions.find(q=>q.id===id);assert.equal(q.status,'UNVALIDATED');assert.match(q.coverageGaps.join(' '),/does not resolve this owner question/);}
+});
+
+test('two adjacent edits preserve hypothetical scope, shared introductions, commands and historical evidence',()=>{
+ const attempt='verification/evidence/2026-09-14-host-closure-correction-attempt-02';
+ const oldModel=JSON.parse(read(attempt+'/pre-narrowing-model.json')),oldClaims=index(oldModel),change=JSON.parse(read(attempt+'/change-map.json'));
+ assert.deepEqual(change.adjacent_edits,['MCL-5ab653314f9e68e8','MCL-23085b459da844bc']);
+ assert.equal(claims.get('MCL-5ab653314f9e68e8').status,'NOT_APPLICABLE');assert.equal(claims.get('MCL-5ab653314f9e68e8').text,'| Offer end date | 12/31/2026 (example) |');
+ assert.equal(claims.get('MCL-23085b459da844bc').history.predecessor.status,'UNVALIDATED');
+ assert.match(claims.get('MCL-23085b459da844bc').rationale,/No runtime or safe-stop result/);
+ for(const id of ['MCL-470bf8ec992a342e','MCL-6e0046c21ac71be4','MCL-c9441dfe43eb92f1'])assert.equal(claims.get(id).text.split('\n')[0],oldClaims.get(id).text.split('\n')[0]);
+ const commands=source=>[...source.matchAll(/```bash\n([\s\S]*?)```/g)].map(m=>m[1]);
+ for(const ref of ['host/pricing-your-listing.mdx','host/maintenance-windows.mdx']){
+  const source=registry.sources.find(s=>s.path===ref);assert.deepEqual(commands(read(ref).toString()),commands(read(source.before_artifact.path).toString()));
+ }
+ assert.doesNotMatch(read('host/pricing-your-listing.mdx').toString(),/Maintenance-safe date/);
+ assert.doesNotMatch(read('host/maintenance-windows.mdx').toString(),/When the active contracts have ended/);
+ const procedures=m=>new Map(m.pages.flatMap(p=>p.procedures.flatMap(pr=>[pr,...pr.nodes]).map(n=>[n.id,n]))),oldProcedures=procedures(oldModel);
+ const invalidated=[];for(const [id,node]of procedures(model)){const prior=oldProcedures.get(id);if(prior.status!=='STALE'&&node.status==='STALE'){invalidated.push(id);assert.equal(node.history.carry_decision,'CURRENT_HOST_CLOSURE_SOURCE_CHANGED');assert.deepEqual(node.evidence_refs,prior.evidence_refs);}}
+ assert.deepEqual(invalidated.sort(),['CUR-hosting-overview-H05','PRICE-C01-main-s03','MNT-E01-B01-S02','MNT-E01-B02-S03','MNT-E01-B-common','MNT-E01-B-common-S01','MNT-E01-B-common-S02'].sort());
+ const manifest=JSON.parse(read(attempt+'/attempt-01-artifact-manifest.json'));for(const file of manifest.files)assert.equal(sha(read(file.path)),file.sha256,`attempt-01 changed: ${file.path}`);
 });

@@ -2,7 +2,7 @@
 
 Current-source claims requiring proof or correction. Historical evidence is carried only where exact source identity is recorded.
 
-Current dispositions: 2008 occurrences (335 PASS, 87 editorial NOT_APPLICABLE, 1586 requiring review or evidence). Most dispositions are automated or exact historical carry-forward; this package records no invented manual completion.
+Current dispositions: 2008 occurrences (345 PASS, 87 editorial NOT_APPLICABLE, 1576 requiring review or evidence). Most dispositions are automated or exact historical carry-forward; this package records no invented manual completion.
 
 ## [Hosting Overview](http://127.0.0.1:4000/host/hosting-overview)
 
@@ -104,34 +104,6 @@ Current dispositions: 2008 occurrences (335 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Locate the exact canonical implementation/schema/configuration for this behavior and reuse applicable retained source/execution/UI evidence. Client dispatch or documentation alone cannot prove backend effects.
 
-### [The Rental Contract](http://127.0.0.1:4000/host/hosting-overview#the-rental-contract) — `MCL-470bf8ec992a342e`
-
-**Status:** FAIL
-
-**Literal source text:** When editing an offer, distinguish the current rental term from a later extension. The [Vast CLI price-increase guidance](https://github.com/vast-ai/vast-cli/blob/ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd/vastai/cli/commands/price_increase.py#L123-L145) describes price protection through the current end date and client acceptance of a higher extension rate. Review each change separately: - Shortening the offer end date affects only future rentals.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation, Authoritative Documentation Citation
-
-**Existing proof / limit:** [SCAN-SOURCE-MCL-470bf8ec992a342e-cli-price-extension](evidence/2026-09-09-host-authority-scan-attempt-01/terminal-sources/cli-price-extension-01.json) — Supports only the exact quoted published clause or pinned technical declaration. No account acceptance, runtime compliance, backend execution, or operational completion is inferred.
-
-**Responsible role:** Documentation authoritative-source reviewer
-
-**Next:** Locate exact independent offer/rental lifecycle authority establishing whether shortening an offer affects existing rental end dates, and cite that clause/control at this occurrence. Retain FAIL for this specific missing citation; price-increase guidance does not resolve it.
-
-### [The Rental Contract](http://127.0.0.1:4000/host/hosting-overview#the-rental-contract) — `MCL-6e0046c21ac71be4`
-
-**Status:** FAIL
-
-**Literal source text:** When editing an offer, distinguish the current rental term from a later extension. The [Vast CLI price-increase guidance](https://github.com/vast-ai/vast-cli/blob/ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd/vastai/cli/commands/price_increase.py#L123-L145) describes price protection through the current end date and client acceptance of a higher extension rate. Review each change separately: - The machine must stay available until the latest active rental end date.
-
-**Required proof:** Authoritative Documentation Citation, Canonical Implementation Source
-
-**Existing proof / limit:** [SCAN-SOURCE-MCL-6e0046c21ac71be4-cli-price-extension](evidence/2026-09-09-host-authority-scan-attempt-01/terminal-sources/cli-price-extension-01.json) — Supports only the exact quoted published clause or pinned technical declaration. No account acceptance, runtime compliance, backend execution, or operational completion is inferred.
-
-**Responsible role:** Documentation authoritative-source reviewer
-
-**Next:** Locate and cite the actual rental obligation requiring machine availability through the latest active rental end date. Do not substitute price-extension help or general uptime language for that exact commitment.
-
 ### [The Rental Contract](http://127.0.0.1:4000/host/hosting-overview#the-rental-contract) — `MCL-8d3286528a924e12`
 
 **Status:** UNVALIDATED
@@ -159,20 +131,6 @@ Current dispositions: 2008 occurrences (335 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Documentation authoritative-source reviewer
 
 **Next:** Verify the residual scope using canonical implementation or a scoped read-only/runtime observation as appropriate: The following non-price contract statements retain their separate source/runtime gaps. Actual backend/billing enforcement and independent offer/spec/end-date mechanics remain unvalidated. Do not use the agreement as evidence of actual compliance.
-
-### [Offer End Date](http://127.0.0.1:4000/host/hosting-overview#offer-end-date) — `MCL-9cfc73236e4c395a`
-
-**Status:** FAIL
-
-**Literal source text:** The offer end date is the latest date a new renter can accept the offer. When accepted, that date becomes the rental end date for that contract.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation, Authoritative Documentation Citation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation authoritative-source reviewer
-
-**Next:** Inspect the retained agreement Offer/Rental Contract/Operation and Maintenance clauses and any current published terms; bind only supported clauses. Inspect the corresponding offer/update/unlist/extension implementation and retained execution for actual system effects.
 
 ### [Offer End Date](http://127.0.0.1:4000/host/hosting-overview#offer-end-date) — `MCL-0246358c365900db`
 
@@ -8074,34 +8032,6 @@ Current dispositions: 2008 occurrences (335 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Verify the residual scope using canonical implementation or a scoped read-only/runtime observation as appropriate: Actual backend/billing enforcement and independent offer/spec/end-date mechanics remain unvalidated. Do not use the agreement as evidence of actual compliance.
 
-### [Changing Price Later](http://127.0.0.1:4000/host/pricing-your-listing#changing-price-later) — `MCL-b7440bdb3eb40fa1`
-
-**Status:** FAIL
-
-**Literal source text:** | Shorten offer end date | New contracts use the new date; active rental end dates do not shorten. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation, Authoritative Documentation Citation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation authoritative-source reviewer
-
-**Next:** Inspect the retained agreement Offer/Rental Contract/Operation and Maintenance clauses and any current published terms; bind only supported clauses. Inspect the corresponding offer/update/unlist/extension implementation and retained execution for actual system effects.
-
-### [Changing Price Later](http://127.0.0.1:4000/host/pricing-your-listing#changing-price-later) — `MCL-939467a533f82627`
-
-**Status:** FAIL
-
-**Literal source text:** Keep the machine online until the latest active rental end date.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation, Authoritative Documentation Citation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation authoritative-source reviewer
-
-**Next:** Inspect the retained agreement Offer/Rental Contract/Operation and Maintenance clauses and any current published terms; bind only supported clauses. Inspect the corresponding offer/update/unlist/extension implementation and retained execution for actual system effects.
-
 ### [When To Adjust](http://127.0.0.1:4000/host/pricing-your-listing#when-to-adjust) — `MCL-85c106837f6a39a8`
 
 **Status:** UNVALIDATED
@@ -13010,34 +12940,6 @@ Current dispositions: 2008 occurrences (335 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-7fbdf0de1f80b419 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Before Maintenance](http://127.0.0.1:4000/host/maintenance-windows#before-maintenance) — `MCL-e36ac539565db44a`
-
-**Status:** FAIL
-
-**Literal source text:**   A single machine can have multiple active rental contracts from different clients. Do not take the machine offline until every active rental contract has ended.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation, Authoritative Documentation Citation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation authoritative-source reviewer
-
-**Next:** Inspect the retained agreement Offer/Rental Contract/Operation and Maintenance clauses and any current published terms; bind only supported clauses. Inspect the corresponding offer/update/unlist/extension implementation and retained execution for actual system effects.
-
-### [Planned Maintenance](http://127.0.0.1:4000/host/maintenance-windows#planned-maintenance) — `MCL-5286ec9ff0cc3272`
-
-**Status:** FAIL
-
-**Literal source text:** For planned work, set the offer end date to the maintenance date so new rentals do not run past your planned downtime. Existing contracts keep their accepted end date, so choose a date that still honors the latest active rental.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation, Authoritative Documentation Citation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation authoritative-source reviewer
-
-**Next:** Inspect the retained agreement Offer/Rental Contract/Operation and Maintenance clauses and any current published terms; bind only supported clauses. Inspect the corresponding offer/update/unlist/extension implementation and retained execution for actual system effects.
-
 ### [Planned Maintenance](http://127.0.0.1:4000/host/maintenance-windows#planned-maintenance) — `MCL-cb17382242b6309e`
 
 **Status:** UNVALIDATED
@@ -13079,20 +12981,6 @@ Current dispositions: 2008 occurrences (335 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Host installer and operations engineering owner; Authorized Host/API operator
 
 **Next:** The Host installer and operations engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-b6d1d82a6e0a63ae and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-b6d1d82a6e0a63ae and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Planned Maintenance](http://127.0.0.1:4000/host/maintenance-windows#planned-maintenance) — `MCL-23085b459da844bc`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** When the active contracts have ended, unlist the machine before taking it down:
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer
-
-**Next:** Record the engineering rationale, inspect relevant canonical technical behavior, and reuse applicable retained observations. Split guidance from any actual obligation or effect when their methods differ.
 
 ### [Planned Maintenance](http://127.0.0.1:4000/host/maintenance-windows#planned-maintenance) — `MCL-53d123c7eca2800c`
 
@@ -21616,20 +21504,6 @@ Current dispositions: 2008 occurrences (335 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Locate the exact canonical implementation/schema/configuration for this behavior and reuse applicable retained source/execution/UI evidence. Client dispatch or documentation alone cannot prove backend effects.
 
-### [Offer end date / rental end date](http://127.0.0.1:4000/host/glossary#offer-end-date-rental-end-date) — `MCL-250a0c0aa31550a1`
-
-**Status:** FAIL
-
-**Literal source text:** The offer end date becomes a renter's contract end date when accepted. Existing rental end dates cannot be shortened by later host changes. See [Hosting Overview](/host/hosting-overview#offer-end-date).
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation, Authoritative Documentation Citation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation authoritative-source reviewer
-
-**Next:** Inspect the retained agreement Offer/Rental Contract/Operation and Maintenance clauses and any current published terms; bind only supported clauses. Inspect the corresponding offer/update/unlist/extension implementation and retained execution for actual system effects.
-
 ### [On-demand rental](http://127.0.0.1:4000/host/glossary#on-demand-rental) — `MCL-89c022e1c11da0a9`
 
 **Status:** UNVALIDATED
@@ -22151,20 +22025,6 @@ Current dispositions: 2008 occurrences (335 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Documentation authoritative-source reviewer
 
 **Next:** Verify the residual scope using canonical implementation or a scoped read-only/runtime observation as appropriate: Checklist rental mechanics remain product/operational claims and are not all legal-clause supported. No exclusive-use legal clause or actual compliance established. Do not use the agreement as evidence of actual compliance.
-
-### [What you commit to, in plain language](http://127.0.0.1:4000/host/hosting-agreement#what-you-commit-to-in-plain-language) — `MCL-c9441dfe43eb92f1`
-
-**Status:** FAIL
-
-**Literal source text:** The [Hosting Agreement — Hardware as a Service and Performance of Services](https://cloud.vast.ai/host/agreement) sets out provider duties for hardware and services. Use this operational checklist when managing active rentals. Individual agreement clauses are cited below where available: - Provide the advertised services until each rental contract's rental end date.
-
-**Required proof:** Authoritative Documentation Citation
-
-**Existing proof / limit:** [SCAN-SOURCE-MCL-c9441dfe43eb92f1-agreement-hardware](evidence/2026-09-09-host-authority-scan-attempt-01/agreement-full-source-01.json) — Supports only the exact quoted published clause or pinned technical declaration. No account acceptance, runtime compliance, backend execution, or operational completion is inferred.
-
-**Responsible role:** Documentation authoritative-source reviewer
-
-**Next:** Find and cite the exact individual-rental commitment for advertised services through each rental end date. General Hardware as a Service/Performance clauses and price cutover help are only partial; retain the specific citation FAIL until resolved.
 
 ### [What you commit to, in plain language](http://127.0.0.1:4000/host/hosting-agreement#what-you-commit-to-in-plain-language) — `MCL-fea1fab97cdb288b`
 

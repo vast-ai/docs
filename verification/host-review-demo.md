@@ -24,10 +24,10 @@ Open [Host Diagnostics — Logs And Support Bundles](http://127.0.0.1:4000/host/
 
 ## Find the other owner questions
 
-- [Hosting Overview](http://127.0.0.1:4000/host/hosting-overview#the-rental-contract): distinguish date-edit behavior from the governing availability commitment.
+- [Hosting Overview](http://127.0.0.1:4000/host/hosting-overview#the-rental-contract): nine unsupported rental assertions have narrower guidance. Open their original FAIL history and current scoped source checks. The separate date-edit and availability questions remain UNVALIDATED; the replacement PASSes do not answer them.
 - [Volume Offers](http://127.0.0.1:4000/host/volume-offers#volume-lifecycle): distinguish instance removal, separately rented volumes, retention and secure erasure.
 - [Workload Policy](http://127.0.0.1:4000/host/workload-policy#host-responsibilities): the narrower noninterference advice is cited; broader local-workload restrictions remain a separate question.
 
 The eight questions are separate from the 2,008 active passage records. They do not add eight failed claims or record acceptance. Page filters select related questions; claim filters do not hide them.
 
-[Current traceability](../REVIEW-TRACEABILITY.md) · [Eleven remaining corrections](host-corrections-walkthrough.md) · [Bounded result and limitations](evidence/2026-09-14-host-closure-correction-attempt-01/result.md)
+[Current traceability](../REVIEW-TRACEABILITY.md) · [Two remaining corrections](host-corrections-walkthrough.md) · [Bounded result and limitations](evidence/2026-09-14-host-closure-correction-attempt-02/result.md)

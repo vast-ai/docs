@@ -438,6 +438,17 @@ export function buildReport() {
     add(closure.resultRef);
     for (const source of closure.registry.sources) add(source.before_artifact.path, source.before_artifact.sha256);
     for (const artifact of closure.registry.artifacts) add(artifact.path, artifact.sha256);
+    // Bounded attempt context stays navigable offline; it is not extra claim proof.
+    const closureAttempt = path.posix.dirname(closure.resultRef);
+    for (const name of ['plan.md', 'change-map.json', 'pre-narrowing-model.json',
+      'pre-narrowing-registry.json', 'attempt-01-artifact-manifest.json',
+      'focused-tests-01.json', 'focused-tests-01.log',
+      'owner-payload-retest-02.json', 'owner-payload-retest-02.log',
+      'offline-context-retest-03.json', 'offline-context-retest-03.log',
+      'generator-check-01.json', 'generator-check-01.log', 'diff-check-01.json',
+      'scoped-integrity-check-01.json', 'root-browser-pages.json',
+      'root-source-controls.json']) add(`${closureAttempt}/${name}`);
+    add('verification/evidence/2026-09-14-host-closure-correction-attempt-01/result.md');
   }
   for (const ref of installationIntake.artifactRefs) add(ref);
   add(currentResultPath); add(currentAuthorityBaselinePath); add(claimCorrectionResultPath);

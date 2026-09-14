@@ -6,17 +6,21 @@ from collections import Counter
 from pathlib import Path
 
 REGISTRY = 'verification/current-host-closure-correction.json'
-REGISTRY_SHA256 = '6997552e8fee36aa619915508f57feb47a9f5e7de32d8a7787e9ef960935c37c'
+REGISTRY_SHA256 = 'f5be2bcc0efb251565d40f89c3c780704902a6c29dc83861dd25b4428734eb30'
 ATTEMPT = 'verification/evidence/2026-09-14-host-closure-correction-attempt-01'
 MARKER = 'HOST-CLOSURE-CORRECTION-01'
 BASELINE = ATTEMPT + '/pre-correction-model.json'
 BASELINE_SHA256 = '56650fad892d1f1d387dd4328bdb474f7c2c923907419a2b74868c4a68b7daf5'
 CORRECTED = {'CUR-a991f28f683ba829','CUR-93f089288e67669d','MCL-b61d15c0282ef567','MCL-c59caa4cd52bcc1f','MCL-af1c482a08b09316','MCL-393941d0e9be9d31','MCL-57133525f112013a','MCL-dcb653ae3a927dae','MCL-47b85b40f58091a2','MCL-ae7f4423cef61511'}
+RENTAL = {'MCL-470bf8ec992a342e','MCL-b7440bdb3eb40fa1','MCL-9cfc73236e4c395a','MCL-250a0c0aa31550a1','MCL-5286ec9ff0cc3272','MCL-6e0046c21ac71be4','MCL-939467a533f82627','MCL-e36ac539565db44a','MCL-c9441dfe43eb92f1'}
+ADJACENT = {'MCL-5ab653314f9e68e8','MCL-23085b459da844bc'}
+CORRECTED |= RENTAL
+ATTEMPT_02 = 'verification/evidence/2026-09-14-host-closure-correction-attempt-02'
 RETIRED = {'MCL-08d534d1cc02eb2c','MCL-4be2159765519977','MCL-b87645b43a9136dd','MCL-d5001953fbd7df0b','MCL-e03564808f65b40b'}
 RUNTIME = {'MCL-d2f649ad765ea7bb','MCL-b15c6cfc26e189c2','MCL-115b4938222083ac','MCL-9edeb94eaa736bca','MCL-e6fb82f7e167fdc8','MCL-3aca6b1f291d4d0c','VOL-C31','VOL-C33'}
 UPSTREAM = {'CUR-f9aad9428d594b40','MCL-217525688a0854b4','CUR-65ffc3ba1623ad1c','CUR-bf6233f2e53eca43','MCL-9dc3b0e54070a926','MCL-ab00ca89f31d5db1'}
 NAVIGATION = {'MCL-0ae9c2fd5ac2ef9a','MCL-9459e18a155808c9'}
-IDS = CORRECTED | RUNTIME | UPSTREAM | NAVIGATION
+IDS = CORRECTED | RUNTIME | UPSTREAM | NAVIGATION | ADJACENT
 STALE = 'Closure source changed; retained procedure evidence does not transfer to changed steps.'
 def sha(value): return hashlib.sha256(value).hexdigest()
 def canon(value): return json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=False)
@@ -61,7 +65,7 @@ def project(root: Path):
     before={};current={};maps={};after_hashes={}
     for source in registry['sources']:
         ref=source['path'];req(ref.startswith('host/') and ref not in before,'source scope')
-        req(source['before_artifact']['path']==ATTEMPT+'/sources-before/'+ref,'source snapshot path')
+        req(source['before_artifact']['path']==(ATTEMPT_02 if ref in {'host/glossary.mdx','host/maintenance-windows.mdx','host/hosting-agreement.mdx'} else ATTEMPT)+'/sources-before/'+ref,'source snapshot path')
         before[ref]=pin(root,source['before_artifact']['path'],source['before_artifact']['sha256']);current[ref]=pin(root,ref,source['after_sha256']);after_hashes[ref]=sha(current[ref])
         oldlines,newlines=before[ref].decode().splitlines(),current[ref].decode().splitlines()
         maps[ref]=dict(source['line_map']);req(len(maps[ref])==len(source['line_map']) and len(set(maps[ref].values()))==len(maps[ref]),'duplicate line map')
@@ -124,7 +128,7 @@ def project(root: Path):
     for cid,f in findings.items():
         if f['disposition']!='CORRECT_NOW':req(remaining[cid]==old[cid],'unresolved stronger assertion changed '+cid)
     out['counts']['claims']=len(remaining);out['counts']['claim_statuses']=dict(sorted(Counter(c['status'] for c in remaining.values()).items()));out['counts']['page_coverage_states']=dict(sorted(Counter(p['coverage_state'] for p in out['pages']).items()))
-    out['generated_at']=registry['generated_at'];out['corrections'].append({'id':MARKER,'scope':'15 supported findings: 10 narrowed corrections and 5 retired checklist clauses; 8 bounded evidence/status reconciliations; upstream PR948 and CON1531 routing','history':'Complete sealed predecessor replayed against exact frozen source bytes. Five historical FAIL objects remain in the application instruction history and frozen baseline.','current':'11 stronger FAIL assertions remain open. Partial runtime observations do not promote compound workflows.','reason':registry['limits']})
+    out['generated_at']=registry['generated_at'];out['corrections'].append({'id':MARKER,'scope':'24 original findings handled: 19 narrowed corrections and 5 retired checklist clauses; 2 adjacent rental edits; 8 bounded evidence/status reconciliations; upstream PR948 and CON1531 routing','history':'Complete sealed predecessor replayed against exact frozen source bytes. Five historical FAIL objects remain in the application instruction history and frozen baseline.','current':'Two tax FAIL assertions remain open. Nine original rental FAIL assertions are retained in history after withdrawal from active prose; backend and maintenance owner questions remain open. Partial runtime observations do not promote compound workflows.','reason':registry['limits']})
     return out
 
 def load_closure_correction(root,model):

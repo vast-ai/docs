@@ -11,26 +11,35 @@ Review PR: [vast-ai/docs#185](https://github.com/vast-ai/docs/pull/185)
 
 ## Bounded closure reconciliation, 14 September 2026
 
-The current package contains **2,008 active claims across 44 Host pages: 335 PASS,
-11 FAIL, 21 BLOCKED, 87 NOT_APPLICABLE and 1,554 UNVALIDATED**. Ten supported
-corrections narrow the wording to its cited source. Five unsupported application
+The current package contains **2,008 active claims across 44 Host pages: 345 PASS,
+2 FAIL, 21 BLOCKED, 87 NOT_APPLICABLE and 1,553 UNVALIDATED**. Nineteen earlier
+FAIL occurrences have narrower supported wording. Five unsupported application
 checklist clauses are withdrawn into one existing application instruction; all
-five historical FAIL objects remain in that instruction's history and the frozen
-baseline. They have not become five product PASSes.
+five historical FAIL objects remain in its history and the frozen baseline.
+They have not become five product PASSes.
 
-The successor also binds six retained observations as partial support, changes
+Attempt 02 removes nine unsupported rental-date and availability assertions from
+active prose. Their original FAIL assertions and evidence remain in history.
+Replacement PASS covers attributed CLI declarations, Agreement referrals and
+review advice; backend date behavior, safe-stop boundaries and maintenance
+policy remain open owner questions. Two adjacent edits align the example date
+and unlisting guidance: the example remains NOT_APPLICABLE, while the unlisting
+instruction has a scoped source/context PASS. Seven newly changed procedure
+nodes are STALE; their prior evidence is retained without transferring a result.
+
+The earlier successor binds six retained observations as partial support, changes
 two Volume records with missing evidence but no demonstrated unavailable
 prerequisite to UNVALIDATED, carries reviewed upstream PR948 verification and
-reliability guidance into the canonical pages, and adds the explicit Overview
-link to Machine Error Reference. The generated Self-Test Reference refreshes only
-its CLI source annotation against current-default source; its customer content
-and claim statuses are unchanged by that refresh.
+reliability guidance into canonical pages, and adds the explicit Overview link
+to Machine Error Reference. The Self-Test Reference source-annotation refresh
+changed no customer-facing claim. These earlier results keep their original scope.
 
-Eleven stronger tax and rental assertions remain unchanged and open. Eight owner
-questions identify the remaining decisions and source needs. This is a checked
-local integration candidate; review, acceptance and merge remain separate.
+Two Vast-specific tax FAIL assertions remain unchanged and open. Eight owner
+questions identify remaining decisions and source needs. Review, acceptance and
+merge remain separate from this local documentation reconciliation.
 
-[Bounded result and limits](verification/evidence/2026-09-14-host-closure-correction-attempt-01/result.md) ·
+[Attempt 02 result and limits](verification/evidence/2026-09-14-host-closure-correction-attempt-02/result.md) ·
+[Retained attempt 01](verification/evidence/2026-09-14-host-closure-correction-attempt-01/result.md) ·
 [Exact transitions and retirements](verification/current-host-closure-correction.json) ·
 [Current owner questions](verification/current-host-owner-questions.json)
 

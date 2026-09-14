@@ -62,6 +62,14 @@ test('owner questions are payload-only handoff context and source-only payout PA
   assert.equal(payout.classification, 'PUBLISHED_FINANCIAL_GUIDANCE_DESCRIPTION');
   assert.match(payout.reader_copy.finding, /published payout guidance/i);
   assert.match(payout.reader_copy.finding, /does not test invoice generation or payment processing/i);
+  for (const ref of [
+    'verification/evidence/2026-09-14-host-closure-correction-attempt-01/result.md',
+    'verification/evidence/2026-09-14-host-closure-correction-attempt-02/plan.md',
+    'verification/evidence/2026-09-14-host-closure-correction-attempt-02/change-map.json',
+    'verification/evidence/2026-09-14-host-closure-correction-attempt-02/pre-narrowing-model.json',
+    'verification/evidence/2026-09-14-host-closure-correction-attempt-02/focused-tests-01.log',
+    'verification/evidence/2026-09-14-host-closure-correction-attempt-02/owner-payload-retest-02.log',
+  ]) assert.equal(payload.files[ref].sha256, crypto.createHash('sha256').update(read(ref)).digest('hex'));
   assert.equal(JSON.stringify(model), before);
 });
 
