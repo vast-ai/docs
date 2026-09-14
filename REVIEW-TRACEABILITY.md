@@ -9,9 +9,44 @@ new-page review coverage are separate from the retained 40-page proof).
 
 Review PR: [vast-ai/docs#185](https://github.com/vast-ai/docs/pull/185)
 
-## Existing-source reconciliation, 14 September 2026
+## Source corrections and retained execution reconciliation, 14 September 2026
 
-The current package contains **2,008 active claims across 44 Host pages: 369 PASS,
+The current package contains **2,008 active claims across 44 Host pages: 392 PASS,
+2 FAIL, 21 BLOCKED, 87 NOT_APPLICABLE and 1,506 UNVALIDATED**. The 1,529 open
+passages include repeats; they are not 1,529 unique defects or required live tests.
+Of the original 1,558 UNVALIDATED passages, **54 now have scoped PASS results**.
+Two formerly BLOCKED Volume passages separately entered UNVALIDATED.
+
+The latest frozen batch covers 23 passages: eight unchanged source declarations,
+three corrected declarations, ten diagnostic collection fences, one manual
+bundle-creation command and one offer-search example. The listing text now says
+`--duration` replaces `-e`; the two bandwidth cells explicitly identify rounded
+values. Those are the only three customer-source lines changed. Commands remain
+unchanged. All 1,985 non-selected claim objects, required evidence lanes, owner
+questions and two tax FAILs are preserved. Three intersecting procedure records
+become STALE with their historical evidence retained.
+
+Diagnostic results remain historical collection observations. Missing logs,
+no-match exits, unavailable September 1 raw captures and unrecorded installed
+tool versions remain explicit. The dump-log result belongs to its recorded CLI
+version and source-equivalent bundle code. Root's fresh offer search ran the exact
+current-source command on macOS and returned eight displayed rows; rounded RAM
+display does not establish exact backend filter enforcement. These results do
+not validate parent procedures, faults, load, maintenance or future availability.
+
+The focused generator and paired projection checks passed **18/18** on their
+first run, plus generator and model/register consistency checks. Independent
+source and projector reviews found no blocking issue. Final offline packaging
+results are retained separately with the attempt and native export manifest;
+previous export sizes and digests remain historical.
+
+[Latest result and limits](verification/evidence/2026-09-14-host-unvalidated-evidence-attempt-02/result.md) ·
+[Frozen 23-passage inventory](verification/evidence/2026-09-14-host-unvalidated-evidence-attempt-02/inventory.json) ·
+[Current owner questions](verification/current-host-owner-questions.json)
+
+## Earlier existing-source reconciliation, 14 September 2026
+
+At that checkpoint, the package contained **2,008 active claims across 44 Host pages: 369 PASS,
 2 FAIL, 21 BLOCKED, 87 NOT_APPLICABLE and 1,529 UNVALIDATED**. A frozen batch of
 26 unchanged passages supports 24 scoped source/declaration/navigation checks;
 two rounded bandwidth rows stay UNVALIDATED. Customer MDX and commands, all
@@ -37,7 +72,7 @@ exact canonical bindings, held-row preservation and rejection of scope drift.
 The current HTML export and consistency check passed: 339 embedded files,
 100,010,000 bytes (below 100 MiB). Its native manifest records the exact digest.
 
-[Current result and limits](verification/evidence/2026-09-14-host-unvalidated-source-attempt-01/result.md) ·
+[Earlier result and limits](verification/evidence/2026-09-14-host-unvalidated-source-attempt-01/result.md) ·
 [Frozen exact inventory](verification/evidence/2026-09-14-host-unvalidated-source-attempt-01/inventory.json) ·
 [Current owner questions](verification/current-host-owner-questions.json)
 

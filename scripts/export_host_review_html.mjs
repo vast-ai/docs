@@ -450,13 +450,23 @@ export function buildReport() {
       'root-source-controls.json']) add(`${closureAttempt}/${name}`);
     add('verification/evidence/2026-09-14-host-closure-correction-attempt-01/result.md');
     add(`${closureAttempt}/result.md`);
-    const unchangedAttempt = path.posix.dirname(closure.resultRef);
+    const unchangedAttempt = 'verification/evidence/2026-09-14-host-unvalidated-source-attempt-01';
+    add(`${unchangedAttempt}/result.md`);
     for (const name of ['plan.md', 'inventory.json', 'unvalidated-source-candidates.json',
       'unvalidated-navigation-bundle-review.json', 'unvalidated-root-source-review.json',
       'unvalidated-runtime-independent-review.json', 'runtime-bundle-review.json',
       'runtime-source-equivalence.json', 'focused-tests-01.json',
       'focused-tests-01.log', 'unvalidated-root-integration-review.json',
       'static-checks-01.json']) add(`${unchangedAttempt}/${name}`);
+    const evidenceAttempt = path.posix.dirname(closure.resultRef);
+    for (const name of ['plan.md', 'inventory.json', 'integration-scope.json',
+      'source-review.json', 'diagnostic-review.json', 'cli-reuse-review.json',
+      'source-static/selectors.json', 'source-diagnostics/primary-tool-sources.json',
+      'source-diagnostics/retained-artifact-inspection.json', 'root-evidence-review.json',
+      'root-model-review.json', 'model-build-01.json', 'model-build-01.log',
+      'generator-build-01.json', 'focused-checks-01.json', 'focused-checks-01.log',
+      'independent-projector-review.json']) add(`${evidenceAttempt}/${name}`);
+
   }
   for (const ref of installationIntake.artifactRefs) add(ref);
   add(currentResultPath); add(currentAuthorityBaselinePath); add(claimCorrectionResultPath);

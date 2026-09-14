@@ -51,5 +51,26 @@ class CellRenderingTests(unittest.TestCase):
         )
 
 
+class BandwidthRoundingTests(unittest.TestCase):
+    def test_only_inexact_display_values_are_marked_rounded(self) -> None:
+        examples = [(f"{gib} GiB total VRAM", min(500, max(100, 500 * gib / 192)))
+                    for gib in (8, 48, 80, 96, 160, 192)]
+        original = list(examples)
+        rendered = generator.render_bandwidth_examples(examples)
+        self.assertEqual(rendered.splitlines(), [
+            "| Total machine VRAM | Required upload and download |",
+            "| --- | --- |",
+            "| 8 GiB total VRAM | 100 Mb/s |",
+            "| 48 GiB total VRAM | 125 Mb/s |",
+            "| 80 GiB total VRAM | 208.33 Mb/s (rounded) |",
+            "| 96 GiB total VRAM | 250 Mb/s |",
+            "| 160 GiB total VRAM | 416.67 Mb/s (rounded) |",
+            "| 192 GiB total VRAM | 500 Mb/s |",
+        ])
+        self.assertEqual(examples, original)
+        self.assertLess(208.33, examples[2][1])
+        self.assertGreater(416.67, examples[4][1])
+
+
 if __name__ == "__main__":
     unittest.main()

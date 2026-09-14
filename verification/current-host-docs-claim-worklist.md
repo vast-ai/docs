@@ -2,7 +2,7 @@
 
 Current-source claims requiring proof or correction. Historical evidence is carried only where exact source identity is recorded.
 
-Current dispositions: 2008 occurrences (369 PASS, 87 editorial NOT_APPLICABLE, 1552 requiring review or evidence). Most dispositions are automated or exact historical carry-forward; this package records no invented manual completion.
+Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1529 requiring review or evidence). Most dispositions are automated or exact historical carry-forward; this package records no invented manual completion.
 
 ## [Hosting Overview](http://127.0.0.1:4000/host/hosting-overview)
 
@@ -6322,48 +6322,6 @@ Current dispositions: 2008 occurrences (369 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [Bandwidth Formula](http://127.0.0.1:4000/host/self-test-reference#bandwidth-formula) — `CUR-d4f1da8861e06594`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | 80 GiB total VRAM | 208.33 Mb/s |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Bandwidth Formula](http://127.0.0.1:4000/host/self-test-reference#bandwidth-formula) — `CUR-6a6640ac777aa39c`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | 160 GiB total VRAM | 416.67 Mb/s |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Self-test Image Selection](http://127.0.0.1:4000/host/self-test-reference#self-test-image-selection) — `CUR-2faec90d5784d0e6`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** The CLI selects from the self-test image family unless `--test-image` or `VAST_SELF_TEST_IMAGE` overrides the image for controlled testing.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [Self-test Image Selection](http://127.0.0.1:4000/host/self-test-reference#self-test-image-selection) — `CUR-5777dfcca00aca8a`
 
 **Status:** UNVALIDATED
@@ -6434,39 +6392,11 @@ Current dispositions: 2008 occurrences (369 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
-### [Self-test Image Selection](http://127.0.0.1:4000/host/self-test-reference#self-test-image-selection) — `CUR-64fa2d17e93746a5`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Pre-Volta GPUs (`compute_cap < 700`) use the CUDA 11.8 image.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [Self-test Image Selection](http://127.0.0.1:4000/host/self-test-reference#self-test-image-selection) — `CUR-2eba2f4a77b58e35`
 
 **Status:** UNVALIDATED
 
 **Literal source text:** - Volta GPUs (`compute_cap < 750`) are capped at CUDA 12.8 because newer PyTorch CUDA 13 wheels do not include sm_70 support.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Self-test Image Selection](http://127.0.0.1:4000/host/self-test-reference#self-test-image-selection) — `CUR-0bad472a0b9106e0`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Other hosts use the newest supported self-test image that is less than or equal to `cuda_max_good`.
 
 **Required proof:** Canonical Implementation Source
 
@@ -10914,20 +10844,6 @@ Current dispositions: 2008 occurrences (369 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
 
-### [Comparing your ranking](http://127.0.0.1:4000/host/not-in-search#comparing-your-ranking) — `MCL-c36fc6f15087d072`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash vastai search offers 'gpu_name=RTX_4090 cpu_ram>257 cpu_ram<258' ```
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** [EV-CLI02-SEARCH-COMPARABLE](evidence/2026-08-30-host-cli-readonly-attempt-02/result.md) — The runtime lane has score-3 direct support, but at least one separately required canonical-source lane remains UNVALIDATED.
-
-**Responsible role:** Marketplace search and Host listing backend owner; Authorized Host/API operator
-
-**Next:** Close every still-UNVALIDATED evidence lane for CLM-16e21c4911f77054; current carrier context: The exact documented comparable-hardware query returned a nonempty result table with no error. The page also states that ranking varies and that a narrow query is only a comparison aid, which correctly bounds the observed behavior. Retain a claim-suitable source or runtime retest before changing the overall status.
-
 ### [Comparing your ranking](http://127.0.0.1:4000/host/not-in-search#comparing-your-ranking) — `MCL-d7643ee2685f24ec`
 
 **Status:** UNVALIDATED
@@ -14936,34 +14852,6 @@ Current dispositions: 2008 occurrences (369 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-e962f57e828074a7 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Fleet State](http://127.0.0.1:4000/host/fleet-operations#fleet-state) — `MCL-67c1400801647f68`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Use `--raw` for scripts and `--retry N` for unattended calls:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Fleet State](http://127.0.0.1:4000/host/fleet-operations#fleet-state) — `MCL-0d219848df6db3d4`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** SDK equivalents live under the [central SDK reference](/sdk/python/reference/show-machines).
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [Bulk Listing And Pricing](http://127.0.0.1:4000/host/fleet-operations#bulk-listing-and-pricing) — `MCL-a2da03ac5606f76d`
 
 **Status:** UNVALIDATED
@@ -14991,20 +14879,6 @@ Current dispositions: 2008 occurrences (369 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Documentation technical-source reviewer
 
 **Next:** Locate the exact canonical implementation/schema/configuration for this behavior and reuse applicable retained source/execution/UI evidence. Client dispatch or documentation alone cannot prove backend effects.
-
-### [Bulk Listing And Pricing](http://127.0.0.1:4000/host/fleet-operations#bulk-listing-and-pricing) — `MCL-9a0af54ea0f29f6a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** The same pattern works for on-demand price (`-g`), min bid (`-b`), discount rate (`-r`), min chunk (`-m`), or rolling duration (`--duration "2 weeks"`). See [vastai list machines](/cli/reference/list-machines).
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [Bulk Listing And Pricing](http://127.0.0.1:4000/host/fleet-operations#bulk-listing-and-pricing) — `MCL-b28d6ff0593a3c9e`
 
@@ -15165,20 +15039,6 @@ Current dispositions: 2008 occurrences (369 PASS, 87 editorial NOT_APPLICABLE, 1
 **Status:** UNVALIDATED
 
 **Literal source text:** 4. Rerun self-test on idle machines after fixes.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Monitor](http://127.0.0.1:4000/host/fleet-operations#monitor) — `MCL-bcd6a81f46a051c6`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** For pricing and demand, use [GPU Market Metrics](/host/market-metrics). The `vastai metrics` commands also support `--raw`.
 
 **Required proof:** Canonical Implementation Source
 
@@ -16900,20 +16760,6 @@ Current dispositions: 2008 occurrences (369 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
-### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-5b8305045e67acdd`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo tail -n 100 /var/lib/vastai_kaalia/kaalia.log ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** [EV-HOST-SAFE-READONLY-03-LOG-TAIL](evidence/2026-09-02-host-safe-readonly-attempt-03/result.md) — Direct carrier evidence is retained but its score is partial; it does not validate the full exact command claim.
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** Close every still-UNVALIDATED evidence lane for CLM-d31f5b78bbf99242; current carrier context: The exact bounded privileged daemon-log tail completed on the current Host, confirming the path, privilege form, and bounded output. It does not reproduce an install failure or incident diagnosis, so this carrier has direct but partial score-2 support only. Retain a claim-suitable source or runtime retest before changing the overall status.
-
 ### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-d825fab0e420cfa3`
 
 **Status:** UNVALIDATED
@@ -17026,20 +16872,6 @@ Current dispositions: 2008 occurrences (369 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** The Backend and Host-daemon source owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-cc7126899c2ce558 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-cc7126899c2ce558 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-f42cc0abe33f4df9`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash vastai dump-logs <machine_id> ```
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** [EV-CLI-DUMP-LOGS-01](evidence/2026-09-02-cli-dump-logs-attempt-01/result.md) — The runtime lane has score-3 direct support, but at least one separately required canonical-source lane remains UNVALIDATED.
-
-**Responsible role:** Backend and Host-daemon source owner; Authorized Host/API operator
-
-**Next:** Close every still-UNVALIDATED evidence lane for CLM-ac5731cde3180fca; current carrier context: The exact CLI-visible dump-logs form created a readable structured restricted archive with zero reported collection errors. It does not prove Host-local artifacts, instance-log retrieval, or real self-test failure completeness. Retain a claim-suitable source or runtime retest before changing the overall status.
-
 ### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-ed7bfef8f478e91b`
 
 **Status:** UNVALIDATED
@@ -17095,20 +16927,6 @@ Current dispositions: 2008 occurrences (369 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Backend and Host-daemon source owner; Authorized Host/API operator
 
 **Next:** The Backend and Host-daemon source owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-1113b3f4ae1a1eb8 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-1113b3f4ae1a1eb8 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Host Service Snapshot](http://127.0.0.1:4000/host/common-errors-diagnostics#host-service-snapshot) — `MCL-f0a3f4f3f551bac6`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash systemctl is-active vastai.service vast_metrics.service docker nvidia-persistenced.service sudo journalctl -u vastai.service -n 80 --no-pager sudo journalctl -u vast_metrics.service -n 80 --no-pager sudo tail -n 100 /var/lib/vastai_kaalia/kaalia.log sudo cat /var/lib/vastai_kaalia/host_port_range ```
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** [EV-DIAG-READONLY-01](evidence/2026-09-01-host-diagnostics-readonly-attempt-01/result.md) — Direct carrier evidence is retained but its score is partial; it does not validate the full exact command claim.
-
-**Responsible role:** Backend and Host-daemon source owner; Authorized Host/API operator
-
-**Next:** Close every still-UNVALIDATED evidence lane for CLM-1aab40fca6f567f6; current carrier context: The exact bounded read-only carrier returned useful retained observations on the authorized Host, including explicit no-match or unavailable-history outcomes where relevant. No representative reported symptom, incident-time correlation, failure branch, load/container behavior, or external boundary was present, so execution passes only for collection and semantic support remains score 2. Retain a claim-suitable source or runtime retest before changing the overall status.
 
 ### [Host Service Snapshot](http://127.0.0.1:4000/host/common-errors-diagnostics#host-service-snapshot) — `MCL-0da076fa2724e22c`
 
@@ -17264,20 +17082,6 @@ Current dispositions: 2008 occurrences (369 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-e8311b1ad833a7c7 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [GPU And Kernel Diagnostics](http://127.0.0.1:4000/host/common-errors-diagnostics#gpu-and-kernel-diagnostics) — `MCL-1153ad469e9e9fc6`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo journalctl -k -b --no-pager | grep -Ei 'NVRM|Xid|AER|PCIe|fallen|GPU has fallen' sudo dmesg -T | grep -Ei 'NVRM|Xid|AER|PCIe|fallen|GPU has fallen' ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** [EV-HOST-DIAGNOSTIC-DIRECT-BINDING-RECONCILIATION-01](evidence/2026-09-02-host-diagnostic-direct-binding-reconciliation-01/result.md) — Direct carrier evidence is retained but its score is partial; it does not validate the full exact command claim.
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** Close every still-UNVALIDATED evidence lane for CLM-ae94a456c56a5bdb; current carrier context: The exact bounded read-only carrier returned useful retained observations on the authorized Host, including explicit no-match or unavailable-history outcomes where relevant. No representative reported symptom, incident-time correlation, failure branch, load/container behavior, or external boundary was present, so execution passes only for collection and semantic support remains score 2. Retain a claim-suitable source or runtime retest before changing the overall status.
-
 ### [GPU And Kernel Diagnostics](http://127.0.0.1:4000/host/common-errors-diagnostics#gpu-and-kernel-diagnostics) — `MCL-5b6599db738b2d7a`
 
 **Status:** UNVALIDATED
@@ -17291,20 +17095,6 @@ Current dispositions: 2008 occurrences (369 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-5b6599db738b2d7a and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [GPU And Kernel Diagnostics](http://127.0.0.1:4000/host/common-errors-diagnostics#gpu-and-kernel-diagnostics) — `MCL-37eacf61109c9393`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo journalctl -k -b --no-pager | grep -Ei 'AER|PCIe Bus Error|pcieport|NVRM|Xid' sudo journalctl -k -b -1 --no-pager | grep -Ei 'AER|PCIe Bus Error|pcieport|NVRM|Xid' sudo dmesg -T | grep -Ei 'AER|PCIe Bus Error|pcieport|NVRM|Xid' sudo grep -Ei 'AER|PCIe Bus Error|pcieport|NVRM|Xid' /var/log/syslog /var/log/syslog.1 /var/log/kern.log /var/log/kern.log.1 2>/dev/null sudo zgrep -Ei 'AER|PCIe Bus Error|pcieport|NVRM|Xid' /var/log/syslog.*.gz /var/log/kern.log.*.gz 2>/dev/null ```
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** [EV-DIAG-READONLY-01](evidence/2026-09-01-host-diagnostics-readonly-attempt-01/result.md) — Direct carrier evidence is retained but its score is partial; it does not validate the full exact command claim.
-
-**Responsible role:** Backend and Host-daemon source owner; Authorized Host/API operator
-
-**Next:** Close every still-UNVALIDATED evidence lane for CLM-121abf61bc80c796; current carrier context: The exact bounded read-only carrier returned useful retained observations on the authorized Host, including explicit no-match or unavailable-history outcomes where relevant. No representative reported symptom, incident-time correlation, failure branch, load/container behavior, or external boundary was present, so execution passes only for collection and semantic support remains score 2. Retain a claim-suitable source or runtime retest before changing the overall status.
 
 ### [GPU And Kernel Diagnostics](http://127.0.0.1:4000/host/common-errors-diagnostics#gpu-and-kernel-diagnostics) — `MCL-a4cf6c21d3b5bb29`
 
@@ -17543,20 +17333,6 @@ Current dispositions: 2008 occurrences (369 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-ee961e4147c99a7a and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Storage And Port Evidence](http://127.0.0.1:4000/host/common-errors-diagnostics#storage-and-port-evidence) — `MCL-5f07229056d10052`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo cat /var/lib/vastai_kaalia/host_port_range df -h /var/lib/docker sudo docker system df findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** [EV-DIAG-READONLY-01](evidence/2026-09-01-host-diagnostics-readonly-attempt-01/result.md) — Direct carrier evidence is retained but its score is partial; it does not validate the full exact command claim.
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** Close every still-UNVALIDATED evidence lane for CLM-a1ecff41b73b1413; current carrier context: The exact bounded read-only carrier returned useful retained observations on the authorized Host, including explicit no-match or unavailable-history outcomes where relevant. No representative reported symptom, incident-time correlation, failure branch, load/container behavior, or external boundary was present, so execution passes only for collection and semantic support remains score 2. Retain a claim-suitable source or runtime retest before changing the overall status.
 
 ### [Storage And Port Evidence](http://127.0.0.1:4000/host/common-errors-diagnostics#storage-and-port-evidence) — `MCL-7202845e81fee694`
 
@@ -18442,20 +18218,6 @@ Current dispositions: 2008 occurrences (369 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
-### [Docker Daemon Unavailable](http://127.0.0.1:4000/host/machine-errors#docker-daemon-unavailable) — `MCL-3001d315efd6d799`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash systemctl is-active docker sudo journalctl -u docker -n 100 --no-pager sudo docker ps ```
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** [EV-DIAG-READONLY-01](evidence/2026-09-01-host-diagnostics-readonly-attempt-01/result.md) — Direct carrier evidence is retained but its score is partial; it does not validate the full exact command claim.
-
-**Responsible role:** Backend and Host-daemon source owner; Authorized Host/API operator
-
-**Next:** Close every still-UNVALIDATED evidence lane for CLM-885315f98e7e1dd9; current carrier context: The exact bounded read-only carrier returned useful retained observations on the authorized Host, including explicit no-match or unavailable-history outcomes where relevant. No representative reported symptom, incident-time correlation, failure branch, load/container behavior, or external boundary was present, so execution passes only for collection and semantic support remains score 2. Retain a claim-suitable source or runtime retest before changing the overall status.
-
 ### [Docker Daemon Unavailable](http://127.0.0.1:4000/host/machine-errors#docker-daemon-unavailable) — `MCL-714ae351589eca7c`
 
 **Status:** UNVALIDATED
@@ -18497,20 +18259,6 @@ Current dispositions: 2008 occurrences (369 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-6bc3393b01a575a4 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [GPU PCIe Issue](http://127.0.0.1:4000/host/machine-errors#gpu-pcie-issue) — `MCL-0eaf940e59130dcc`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo journalctl -k -b --no-pager | grep -Ei 'AER|PCIe|NVRM|Xid|fallen' sudo dmesg -T | grep -Ei 'AER|PCIe|NVRM|Xid|fallen' ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** [EV-HOST-DIAGNOSTIC-DIRECT-BINDING-RECONCILIATION-01](evidence/2026-09-02-host-diagnostic-direct-binding-reconciliation-01/result.md) — Direct carrier evidence is retained but its score is partial; it does not validate the full exact command claim.
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** Close every still-UNVALIDATED evidence lane for CLM-0bae256f5a9e7bc7; current carrier context: The exact bounded read-only carrier returned useful retained observations on the authorized Host, including explicit no-match or unavailable-history outcomes where relevant. No representative reported symptom, incident-time correlation, failure branch, load/container behavior, or external boundary was present, so execution passes only for collection and semantic support remains score 2. Retain a claim-suitable source or runtime retest before changing the overall status.
 
 ### [GPU PCIe Issue](http://127.0.0.1:4000/host/machine-errors#gpu-pcie-issue) — `MCL-f9df4750dc665783`
 
@@ -18582,20 +18330,6 @@ Current dispositions: 2008 occurrences (369 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-783a23e5cbc3d28a and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [GPU Missing Or Unhealthy](http://127.0.0.1:4000/host/machine-errors#gpu-missing-or-unhealthy) — `MCL-2713359efabc2462`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash lspci | grep -i nvidia nvidia-smi -L sudo journalctl -k -b --no-pager | grep -Ei 'NVRM|Xid|fallen|AER|PCIe' ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** [EV-DIAG-READONLY-01](evidence/2026-09-01-host-diagnostics-readonly-attempt-01/result.md) — Direct carrier evidence is retained but its score is partial; it does not validate the full exact command claim.
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** Close every still-UNVALIDATED evidence lane for CLM-d2cb5452a0e2063a; current carrier context: The exact bounded read-only carrier returned useful retained observations on the authorized Host, including explicit no-match or unavailable-history outcomes where relevant. No representative reported symptom, incident-time correlation, failure branch, load/container behavior, or external boundary was present, so execution passes only for collection and semantic support remains score 2. Retain a claim-suitable source or runtime retest before changing the overall status.
-
 ### [GPU Missing Or Unhealthy](http://127.0.0.1:4000/host/machine-errors#gpu-missing-or-unhealthy) — `MCL-790a4747eda0a70a`
 
 **Status:** UNVALIDATED
@@ -18637,20 +18371,6 @@ Current dispositions: 2008 occurrences (369 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-b7928b5bc97aa228 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [ECC And GPU Memory Errors](http://127.0.0.1:4000/host/machine-errors#ecc-and-gpu-memory-errors) — `MCL-9e63dfa32acf8aad`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash nvidia-smi -q -d ECC nvidia-smi -q | grep -iE 'Xid|Remapped|Pending' sudo journalctl -k -b --no-pager | grep -i xid ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** [EV-DIAG-READONLY-01](evidence/2026-09-01-host-diagnostics-readonly-attempt-01/result.md) — Direct carrier evidence is retained but its score is partial; it does not validate the full exact command claim.
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** Close every still-UNVALIDATED evidence lane for CLM-a4c552f07e09986c; current carrier context: The exact bounded read-only carrier returned useful retained observations on the authorized Host, including explicit no-match or unavailable-history outcomes where relevant. No representative reported symptom, incident-time correlation, failure branch, load/container behavior, or external boundary was present, so execution passes only for collection and semantic support remains score 2. Retain a claim-suitable source or runtime retest before changing the overall status.
 
 ### [ECC And GPU Memory Errors](http://127.0.0.1:4000/host/machine-errors#ecc-and-gpu-memory-errors) — `MCL-fbdc4691cbb74f9d`
 
@@ -18805,20 +18525,6 @@ Current dispositions: 2008 occurrences (369 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
 
 **Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Full Client Storage](http://127.0.0.1:4000/host/machine-errors#full-client-storage) — `MCL-eb966558ff3e0a48`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash df -h /var/lib/docker sudo docker system df findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** [EV-DIAG-READONLY-01](evidence/2026-09-01-host-diagnostics-readonly-attempt-01/result.md) — Direct carrier evidence is retained but its score is partial; it does not validate the full exact command claim.
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** Close every still-UNVALIDATED evidence lane for CLM-3959b3397aeb7b35; current carrier context: The exact bounded read-only carrier returned useful retained observations on the authorized Host, including explicit no-match or unavailable-history outcomes where relevant. No representative reported symptom, incident-time correlation, failure branch, load/container behavior, or external boundary was present, so execution passes only for collection and semantic support remains score 2. Retain a claim-suitable source or runtime retest before changing the overall status.
 
 ### [Full Client Storage](http://127.0.0.1:4000/host/machine-errors#full-client-storage) — `MCL-75f7b6edfb04fc5b`
 
@@ -21463,34 +21169,6 @@ Current dispositions: 2008 occurrences (369 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Teams and account engineering owner; Authorized Host/API operator
 
 **Next:** The Teams and account engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-39d956b828a766be and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-39d956b828a766be and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Common Host Workflows](http://127.0.0.1:4000/host/cli-api-sdk#common-host-workflows) — `MCL-720d258a01fceff8`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Schedule maintenance | [schedule maint](/cli/reference/schedule-maint), [cancel maint](/cli/reference/cancel-maint), [show maints](/cli/reference/show-maints) | [schedule_maint](/sdk/python/reference/schedule-maint), [cancel_maint](/sdk/python/reference/cancel-maint), [show_maints](/sdk/python/reference/show-maints) |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Common Host Workflows](http://127.0.0.1:4000/host/cli-api-sdk#common-host-workflows) — `MCL-02551a51955f4134`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Configure default jobs | [set defjob](/cli/reference/set-defjob), [remove defjob](/cli/reference/remove-defjob) | [set_defjob](/sdk/python/reference/set-defjob), [remove_defjob](/sdk/python/reference/remove-defjob) |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [Common Host Workflows](http://127.0.0.1:4000/host/cli-api-sdk#common-host-workflows) — `MCL-d078ec43af5e7a28`
 

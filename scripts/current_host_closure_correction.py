@@ -6,7 +6,7 @@ from collections import Counter
 from pathlib import Path
 
 REGISTRY = 'verification/current-host-closure-correction.json'
-REGISTRY_SHA256 = '7db54cd1a7c993e65853419292e8d4f24df1cd71e10ab13f0988de9ce5b33164'
+REGISTRY_SHA256 = 'b42dc3ed5dde29a2c7dc9031acb1803837b50298686e0ccaad4e6a77bd420945'
 ATTEMPT = 'verification/evidence/2026-09-14-host-closure-correction-attempt-01'
 MARKER = 'HOST-CLOSURE-CORRECTION-01'
 BASELINE = ATTEMPT + '/pre-correction-model.json'
@@ -26,7 +26,13 @@ UNCHANGED_HELD = {'CUR-d4f1da8861e06594','CUR-6a6640ac777aa39c'}
 UNCHANGED_ATTEMPT = 'verification/evidence/2026-09-14-host-unvalidated-source-attempt-01'
 UNCHANGED_INVENTORY = UNCHANGED_ATTEMPT + '/inventory.json'
 UNCHANGED_INVENTORY_SHA256 = 'fd7d453317ec6aebea68701e49e55fb93337134beb3095d42923d6c3855ec783'
-IDS |= UNCHANGED_REVIEW
+EVIDENCE_ATTEMPT = 'verification/evidence/2026-09-14-host-unvalidated-evidence-attempt-02'
+EVIDENCE_INVENTORY_SHA256 = '588d6d4f9776764c32e2ab3d93fa00956dc5a209006a4a88cbe1e302a20d301a'
+EVIDENCE_SCOPE_SHA256 = 'd0cea0452b048b78b76c1b01d70fbe8a9cdecd3898d020df307df1e369b26fc6'
+EVIDENCE_REVIEW = {'MCL-9e63dfa32acf8aad', 'CUR-64fa2d17e93746a5', 'CUR-0bad472a0b9106e0', 'MCL-37eacf61109c9393', 'MCL-5f07229056d10052', 'MCL-720d258a01fceff8', 'MCL-c36fc6f15087d072', 'MCL-67c1400801647f68', 'CUR-6a6640ac777aa39c', 'MCL-0d219848df6db3d4', 'MCL-0eaf940e59130dcc', 'MCL-2713359efabc2462', 'MCL-f0a3f4f3f551bac6', 'MCL-9a0af54ea0f29f6a', 'MCL-02551a51955f4134', 'MCL-3001d315efd6d799', 'MCL-5b8305045e67acdd', 'MCL-bcd6a81f46a051c6', 'MCL-eb966558ff3e0a48', 'CUR-2faec90d5784d0e6', 'MCL-f42cc0abe33f4df9', 'MCL-1153ad469e9e9fc6', 'CUR-d4f1da8861e06594'}
+EVIDENCE_CORRECTED = {'CUR-d4f1da8861e06594', 'MCL-9a0af54ea0f29f6a', 'CUR-6a6640ac777aa39c'}
+EVIDENCE_STALE = {'CUR-self-test-reference-ORDERED-SECTIONS','CUR-self-test-reference-H04','FLT-E02-B01-S02'}
+IDS |= UNCHANGED_REVIEW | EVIDENCE_REVIEW
 STALE = 'Closure source changed; retained procedure evidence does not transfer to changed steps.'
 def sha(value): return hashlib.sha256(value).hexdigest()
 def canon(value): return json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=False)
@@ -52,6 +58,7 @@ def selection(raw, pointer):
         return '\n'.join(lines[first-1:last])
     value=json.loads(raw)
     for part in pointer[1:].split('/'):
+        part=part.replace('~1','/').replace('~0','~')
         value=value[int(part)] if isinstance(value,list) else value[part]
     return value if isinstance(value,str) else canon(value)
 
@@ -63,10 +70,26 @@ def project(root: Path):
     req(registry['schema_version']=='1.0' and registry['record_type']=='HOST_CLOSURE_CORRECTION','registry type')
     req(registry['baseline']=={'path':BASELINE,'sha256':BASELINE_SHA256},'baseline substitution')
     baseline=json.loads(pin(root,BASELINE,BASELINE_SHA256));old=index(baseline)
+    evidence_inventory=json.loads(pin(root,EVIDENCE_ATTEMPT+'/inventory.json',EVIDENCE_INVENTORY_SHA256))
+    evidence_scope=json.loads(pin(root,EVIDENCE_ATTEMPT+'/integration-scope.json',EVIDENCE_SCOPE_SHA256))
+    req(set(evidence_scope['accepted_ids'])==EVIDENCE_REVIEW and set(evidence_scope['corrected_ids'])==EVIDENCE_CORRECTED and set(evidence_scope['decisions'])==EVIDENCE_REVIEW,'evidence review inventory')
+    req(set(evidence_scope['candidate_ids'])==set(evidence_inventory['scope_claim_ids']) and len(evidence_inventory['claims'])==23,'frozen evidence inventory')
+    evidence_prior={item['claim']['id']:item['claim'] for item in evidence_inventory['claims']}
+    req(all(old[cid]==claim for cid,claim in evidence_prior.items()),'evidence review predecessor')
+    evidence_before={}
+    for source in evidence_scope['before_sources']:
+        ref=source['path'];req(ref in {'host/fleet-operations.mdx','host/self-test-reference.mdx'} and ref not in evidence_before,'evidence source scope')
+        req(source['before_artifact']['path']==EVIDENCE_ATTEMPT+'/sources-before/'+ref,'evidence source snapshot path')
+        evidence_before[ref]=pin(root,source['before_artifact']['path'],source['before_artifact']['sha256'])
+        pin(root,ref,source['after_sha256'])
+    req(set(evidence_before)=={'host/fleet-operations.mdx','host/self-test-reference.mdx'},'evidence source inventory')
+    for ref,wanted in evidence_inventory['all_baseline_page_hashes'].items():
+        req(sha(evidence_before[ref])==wanted,'evidence frozen source drift') if ref in evidence_before else pin(root,ref,wanted)
     inventory=json.loads(pin(root,UNCHANGED_INVENTORY,UNCHANGED_INVENTORY_SHA256))
     req(set(inventory['accepted_ids'])==UNCHANGED_REVIEW and set(inventory['held_ids'])==UNCHANGED_HELD and len(inventory['candidates'])==26,'unchanged review inventory')
     req(all(item['original_claim']==old[item['claim_id']] and objhash(item['original_claim'])==item['original_claim_sha256'] for item in inventory['candidates']),'unchanged review predecessor')
-    for ref,wanted in inventory['customer_mdx_sha256'].items():pin(root,ref,wanted)
+    for ref,wanted in inventory['customer_mdx_sha256'].items():
+        req(sha(evidence_before[ref])==wanted,'unchanged review frozen source drift') if ref in evidence_before else pin(root,ref,wanted)
     req(len(old)==2013 and len(registry['transitions'])==len(IDS) and {x['claim_id'] for x in registry['transitions']}==IDS,'transition inventory')
     req(len(registry['retirements'])==5 and {x['claim_id'] for x in registry['retirements']}==RETIRED,'retirement inventory')
     findings={x['claim_id']:x for x in registry['original_findings']}
@@ -75,7 +98,7 @@ def project(root: Path):
     before={};current={};maps={};after_hashes={}
     for source in registry['sources']:
         ref=source['path'];req(ref.startswith('host/') and ref not in before,'source scope')
-        req(source['before_artifact']['path']==(ATTEMPT_02 if ref in {'host/glossary.mdx','host/maintenance-windows.mdx','host/hosting-agreement.mdx'} else ATTEMPT)+'/sources-before/'+ref,'source snapshot path')
+        req(source['before_artifact']['path']==(EVIDENCE_ATTEMPT if ref=='host/fleet-operations.mdx' else ATTEMPT_02 if ref in {'host/glossary.mdx','host/maintenance-windows.mdx','host/hosting-agreement.mdx'} else ATTEMPT)+'/sources-before/'+ref,'source snapshot path')
         before[ref]=pin(root,source['before_artifact']['path'],source['before_artifact']['sha256']);current[ref]=pin(root,ref,source['after_sha256']);after_hashes[ref]=sha(current[ref])
         oldlines,newlines=before[ref].decode().splitlines(),current[ref].decode().splitlines()
         maps[ref]=dict(source['line_map']);req(len(maps[ref])==len(source['line_map']) and len(set(maps[ref].values()))==len(maps[ref]),'duplicate line map')
@@ -103,11 +126,20 @@ def project(root: Path):
         patch=entry['after'];req(set(patch)<= {'text','spans','status','classification','required_evidence_types','owner_role','rationale','next_action','evidence_refs','source_refs','coverage_state'},'unsupported claim patch')
         if cid in UNCHANGED_REVIEW:
             req(prior['status']=='UNVALIDATED' and patch['status']=='PASS' and 'spans' not in patch and all(patch[k]==prior[k] for k in ['text','classification','required_evidence_types','owner_role']),'unchanged review scope')
+        if cid in EVIDENCE_REVIEW:
+            decision=evidence_scope['decisions'][cid]
+            req(prior==evidence_prior[cid] and prior['status']=='UNVALIDATED' and patch['status']==decision['expected_status'] and patch['text']==decision['expected_text'],'evidence review disposition')
+            req(all(patch[k]==prior[k] for k in ['classification','required_evidence_types','owner_role']),'evidence review method drift')
+            req(all(e in patch['evidence_refs'] for e in prior['evidence_refs']) and all(e in patch['source_refs'] for e in prior['source_refs']),'evidence review discarded history')
+            req((cid in EVIDENCE_CORRECTED)==('spans' in patch) and (cid in EVIDENCE_CORRECTED)==(patch['text']!=prior['text']),'evidence review literal scope')
         if cid in RUNTIME:req(patch['text']==prior['text'] and patch['status']==('UNVALIDATED' if cid.startswith('VOL-') else prior['status']),'runtime promotion forbidden')
         for basis in entry['basis']:
             req(basis['artifactRef'] in artifacts and selection(artifacts[basis['artifactRef']],basis['text_pointer'])==basis['excerpt'],'source selector/excerpt drift '+cid)
             req(basis['support_rationale'] and any(e['artifact_ref']==basis['artifactRef'] for e in patch['evidence_refs']),'unbound scoped evidence')
-            if cid in UNCHANGED_REVIEW:req(any(ref['path']==(basis['sourceUrl'] or basis['artifactRef']) and ref['locator']==basis['text_pointer'] for ref in patch['source_refs']),'unchanged review canonical binding')
+            if cid in UNCHANGED_REVIEW|EVIDENCE_REVIEW:req(any(ref['path']==(basis['sourceUrl'] or basis['artifactRef']) and ref['locator']==basis['text_pointer'] for ref in patch['source_refs']),'unchanged review canonical binding')
+            if cid in EVIDENCE_REVIEW and basis['artifactRef']==EVIDENCE_ATTEMPT+'/source-static/selectors.json':
+                selected=selection(artifacts[basis['artifactRef']],basis['text_pointer'].rsplit('/',1)[0])
+                req(json.loads(selected)['canonical_url']==basis['sourceUrl'],'selected source canonical URL drift')
             if basis['text_pointer'].startswith('/observations/'):
                 observation=json.loads(artifacts[basis['artifactRef']])['observations'][int(basis['text_pointer'].split('/')[2])]
                 if isinstance(observation,dict) and observation.get('url'):
@@ -140,13 +172,29 @@ def project(root: Path):
     remaining=index(out);req(set(remaining)==set(old)-RETIRED and len(remaining)==2008,'active inventory drift')
     for cid,f in findings.items():
         if f['disposition']!='CORRECT_NOW':req(remaining[cid]==old[cid],'unresolved stronger assertion changed '+cid)
-    req(set(remaining)==set(inventory['all_current_claim_hashes']) and all(objhash(c)==inventory['all_current_claim_hashes'][cid] for cid,c in remaining.items() if cid not in UNCHANGED_REVIEW),'unrelated current claim changed')
-    req(objhash([p['procedures'] for p in out['pages']])==inventory['procedures_sha256'],'unchanged review procedure drift')
-    req(out['source']['source_manifest']==inventory['source_manifest'],'unchanged review source manifest drift')
+    req(set(remaining)==set(inventory['all_current_claim_hashes']) and all(objhash(c)==inventory['all_current_claim_hashes'][cid] for cid,c in remaining.items() if cid not in UNCHANGED_REVIEW|EVIDENCE_REVIEW),'unrelated current claim changed')
+    req(set(remaining)==set(evidence_inventory['all_baseline_claim_hashes']) and all(objhash(c)==evidence_inventory['all_baseline_claim_hashes'][cid] for cid,c in remaining.items() if cid not in EVIDENCE_REVIEW),'unrelated evidence-batch claim changed')
+    original_nodes={item['id']:item['before'] for item in evidence_scope['affected_procedures']}
+    req(set(original_nodes)==EVIDENCE_STALE,'affected procedure inventory')
+    historical_procedures=copy.deepcopy([p['procedures'] for p in out['pages']]);seen=set()
+    for procedures in historical_procedures:
+        for procedure in procedures:
+            for node in [procedure,*procedure['nodes']]:
+                if node['id'] in original_nodes:
+                    prior=original_nodes[node['id']];expected={**prior,'spans':[],'status':'STALE','coverage_state':'CHANGED','limits':[*prior.get('limits',[]),STALE],'history':{**prior.get('history',{}),'carry_decision':'CURRENT_HOST_CLOSURE_SOURCE_CHANGED'}}
+                    req({k:v for k,v in node.items() if k!='nodes'}==expected,'affected procedure drift')
+                    children=node.get('nodes');node.clear();node.update(copy.deepcopy(prior))
+                    if children is not None:node['nodes']=children
+                    seen.add(node['id'])
+    req(seen==EVIDENCE_STALE and objhash(historical_procedures)==inventory['procedures_sha256']==evidence_inventory['procedure_population_sha256'],'evidence review procedure drift')
+    expected_manifest=copy.deepcopy(inventory['source_manifest'])
+    for item in expected_manifest:
+        if item['path'] in evidence_before:item['sha256']=after_hashes[item['path']]
+    req(out['source']['source_manifest']==expected_manifest,'evidence review source manifest drift')
     owners=json.loads(safe(root,'verification/current-host-owner-questions.json').read_bytes());owners.pop('model_sha256')
     req(objhash(owners)==inventory['owner_questions_without_model_hash_sha256'],'unchanged review owner question drift')
     out['counts']['claims']=len(remaining);out['counts']['claim_statuses']=dict(sorted(Counter(c['status'] for c in remaining.values()).items()));out['counts']['page_coverage_states']=dict(sorted(Counter(p['coverage_state'] for p in out['pages']).items()))
-    out['generated_at']=registry['generated_at'];out['corrections'].append({'id':MARKER,'scope':'24 original findings handled: 19 narrowed corrections and 5 retired checklist clauses; 2 adjacent rental edits; 8 bounded evidence/status reconciliations; upstream PR948 and CON1531 routing; 24 unchanged source/declaration occurrences from a frozen 26-candidate inventory','history':'Complete sealed predecessor replayed against exact frozen source bytes. Five historical FAIL objects remain in the application instruction history and frozen baseline.','current':'Two tax FAIL assertions remain open. Nine original rental FAIL assertions are retained in history after withdrawal from active prose; backend and maintenance owner questions remain open. Partial runtime observations do not promote compound workflows.','reason':registry['limits']})
+    out['generated_at']=registry['generated_at'];out['corrections'].append({'id':MARKER,'scope':'24 original findings handled: 19 narrowed corrections and 5 retired checklist clauses; 2 adjacent rental edits; 8 bounded evidence/status reconciliations; upstream PR948 and CON1531 routing; 24 unchanged source/declaration occurrences from a frozen 26-candidate inventory; bounded evidence attempt02 source corrections and retained observations','history':'Complete sealed predecessor replayed against exact frozen source bytes. Five historical FAIL objects remain in the application instruction history and frozen baseline.','current':'Two tax FAIL assertions remain open. Nine original rental FAIL assertions are retained in history after withdrawal from active prose; backend and maintenance owner questions remain open. Partial runtime observations do not promote compound workflows.','reason':registry['limits']})
     return out
 
 def load_closure_correction(root,model):

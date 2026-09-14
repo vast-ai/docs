@@ -405,7 +405,8 @@ def render_bandwidth_examples(examples: list[tuple[str, float]]) -> str:
     lines = ["| Total machine VRAM | Required upload and download |", "| --- | --- |"]
     for label, mbps in examples:
         value = f"{mbps:.2f}".rstrip("0").rstrip(".")
-        lines.append(f"| {cell(label)} | {cell(value + ' Mb/s')} |")
+        suffix = " Mb/s (rounded)" if float(value) != mbps else " Mb/s"
+        lines.append(f"| {cell(label)} | {cell(value + suffix)} |")
     return "\n".join(lines)
 
 
