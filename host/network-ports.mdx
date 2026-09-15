@@ -65,7 +65,13 @@ Same-LAN tests can be misleading because of NAT hairpinning. Test from a differe
 Use two SSH sessions on the host; do not paste the following lines into one shell. In the first session, start the temporary TCP listener and leave it running. While it is still running, use the second session to confirm the port is listening:
 
 ```bash
-sudo python3 -m http.server 40000 --bind 0.0.0.0
+# First SSH session: serve only a newly created empty directory, without sudo.
+VAST_PORT_TEST_DIR=$(mktemp -d) &&
+python3 -m http.server 40000 --bind 0.0.0.0 --directory "$VAST_PORT_TEST_DIR"
+# After stopping the server with Ctrl+C:
+rmdir "$VAST_PORT_TEST_DIR"
+
+# Second SSH session, while the server is running:
 sudo ss -ltnp | grep ':40000'
 ```
 

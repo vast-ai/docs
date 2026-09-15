@@ -2,7 +2,7 @@
 
 Current-source claims requiring proof or correction. Historical evidence is carried only where exact source identity is recorded.
 
-Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 875 requiring review or evidence). Most dispositions are automated or exact historical carry-forward; this package records no invented manual completion.
+Current dispositions: 2008 occurrences (1130 PASS, 91 editorial NOT_APPLICABLE, 787 requiring review or evidence). Most dispositions are automated or exact historical carry-forward; this package records no invented manual completion.
 
 ## [Hosting Overview](http://127.0.0.1:4000/host/hosting-overview)
 
@@ -614,34 +614,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-f2c28cfd1aa6c89a and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Market Data](http://127.0.0.1:4000/host/earning#market-data) — `MCL-a4d2a107c1d3613a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - [Host market dashboard](https://cloud.vast.ai/host/market/)
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-a4d2a107c1d3613a and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Market Data](http://127.0.0.1:4000/host/earning#market-data) — `MCL-f828fb951d267757`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Use the Host market dashboard as the source of truth for current host market demand and pricing signals.
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer
-
-**Next:** Reuse retained current console evidence for this exact label/action and account context; check source for hidden field computation or state semantics separately. An authored screenshot/caption is not automatically current UI proof.
-
 ## [Tax Guide for Hosts](http://127.0.0.1:4000/host/guide-to-taxes)
 
 ### [Introduction](http://127.0.0.1:4000/host/guide-to-taxes) — `CUR-99fb8d131e321e03`
@@ -716,34 +688,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 
 **Next:** Inspect canonical account/team/auth/invoice/payout configuration and applicable retained console or API observation for the exact transition. Existing general docs are navigation to sources, not terminal proof.
 
-### [How to accept the hosting agreement](http://127.0.0.1:4000/host/account-hosting-agreement#how-to-accept-the-hosting-agreement) — `MCL-e7e229ef151582f6`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** <Frame caption="Host-enabled console navigation showing the Machines link under Hosting.">
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer
-
-**Next:** Reuse retained current console evidence for this exact label/action and account context; check source for hidden field computation or state semantics separately. An authored screenshot/caption is not automatically current UI proof.
-
-### [How to accept the hosting agreement](http://127.0.0.1:4000/host/account-hosting-agreement#how-to-accept-the-hosting-agreement) — `MCL-734bbfe42918282f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** <Frame caption="Machines in the compact list view, with the host machine row and status controls visible.">
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer
-
-**Next:** Reuse retained current console evidence for this exact label/action and account context; check source for hidden field computation or state semantics separately. An authored screenshot/caption is not automatically current UI proof.
-
 ### [How to accept the hosting agreement](http://127.0.0.1:4000/host/account-hosting-agreement#how-to-accept-the-hosting-agreement) — `MCL-86490b3b8b54d863`
 
 **Status:** UNVALIDATED
@@ -785,20 +729,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Responsible role:** Documentation technical-source reviewer
 
 **Next:** Find the exact account, permission or command definition and compare it with this passage. Reuse a suitable retained result for any claimed account effect; if none exists, specify the smallest approved check. Ask the source owner only if the implementation source or meaning is unavailable.
-
-### [What must happen before I can see host features or the Machines tab?](http://127.0.0.1:4000/host/account-hosting-agreement#what-must-happen-before-i-can-see-host-features-or-the-machines-tab) — `MCL-2ce4e0eb4411fbe4`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** <Frame caption="Expanded machine health and listing details shown on the Machines page.">
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-2ce4e0eb4411fbe4 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
 ### [What if I accepted the agreement but still see a client account?](http://127.0.0.1:4000/host/account-hosting-agreement#what-if-i-accepted-the-agreement-but-still-see-a-client-account) — `MCL-83e1933991062890`
 
@@ -1172,20 +1102,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-d390fab4066502be and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Docker Storage Layout](http://127.0.0.1:4000/host/storage-setup#docker-storage-layout) — `MCL-866da08edb70b03a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo cp /etc/fstab /etc/fstab.pre-vast-docker.$(date -u +%Y%m%d%H%M%S) ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-866da08edb70b03a and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
 ### [XFS Project Quotas](http://127.0.0.1:4000/host/storage-setup#xfs-project-quotas) — `MCL-a8b24ed1c77188ae`
 
 **Status:** UNVALIDATED
@@ -1200,20 +1116,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-a8b24ed1c77188ae and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [XFS Project Quotas](http://127.0.0.1:4000/host/storage-setup#xfs-project-quotas) — `MCL-2d14d0f899f685a5`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```text UUID=a1b2c3d4-e5f6-7890-abcd-ef1234567890  /var/lib/docker  xfs  rw,auto,pquota,nofail  0  0 ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-2d14d0f899f685a5 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
 ### [XFS Project Quotas](http://127.0.0.1:4000/host/storage-setup#xfs-project-quotas) — `MCL-d540ae3801c031c2`
 
 **Status:** UNVALIDATED
@@ -1227,20 +1129,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-d540ae3801c031c2 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [XFS Project Quotas](http://127.0.0.1:4000/host/storage-setup#xfs-project-quotas) — `MCL-9ae6747b8311ab42`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo mount -a findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS sudo xfs_quota -x -c "state" /var/lib/docker ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-9ae6747b8311ab42 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
 ### [XFS Project Quotas](http://127.0.0.1:4000/host/storage-setup#xfs-project-quotas) — `MCL-7a5577cd886c6773`
 
@@ -1298,20 +1186,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-984d77eda277edf8 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Disposable Device Example](http://127.0.0.1:4000/host/storage-setup#disposable-device-example) — `MCL-bdf5382f39dc8dcd`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo mount -a findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS sudo xfs_quota -x -c "state" /var/lib/docker ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-bdf5382f39dc8dcd and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
 ### [Disposable Device Example](http://127.0.0.1:4000/host/storage-setup#disposable-device-example) — `MCL-9d63eb54604a21f2`
 
 **Status:** UNVALIDATED
@@ -1325,34 +1199,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-9d63eb54604a21f2 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Example fstab Line](http://127.0.0.1:4000/host/storage-setup#example-fstab-line) — `MCL-f6e3f0b997672433`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```text UUID=a1b2c3d4-e5f6-7890-abcd-ef1234567890  /var/lib/docker  xfs  rw,auto,pquota,nofail  0  0 ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-f6e3f0b997672433 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Example fstab Line](http://127.0.0.1:4000/host/storage-setup#example-fstab-line) — `MCL-1efcd4c10e077500`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo mount -a findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS sudo xfs_quota -x -c "state" /var/lib/docker ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-1efcd4c10e077500 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
 ### [Example fstab Line](http://127.0.0.1:4000/host/storage-setup#example-fstab-line) — `MCL-850c39d1d4307b70`
 
@@ -1635,90 +1481,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-811c918334e0bf75 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Test Ports From Outside The LAN](http://127.0.0.1:4000/host/network-ports#test-ports-from-outside-the-lan) — `MCL-9fc1250d7de86b7a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo python3 -m http.server 40000 --bind 0.0.0.0 sudo ss -ltnp | grep ':40000' ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-9fc1250d7de86b7a and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Test Ports From Outside The LAN](http://127.0.0.1:4000/host/network-ports#test-ports-from-outside-the-lan) — `MCL-d08fdb3ef4305f9e`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash curl -v http://PUBLIC_IP:40000/ nc -vz PUBLIC_IP 40000 ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-d08fdb3ef4305f9e and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Test Ports From Outside The LAN](http://127.0.0.1:4000/host/network-ports#test-ports-from-outside-the-lan) — `MCL-7f18c2db6ac29a93`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```powershell Test-NetConnection PUBLIC_IP -Port 40000 curl.exe http://PUBLIC_IP:40000/ ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-7f18c2db6ac29a93 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Test Ports From Outside The LAN](http://127.0.0.1:4000/host/network-ports#test-ports-from-outside-the-lan) — `MCL-4827980ddca2e91f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo tcpdump -ni any udp port 40000 ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-4827980ddca2e91f and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Test Ports From Outside The LAN](http://127.0.0.1:4000/host/network-ports#test-ports-from-outside-the-lan) — `MCL-9bef13cb9998b6e4`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash printf 'vast-port-test\n' | nc -u -w2 PUBLIC_IP 40000 ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-9bef13cb9998b6e4 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Test Ports From Outside The LAN](http://127.0.0.1:4000/host/network-ports#test-ports-from-outside-the-lan) — `MCL-d0803f8f2134bc18`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```powershell $udp = New-Object System.Net.Sockets.UdpClient $bytes = [Text.Encoding]::ASCII.GetBytes("vast-port-test") $udp.Send($bytes, $bytes.Length, "PUBLIC_IP", 40000) $udp.Close() ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-d0803f8f2134bc18 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
 ### [Test Ports From Outside The LAN](http://127.0.0.1:4000/host/network-ports#test-ports-from-outside-the-lan) — `MCL-e3deafcccc558deb`
 
@@ -2228,20 +1990,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-92315f1f5e5eb54c and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [First SSH Connection After Provisioning](http://127.0.0.1:4000/host/headless-install#first-ssh-connection-after-provisioning) — `MCL-cd8355f95ae6cb25`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash ssh-keygen -R HOST_PUBLIC_IP ssh ubuntu@HOST_PUBLIC_IP ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-cd8355f95ae6cb25 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
 ### [Step 1: Update The System](http://127.0.0.1:4000/host/headless-install#step-1-update-the-system) — `MCL-5781f13d103cf332`
 
 **Status:** UNVALIDATED
@@ -2297,20 +2045,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-fa32bffb19b7c163 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Step 1: Update The System](http://127.0.0.1:4000/host/headless-install#step-1-update-the-system) — `MCL-7d482ea6973bfba5`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo reboot ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-7d482ea6973bfba5 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
 ### [Step 2: Install NVIDIA Drivers](http://127.0.0.1:4000/host/headless-install#step-2-install-nvidia-drivers) — `MCL-2654567dd0770651`
 
@@ -2381,20 +2115,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-eb3f955a962d439d and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Step 2: Install NVIDIA Drivers](http://127.0.0.1:4000/host/headless-install#step-2-install-nvidia-drivers) — `MCL-bafeeaa323b08ddb`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo reboot ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-bafeeaa323b08ddb and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
 ### [Step 2: Install NVIDIA Drivers](http://127.0.0.1:4000/host/headless-install#step-2-install-nvidia-drivers) — `MCL-11d5d6c311d21f85`
 
@@ -2648,34 +2368,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-a543dbb7637f8d4f and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Step 5: Mount NVMe For Docker Storage](http://127.0.0.1:4000/host/headless-install#step-5-mount-nvme-for-docker-storage) — `MCL-05a1cc5c0a2b4400`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo mkdir -p /var/lib/docker ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-05a1cc5c0a2b4400 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Step 5: Mount NVMe For Docker Storage](http://127.0.0.1:4000/host/headless-install#step-5-mount-nvme-for-docker-storage) — `MCL-7ffe783837c47370`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo blkid /dev/nvme0n1p1 ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-7ffe783837c47370 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
 ### [Step 5: Mount NVMe For Docker Storage](http://127.0.0.1:4000/host/headless-install#step-5-mount-nvme-for-docker-storage) — `MCL-42d03b2de71ace59`
 
 **Status:** UNVALIDATED
@@ -2703,20 +2395,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-f2adfd33cc34b472 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Step 5: Mount NVMe For Docker Storage](http://127.0.0.1:4000/host/headless-install#step-5-mount-nvme-for-docker-storage) — `MCL-cff8fdf09c0b0487`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```text UUID=a1b2c3d4-e5f6-7890-abcd-ef1234567890  /var/lib/docker  xfs  rw,auto,pquota,nofail  0  0 ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-cff8fdf09c0b0487 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
 ### [Step 5: Mount NVMe For Docker Storage](http://127.0.0.1:4000/host/headless-install#step-5-mount-nvme-for-docker-storage) — `MCL-7b586d05ca4de924`
 
@@ -2773,20 +2451,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-a4d692238cc05773 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Step 5: Mount NVMe For Docker Storage](http://127.0.0.1:4000/host/headless-install#step-5-mount-nvme-for-docker-storage) — `MCL-1274f84bacb3d288`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo mount -a df -h /var/lib/docker findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS sudo xfs_quota -x -c "state" /var/lib/docker ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-1274f84bacb3d288 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
 ### [Step 5: Mount NVMe For Docker Storage](http://127.0.0.1:4000/host/headless-install#step-5-mount-nvme-for-docker-storage) — `MCL-c8dc836d2782d537`
 
@@ -2857,20 +2521,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-417354e77d2057a9 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Step 7: Install The Vast Host Software](http://127.0.0.1:4000/host/headless-install#step-7-install-the-vast-host-software) — `MCL-df7b49a72b78194b`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash tmux new -s vast-install ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-df7b49a72b78194b and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
 ### [Step 7: Install The Vast Host Software](http://127.0.0.1:4000/host/headless-install#step-7-install-the-vast-host-software) — `MCL-d5e8757adc04bfeb`
 
@@ -3011,20 +2661,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Responsible role:** Host installer and operations engineering owner; Authorized Host/API operator
 
 **Next:** The Host installer and operations engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-263ad1fed2af9bb0 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-263ad1fed2af9bb0 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Step 11: Reboot And Verify](http://127.0.0.1:4000/host/headless-install#step-11-reboot-and-verify) — `MCL-d7fe2ce08c179698`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo reboot ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-d7fe2ce08c179698 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
 ### [Step 11: Reboot And Verify](http://127.0.0.1:4000/host/headless-install#step-11-reboot-and-verify) — `MCL-23d22589b6a3d624`
 
@@ -3660,20 +3296,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-5278daabe8c0235e and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Run The Test](http://127.0.0.1:4000/host/how-to-self-test#run-the-test) — `MCL-3fc1da6aa6bdfbba`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash vastai self-test machine <machine_id> ```
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Self-Test and Verification source owner; Authorized Host/API operator
-
-**Next:** The Self-Test and Verification source owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-3fc1da6aa6bdfbba and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-3fc1da6aa6bdfbba and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
 ### [Run The Test](http://127.0.0.1:4000/host/how-to-self-test#run-the-test) — `MCL-d964b7fce869d64b`
 
 **Status:** UNVALIDATED
@@ -3900,90 +3522,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 
 ## [Pricing Your Listing](http://127.0.0.1:4000/host/pricing-your-listing)
 
-### [Listing Controls](http://127.0.0.1:4000/host/pricing-your-listing#listing-controls) — `MCL-02886603d761ca6c`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Interruptible min bid | `--price_min_bid` | Lowest bid you will accept for interruptible rentals. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer
-
-**Next:** Inspect the pinned option/dispatch and backend handling of the exact values, then bind applicable retained execution/readback. Do not promote backend semantics from a generated client schema.
-
-### [Listing Controls](http://127.0.0.1:4000/host/pricing-your-listing#listing-controls) — `MCL-3b6b597d4d8f4fae`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Reserved discount | `--discount_rate` | Maximum long-term prepay discount. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer
-
-**Next:** Inspect the pinned option/dispatch and backend handling of the exact values, then bind applicable retained execution/readback. Do not promote backend semantics from a generated client schema.
-
-### [Listing Controls](http://127.0.0.1:4000/host/pricing-your-listing#listing-controls) — `MCL-a36d710b5fa47b76`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Minimum GPU chunk | `--min_chunk` | Smallest GPU group renters can select. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer
-
-**Next:** Inspect the pinned option/dispatch and backend handling of the exact values, then bind applicable retained execution/readback. Do not promote backend semantics from a generated client schema.
-
-### [Listing Controls](http://127.0.0.1:4000/host/pricing-your-listing#listing-controls) — `MCL-fabed78e7914587b`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Offer end date | `--end_date` or `--duration` | How long new renters can accept the offer. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer
-
-**Next:** Inspect the pinned option/dispatch and backend handling of the exact values, then bind applicable retained execution/readback. Do not promote backend semantics from a generated client schema.
-
-### [Listing Controls](http://127.0.0.1:4000/host/pricing-your-listing#listing-controls) — `MCL-97d652cd19c524c1`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Volume offer | `--vol_size`, `--vol_price` | Optional separately listed storage. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer
-
-**Next:** Inspect the pinned option/dispatch and backend handling of the exact values, then bind applicable retained execution/readback. Do not promote backend semantics from a generated client schema.
-
-### [Listing Controls](http://127.0.0.1:4000/host/pricing-your-listing#listing-controls) — `MCL-5a65ddc74c09c148`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** <Frame caption="Listing settings for on-demand, bid, bandwidth, storage, minimum-GPU, and expiration controls.">
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-5a65ddc74c09c148 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
 ### [Starting Workflow](http://127.0.0.1:4000/host/pricing-your-listing#starting-workflow) — `MCL-45728db1cf0fbe35`
 
 **Status:** UNVALIDATED
@@ -4168,20 +3706,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 
 **Next:** Inspect the pinned option/dispatch and backend handling of the exact values, then bind applicable retained execution/readback. Do not promote backend semantics from a generated client schema.
 
-### [Publish Local Storage](http://127.0.0.1:4000/host/volume-offers#publish-local-storage) — `VOL-C39`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Use [`vastai list volumes`](/cli/reference/list-volumes) to apply the same settings to several machines. `--end_date` sets the volume offer's expiration; review the date before publishing.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer
-
-**Next:** Inspect the pinned option/dispatch and backend handling of the exact values, then bind applicable retained execution/readback. Do not promote backend semantics from a generated client schema.
-
 ### [Shared Disk Capacity](http://127.0.0.1:4000/host/volume-offers#shared-disk-capacity) — `VOL-C25`
 
 **Status:** BLOCKED
@@ -4287,34 +3811,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Status:** UNVALIDATED
 
 **Literal source text:** All Vast market metric methods require a host-enabled account. Some views also require the account to have at least one registered machine.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Access](http://127.0.0.1:4000/host/market-metrics#access) — `CUR-c746dbd4e826e32c`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | CLI | `vastai metrics ...` — install the [Vast CLI](/cli/hello-world) |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Access](http://127.0.0.1:4000/host/market-metrics#access) — `CUR-fa40333d308bf100`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | REST API | `/api/v0/metrics/gpu/...` |
 
 **Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
 
@@ -4525,34 +4021,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Status:** UNVALIDATED
 
 **Literal source text:** - [Vast GPU market prices](https://vast.ai/pricing)
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [API](http://127.0.0.1:4000/host/market-metrics#api) — `CUR-fcc30ead99e2c846`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `gpu_name` | GPU name, such as `RTX 4090` |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [API](http://127.0.0.1:4000/host/market-metrics#api) — `CUR-1f0bcff5445a9a7f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash curl -H "Authorization: Bearer $API_KEY" \   "https://console.vast.ai/api/v0/metrics/gpu/current/?verified=yes&hosting_type=secure_cloud" ```
 
 **Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
 
@@ -5878,20 +5346,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [Where to Find Notification Settings](http://127.0.0.1:4000/host/notifications#where-to-find-notification-settings) — `CUR-c8657007c73f9603`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Open [Account Settings](https://cloud.vast.ai/account/) and go to **Notification Settings**. Host events appear only when you provide machines on Vast.ai.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** [EVIDENCE-REUSE-CUR-c8657007c73f9603-1](evidence/2026-09-15-host-evidence-reuse-source-review-attempt-01/a-policy-account/published-current.json) — Exact retained selector; source/runtime boundary is stated in the passage review.; [EVIDENCE-REUSE-CUR-c8657007c73f9603-2](evidence/2026-09-15-host-evidence-reuse-source-review-attempt-01/a-policy-account/notification-original-provenance.json) — Exact retained selector; source/runtime boundary is stated in the passage review.; [EVIDENCE-REUSE-CUR-c8657007c73f9603-3](evidence/2026-09-15-host-evidence-reuse-source-review-attempt-01/a-policy-account/included-image-observations.json) — Exact retained selector; source/runtime boundary is stated in the passage review.; [EVIDENCE-REUSE-CUR-c8657007c73f9603-4](evidence/2026-09-15-host-evidence-reuse-source-review-attempt-01/a-policy-account/setup-browser-response.json) — Exact retained selector; source/runtime boundary is stated in the passage review.
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Confirm the current account navigation destination and section label, then keep or correct this compound passage. The provider-only visibility description is source-supported; no new visibility, preference-save or delivery experiment is required.
-
 ### [Where to Find Notification Settings](http://127.0.0.1:4000/host/notifications#where-to-find-notification-settings) — `CUR-64c18e77b4e98ccb`
 
 **Status:** UNVALIDATED
@@ -6750,48 +6204,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-7fbdf0de1f80b419 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Planned Maintenance](http://127.0.0.1:4000/host/maintenance-windows#planned-maintenance) — `MCL-cb17382242b6309e`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash vastai list machine <machine-id> --end_date MM/DD/YYYY ```
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host installer and operations engineering owner; Authorized Host/API operator
-
-**Next:** The Host installer and operations engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-cb17382242b6309e and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-cb17382242b6309e and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Planned Maintenance](http://127.0.0.1:4000/host/maintenance-windows#planned-maintenance) — `MCL-b6d1d82a6e0a63ae`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash vastai list machines <machine-id-1> <machine-id-2> --end_date MM/DD/YYYY --retry 6 ```
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host installer and operations engineering owner; Authorized Host/API operator
-
-**Next:** The Host installer and operations engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-b6d1d82a6e0a63ae and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-b6d1d82a6e0a63ae and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Planned Maintenance](http://127.0.0.1:4000/host/maintenance-windows#planned-maintenance) — `MCL-53d123c7eca2800c`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash vastai unlist machine <machine-id> ```
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host installer and operations engineering owner; Authorized Host/API operator
-
-**Next:** The Host installer and operations engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-53d123c7eca2800c and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-53d123c7eca2800c and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
 ### [Schedule An Unplanned Window](http://127.0.0.1:4000/host/maintenance-windows#schedule-an-unplanned-window) — `MCL-68587b2f7067d91a`
 
 **Status:** UNVALIDATED
@@ -6820,48 +6232,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-00431aaac5977008 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Schedule An Unplanned Window](http://127.0.0.1:4000/host/maintenance-windows#schedule-an-unplanned-window) — `MCL-2618404284b86632`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash vastai schedule maint <machine-id> --sdate <unix-start> --duration <hours> --maintenance_category software ```
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host installer and operations engineering owner; Authorized Host/API operator
-
-**Next:** The Host installer and operations engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-2618404284b86632 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-2618404284b86632 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Schedule An Unplanned Window](http://127.0.0.1:4000/host/maintenance-windows#schedule-an-unplanned-window) — `MCL-5789114e2e680769`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash vastai schedule maint 8207 --sdate 1782950400 --duration 2 --maintenance_category power ```
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host installer and operations engineering owner; Authorized Host/API operator
-
-**Next:** The Host installer and operations engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-5789114e2e680769 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-5789114e2e680769 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Schedule An Unplanned Window](http://127.0.0.1:4000/host/maintenance-windows#schedule-an-unplanned-window) — `MCL-9d3699ef0d06b2bf`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Maintenance categories are `power`, `internet`, `disk`, `gpu`, `software`, or `other`. See [vastai schedule maint](/cli/reference/schedule-maint).
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host installer and operations engineering owner; Authorized Host/API operator
-
-**Next:** The Host installer and operations engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-9d3699ef0d06b2bf and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-9d3699ef0d06b2bf and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
 ### [Schedule An Unplanned Window](http://127.0.0.1:4000/host/maintenance-windows#schedule-an-unplanned-window) — `MCL-e77d46d33f06a175`
 
 **Status:** UNVALIDATED
@@ -6889,20 +6259,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-6141b9411a225436 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Check Or Cancel Maintenance](http://127.0.0.1:4000/host/maintenance-windows#check-or-cancel-maintenance) — `MCL-117c5c8a5048c363`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash vastai cancel maint <machine-id> ```
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host installer and operations engineering owner; Authorized Host/API operator
-
-**Next:** The Host installer and operations engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-117c5c8a5048c363 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-117c5c8a5048c363 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
 ### [Should I disable automatic updates?](http://127.0.0.1:4000/host/maintenance-windows#should-i-disable-automatic-updates) — `MCL-e2e25df310050c8c`
 
@@ -6981,20 +6337,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Status:** UNVALIDATED
 
 **Literal source text:** For a machine whose packages you already keep current. The kernel moves with everything else, and the whole upgrade is three commands:
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Full system upgrade (packages included)](http://127.0.0.1:4000/host/upgrade-kernel#full-system-upgrade-packages-included) — `CUR-5ee9df44cc856e63`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo apt-get update sudo apt-get upgrade --with-new-pkgs sudo reboot ```
 
 **Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
 
@@ -7214,20 +6556,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [3. Install the kernel update](http://127.0.0.1:4000/host/upgrade-kernel#3-install-the-kernel-update) — `CUR-801fe15d902e4614`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo apt install --only-upgrade $KERNEL_METAPACKAGES ```
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
 ### [3. Install the kernel update](http://127.0.0.1:4000/host/upgrade-kernel#3-install-the-kernel-update) — `CUR-587616f2592ba37b`
 
 **Status:** UNVALIDATED
@@ -7261,20 +6589,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Status:** UNVALIDATED
 
 **Literal source text:** This stops every running instance on the machine. Before you run it, confirm you are inside your maintenance window and that there are no active rentals.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [4. Reboot](http://127.0.0.1:4000/host/upgrade-kernel#4-reboot) — `CUR-b57eaf161338cbc9`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo reboot ```
 
 **Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
 
@@ -7452,20 +6766,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [If the machine booted the old kernel](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-booted-the-old-kernel) — `CUR-0f5e5133cd9a417c`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo reboot ```
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
 ### [If the machine does not come back](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-does-not-come-back) — `CUR-04895d4ff3bd2cae`
 
 **Status:** UNVALIDATED
@@ -7622,39 +6922,11 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [4. Apply and verify](http://127.0.0.1:4000/host/disable-ssh-password-login#4-apply-and-verify) — `CUR-92976486d5cbf5fc`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo sshd -t && sudo systemctl restart ssh.service ```
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
 ### [4. Apply and verify](http://127.0.0.1:4000/host/disable-ssh-password-login#4-apply-and-verify) — `CUR-4f4370d23549cda8`
 
 **Status:** UNVALIDATED
 
 **Literal source text:** If it still says `yes`, most likely no config file had the setting. Add it, then restart and check again:
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [4. Apply and verify](http://127.0.0.1:4000/host/disable-ssh-password-login#4-apply-and-verify) — `CUR-c42096e1282c0d44`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash echo "PasswordAuthentication no" | sudo tee -a /etc/ssh/sshd_config sudo sshd -t && sudo systemctl restart ssh.service sudo sshd -T | grep passwordauthentication ```
 
 **Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
 
@@ -7683,20 +6955,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Status:** UNVALIDATED
 
 **Literal source text:** You need access that does not go through SSH. Use the machine's IPMI, iDRAC, iLO, or other BMC console, or plug a monitor and keyboard into it. Then put back every copy you saved in step 3, and restart:
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [If you are locked out](http://127.0.0.1:4000/host/disable-ssh-password-login#if-you-are-locked-out) — `CUR-89c08cb5b29ce444`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo sh -c 'for f in /etc/ssh/sshd_config.orig /etc/ssh/sshd_config.d/*.orig; do [ -e "$f" ] && cp "$f" "${f%.orig}"; done' sudo sshd -t && sudo systemctl restart ssh.service ```
 
 **Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
 
@@ -7794,34 +7052,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 
 **Next:** Record the engineering rationale, inspect relevant canonical technical behavior, and reuse applicable retained observations. Split guidance from any actual obligation or effect when their methods differ.
 
-### [Bulk Listing And Pricing](http://127.0.0.1:4000/host/fleet-operations#bulk-listing-and-pricing) — `MCL-66cd0b05ed1b29b9`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash vastai list machines <selected-machines> -e 12/31/2026 --retry 6 ```
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer
-
-**Next:** Locate the exact canonical implementation/schema/configuration for this behavior and reuse applicable retained source/execution/UI evidence. Client dispatch or documentation alone cannot prove backend effects.
-
-### [Maintenance Windows](http://127.0.0.1:4000/host/fleet-operations#maintenance-windows) — `MCL-db1a801893d32d6b`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash vastai schedule maint <selected-machine> --sdate 1782950400 --duration 2 --maintenance_category power vastai show maints --ids <selected-machine> vastai cancel maint <selected-machine> ```
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host installer and operations engineering owner; Authorized Host/API operator
-
-**Next:** The Host installer and operations engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-db1a801893d32d6b and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-db1a801893d32d6b and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
 ### [Maintenance Windows](http://127.0.0.1:4000/host/fleet-operations#maintenance-windows) — `MCL-7118c859b1c62f5d`
 
 **Status:** UNVALIDATED
@@ -7849,20 +7079,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-f16d11e0b0e9e16a and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Default Jobs](http://127.0.0.1:4000/host/fleet-operations#default-jobs) — `MCL-a3a04d2e63a65054`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash vastai set defjob <ID> --price_gpu 0.20 --image <your-image> --args <container-args> vastai remove defjob <ID> ```
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host installer and operations engineering owner; Authorized Host/API operator
-
-**Next:** The Host installer and operations engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-a3a04d2e63a65054 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-a3a04d2e63a65054 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
 ### [Defragment GPUs](http://127.0.0.1:4000/host/fleet-operations#defragment-gpus) — `MCL-c0ec17dd86d47c87`
 
@@ -7892,20 +7108,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 
 **Next:** The Host installer and operations engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-c3e830af14448060 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-c3e830af14448060 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Cleanup And Decommissioning](http://127.0.0.1:4000/host/fleet-operations#cleanup-and-decommissioning) — `MCL-fce31ce14153d043`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash vastai cleanup machine <selected-machine> ```
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host installer and operations engineering owner; Authorized Host/API operator
-
-**Next:** The Host installer and operations engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-fce31ce14153d043 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-fce31ce14153d043 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
 ### [Cleanup And Decommissioning](http://127.0.0.1:4000/host/fleet-operations#cleanup-and-decommissioning) — `MCL-5035a12250932203`
 
 **Status:** UNVALIDATED
@@ -7922,39 +7124,11 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 
 ## [Host Teams](http://127.0.0.1:4000/host/host-teams)
 
-### [Introduction](http://127.0.0.1:4000/host/host-teams) — `MCL-c097d0beccbacad9`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** In the console, this team-management area is labeled **Account > Members**. There is no separate **Host Teams** console page; this guide uses "host teams" to describe using **Account > Members** for hosting operations.
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-c097d0beccbacad9 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
 ### [Introduction](http://127.0.0.1:4000/host/host-teams) — `MCL-f2b6a71513a07d91`
 
 **Status:** UNVALIDATED
 
 **Literal source text:** This page covers the host-specific parts: machine ownership, install context, machine permissions, earnings, payouts, invoice information, escalation contacts, and wrong-account recovery. If the team does not exist yet, create it first, then return here before installing or registering host machines under that team.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer
-
-**Next:** Find the exact account, permission or command definition and compare it with this passage. Reuse a suitable retained result for any claimed account effect; if none exists, specify the smallest approved check. Ask the source owner only if the implementation source or meaning is unavailable.
-
-### [Team Context](http://127.0.0.1:4000/host/host-teams#team-context) — `MCL-5a8901f1b2e4c83e`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** A team is its own Vast account. When you switch into a team with the Context Switcher, actions are performed as the team account instead of your personal account.
 
 **Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
 
@@ -8061,146 +7235,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Responsible role:** Documentation technical-source reviewer
 
 **Next:** Find the exact account, permission or command definition and compare it with this passage. Reuse a suitable retained result for any claimed account effect; if none exists, specify the smallest approved check. Ask the source owner only if the implementation source or meaning is unavailable.
-
-### [Invite Host Operators](http://127.0.0.1:4000/host/host-teams#invite-host-operators) — `MCL-6e7d62936ffffaba`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** 2. If the page says **No team found**, click **Create Team** and complete team creation first. For the full team-creation flow, see [Teams Quickstart](/guides/teams/teams-quickstart).
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-6e7d62936ffffaba and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Invite Host Operators](http://127.0.0.1:4000/host/host-teams#invite-host-operators) — `MCL-07471963000a0522`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** 3. Switch to the intended team in the Context Switcher.
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-07471963000a0522 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Invite Host Operators](http://127.0.0.1:4000/host/host-teams#invite-host-operators) — `MCL-93a24562033d34ef`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** 4. If the pre-populated roles are not right for this operator, open the **Roles** tab and create or edit a role first.
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-93a24562033d34ef and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Invite Host Operators](http://127.0.0.1:4000/host/host-teams#invite-host-operators) — `MCL-54f7239ba5c24fb9`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** 5. Click **Invite**.
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-54f7239ba5c24fb9 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Invite Host Operators](http://127.0.0.1:4000/host/host-teams#invite-host-operators) — `MCL-d4514d6f3c4833d7`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** 6. Enter the operator's email address.
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-d4514d6f3c4833d7 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Invite Host Operators](http://127.0.0.1:4000/host/host-teams#invite-host-operators) — `MCL-44e2fbea07a36bf6`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** 7. Assign one of the available roles, such as a pre-populated `manager` or `member` role, or a custom role created for host operations.
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-44e2fbea07a36bf6 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Invite Host Operators](http://127.0.0.1:4000/host/host-teams#invite-host-operators) — `MCL-3c0763087180e065`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** 8. Send the invite and confirm the operator appears on the Members page after accepting.
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-3c0763087180e065 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Invite Host Operators](http://127.0.0.1:4000/host/host-teams#invite-host-operators) — `MCL-4441c9b7e3545518`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** <Frame caption="Create a team before inviting members">
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-4441c9b7e3545518 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Invite Host Operators](http://127.0.0.1:4000/host/host-teams#invite-host-operators) — `MCL-3085fa53e17bafce`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** <Frame caption="Create Team dialog">
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-3085fa53e17bafce and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Invite Host Operators](http://127.0.0.1:4000/host/host-teams#invite-host-operators) — `MCL-a93a7827d67b5d46`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** <Frame caption="Invite a team member and assign a role">
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-a93a7827d67b5d46 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
 ### [Machines And Teams](http://127.0.0.1:4000/host/host-teams#machines-and-teams) — `MCL-fb88473a2cbdd618`
 
@@ -8384,20 +7418,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-9ec8a6cd0fca2e61 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Machine Roles](http://127.0.0.1:4000/host/host-teams#machine-roles) — `MCL-ccf83e8b58bedb7b`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** <Frame caption="Pre-populated roles and New Role action">
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-ccf83e8b58bedb7b and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
 ### [Machine Roles](http://127.0.0.1:4000/host/host-teams#machine-roles) — `MCL-e792121d10be526e`
 
 **Status:** UNVALIDATED
@@ -8537,20 +7557,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-8ca1ec3fa3fc92d1 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Machine Roles](http://127.0.0.1:4000/host/host-teams#machine-roles) — `MCL-3fb8a10a89396bf3`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** <Frame caption="Create a custom role with permissions and 2FA options">
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-3fb8a10a89396bf3 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
 ### [Machine Roles](http://127.0.0.1:4000/host/host-teams#machine-roles) — `MCL-99d16647a9942e13`
 
@@ -8944,34 +7950,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 
 **Next:** Inspect canonical account/team/auth/invoice/payout configuration and applicable retained console or API observation for the exact transition. Existing general docs are navigation to sources, not terminal proof.
 
-### [Invoice Information](http://127.0.0.1:4000/host/host-teams#invoice-information) — `MCL-50bef63411cab332`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** <Frame caption="Invoice Information settings">
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer
-
-**Next:** Reuse retained current console evidence for this exact label/action and account context; check source for hidden field computation or state semantics separately. An authored screenshot/caption is not automatically current UI proof.
-
-### [Escalation Contact](http://127.0.0.1:4000/host/host-teams#escalation-contact) — `MCL-b142dfdfe312f402`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Set an escalation contact for hosted-machine incidents from **Account > Settings**, or open [Settings](https://cloud.vast.ai/settings/). The console asks for an escalation email and phone number.
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-b142dfdfe312f402 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
 ### [Escalation Contact](http://127.0.0.1:4000/host/host-teams#escalation-contact) — `MCL-8c33387b77ee9927`
 
 **Status:** UNVALIDATED
@@ -8985,48 +7963,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-8c33387b77ee9927 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Escalation Contact](http://127.0.0.1:4000/host/host-teams#escalation-contact) — `MCL-e65e26d4135b3968`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** <Frame caption="Escalation Contact settings">
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-e65e26d4135b3968 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Team Owner Actions](http://127.0.0.1:4000/host/host-teams#team-owner-actions) — `MCL-ea13479f0f091d09`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Team owners can manage account-level team settings from the three-dot menu in **Account > Members**, or by opening the [Members page](https://cloud.vast.ai/manage-members/).
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-ea13479f0f091d09 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Team Owner Actions](http://127.0.0.1:4000/host/host-teams#team-owner-actions) — `MCL-89625175d4046544`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** <Frame caption="Team owner actions menu">
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-89625175d4046544 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
 ### [Team Owner Actions](http://127.0.0.1:4000/host/host-teams#team-owner-actions) — `MCL-c86e8e5951c1db93`
 
@@ -9070,34 +8006,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 
 **Next:** Find the exact account, permission or command definition and compare it with this passage. Reuse a suitable retained result for any claimed account effect; if none exists, specify the smallest approved check. Ask the source owner only if the implementation source or meaning is unavailable.
 
-### [Team Owner Actions](http://127.0.0.1:4000/host/host-teams#team-owner-actions) — `MCL-f593020956f600e5`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** <Frame caption="Edit the team name">
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-f593020956f600e5 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Team Owner Actions](http://127.0.0.1:4000/host/host-teams#team-owner-actions) — `MCL-3d270ab33c94417b`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** <Frame caption="Transfer team ownership">
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-3d270ab33c94417b and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
 ### [Team Owner Actions](http://127.0.0.1:4000/host/host-teams#team-owner-actions) — `MCL-51b843955400733f`
 
 **Status:** UNVALIDATED
@@ -9111,20 +8019,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Responsible role:** Documentation technical-source reviewer
 
 **Next:** Record the engineering rationale, inspect relevant canonical technical behavior, and reuse applicable retained observations. Split guidance from any actual obligation or effect when their methods differ.
-
-### [Team Owner Actions](http://127.0.0.1:4000/host/host-teams#team-owner-actions) — `MCL-e1837a870bc7261f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** <Frame caption="Delete team confirmation">
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-e1837a870bc7261f and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
 ### [Recommended Business Setup](http://127.0.0.1:4000/host/host-teams#recommended-business-setup) — `MCL-5075d8df303869df`
 
@@ -9294,20 +8188,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-b9b59c5c66256b98 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Related](http://127.0.0.1:4000/host/host-teams#related) — `MCL-8cd80672d65dc8a2`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Escalation contact | [Settings](https://cloud.vast.ai/settings/) |
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-8cd80672d65dc8a2 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
 ## [Host Diagnostics](http://127.0.0.1:4000/host/common-errors-diagnostics)
 
 ### [Where To Start](http://127.0.0.1:4000/host/common-errors-diagnostics#where-to-start) — `MCL-24bf5b0070133bc5`
@@ -9365,34 +8245,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-be6f050aaddc289f and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-d825fab0e420cfa3`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash vastai self-test machine <machine_id> ```
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Backend and Host-daemon source owner; Authorized Host/API operator
-
-**Next:** The Backend and Host-daemon source owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-d825fab0e420cfa3 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-d825fab0e420cfa3 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-720745be69fff90b`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```text /tmp/vast_selftest_<machine_id>_<timestamp>.tar.gz ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-720745be69fff90b and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
 ### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-3aca6b1f291d4d0c`
 
@@ -9477,20 +8329,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-ed7bfef8f478e91b and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-ce761396fde491b7`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash vastai dump-logs <machine_id> --include-local-host-artifacts ```
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Backend and Host-daemon source owner; Authorized Host/API operator
-
-**Next:** The Backend and Host-daemon source owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-ce761396fde491b7 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-ce761396fde491b7 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
 ### [Host Service Snapshot](http://127.0.0.1:4000/host/common-errors-diagnostics#host-service-snapshot) — `MCL-1113b3f4ae1a1eb8`
 
@@ -9701,20 +8539,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-9204669b44a3c760 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [GPU And Kernel Diagnostics](http://127.0.0.1:4000/host/common-errors-diagnostics#gpu-and-kernel-diagnostics) — `MCL-d46b829325bad007`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** If Docker reports that direct `--gpus` or CDI-hook invocation is unsupported, use the registered `nvidia` runtime form above.
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-d46b829325bad007 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
 ### [GPU And Kernel Diagnostics](http://127.0.0.1:4000/host/common-errors-diagnostics#gpu-and-kernel-diagnostics) — `MCL-b2de76171172a582`
 
@@ -10613,20 +9437,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-ef226b48044d21cb and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [NCCL Failed](http://127.0.0.1:4000/host/machine-errors#nccl-failed) — `MCL-c9ccf1cbdcadfa35`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash systemctl status nvidia-fabricmanager journalctl -u nvidia-fabricmanager --since "-24h" nvidia-smi -q | grep -i -A 2 Fabric nvidia-smi topo -m ```
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-c9ccf1cbdcadfa35 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
 ### [XFS Project Quota Error](http://127.0.0.1:4000/host/machine-errors#xfs-project-quota-error) — `MCL-7fe0bdcfe4fa3da6`
 
@@ -12189,50 +10999,6 @@ Current dispositions: 2008 occurrences (1042 PASS, 91 editorial NOT_APPLICABLE, 
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-9d2fe906a3395548 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-## [Host CLI/API/SDK](http://127.0.0.1:4000/host/cli-api-sdk)
-
-### [Introduction](http://127.0.0.1:4000/host/cli-api-sdk) — `MCL-d692c68e7a18cf61`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Hosts can use the Vast CLI, REST API, and Python SDK to operate machines without relying only on the console.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Teams and account engineering owner; Authorized Host/API operator
-
-**Next:** The Teams and account engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-d692c68e7a18cf61 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-d692c68e7a18cf61 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Start With Authentication](http://127.0.0.1:4000/host/cli-api-sdk#start-with-authentication) — `MCL-eaa89f1e15e2195a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Install and authenticate the CLI before using host commands:
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Teams and account engineering owner; Authorized Host/API operator
-
-**Next:** The Teams and account engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-eaa89f1e15e2195a and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-eaa89f1e15e2195a and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Automation Notes](http://127.0.0.1:4000/host/cli-api-sdk#automation-notes) — `MCL-963235c71bdb0ca9`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Use `--raw` for scripts so commands return structured output where supported. Use `--retry N` for unattended workflows that may hit transient rate limits.
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-963235c71bdb0ca9 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
 ## [Hosting Agreement](http://127.0.0.1:4000/host/hosting-agreement)
 

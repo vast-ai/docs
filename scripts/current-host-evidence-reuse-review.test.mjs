@@ -4,14 +4,14 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {projectEvidenceReuseReview,loadEvidenceReuseReview,EVIDENCE_REUSE_PATH as REG,EVIDENCE_REUSE_SHA256 as PIN,EVIDENCE_REUSE_ATTEMPT as A} from './current_host_evidence_reuse_review.mjs';
-import {beforeEvidenceReuse} from './closure_historical_test_sources.mjs';
-const read=p=>fs.readFileSync(new URL('../'+p,import.meta.url)),exists=p=>fs.existsSync(new URL('../'+p,import.meta.url));
+import {beforeContinuation,beforeEvidenceReuse} from './closure_historical_test_sources.mjs';
+const rawRead=p=>fs.readFileSync(new URL('../'+p,import.meta.url)),read=beforeContinuation(rawRead),exists=p=>{try{read(p);return true;}catch(error){if(error.code==='ENOENT')return false;throw error;}};
 const registry=JSON.parse(read(REG)),model=JSON.parse(read('verification/current-host-docs-review.json')),before=JSON.parse(beforeEvidenceReuse(read)('verification/current-host-docs-review.json'));
 const sha=x=>crypto.createHash('sha256').update(x).digest('hex'),index=x=>new Map(x.pages.flatMap(p=>p.claims.map(c=>[c.id,c]))),old=index(before),claims=index(model),omit=(o,ks)=>Object.fromEntries(Object.entries(o).filter(([k])=>!ks.includes(k))),at=(o,p)=>p.slice(1).split('/').reduce((v,k)=>v[k],o);
 async function reseal(change){const r=structuredClone(registry);change(r);const bytes=Buffer.from(JSON.stringify(r));const source=read('scripts/current_host_evidence_reuse_review.mjs').toString().replace(PIN,sha(bytes)).replace("'./current_host_source_family_review.mjs'",JSON.stringify(new URL('./current_host_source_family_review.mjs',import.meta.url).href));const m=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));return ()=>m.projectEvidenceReuseReview({read:p=>p===REG?bytes:read(p),exists});}
 test('318 scoped decisions have exact Python/JS parity and preserve all1690 unselected claims apart from spans',()=>{
  const js=projectEvidenceReuseReview({read,exists});assert.deepEqual(js.model,model);assert.deepEqual(loadEvidenceReuseReview({read,exists,model}).model,model);
- const py=JSON.parse(execFileSync('python3',['-c',"import json,sys;from pathlib import Path;sys.path.insert(0,'scripts');import current_host_evidence_reuse_review as m;print(json.dumps(m.project(Path.cwd())))"],{cwd:new URL('../',import.meta.url),maxBuffer:24*1024*1024}));assert.deepEqual(py,model);
+ const py=JSON.parse(execFileSync('python3',['-c',"import json,sys;from pathlib import Path;sys.path.insert(0,'scripts');import current_host_evidence_reuse_review as m;r=Path.cwd();p=r/'verification/current-host-continuation-review.json';reg=json.loads(p.read_text()) if p.exists() else {'sources':[]};overrides={s['path']:(r/s['before_artifact']['path']).read_bytes() for s in reg['sources']};print(json.dumps(m.project(r,frozen_source_overrides=overrides)))"],{cwd:new URL('../',import.meta.url),maxBuffer:24*1024*1024}));assert.deepEqual(py,model);
  assert.deepEqual(model.counts.claim_statuses,{BLOCKED:21,FAIL:3,NOT_APPLICABLE:91,PASS:1042,UNVALIDATED:851});assert.equal(claims.size,2008);
  const selected=new Set(registry.transitions.map(t=>t.claim_id));assert.equal(selected.size,318);let unaffected=0;
  for(const[id,c]of claims){const p=old.get(id);if(!selected.has(id)){assert.deepEqual(omit(c,['spans']),omit(p,['spans']),id);unaffected++;continue;}

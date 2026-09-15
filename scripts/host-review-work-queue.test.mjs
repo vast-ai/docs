@@ -36,7 +36,8 @@ test('every current occurrence belongs to exactly one actionable category; suppo
   assert.equal(queue.buckets.find(b=>b.id==='triage').count,0,'new current classes need explicit review mapping');
   assert.equal(queue.buckets.find(b=>b.id==='completed').count,claims.filter(c=>['PASS','NOT_APPLICABLE'].includes(c.status)).length);
   const cohort=claims.filter(c=>['PUBLISHED_FINANCIAL_GUIDANCE_DESCRIPTION','PUBLICATION_DESCRIPTION','PUBLISHED_TERMS_SUMMARY','REVIEWED_UI_PROVIDER_OPTION'].includes(c.classification));
-  assert.equal(cohort.length,17);
+  // The continuation adds 11 Teams captions and four console-image captions.
+  assert.equal(cohort.length,model.corrections.some(x=>x.id==='HOST-CONTINUATION-REVIEW-01')?32:17);
   assert.ok(cohort.every(c=>describeHostReview(c).completed&&!describeHostReview(c).needsTriage));
   assert.equal(cohort.filter(c=>c.classification==='REVIEWED_UI_PROVIDER_OPTION').every(c=>describeHostReview(c).type==='Technical behavior or workflow'),true);
   assert.equal(cohort.filter(c=>c.classification!=='REVIEWED_UI_PROVIDER_OPTION').every(c=>describeHostReview(c).type==='Published source or rule'),true);
@@ -99,8 +100,15 @@ test('export carries the shared queue without changing any claim status, lanes, 
     assert.equal(payload.current_result_ref,payload.cleanup_transition.result_ref);
     for(const ref of [payload.cleanup_transition.registry_ref,payload.cleanup_transition.baseline_ref,...payload.cleanup_transition.context_refs])assert.ok(payload.files[ref],ref);
   }
+  if(payload.continuation_transition) {
+    const review=payload.continuation_transition;
+    assert.equal(review.reviewed_claims,88);
+    for(const ref of [review.registry_ref,review.baseline_ref,review.result_ref])assert.ok(payload.files[ref],ref);
+    const registry=JSON.parse(payload.files[review.registry_ref].text);
+    for(const artifact of registry.artifacts)assert.ok(payload.files[artifact.path],artifact.path);
+  }
   if(payload.evidence_reuse_transition) {
-    assert.equal(payload.current_result_ref,payload.evidence_reuse_transition.result_ref);
+    assert.equal(payload.current_result_ref,(payload.continuation_transition||payload.evidence_reuse_transition).result_ref);
     for(const ref of [payload.evidence_reuse_transition.registry_ref,payload.evidence_reuse_transition.baseline_ref,
       payload.evidence_reuse_transition.result_ref,payload.source_family_transition.result_ref,payload.closure_transition.result_ref])assert.ok(payload.files[ref],ref);
     const registry=JSON.parse(payload.files[payload.evidence_reuse_transition.registry_ref].text);
