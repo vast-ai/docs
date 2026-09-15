@@ -971,6 +971,9 @@ def build() -> dict[str, Any]:
     The transition projection is an internal output-only snapshot: it must not
     change this established builder API or leak into the public JSON package.
     """
+    teams_console = teams_console_module()
+    if (REPO / teams_console.REGISTRY).exists():
+        return teams_console.project(REPO)
     diagnostics_ssh = diagnostics_ssh_module()
     if (REPO / diagnostics_ssh.REGISTRY).exists():
         return diagnostics_ssh.project(REPO)
@@ -1073,6 +1076,13 @@ def payout_terms_module() -> Any:
     spec.loader.exec_module(module)
     return module
 
+def teams_console_module() -> Any:
+    spec = importlib.util.spec_from_file_location('current_host_teams_console_review',
+        Path(__file__).with_name('current_host_teams_console_review.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
 def diagnostics_ssh_module() -> Any:
     spec = importlib.util.spec_from_file_location('current_host_diagnostics_ssh_review',
         Path(__file__).with_name('current_host_diagnostics_ssh_review.py'))
@@ -1120,6 +1130,14 @@ def payout_invoice_module() -> Any:
 
 def classify_literal_source_first(source_file: str, text: str) -> tuple[str, list[str], bool]:
     """Exact reviewed current classifier shared with repository reconciliation."""
+    teams_console = teams_console_module()
+    if (REPO / teams_console.REGISTRY).exists():
+        model = teams_console.project(REPO)
+        matches = [claim for page in model['pages'] for claim in page['claims'] if claim['text'] == text and any(span['source_file'] == source_file for span in claim['spans'])]
+        if not matches: raise ValueError('teams_console classification has no exact reviewed occurrence')
+        values = {(claim['classification'], tuple(claim['required_evidence_types'])) for claim in matches}
+        if len(values) != 1: raise ValueError('same literal has differing teams_console classifications; select exact claim ID')
+        classification, lanes = next(iter(values)); return classification, list(lanes), 'AUTHORITATIVE_DOCUMENTATION_CITATION' in lanes
     diagnostics_ssh = diagnostics_ssh_module()
     if (REPO / diagnostics_ssh.REGISTRY).exists():
         model = diagnostics_ssh.project(REPO)
@@ -1224,6 +1242,10 @@ def classify_literal_source_first(source_file: str, text: str) -> tuple[str, lis
 
 
 def outputs() -> dict[Path, bytes]:
+    teams_console = teams_console_module()
+    if (REPO / teams_console.REGISTRY).exists():
+        package=teams_console.project(REPO); worklist_md,runtime_md,owner_md=worklist(package)
+        return {OUT:(json.dumps(package,indent=2,ensure_ascii=False)+'\n').encode(),WORKLIST:worklist_md.encode(),RUNTIME_REGISTER:runtime_md.encode(),OWNER_REGISTER:owner_md.encode()}
     diagnostics_ssh = diagnostics_ssh_module()
     if (REPO / diagnostics_ssh.REGISTRY).exists():
         package=diagnostics_ssh.project(REPO); worklist_md,runtime_md,owner_md=worklist(package)

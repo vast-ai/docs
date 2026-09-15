@@ -31,7 +31,7 @@ Before doing any host operation, confirm the active context in the console:
 - Editing invoice information.
 - Setting the escalation contact for urgent hosted-machine issues.
 
-If you are in the wrong context, machines, API keys, earnings, and payout settings can end up attached to the wrong account.
+Check both the selected console account and the credentials used by the CLI or installer. Switching the console context does not change a separately configured CLI API key.
 
 ## Invite Host Operators
 
@@ -60,9 +60,9 @@ To invite someone to help manage team-owned host machines:
 
 ## Machines And Teams
 
-Machines registered while you are operating in a team context belong to the team account. Their offers, listings, pricing, maintenance windows, and rental history are managed through that team context.
+Use an installation command generated for the intended team account, then confirm that the registered machine appears on that team’s **Machines** page. Use the same team context to inspect and manage its offers, listings, pricing, and maintenance.
 
-Machines registered while you are operating in a personal account context belong to that personal account unless they are migrated or re-registered through a supported flow.
+The account identity in the installation command matters. If a machine appears under your personal account instead of the intended team, contact Vast support about the supported migration or re-registration flow before changing the installation.
 
 <Warning>
 Do not assume that switching context moves existing machines, active rentals, earnings, or payout history. If you need to move an existing host operation from an individual account to a team, contact Vast support before changing install keys, deleting machines, or reinstalling the daemon.
@@ -81,7 +81,7 @@ When installing a team-owned host:
 
 Do not reuse a setup command copied from a personal account, another team, an old note, shell history, or a screenshot. Setup commands can include account-specific machine installation keys. See [Installing Host Software](/host/installing-host-software#install-command).
 
-If the generated command contains `undefined`, uses the wrong account, or the installed machine appears as unauthenticated, stop and regenerate the command from the intended team context. If the problem persists after switching context, refreshing the setup page, and re-accepting any required agreement flow, contact support with the team name, account email, and screenshots of the setup-page state.
+If the generated command contains `undefined`, shows the wrong account, or the installed machine appears unauthenticated, stop and check the selected account. Refresh the setup page and copy a fresh command for the intended team. If the problem persists, contact support with the team name, account email, and the setup-page state, keeping installation keys out of screenshots.
 
 ## Machine Roles
 
@@ -96,8 +96,8 @@ Role names are less important than the permissions on the role. For host operati
 | Permission or role | Host use |
 | --- | --- |
 | Machines Read | Allows the operator to view team machines and machine state. |
-| Machines Write | Required for registering and managing host machines, including listing, unlisting, price changes, min-bid changes, default jobs, cleanup, and maintenance. |
-| Billing/Earning Read | Allows earnings, invoices, and payout-history visibility. Grant only when the operator needs business or accounting visibility. |
+| Machines Write | Allows machine-management operations such as listing, unlisting, price and min-bid changes, default jobs, cleanup, and maintenance. Check installation-key registration rights separately. |
+| Billing/Earning Read | Allows earnings and invoice visibility. Grant it only when needed, and confirm payout-history access separately with the team owner. |
 | Billing/Earning Write | Allows billing-related changes where supported. Reserve for admins or finance owners. |
 | Team Write | Allows team administration actions such as changing members or roles. Grant only to admins. |
 | Require 2FA | The role editor can require 2FA for the whole role, or for selected permissions. Use this for roles that can change machines, billing, payouts, or team membership. |
@@ -112,7 +112,7 @@ Role names are less important than the permissions on the role. For host operati
 
 Before assigning a role that requires 2FA, make sure the operator has 2FA configured on their personal account. See [Two-factor authentication](/guides/reference/two-factor-authentication).
 
-The role editor maps to API permission scopes such as `machine_read`, `machine_write`, `billing_read`, `billing_write`, and `team_write`. For the full permission reference, see [API Permissions](/api-reference/permissions) and [Teams role syntax](/guides/teams/teams-roles#role-syntax). The exact flow for granting machine registration rights to a team API key still needs engineering confirmation before this draft is published.
+The role editor uses API permission scopes such as `machine_read`, `machine_write`, `billing_read`, `billing_write`, and `team_write`. See [API Permissions](/api-reference/permissions) and [Teams role syntax](/guides/teams/teams-roles#role-syntax). For machine installation, use the command generated by the intended team’s setup page; ask Vast support about unresolved registration-rights errors instead of assuming that an ordinary scoped API key is sufficient.
 
 ## API Keys For Host Teams
 
@@ -121,11 +121,11 @@ Create host automation keys while switched into the team context. A key created 
 Use a team key or role with:
 
 - `machine_read` for read-only machine dashboards.
-- `machine_read` and `machine_write` for host registration, listing, repricing, maintenance, cleanup, and daemon workflows.
-- `billing_read` only for operators who need earnings, invoice, or payout-history visibility.
+- `machine_read` and `machine_write` for machine inspection, listing, repricing, maintenance, and cleanup. Use the current team setup flow for installation credentials.
+- `billing_read` only for operators who need earnings or invoice visibility. Confirm payout-history access separately with the team owner.
 - `billing_write` only for people or automation allowed to change billing or transfer credit.
 
-If a host command returns `403`, `machine_api_key does not have machine registration rights`, or another permission error, check that the key was created in the team context and that the role grants the needed machine permission. See [Manage API keys](/guides/reference/api-keys) and [API Permissions](/api-reference/permissions).
+For a `403` from an authenticated host command, check the account associated with the configured API key and the permission required by that endpoint. For `machine_api_key does not have machine registration rights`, refresh the intended team’s setup page and contact support if the error persists; do not assume an ordinary `machine_write` API key supplies installation rights. See [Manage API keys](/guides/reference/api-keys) and [API Permissions](/api-reference/permissions).
 
 ## Vast CLI For Host Teams
 
@@ -137,7 +137,7 @@ Use these team-related commands for host operations:
 
 | Workflow | Commands | Host-team use |
 | --- | --- | --- |
-| Create the team | [`vastai create team`](/cli/reference/create-team) | Create a team account from the CLI before inviting operators or registering team-owned machines. |
+| Create the team | [`vastai create team`](/cli/reference/create-team) | Use personal-account credentials to create a separate team account before inviting operators or registering team-owned machines. |
 | Delete the team | [`vastai destroy team`](/cli/reference/destroy-team) | Permanently remove the team. Do not use this while the team owns active host machines, unresolved rentals, payout history, or billing records that need to be preserved. |
 | Manage members | [`vastai show members`](/cli/reference/show-members), [`vastai invite member`](/cli/reference/invite-member), [`vastai remove member`](/cli/reference/remove-member) | List operators, invite an operator with a role, or remove access. Requires the team key or user role to allow team administration. |
 | Manage roles | [`vastai create team-role`](/cli/reference/create-team-role), [`vastai show team-roles`](/cli/reference/show-team-roles), [`vastai show team-role`](/cli/reference/show-team-role), [`vastai update team-role`](/cli/reference/update-team-role), [`vastai remove team-role`](/cli/reference/remove-team-role) | Create or inspect custom roles for operators. Host operators usually need machine read/write permissions; team administration should stay limited. |
@@ -158,7 +158,7 @@ Earnings and payout visibility is role-gated:
 
 | Access | What it allows |
 | --- | --- |
-| `billing_read` | View team earnings, invoices, and payout history. |
+| `billing_read` | View team earnings and invoices. Confirm payout-history access separately with the team owner. |
 | `billing_write` | Change billing-related settings or transfer credit where supported. |
 | Owner or billing administrator | Configure the team payout account. |
 
@@ -168,9 +168,9 @@ For payout timing, invoices, and provider setup, see [Host Payouts](/host/paymen
 
 ## Invoice Information
 
-Invoice information is edited from **Account > Settings**, or directly from [Settings](https://cloud.vast.ai/settings/). For host teams, set this while operating in the team context so generated invoices use the team or business name, address, country, zipcode, and tax information instead of a personal account's default details.
+In the intended team context, open **Account > Settings**, or [Settings](https://cloud.vast.ai/settings/), and look for **Invoice Information**. Enter the team or business name, address, country, zipcode, and tax information. Review a generated invoice to confirm that it uses the intended details; ask the team owner or support if the section is unavailable.
 
-Keep this separate from payout setup. Invoice information controls what appears on generated invoices; payout-provider and payment details are managed from the earnings or payout flow.
+Keep invoice details separate from payout setup. Check a generated invoice for the intended team details, and follow [Host Payouts](/host/payment) for the payout-provider setup available to the account.
 
 <Frame caption="Invoice Information settings">
   ![Invoice Information section in Settings with business name, address, country, zipcode, and tax information fields](/images/host-teams-invoice-information.webp)
@@ -198,7 +198,7 @@ Team owners can manage account-level team settings from the three-dot menu in **
 
 | Action | Host-team guidance |
 | --- | --- |
-| Edit Team Name | Changes the team display name. It does not move machines, API keys, earnings, or payout setup. |
+| Edit Team Name | Edit the team’s display name. Treat renaming and moving machines or financial records between accounts as separate tasks; ask support about the supported migration path. |
 | Transfer Team Ownership | Reassigns ownership to an existing team member. The current owner cannot undo the transfer by themselves after confirmation. Decide whether billing and payment information should be cleared before transferring ownership. |
 | Delete Team | Permanently removes the team and its members, and returns remaining credits to the owner's personal account. Do not use this to move machines, payout history, or earnings between accounts. |
 
@@ -230,8 +230,8 @@ For a hosting business or multi-operator fleet:
 - Reserve Owner access for the business principal or accountable administrator.
 - Treat ownership transfer and team deletion as business-critical account actions.
 - Create team API keys for automation in team context, then rotate and revoke them like production secrets.
-- Set invoice information in team context so generated invoices use the business or team details.
-- Set a monitored escalation email and phone number in Settings for urgent hosted-machine issues.
+- Enter the business or team details in Invoice Information while using the intended team context, then check a generated invoice to confirm them.
+- Set a monitored escalation email and phone number in Settings where **Escalation Contact** is available; ask the team owner or support which context to use if it is missing.
 
 For machine automation after setup, see [Fleet Operations](/host/fleet-operations).
 
@@ -239,12 +239,12 @@ For machine automation after setup, see [Fleet Operations](/host/fleet-operation
 
 | Symptom | Likely cause | What to do |
 | --- | --- | --- |
-| Install command contains `undefined` or uses an unexpected host/account ID | Setup page generated a command from the wrong or incomplete context. | Switch to the intended team, refresh the setup page, complete any agreement flow, and copy a fresh command. Contact support if it still generates incorrectly. |
-| Machine appears under the individual account instead of the team | The install command or API key came from the personal account context. | Do not keep listing from the wrong account. If there are no active rentals, prepare to re-register under the team context or ask support about the supported migration path. |
+| Install command contains `undefined` or uses an unexpected host/account ID | Check the selected account and whether the setup page has loaded the intended account identity. | Switch to the intended team, refresh the setup page, and copy a fresh command. Complete the team’s hosting setup if it has not been completed; contact support if command generation still fails. |
+| Machine appears under the individual account instead of the team | Check which account identity was used by the installation command or machine credentials. | Pause further listing changes and contact support about the supported migration or re-registration path, including active rentals, stored data, and financial records that must be preserved. |
 | Existing rigs and payout history need to move from individual to team | Existing machines, earnings, and payout history may require account-level migration support. | Contact support before deleting, reinstalling, or changing payout setup. Include machine IDs, account email, intended team, and whether active rentals exist. |
-| `403` or `machine_api_key does not have machine registration rights` | The key or role lacks `machine_write`, or the key was created in personal context. | Create or select a team-context key with `machine_read` and `machine_write`, then rerun from the intended context. |
-| Team API key keeps being created under the personal account | The Keys page or CLI is still operating in personal context. | Switch to the team in the Context Switcher before creating the key. Verify the key is associated with the team before using it for host automation. |
-| Unauthenticated machine or wrong-account errors | Daemon, CLI, or setup flow is using a key from the wrong context. | Switch context, regenerate the setup command or API key, update the CLI/daemon configuration, then confirm the machine appears under the intended team. |
+| `403` or `machine_api_key does not have machine registration rights` | Check the account, endpoint permissions, and whether the failing operation uses an ordinary API key or an installation key. | For an API command, inspect the key’s documented scopes. For installation, refresh the intended team’s setup page and contact support if registration rights remain unresolved; do not assume `machine_write` alone fixes the error. |
+| Team API key keeps being created under the personal account | Check the account selected on the Keys page and the credentials used by the CLI separately. | In the console, select the intended team before creating the key. For CLI creation, configure credentials for that team account. Verify the new key’s account association before using it for host automation. |
+| Unauthenticated machine or wrong-account errors | Check the selected account, installation-command identity, and the credentials used by the failing operation. | Refresh the intended team’s setup page and confirm the machine’s visible account. If the error persists, contact support before changing daemon credentials or reinstalling; include the exact error and machine/account context. |
 
 ## Related
 
