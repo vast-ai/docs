@@ -27,6 +27,15 @@ on.
 
 ## 1. Check for rentals and unlist
 
+<Warning>
+The Docker restart in step 5 and the reboot in step 7 stop every instance on
+the machine, running or stopped. Do not go past this step until both checks
+below show the machine has no instances at all. Wait until all rental
+contracts have ended, or schedule the window with
+[`vastai schedule maintenance`](/host/cli/schedule-maint) so renters are
+notified and can save their work.
+</Warning>
+
 List every container, including stopped ones:
 
 ```bash
@@ -98,8 +107,7 @@ containerd.io:
   Candidate: 2.2.3-1~ubuntu.24.04~noble
 ```
 
-**Save this output.** `Installed` is your rollback version. If `Candidate`
-equals `Installed` for both, step 5 has nothing to do.
+If `Candidate` equals `Installed` for both, step 5 has nothing to do.
 
 List every other package with an update:
 
@@ -115,8 +123,8 @@ openssh-server/noble-updates 1:9.6p1-3ubuntu13.14 amd64 [upgradable from: 1:9.6p
 ...
 ```
 
-Save this too; the bracketed version is what you roll back to. Empty list and
-Docker already current: nothing to upgrade. **Relist and stop here.**
+Empty list and Docker already current: nothing to upgrade.
+**Relist and stop here.**
 
 List the packages the daemon holds. Everything here gets upgraded:
 
@@ -280,8 +288,7 @@ active
 active
 ```
 
-Both must say `active`. Anything else: see
-[Docker will not start](#docker-will-not-start) before continuing.
+Both must say `active` before you continue.
 
 ```bash
 docker version --format 'Client {{.Client.Version}} / Server {{.Server.Version}}'
@@ -350,9 +357,11 @@ sudo reboot
 
 Wait about 5 minutes and log back in.
 
-If the machine does not come back, use the out-of-band console. The kernel did
-not change, so follow the
-[kernel page's recovery steps](/host/upgrade-kernel#if-the-machine-does-not-come-back).
+If the machine does not come back, use the out-of-band console (IPMI, iDRAC,
+iLO, another BMC, or a monitor and keyboard). The kernel was held in step 4, so
+booting the previous kernel, the fix on the
+[kernel page](/host/upgrade-kernel#if-the-machine-does-not-come-back), does not
+apply here. Read the boot messages on the console to see which service fails.
 
 ## 8. Verify, start the daemon and relist
 
@@ -370,8 +379,7 @@ active
 active
 ```
 
-Both must say `active`. Otherwise see
-[Docker will not start](#docker-will-not-start).
+Both must say `active`.
 
 ### GPUs
 
@@ -384,9 +392,7 @@ NVIDIA GeForce RTX 4090, 595.98
 NVIDIA GeForce RTX 4090, 595.98
 ```
 
-One line per GPU, driver version as installed in step 6.
-`Driver/library version mismatch` after the reboot: see
-[Driver did not load](#driver-did-not-load-after-reboot).
+One line per GPU, driver version as installed in step 6. Do not start the daemon until this works.
 
 ### Docker configuration
 
@@ -411,13 +417,7 @@ cat /etc/docker/daemon.json
       "path": "/var/lib/vastai_kaalia/latest/kaalia_docker_shim",
       "runtimeArgs": []
     }
-  },
-  "features": {
-    "cdi": true
-  },
-  "cdi-spec-dirs": [
-    "/run/vast-cdi-atomic"
-  ]
+  }
 }
 ```
 
@@ -442,8 +442,6 @@ ubuntu:22.04
 ```
 
 The Vast test images and everything else from before the upgrade must be there.
-Only `ubuntu:22.04` or nothing: see the last row of the table in
-[Docker will not start](#docker-will-not-start).
 
 ### Start the Vast daemon
 
@@ -486,8 +484,11 @@ sudo systemctl status vastai --no-pager
 ```
 
 Run it again after a minute. `ago` must grow and `Main PID` must not change.
-Otherwise see [The Vast daemon is not running](#the-vast-daemon-is-not-running).
 The console shows Online within about 5 minutes.
+
+If `Loaded:` says `masked`, redo the start commands above. If the daemon keeps
+restarting or the console stays Offline after 5 minutes, follow the
+[Offline Machine](/host/machine-offline) page from its step 2.
 
 ### Self-test
 
@@ -568,125 +569,3 @@ container; daemon running; self-test passed; daemon holds back; kernel hold
 released; machine listed. A flag set before the upgrade can take a couple of hourly checks to
 clear.
 </Check>
-
-## If something breaks
-
-### Docker will not start
-
-```bash
-sudo journalctl -u docker -n 50 --no-pager
-```
-
-```text nocopy
-Sep 02 10:14:03 host dockerd[51234]: unable to configure the Docker daemon with file /etc/docker/daemon.json: invalid character '}' looking for beginning of object key string
-Sep 02 10:14:03 host systemd[1]: docker.service: Main process exited, code=exited, status=1/FAILURE
-```
-
-The last `dockerd[...]` line before `Main process exited` is the error:
-
-| Error contains | Fix |
-| --- | --- |
-| `unable to configure the Docker daemon with file /etc/docker/daemon.json` | Run `sudo dockerd --validate` to find the bad line. Fix it, then `sudo systemctl restart docker` |
-| `failed to start containerd` / `containerd.sock: connect: no such file` | Run `sudo journalctl -u containerd -n 30 --no-pager`. On a config version error: `sudo containerd config migrate | sudo tee /etc/containerd/config.toml`, then `sudo systemctl restart containerd`, then `sudo systemctl restart docker` |
-| `dpkg was interrupted` / `half-configured` | `sudo dpkg --configure -a`, then `sudo apt install -f`, then repeat step 5 |
-| `error initializing graphdriver` / `driver not supported`, or `docker images` is empty | Remove any `storage-driver` or `containerd-snapshotter` line from `daemon.json`, then `sudo systemctl restart docker` |
-
-If none apply, roll back to the `Installed` versions saved in step 2:
-
-```bash
-sudo apt install --allow-downgrades docker-ce=5:28.5.2-1~ubuntu.24.04~noble docker-ce-cli=5:28.5.2-1~ubuntu.24.04~noble docker-ce-rootless-extras=5:28.5.2-1~ubuntu.24.04~noble containerd.io=1.7.29-1~ubuntu.24.04~noble
-```
-
-```text nocopy
-The following packages will be DOWNGRADED:
-  containerd.io docker-ce docker-ce-cli docker-ce-rootless-extras
-0 upgraded, 0 newly installed, 4 downgraded, 0 to remove and 0 not upgraded.
-Do you want to continue? [Y/n] y
-```
-
-Docker restarts as part of this. Continue with step 6.
-
-<Warning>
-Only downgrade to the exact versions you came from. Do not delete
-`/var/lib/docker`: it holds every cached image.
-</Warning>
-
-### Other packages broke something
-
-Old versions are in the `apt list --upgradable` output from step 2 and in apt's
-log:
-
-```bash
-grep -A3 'Start-Date' /var/log/apt/history.log | tail -n 20
-```
-
-```text nocopy
-Start-Date: 2026-09-07  14:02:11
-Commandline: apt upgrade
-Upgrade: libvirt-daemon-system:amd64 (10.0.0-2ubuntu8.8, 10.0.0-2ubuntu8.9), ...
-End-Date: 2026-09-07  14:09:40
-```
-
-Each entry is `(old, new)`. Roll one package back with
-`sudo apt install --allow-downgrades <package>=<old_version>`, then repeat
-step 8.
-
-### Driver did not load after reboot
-
-**Prebuilt (`linux-modules-nvidia-*`).** The module package for the running
-kernel must be installed:
-
-```bash
-dpkg -l | grep "linux-modules-nvidia.*$(uname -r)"
-```
-
-```text nocopy
-ii  linux-modules-nvidia-595-open-7.0.0-31-generic  7.0.0-31.31~24.04.1  amd64  Linux kernel nvidia modules for version 7.0.0-31
-```
-
-Must start with `ii` (`rc` lines are old-kernel leftovers). If missing, install
-it with your driver branch in place of `595-open`, then reboot:
-
-```bash
-sudo apt install linux-modules-nvidia-595-open-$(uname -r)
-```
-
-**DKMS (`nvidia-dkms-*`).** Rebuild, then reboot:
-
-```bash
-sudo dkms autoinstall
-```
-
-```text nocopy
-Building module nvidia/595.98 for kernel 7.0.0-31-generic...
-Installing module nvidia/595.98 for kernel 7.0.0-31-generic
-```
-
-A compiler error means the driver does not support this kernel yet: roll the
-driver back (see [Other packages broke something](#other-packages-broke-something))
-and contact Vast.ai Support with the output.
-
-**Either type.** If the module is present but still does not load:
-
-```bash
-sudo dmesg | grep -i nvrm | tail -n 5
-```
-
-```text nocopy
-NVRM: API mismatch: the client has the version 595.98, but
-NVRM: this kernel module has the version 595.84.
-```
-
-`API mismatch`: run `sudo apt install --only-upgrade` on the
-`linux-modules-nvidia-*` meta package from step 6 and reboot. Any other `NVRM`
-error: contact Vast.ai Support with this output.
-
-### The Vast daemon is not running
-
-`sudo systemctl status vastai` must not say `Loaded: masked`; if it does, redo
-the start commands in step 8. Then give it 5 minutes. If `nvidia-smi` fails, fix the driver first
-(see [Driver did not load](#driver-did-not-load-after-reboot)); the daemon
-recovers on its own once the GPUs work.
-
-If `nvidia-smi` is healthy, follow the [Offline Machine](/host/machine-offline)
-page from its step 2.
