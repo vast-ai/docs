@@ -83,3 +83,29 @@ export function requireHostReviewOwnerQuestions(options) {
   if (!projection.available) throw new Error(`Owner-question registry unavailable: ${projection.error}`);
   return projection;
 }
+
+/** Accepted purpose overlay: original registry/statuses remain immutable. */
+export function reconcileHostReviewOwnerQuestions({projection, finalOwner, model}) {
+  if (!finalOwner) return projection;
+  const proposal = finalOwner.ownerReconciliation, claims = currentClaims(model);
+  if (!proposal || proposal.cards.length !== 8 || proposal.additional_residual_topics.length !== 3 || projection.questions.length !== 8) throw Error('Final owner-purpose scope differs');
+  const existing = new Map(projection.questions.map(q => [q.id,q]));
+  const related = ids => ids.map(id => {
+    const entry = claims.get(id);
+    if (!entry || entry.claim.status !== 'PASS') throw Error('Final owner purpose requires the accepted current passage: '+id);
+    return {id,route:entry.page.route,headings:[...entry.claim.headings],text:entry.claim.text,status:entry.claim.status,sourceLinks:entry.claim.source_refs.map(x=>x.path)};
+  });
+  const questions = proposal.cards.map(card => {
+    const old = existing.get(card.id);
+    if (!old || card.current_wording_requires_answer !== false) throw Error('Final owner-purpose identity differs');
+    return {...old,question:card.suggested_question,proposedTeams:card.suggested_teams,requiredDecisionOrSource:card.suggested_next_action,
+      relatedClaims:related(card.related_claim_ids),coverageGaps:[card.reason],originalQuestion:old,
+      presentationKind:card.suggested_presentation==='current_publication_conflict'?'current_publication_conflict':'future_detail',currentWordingRequiresAnswer:false,
+      sourceBasis:finalOwner.ownerBasis.filter(b=>b.id===card.id)};
+  });
+  for (const topic of proposal.additional_residual_topics) questions.push({id:topic.topic.key,status:'UNVALIDATED',question:topic.topic.title,
+    proposedTeams:topic.suggested_teams,requiredDecisionOrSource:topic.next_action,relatedClaims:related(topic.related_claim_ids),
+    coverageGaps:[topic.current_gap,topic.after_narrowing],presentationKind:'future_detail',currentWordingRequiresAnswer:false,additionalTopic:true,sourceBasis:[]});
+  if (new Set(questions.map(q=>q.id)).size!==11 || questions.filter(q=>q.presentationKind==='current_publication_conflict').length!==3) throw Error('Final owner-purpose counts differ');
+  return {...projection,questions,reconciliationRef:finalOwner.ownerReconciliationRef,reconciliationSha256:finalOwner.ownerReconciliationSha256};
+}

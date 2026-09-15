@@ -14,6 +14,7 @@ import { CLOSURE_PATH } from './current_host_closure_correction.mjs';
 import { SOURCE_FAMILY_PATH, SOURCE_FAMILY_ATTEMPT } from './current_host_source_family_review.mjs';
 import { SETUP_METRICS_PATH, SETUP_METRICS_ATTEMPT } from './current_host_setup_metrics_review.mjs';
 import { RECOVERY_EARNINGS_PATH, RECOVERY_EARNINGS_ATTEMPT } from './current_host_recovery_earnings_review.mjs';
+import { FINAL_OWNER_PATH, FINAL_OWNER_ATTEMPT } from './current_host_final_owner_review.mjs';
 import { HARDWARE_OPERATOR_PATH, HARDWARE_OPERATOR_ATTEMPT } from './current_host_hardware_operator_review.mjs';
 import { VERIFICATION_STORAGE_PATH, VERIFICATION_STORAGE_ATTEMPT } from './current_host_verification_storage_review.mjs';
 import { TEAMS_CONSOLE_PATH, TEAMS_CONSOLE_ATTEMPT } from './current_host_teams_console_review.mjs';
@@ -24,7 +25,7 @@ import { PAYOUT_INVOICE_PATH } from './current_host_payout_invoice_correction.mj
 import { loadCurrentHostReviewTransition } from './current_host_review_transition.mjs';
 import { hostReviewReaderCopy } from './host_review_reader_copy.mjs';
 import { buildHostReviewQueue, buildHostReviewIssues, describeHostReview } from './host_review_work_queue.mjs';
-import { OWNER_QUESTIONS_PATH, requireHostReviewOwnerQuestions } from './host_review_owner_questions.mjs';
+import { OWNER_QUESTIONS_PATH, reconcileHostReviewOwnerQuestions, requireHostReviewOwnerQuestions } from './host_review_owner_questions.mjs';
 import {encodeHostReviewPayload, decodeHostReviewPayload} from './host_review_payload.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -362,9 +363,10 @@ function readonlyCommandProofs(claims, add) {
 export function buildReport() {
   const bytes = read(inputPath);
   const model = JSON.parse(bytes);
-  const ownerQuestions = requireHostReviewOwnerQuestions({ read, model, modelSha256: sha(bytes) });
+  const originalOwnerQuestions = requireHostReviewOwnerQuestions({ read, model, modelSha256: sha(bytes) });
   const authorityScan = loadCurrentHostReviewTransition({ read, model });
-  const selectedResult = authorityScan?.hardwareOperator?.resultRef || authorityScan?.verificationStorage?.resultRef || authorityScan?.recoveryEarnings?.resultRef || authorityScan?.setupMetrics?.resultRef || authorityScan?.teamsConsole?.resultRef || authorityScan?.diagnosticsSsh?.resultRef || authorityScan?.continuation?.resultRef || authorityScan?.evidenceReuse?.resultRef || authorityScan?.sourceFamily?.resultRef || authorityScan?.closure?.resultRef || (authorityScan?.payoutInvoice ? payoutInvoiceResultPath : (authorityScan?.payoutTerms ? payoutTermsResultPath : (authorityScan?.payoutProvider ? payoutProviderResultPath : (authorityScan?.cleanup?.resultRef || (authorityScan?.jurisdiction ? `${JURISDICTION_ATTEMPT}/result.md` : authorityScan?.terms ? `${TERMS_ATTEMPT}/result.md` : authorityScan ? `${AUTHORITY_SCAN_ATTEMPT}/result.md` : currentResultPath)))));
+  const ownerQuestions = reconcileHostReviewOwnerQuestions({projection:originalOwnerQuestions, finalOwner:authorityScan?.finalOwner, model});
+  const selectedResult = authorityScan?.finalOwner?.resultRef || authorityScan?.hardwareOperator?.resultRef || authorityScan?.verificationStorage?.resultRef || authorityScan?.recoveryEarnings?.resultRef || authorityScan?.setupMetrics?.resultRef || authorityScan?.teamsConsole?.resultRef || authorityScan?.diagnosticsSsh?.resultRef || authorityScan?.continuation?.resultRef || authorityScan?.evidenceReuse?.resultRef || authorityScan?.sourceFamily?.resultRef || authorityScan?.closure?.resultRef || (authorityScan?.payoutInvoice ? payoutInvoiceResultPath : (authorityScan?.payoutTerms ? payoutTermsResultPath : (authorityScan?.payoutProvider ? payoutProviderResultPath : (authorityScan?.cleanup?.resultRef || (authorityScan?.jurisdiction ? `${JURISDICTION_ATTEMPT}/result.md` : authorityScan?.terms ? `${TERMS_ATTEMPT}/result.md` : authorityScan ? `${AUTHORITY_SCAN_ATTEMPT}/result.md` : currentResultPath)))));
   const claims = model.pages.flatMap(page => page.claims.map(claim => ({ ...claim, route: page.route, page_title: page.title })));
   const ids = new Set(claims.map(c => c.id));
   if (ids.size !== claims.length || claims.length !== model.counts.claims) throw new Error('Claim inventory mismatch');
@@ -612,6 +614,19 @@ export function buildReport() {
     for (const source of review.registry.sources) add(source.before_artifact.path, source.before_artifact.sha256);
     for (const artifact of review.registry.artifacts) add(artifact.path, artifact.sha256);
   }
+  if (authorityScan?.finalOwner) {
+    const review = authorityScan.finalOwner;
+    add(FINAL_OWNER_PATH, review.registrySha256);
+    add(`${FINAL_OWNER_ATTEMPT}/inventory.json`, authorityScan.artifactHashes.get(`${FINAL_OWNER_ATTEMPT}/inventory.json`));
+    add(review.registry.scope.path, review.registry.scope.sha256);
+    add(review.baseline, review.baselineSha256);
+    add(review.resultRef);
+    // The successor registry explicitly lists its approved, shareable records.
+    // Preserve earlier source-family/closure evidence above; never crawl raw
+    // captures or infer a new evidence scope from files present on disk.
+    for (const source of review.registry.sources) add(source.before_artifact.path, source.before_artifact.sha256);
+    for (const artifact of review.registry.artifacts) add(artifact.path, artifact.sha256);
+  }
   for (const ref of installationIntake.artifactRefs) add(ref);
   add(currentResultPath); add(currentAuthorityBaselinePath); add(claimCorrectionResultPath);
   for (const ref of currentAttemptArtifacts) add(ref);
@@ -649,9 +664,9 @@ export function buildReport() {
       setupMetricsTransitions: authorityScan?.setupMetrics?.registry.transitions || [],
       recoveryEarningsTransitions: authorityScan?.recoveryEarnings?.registry.transitions || [],
       verificationStorageTransitions: authorityScan?.verificationStorage?.registry.transitions || [],
-      hardwareOperatorTransitions: authorityScan?.hardwareOperator?.registry.transitions || []}), (_, value) => typeof value === 'string' ? sanitize(value) : value)),
+      hardwareOperatorTransitions: authorityScan?.hardwareOperator?.registry.transitions || [], finalOwnerTransitions: authorityScan?.finalOwner?.registry.transitions || []}), (_, value) => typeof value === 'string' ? sanitize(value) : value)),
     owner_questions: JSON.parse(JSON.stringify({ registry_ref: ownerQuestions.registryRef, registry_sha256: ownerQuestions.registrySha256,
-      questions: ownerQuestions.questions }, (_, value) => typeof value === 'string' ? sanitize(value) : value)),
+      questions: ownerQuestions.questions, original_questions: originalOwnerQuestions.questions, reconciliation_ref: ownerQuestions.reconciliationRef, reconciliation_sha256: ownerQuestions.reconciliationSha256 }, (_, value) => typeof value === 'string' ? sanitize(value) : value)),
     cleanup_transition: authorityScan?.cleanup ? {registry_ref: 'verification/current-host-review-cleanup.json', registry_sha256: authorityScan.cleanup.registrySha256,
       baseline_ref: authorityScan.cleanup.baseline, baseline_sha256: authorityScan.cleanup.baselineSha256,
       result_ref: authorityScan.cleanup.resultRef, context_refs: [...authorityScan.contextHashes.keys()],
@@ -708,6 +723,7 @@ export function buildReport() {
       reviewed_claims:106, adjacent_pass_consistency_records:1, newly_resolved:105, transition_records:authorityScan.hardwareOperator.registry.transitions.length,
       wording_corrections:36, adjacent_wording_corrections:1, uncounted_heading_changes:1, corrected_claim_literals:authorityScan.hardwareOperator.registry.transitions.filter(entry => entry.decision === 'correction').length,
       limit:authorityScan.hardwareOperator.registry.limits} : null,
+    final_owner_transition: authorityScan?.finalOwner ? {registry_ref:FINAL_OWNER_PATH, attempt_ref:FINAL_OWNER_ATTEMPT, registry_sha256:authorityScan.finalOwner.registrySha256, baseline_ref:authorityScan.finalOwner.baseline, baseline_sha256:authorityScan.finalOwner.baselineSha256, result_ref:authorityScan.finalOwner.resultRef, reviewed_claims:11, newly_resolved:11, wording_corrections:11, adjacent_wording_corrections:1, adjacent_pass_consistency_records:1, transition_records:12, limit:authorityScan.finalOwner.registry.limits} : null,
     verification_storage_transition: authorityScan?.verificationStorage ? {registry_ref:VERIFICATION_STORAGE_PATH, attempt_ref:VERIFICATION_STORAGE_ATTEMPT,
       registry_sha256:authorityScan.verificationStorage.registrySha256, baseline_ref:authorityScan.verificationStorage.baseline,
       baseline_sha256:authorityScan.verificationStorage.baselineSha256, result_ref:authorityScan.verificationStorage.resultRef,

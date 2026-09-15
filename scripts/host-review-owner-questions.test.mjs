@@ -53,7 +53,8 @@ test('owner questions are payload-only handoff context and source-only payout PA
   const {payload, html} = buildReport();
   assert.equal(payload.claims.length, 2008);
   assert.deepEqual(payload.counts.claim_statuses, model.counts.claim_statuses);
-  assert.equal(payload.owner_questions.questions.length, 8);
+  assert.equal(payload.owner_questions.questions.length, payload.final_owner_transition ? 11 : 8);
+  if(payload.final_owner_transition){assert.equal(payload.owner_questions.original_questions.length,8);assert.equal(payload.issues.counts.publicationConflicts,3);assert.equal(payload.issues.counts.futureDetailQuestions,8);}
   assert.equal(payload.work_queue.total, 2008);
   assert.match(html, /Owner questions that remain open/);
   assert.match(html, /Show all page corrections/);

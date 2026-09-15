@@ -91,8 +91,8 @@ export function buildHostReviewQueue(claims) {
  * Page grouping is deliberately transparent: it asserts no shared root cause.
  * UNVALIDATED alone never creates a finding or workflow follow-up.
  */
-export function buildHostReviewIssues({pages, ownerQuestions, originalFindings = [], sourceFamilyTransitions = [], evidenceReuseTransitions = [], continuationTransitions = [], diagnosticsSshTransitions = [], teamsConsoleTransitions = [], setupMetricsTransitions = [], recoveryEarningsTransitions = [], verificationStorageTransitions = [], hardwareOperatorTransitions = []}) {
-  if (!Array.isArray(pages) || !Array.isArray(ownerQuestions) || !Array.isArray(sourceFamilyTransitions) || !Array.isArray(evidenceReuseTransitions) || !Array.isArray(continuationTransitions) || !Array.isArray(diagnosticsSshTransitions) || !Array.isArray(teamsConsoleTransitions) || !Array.isArray(setupMetricsTransitions) || !Array.isArray(recoveryEarningsTransitions) || !Array.isArray(verificationStorageTransitions) || !Array.isArray(hardwareOperatorTransitions)) throw new Error('Issue view requires current pages, validated owner questions and explicit review transitions');
+export function buildHostReviewIssues({pages, ownerQuestions, originalFindings = [], sourceFamilyTransitions = [], evidenceReuseTransitions = [], continuationTransitions = [], diagnosticsSshTransitions = [], teamsConsoleTransitions = [], setupMetricsTransitions = [], recoveryEarningsTransitions = [], verificationStorageTransitions = [], hardwareOperatorTransitions = [], finalOwnerTransitions = []}) {
+  if (!Array.isArray(pages) || !Array.isArray(ownerQuestions) || !Array.isArray(sourceFamilyTransitions) || !Array.isArray(evidenceReuseTransitions) || !Array.isArray(continuationTransitions) || !Array.isArray(diagnosticsSshTransitions) || !Array.isArray(teamsConsoleTransitions) || !Array.isArray(setupMetricsTransitions) || !Array.isArray(recoveryEarningsTransitions) || !Array.isArray(verificationStorageTransitions) || !Array.isArray(hardwareOperatorTransitions) || !Array.isArray(finalOwnerTransitions)) throw new Error('Issue view requires current pages, validated owner questions and explicit review transitions');
   const claims = pages.flatMap(page => page.claims);
   const ids = new Set(claims.map(claim => claim.id));
   if (ids.size !== claims.length) throw new Error('Issue view requires distinct passage IDs');
@@ -101,7 +101,7 @@ export function buildHostReviewIssues({pages, ownerQuestions, originalFindings =
   // same occurrence supersedes its earlier follow-up, including a later PASS
   // or FAIL; it must not leave an obsolete UNVALIDATED card on the landing page.
   const latestTransitions = new Map();
-  for (const batch of [sourceFamilyTransitions, evidenceReuseTransitions, continuationTransitions, diagnosticsSshTransitions, teamsConsoleTransitions, setupMetricsTransitions, recoveryEarningsTransitions, verificationStorageTransitions, hardwareOperatorTransitions]) {
+  for (const batch of [sourceFamilyTransitions, evidenceReuseTransitions, continuationTransitions, diagnosticsSshTransitions, teamsConsoleTransitions, setupMetricsTransitions, recoveryEarningsTransitions, verificationStorageTransitions, hardwareOperatorTransitions, finalOwnerTransitions]) {
     const seen = new Set();
     for (const entry of batch) {
       if (!entry?.claim_id || seen.has(entry.claim_id)) throw new Error('Issue view requires distinct transition IDs within each review');
@@ -169,7 +169,7 @@ export function buildHostReviewIssues({pages, ownerQuestions, originalFindings =
   }
   return {corrections, questions, workflows, sourceFollowUps, sourceFollowUpTopics,
     counts: {correctionTopics: corrections.length, correctionPassages: corrections.reduce((sum,group) => sum + group.claimIds.length,0),
-      ownerQuestions: questions.length, workflowPageGroups: workflows.length,
+      ownerQuestions: questions.length, publicationConflicts: ownerQuestions.filter(q=>q.presentationKind==='current_publication_conflict').length, futureDetailQuestions: ownerQuestions.filter(q=>q.presentationKind==='future_detail').length, workflowPageGroups: workflows.length,
       recordedProcedures: workflows.reduce((sum,group) => sum + group.procedures.length,0),
       blockedPassages: workflows.reduce((sum,group) => sum + group.claimIds.length,0)},
     originalFindings: {total: originalFindings.length, addressed: originalFindings.filter(finding => finding.disposition === 'CORRECT_NOW').length},

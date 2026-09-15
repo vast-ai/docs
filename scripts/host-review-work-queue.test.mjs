@@ -137,7 +137,7 @@ test('export carries the shared queue without changing any claim status, lanes, 
     for(const artifact of registry.artifacts)assert.ok(payload.files[artifact.path],artifact.path);
   }
   if(payload.evidence_reuse_transition) {
-    assert.equal(payload.current_result_ref,(payload.hardware_operator_transition||payload.verification_storage_transition||payload.recovery_earnings_transition||payload.setup_metrics_transition||payload.teams_console_transition||payload.diagnostics_ssh_transition||payload.continuation_transition||payload.evidence_reuse_transition).result_ref);
+    assert.equal(payload.current_result_ref,(payload.final_owner_transition||payload.hardware_operator_transition||payload.verification_storage_transition||payload.recovery_earnings_transition||payload.setup_metrics_transition||payload.teams_console_transition||payload.diagnostics_ssh_transition||payload.continuation_transition||payload.evidence_reuse_transition).result_ref);
     for(const ref of [payload.evidence_reuse_transition.registry_ref,payload.evidence_reuse_transition.baseline_ref,
       payload.evidence_reuse_transition.result_ref,payload.source_family_transition.result_ref,payload.closure_transition.result_ref])assert.ok(payload.files[ref],ref);
     const registry=JSON.parse(payload.files[payload.evidence_reuse_transition.registry_ref].text);
@@ -171,15 +171,16 @@ test('issues view uses only recorded findings and prerequisites, preserving ever
   const bytes=fs.readFileSync(new URL('verification/current-host-docs-review.json',root));
   const owner=loadHostReviewOwnerQuestions({read:ref=>fs.readFileSync(new URL(ref,root)),model,modelSha256:createHash('sha256').update(bytes).digest('hex')});
   const before=JSON.stringify(model), projection=buildHostReviewIssues({pages:model.pages,ownerQuestions:owner.questions});
+  const finalReviewed=model.corrections.some(x=>x.id==='HOST-FINAL-OWNER-REVIEW-01');
   const hardwareReviewed=model.corrections.some(x=>x.id==='HOST-HARDWARE-OPERATOR-REVIEW-01');
   const sourceReviewed=model.corrections.some(x=>x.id==='HOST-VERIFICATION-STORAGE-REVIEW-01');
-  assert.deepEqual(projection.counts,{correctionTopics:hardwareReviewed?1:2,correctionPassages:hardwareReviewed?2:3,ownerQuestions:8,workflowPageGroups:hardwareReviewed?11:sourceReviewed?12:13,recordedProcedures:14,blockedPassages:hardwareReviewed?0:sourceReviewed?5:21});
+  assert.deepEqual(projection.counts,{correctionTopics:finalReviewed?0:hardwareReviewed?1:2,correctionPassages:finalReviewed?0:hardwareReviewed?2:3,ownerQuestions:8,publicationConflicts:0,futureDetailQuestions:0,workflowPageGroups:hardwareReviewed?11:sourceReviewed?12:13,recordedProcedures:14,blockedPassages:hardwareReviewed?0:sourceReviewed?5:21});
   assert.deepEqual(projection.corrections.flatMap(group=>group.claimIds).sort(),claims.filter(c=>c.status==='FAIL').map(c=>c.id).sort());
   assert.deepEqual(projection.workflows.flatMap(group=>group.claimIds).sort(),claims.filter(c=>c.status==='BLOCKED').map(c=>c.id).sort());
   const parents=projection.workflows.flatMap(group=>group.procedures);
   assert.equal(parents.filter(procedure=>procedure.status==='FAIL').length,1);
   assert.equal(parents.find(procedure=>procedure.id==='TS-ST-E01').recorded_nodes.filter(node=>node.status==='FAIL').length,4);
-  assert.ok(projection.corrections[0].ownerQuestionIds.includes('HQ-VAST-TAX-HANDLING'));
+  if(finalReviewed)assert.equal(projection.corrections.length,0);else assert.ok(projection.corrections[0].ownerQuestionIds.includes('HQ-VAST-TAX-HANDLING'));
   if(hardwareReviewed)assert.equal(projection.workflows.some(group=>group.unassignedClaimIds.length),false);
   else assert.ok(projection.workflows.some(group=>group.unassignedClaimIds.length));
   assert.equal(JSON.stringify(model),before);
@@ -218,12 +219,12 @@ async function runWholeTemplate(payload,hash='') {
   return {context,elements,listeners,windowListeners};
 }
 
-test('whole offline script initializes with eight owner questions, defaults to issues and keeps all ledger navigation and evidence controls', async () => {
+test('whole offline script initializes with preserved owner questions, defaults to issues and keeps all ledger navigation and evidence controls', async () => {
   const before=JSON.stringify(model),{payload}=buildReport();
   const {context,elements}=await runWholeTemplate(payload);
-  assert.equal(elements.get('issue-owner-count').textContent,8);
+  assert.equal(elements.get('issue-owner-count').textContent,payload.final_owner_transition?'3 + 8':8);
   assert.equal(elements.get('issue-workflow-count').textContent,payload.hardware_operator_transition?11:payload.verification_storage_transition?12:13);
-  assert.match(elements.get('priority-cards').innerHTML,/CUR-11f83626486ada1d/);
+  if(payload.final_owner_transition){assert.match(elements.get('priority-cards').innerHTML,/No current FAIL/);for(const id of ['HOST-AMD-LISTING-COMPATIBILITY','HOST-CPU-ARCHITECTURE-REQUIREMENTS','HOST-TEAM-EARNINGS-PAYOUT-POLICY'])assert.ok(elements.get('issue-owner-list').innerHTML.includes(id));}else assert.match(elements.get('priority-cards').innerHTML,/CUR-11f83626486ada1d/);
   assert.match(elements.get('issue-owner-list').innerHTML,/HQ-RENTAL-AVAILABILITY/);
   if(payload.hardware_operator_transition)assert.doesNotMatch(elements.get('issue-workflow-list').innerHTML,/page-based fallback/);
   else assert.match(elements.get('issue-workflow-list').innerHTML,/page-based fallback/);
@@ -237,7 +238,7 @@ test('whole offline script initializes with eight owner questions, defaults to i
   assert.equal(elements.get('coverage').hidden,true);
   assert.equal(elements.get('claims').hidden,true);
   assert.equal(elements.get('overview').hidden,false);
-  assert.equal(elements.get('coverage-unvalidated').textContent,model.counts.claim_statuses.UNVALIDATED.toLocaleString());
+  assert.equal(elements.get('coverage-unvalidated').textContent,(model.counts.claim_statuses.UNVALIDATED||0).toLocaleString());
   vm.runInContext("location.hash='#claims';handleReviewHash();",context);
   assert.equal(elements.get('claims').hidden,false);
   assert.equal(elements.get('overview').hidden,true);

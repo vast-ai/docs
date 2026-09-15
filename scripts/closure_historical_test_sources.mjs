@@ -1,5 +1,6 @@
 /** Test-only historical source view; production never imports this helper. */
 import crypto from 'node:crypto';
+import {projectHardwareOperatorReview} from './current_host_hardware_operator_review.mjs';
 import {projectVerificationStorageReview} from './current_host_verification_storage_review.mjs';
 import {projectRecoveryEarningsReview} from './current_host_recovery_earnings_review.mjs';
 import {projectSetupMetricsReview} from './current_host_setup_metrics_review.mjs';
@@ -10,7 +11,24 @@ import {projectEvidenceReuseReview} from './current_host_evidence_reuse_review.m
 import {projectSourceFamilyReview} from './current_host_source_family_review.mjs';
 import {projectClosureCorrection} from './current_host_closure_correction.mjs';
 
+export function beforeFinalOwner(read) {
+  const path='verification/current-host-final-owner-review.json';
+  let registry;
+  try { registry=JSON.parse(read(path)); }
+  catch (error) { if(error.code==='ENOENT') return read; throw error; }
+  const frozen=new Map(registry.sources.map(source=>[source.path,read(source.before_artifact.path)]));
+  const historicalRead=ref=>frozen.get(ref)||read(ref);
+  const modelBytes=Buffer.from(JSON.stringify(projectHardwareOperatorReview({read:historicalRead}).model,null,2)+'\n');
+  const inventory=JSON.parse(read('verification/evidence/2026-09-15-host-final-owner-reconciliation-attempt-01/inventory.json'));
+  if(crypto.createHash('sha256').update(modelBytes).digest('hex')!==inventory.baseline_model_sha256)
+    throw Error('Historical Hardware/operator serialization differs from frozen model bytes');
+  frozen.set('verification/current-host-docs-review.json',modelBytes);
+  const owner=JSON.parse(read('verification/current-host-owner-questions.json'));owner.model_sha256=inventory.baseline_model_sha256;frozen.set('verification/current-host-owner-questions.json',Buffer.from(JSON.stringify(owner,null,2)+'\n'));
+  return ref=>{if(ref===path){const error=Error('Historical view excludes successor');error.code='ENOENT';throw error;}return historicalRead(ref);};
+}
+
 export function beforeHardwareOperator(read) {
+  read=beforeFinalOwner(read);
   const path='verification/current-host-hardware-operator-review.json';
   let registry;
   try { registry=JSON.parse(read(path)); }
