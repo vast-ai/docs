@@ -971,6 +971,9 @@ def build() -> dict[str, Any]:
     The transition projection is an internal output-only snapshot: it must not
     change this established builder API or leak into the public JSON package.
     """
+    tax_retirement = tax_retirement_module()
+    if (REPO / tax_retirement.REGISTRY).exists():
+        return tax_retirement.project(REPO)
     final_owner = final_owner_module()
     if (REPO / final_owner.REGISTRY).exists():
         return final_owner.project(REPO)
@@ -1091,6 +1094,11 @@ def payout_terms_module() -> Any:
     spec.loader.exec_module(module)
     return module
 
+def tax_retirement_module() -> Any:
+    spec = importlib.util.spec_from_file_location('current_host_tax_guide_retirement', Path(__file__).with_name('current_host_tax_guide_retirement.py'))
+    module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module); return module
+
+
 def final_owner_module() -> Any:
     spec = importlib.util.spec_from_file_location('current_host_final_owner_review',
         Path(__file__).with_name('current_host_final_owner_review.py'))
@@ -1180,6 +1188,14 @@ def payout_invoice_module() -> Any:
 
 def classify_literal_source_first(source_file: str, text: str) -> tuple[str, list[str], bool]:
     """Exact reviewed current classifier shared with repository reconciliation."""
+    tax_retirement = tax_retirement_module()
+    if (REPO / tax_retirement.REGISTRY).exists():
+        model = tax_retirement.project(REPO)
+        matches = [claim for page in model['pages'] for claim in page['claims'] if claim['text'] == text and any(span['source_file'] == source_file for span in claim['spans'])]
+        if not matches: raise ValueError('tax_retirement classification has no exact reviewed occurrence')
+        values = {(claim['classification'], tuple(claim['required_evidence_types'])) for claim in matches}
+        if len(values) != 1: raise ValueError('same literal has differing tax_retirement classifications; select exact claim ID')
+        classification, lanes = next(iter(values)); return classification, list(lanes), 'AUTHORITATIVE_DOCUMENTATION_CITATION' in lanes
     final_owner = final_owner_module()
     if (REPO / final_owner.REGISTRY).exists():
         model = final_owner.project(REPO)
@@ -1332,6 +1348,10 @@ def classify_literal_source_first(source_file: str, text: str) -> tuple[str, lis
 
 
 def outputs() -> dict[Path, bytes]:
+    tax_retirement = tax_retirement_module()
+    if (REPO / tax_retirement.REGISTRY).exists():
+        package=tax_retirement.project(REPO); worklist_md,runtime_md,owner_md=worklist(package)
+        return {OUT:(json.dumps(package,indent=2,ensure_ascii=False)+'\n').encode(),WORKLIST:worklist_md.encode(),RUNTIME_REGISTER:runtime_md.encode(),OWNER_REGISTER:owner_md.encode()}
     final_owner = final_owner_module()
     if (REPO / final_owner.REGISTRY).exists():
         package=final_owner.project(REPO); worklist_md,runtime_md,owner_md=worklist(package)
@@ -1473,7 +1493,7 @@ def main() -> int:
     if args.check:
         if stale:
             raise SystemExit("stale current Host review output: " + ", ".join(stale))
-        print("PASS: current Host review package covers 44 primary routes and 33 support layers.")
+        print(f"PASS: current Host review package covers {json.loads(expected[OUT])['counts']['primary_pages']} primary routes and 33 support layers.")
         return 0
     for path, value in expected.items():
         path.parent.mkdir(parents=True, exist_ok=True)

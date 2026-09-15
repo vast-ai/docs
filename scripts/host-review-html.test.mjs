@@ -23,7 +23,7 @@ const app=html.match(/<script>([\s\S]*?)<\/script>/)[1];
 const model=JSON.parse(fs.readFileSync(new URL('../verification/current-host-docs-review.json',import.meta.url)));
 const inputClaims=model.pages.flatMap(p=>p.claims);
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
-const currentResultTransition=payload.final_owner_transition||payload.hardware_operator_transition||payload.verification_storage_transition||payload.recovery_earnings_transition||payload.setup_metrics_transition||payload.teams_console_transition||payload.diagnostics_ssh_transition||payload.continuation_transition||payload.evidence_reuse_transition||payload.source_family_transition||payload.closure_transition||payload.payout_invoice_transition||payload.payout_terms_transition||payload.payout_provider_transition||payload.cleanup_transition||payload.jurisdiction_transition||payload.terms_transition;
+const currentResultTransition=payload.tax_retirement_transition||payload.final_owner_transition||payload.hardware_operator_transition||payload.verification_storage_transition||payload.recovery_earnings_transition||payload.setup_metrics_transition||payload.teams_console_transition||payload.diagnostics_ssh_transition||payload.continuation_transition||payload.evidence_reuse_transition||payload.source_family_transition||payload.closure_transition||payload.payout_invoice_transition||payload.payout_terms_transition||payload.payout_provider_transition||payload.cleanup_transition||payload.jurisdiction_transition||payload.terms_transition;
 const jurisdictionIds=new Map([
  ['CUR-708c718cf735c8b2','Advice checked'],['CUR-555543e9b2ceddb4','Advice checked'],['CUR-2ead4eda972e84b0','Advice checked'],
  ['MCL-8fe2020c0e7efe26','Advice and rule checked'],
@@ -33,7 +33,7 @@ const jurisdictionIds=new Map([
 
 test('all current occurrences retain identity, status, source and bounded text',()=>{
  assert.equal(payload.claims.length,model.counts.claims);
- assert.equal(payload.pages.length,44);
+ assert.equal(payload.pages.length,model.counts.primary_pages);
  assert.equal(payload.support_layers.length,33);
  for(const [i,c] of payload.claims.entries()){
   const original=inputClaims[i];
@@ -474,7 +474,7 @@ test('all evidence and source passage references are embedded with digests',()=>
   for(const s of c.spans){const f=payload.files[s.source_file];assert.ok(f);assert.ok(s.start>=1&&s.end<=f.text.split('\n').length);}
  }
  for(const f of Object.values(payload.files)){
-  const raw=fs.readFileSync(new URL('../'+f.ref,import.meta.url));
+  const raw=fs.readFileSync(new URL('../'+(f.historical_source_ref||f.ref),import.meta.url));
   assert.equal(f.sha256,hash(raw));assert.equal(f.display_sha256,hash(f.text));
   assert.equal(f.masked,raw.toString('utf8')!==f.text);
   if(f.ref.startsWith('host/')||f.ref.startsWith('snippets/'))assert.equal(raw.toString('utf8').split('\n').length,f.text.split('\n').length,'source line numbers must survive masking');
@@ -694,11 +694,11 @@ test('the exact non-secret Bash prompt stays readable while credential values an
 test('final owner purposes and immutable historical Tax Guide keep current and earlier text separate',()=>{
  const escapeHTML=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('\"','&quot;').replaceAll("'",'&#39;');
  if(!payload.final_owner_transition)return;
- assert.equal(payload.owner_questions.original_questions.length,8);assert.equal(payload.owner_questions.questions.length,11);
- assert.equal(payload.issues.counts.publicationConflicts,3);assert.equal(payload.issues.counts.futureDetailQuestions,8);
+ assert.equal(payload.owner_questions.original_questions.length,payload.tax_retirement_transition?7:8);assert.equal(payload.owner_questions.questions.length,payload.tax_retirement_transition?10:11);
+ assert.equal(payload.issues.counts.publicationConflicts,3);assert.equal(payload.issues.counts.futureDetailQuestions,payload.tax_retirement_transition?7:8);
  assert.equal(payload.issues.counts.correctionPassages,0);assert.equal(payload.issues.counts.blockedPassages,0);
  assert.match(app,/At that checkpoint, four financial passages remained unresolved/);assert.match(app,/At that checkpoint, five financial passages remained open/);
- const ref=payload.final_owner_transition.attempt_ref+'/sources-before/host/guide-to-taxes.mdx',old=payload.files[ref],current=payload.files['host/guide-to-taxes.mdx'];
+ const ref=payload.final_owner_transition.attempt_ref+'/sources-before/host/guide-to-taxes.mdx',old=payload.files[ref],current=payload.files[payload.tax_retirement_transition ? 'verification/evidence/2026-09-15-host-tax-guide-retirement-attempt-01/sources-before/host/guide-to-taxes.mdx' : 'host/guide-to-taxes.mdx'];
  assert.equal(old.sha256,'0cef831564be2dfcbfd90291acfe00169da777f0af8bd5157ea0b4210ca1471a');assert.notEqual(current.sha256,old.sha256);
  assert.ok(old.text.includes('VAT'));assert.ok(current.text.includes('Ask Vast Billing or Support to confirm the VAT treatment'));
  let shown;const source=app.slice(app.indexOf('function showArtifact('),app.indexOf('const jurisdictionActive=',app.indexOf('function showArtifact(')));

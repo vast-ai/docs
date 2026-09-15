@@ -14,6 +14,7 @@ import { CLOSURE_PATH } from './current_host_closure_correction.mjs';
 import { SOURCE_FAMILY_PATH, SOURCE_FAMILY_ATTEMPT } from './current_host_source_family_review.mjs';
 import { SETUP_METRICS_PATH, SETUP_METRICS_ATTEMPT } from './current_host_setup_metrics_review.mjs';
 import { RECOVERY_EARNINGS_PATH, RECOVERY_EARNINGS_ATTEMPT } from './current_host_recovery_earnings_review.mjs';
+import { TAX_RETIREMENT_PATH, TAX_RETIREMENT_ATTEMPT } from './current_host_tax_guide_retirement.mjs';
 import { FINAL_OWNER_PATH, FINAL_OWNER_ATTEMPT } from './current_host_final_owner_review.mjs';
 import { HARDWARE_OPERATOR_PATH, HARDWARE_OPERATOR_ATTEMPT } from './current_host_hardware_operator_review.mjs';
 import { VERIFICATION_STORAGE_PATH, VERIFICATION_STORAGE_ATTEMPT } from './current_host_verification_storage_review.mjs';
@@ -83,7 +84,7 @@ const earlierBaselineSummaryPath = 'verification/evidence/2026-09-07-host-curren
 const priorityPath = 'verification/HOST-DOCS-CLAIMS-TO-RESOLVE.md';
 const sha = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 const read = (ref) => {
-  if ((!/^(verification|host|snippets|cli|sdk|python)\//.test(ref) && ref !== 'guides/reference/faq/rental-types.mdx') || ref.split('/').includes('..')) throw new Error(`Unsafe export path: ${ref}`);
+  if ((!/^(verification|host|snippets|cli|sdk|python)\//.test(ref) && !['docs.json', 'guides/reference/faq/rental-types.mdx'].includes(ref)) || ref.split('/').includes('..')) throw new Error(`Unsafe export path: ${ref}`);
   const resolved = fs.realpathSync(path.join(root, ref));
   if (!resolved.startsWith(root + path.sep)) throw new Error('Export symlink escapes repository');
   return fs.readFileSync(resolved);
@@ -365,8 +366,8 @@ export function buildReport() {
   const model = JSON.parse(bytes);
   const originalOwnerQuestions = requireHostReviewOwnerQuestions({ read, model, modelSha256: sha(bytes) });
   const authorityScan = loadCurrentHostReviewTransition({ read, model });
-  const ownerQuestions = reconcileHostReviewOwnerQuestions({projection:originalOwnerQuestions, finalOwner:authorityScan?.finalOwner, model});
-  const selectedResult = authorityScan?.finalOwner?.resultRef || authorityScan?.hardwareOperator?.resultRef || authorityScan?.verificationStorage?.resultRef || authorityScan?.recoveryEarnings?.resultRef || authorityScan?.setupMetrics?.resultRef || authorityScan?.teamsConsole?.resultRef || authorityScan?.diagnosticsSsh?.resultRef || authorityScan?.continuation?.resultRef || authorityScan?.evidenceReuse?.resultRef || authorityScan?.sourceFamily?.resultRef || authorityScan?.closure?.resultRef || (authorityScan?.payoutInvoice ? payoutInvoiceResultPath : (authorityScan?.payoutTerms ? payoutTermsResultPath : (authorityScan?.payoutProvider ? payoutProviderResultPath : (authorityScan?.cleanup?.resultRef || (authorityScan?.jurisdiction ? `${JURISDICTION_ATTEMPT}/result.md` : authorityScan?.terms ? `${TERMS_ATTEMPT}/result.md` : authorityScan ? `${AUTHORITY_SCAN_ATTEMPT}/result.md` : currentResultPath)))));
+  const ownerQuestions = reconcileHostReviewOwnerQuestions({projection:originalOwnerQuestions, finalOwner:authorityScan?.finalOwner, model, taxRetirement:authorityScan?.taxRetirement});
+  const selectedResult = authorityScan?.taxRetirement?.resultRef || authorityScan?.finalOwner?.resultRef || authorityScan?.hardwareOperator?.resultRef || authorityScan?.verificationStorage?.resultRef || authorityScan?.recoveryEarnings?.resultRef || authorityScan?.setupMetrics?.resultRef || authorityScan?.teamsConsole?.resultRef || authorityScan?.diagnosticsSsh?.resultRef || authorityScan?.continuation?.resultRef || authorityScan?.evidenceReuse?.resultRef || authorityScan?.sourceFamily?.resultRef || authorityScan?.closure?.resultRef || (authorityScan?.payoutInvoice ? payoutInvoiceResultPath : (authorityScan?.payoutTerms ? payoutTermsResultPath : (authorityScan?.payoutProvider ? payoutProviderResultPath : (authorityScan?.cleanup?.resultRef || (authorityScan?.jurisdiction ? `${JURISDICTION_ATTEMPT}/result.md` : authorityScan?.terms ? `${TERMS_ATTEMPT}/result.md` : authorityScan ? `${AUTHORITY_SCAN_ATTEMPT}/result.md` : currentResultPath)))));
   const claims = model.pages.flatMap(page => page.claims.map(claim => ({ ...claim, route: page.route, page_title: page.title })));
   const ids = new Set(claims.map(c => c.id));
   if (ids.size !== claims.length || claims.length !== model.counts.claims) throw new Error('Claim inventory mismatch');
@@ -375,11 +376,14 @@ export function buildReport() {
   const files = new Map();
   const add = (ref, expected) => {
     if (files.has(ref)) return;
-    const raw = read(ref);
+    const retiredSource = authorityScan?.taxRetirement?.registry.sources.find(source => source.removed && source.path === ref);
+    const historicalCandidates = retiredSource ? Object.values(authorityScan).flatMap(review => (review?.registry?.sources || []).filter(source => source.path === ref).map(source => source.before_artifact)) : [];
+    const historical = retiredSource ? historicalCandidates.find(source => source.sha256 === expected) || retiredSource.before_artifact : null;
+    const raw = read(historical ? historical.path : ref);
     if (raw.includes(0)) throw new Error(`Binary evidence excluded: ${ref}`);
     if (expected && sha(raw) !== expected) throw new Error(`Source no longer matches snapshot: ${ref}`);
     const text = raw.toString('utf8'), display = sanitizeArtifact(ref, text);
-    files.set(ref, { ref, sha256: sha(raw), display_sha256: sha(display), masked: text !== display, text: display });
+    files.set(ref, { ref, ...(historical ? {historical_source_ref:historical.path} : {}), sha256: sha(raw), display_sha256: sha(display), masked: text !== display, text: display });
   };
   for (const p of model.pages) {
     add(p.source_file, p.source_sha256);
@@ -627,6 +631,13 @@ export function buildReport() {
     for (const source of review.registry.sources) add(source.before_artifact.path, source.before_artifact.sha256);
     for (const artifact of review.registry.artifacts) add(artifact.path, artifact.sha256);
   }
+  if (authorityScan?.taxRetirement) {
+    const review = authorityScan.taxRetirement;
+    add(TAX_RETIREMENT_PATH, review.registrySha256);
+    for (const source of review.registry.sources) add(source.before_artifact.path, source.before_artifact.sha256);
+    for (const artifact of [review.registry.archive, review.registry.before_owners, review.registry.instruction]) add(artifact.path, artifact.sha256);
+    add(review.resultRef);
+  }
   for (const ref of installationIntake.artifactRefs) add(ref);
   add(currentResultPath); add(currentAuthorityBaselinePath); add(claimCorrectionResultPath);
   for (const ref of currentAttemptArtifacts) add(ref);
@@ -723,6 +734,7 @@ export function buildReport() {
       reviewed_claims:106, adjacent_pass_consistency_records:1, newly_resolved:105, transition_records:authorityScan.hardwareOperator.registry.transitions.length,
       wording_corrections:36, adjacent_wording_corrections:1, uncounted_heading_changes:1, corrected_claim_literals:authorityScan.hardwareOperator.registry.transitions.filter(entry => entry.decision === 'correction').length,
       limit:authorityScan.hardwareOperator.registry.limits} : null,
+    tax_retirement_transition: authorityScan?.taxRetirement ? {registry_ref:TAX_RETIREMENT_PATH, registry_sha256:authorityScan.taxRetirement.registrySha256, result_ref:authorityScan.taxRetirement.resultRef, archive_ref:authorityScan.taxRetirement.registry.archive.path, retired_claim_ids:authorityScan.taxRetirement.registry.retired_claim_ids, retired_owner_ids:authorityScan.taxRetirement.registry.retired_owner_ids, retired_route:authorityScan.taxRetirement.registry.retired_route, retired_passages:16, retired_procedures:2, retired_nodes:14, new_validation_credit:0, instruction_url:authorityScan.taxRetirement.instruction.url, limit:authorityScan.taxRetirement.registry.limits} : null,
     final_owner_transition: authorityScan?.finalOwner ? {registry_ref:FINAL_OWNER_PATH, attempt_ref:FINAL_OWNER_ATTEMPT, registry_sha256:authorityScan.finalOwner.registrySha256, baseline_ref:authorityScan.finalOwner.baseline, baseline_sha256:authorityScan.finalOwner.baselineSha256, result_ref:authorityScan.finalOwner.resultRef, reviewed_claims:11, newly_resolved:11, wording_corrections:11, adjacent_wording_corrections:1, adjacent_pass_consistency_records:1, transition_records:12, limit:authorityScan.finalOwner.registry.limits} : null,
     verification_storage_transition: authorityScan?.verificationStorage ? {registry_ref:VERIFICATION_STORAGE_PATH, attempt_ref:VERIFICATION_STORAGE_ATTEMPT,
       registry_sha256:authorityScan.verificationStorage.registrySha256, baseline_ref:authorityScan.verificationStorage.baseline,

@@ -85,17 +85,19 @@ export function requireHostReviewOwnerQuestions(options) {
 }
 
 /** Accepted purpose overlay: original registry/statuses remain immutable. */
-export function reconcileHostReviewOwnerQuestions({projection, finalOwner, model}) {
+export function reconcileHostReviewOwnerQuestions({projection, finalOwner, model, taxRetirement}) {
   if (!finalOwner) return projection;
   const proposal = finalOwner.ownerReconciliation, claims = currentClaims(model);
-  if (!proposal || proposal.cards.length !== 8 || proposal.additional_residual_topics.length !== 3 || projection.questions.length !== 8) throw Error('Final owner-purpose scope differs');
+  if (!proposal || proposal.cards.length !== 8 || proposal.additional_residual_topics.length !== 3 || projection.questions.length !== 8 - (taxRetirement ? 1 : 0)) throw Error('Final owner-purpose scope differs');
   const existing = new Map(projection.questions.map(q => [q.id,q]));
   const related = ids => ids.map(id => {
     const entry = claims.get(id);
     if (!entry || entry.claim.status !== 'PASS') throw Error('Final owner purpose requires the accepted current passage: '+id);
     return {id,route:entry.page.route,headings:[...entry.claim.headings],text:entry.claim.text,status:entry.claim.status,sourceLinks:entry.claim.source_refs.map(x=>x.path)};
   });
-  const questions = proposal.cards.map(card => {
+  const retired = new Set(taxRetirement?.registry.retired_owner_ids || []);
+  if (taxRetirement && (retired.size !== 1 || !retired.has('HQ-VAST-TAX-HANDLING'))) throw Error('Unexpected retired owner scope');
+  const questions = proposal.cards.filter(card => !retired.has(card.id)).map(card => {
     const old = existing.get(card.id);
     if (!old || card.current_wording_requires_answer !== false) throw Error('Final owner-purpose identity differs');
     return {...old,question:card.suggested_question,proposedTeams:card.suggested_teams,requiredDecisionOrSource:card.suggested_next_action,
@@ -106,6 +108,6 @@ export function reconcileHostReviewOwnerQuestions({projection, finalOwner, model
   for (const topic of proposal.additional_residual_topics) questions.push({id:topic.topic.key,status:'UNVALIDATED',question:topic.topic.title,
     proposedTeams:topic.suggested_teams,requiredDecisionOrSource:topic.next_action,relatedClaims:related(topic.related_claim_ids),
     coverageGaps:[topic.current_gap,topic.after_narrowing],presentationKind:'future_detail',currentWordingRequiresAnswer:false,additionalTopic:true,sourceBasis:[]});
-  if (new Set(questions.map(q=>q.id)).size!==11 || questions.filter(q=>q.presentationKind==='current_publication_conflict').length!==3) throw Error('Final owner-purpose counts differ');
+  if (new Set(questions.map(q=>q.id)).size!==11-retired.size || questions.filter(q=>q.presentationKind==='current_publication_conflict').length!==3) throw Error('Final owner-purpose counts differ');
   return {...projection,questions,reconciliationRef:finalOwner.ownerReconciliationRef,reconciliationSha256:finalOwner.ownerReconciliationSha256};
 }

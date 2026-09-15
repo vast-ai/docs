@@ -191,7 +191,7 @@ const PAGE_REVIEW_CONTEXTS = [
     ],
   },
   {
-    paths: ['/host/pricing-your-listing', '/host/market-metrics', '/host/optimization-guide', '/host/earning', '/host/payment', '/host/datacenter-status', '/host/guide-to-taxes'],
+    paths: ['/host/pricing-your-listing', '/host/market-metrics', '/host/optimization-guide', '/host/earning', '/host/payment', '/host/datacenter-status'],
     epics: ['CON-1187'], issues: ['CON-1256'],
     blockers: [
       { issue: 'CON-1256', owner: 'Solutions Engineering / Business', question: 'Review pricing, sales-process, datacenter, Secure Cloud, payment, and tax positioning.' },
@@ -2362,7 +2362,7 @@ function currentReviewClaim(value, page, sourceCache, message) {
         path: currentReviewText(item.path, message), locator: currentReviewText(item.locator, message), sourceKind: vvIdentifier(item.source_kind) };
     });
     return { id, text: currentReviewText(value.text, message), headings, spans, status, requiredEvidenceTypes: value.required_evidence_types,
-      ownerRole: currentReviewText(value.owner_role, message), rationale: currentReviewText(value.rationale, message), nextAction: currentReviewText(value.next_action, message),
+      ownerRole: currentReviewText(value.owner_role, message), rationale: currentReviewText(value.rationale, message), nextAction: value.next_action === null ? null : currentReviewText(value.next_action, message),
       evidenceRefs: currentReviewRefs(value.evidence_refs, message, id), sourceRefs,
       history: { baselineClaimId: value.history.baseline_claim_id, baselineSourceTextSha256: value.history.baseline_source_text_sha256,
         carryDecision: value.history.carry_decision, reason: currentReviewText(value.history.reason, message) },
@@ -2493,6 +2493,9 @@ function currentReviewClaim(value, page, sourceCache, message) {
     sourceTransition: sourceTransition?.oldClaim ? { oldFailClaim: sourceTransition.oldClaim, replacement: sourceTransition.replacement } : null };
 }
 function currentReviewProcedure(value, page, sourceCache, message) {
+  const projectedProcedure = CURRENT_AUTHORITY_SCAN?.model?.pages.find(row => row.route === page.route)?.procedures.find(row => row.id === value.id);
+  const boundCurrentProcedure = Boolean(projectedProcedure && JSON.stringify(projectedProcedure) === JSON.stringify(value));
+  if (CURRENT_AUTHORITY_SCAN && !boundCurrentProcedure) throw new Error(message);
   vvExactKeys(value, ['id', 'title', 'coverage_state', 'status', 'headings', 'spans', 'limits', 'history', 'nodes'], message);
   const coverageState = currentReviewCoverage(value.coverage_state, message);
   if (!CURRENT_AUTHORITY_SCAN && coverageState !== page.coverageState) throw new Error(message);
@@ -2506,7 +2509,7 @@ function currentReviewProcedure(value, page, sourceCache, message) {
     return [file, vvSourceIndex(source)];
   }));
   const headings = currentReviewHeadings(value.headings, sourceIndexes, spans, message, { allowIntroduction: true, allowOutsideHeadings: true });
-  vvExactKeys(value.history, ['baseline_test_set_id', 'carry_decision', 'reason'], message);
+  vvExactKeys(value.history, boundCurrentProcedure ? Object.keys(projectedProcedure.history) : ['baseline_test_set_id', 'carry_decision', 'reason'], message);
   if ((!CURRENT_HOST_REVIEW_CARRY.has(value.history.carry_decision) && !(CURRENT_AUTHORITY_SCAN && CURRENT_REVIEW_RELOCATIONS.has(value.history.carry_decision))) ||
     [TWO_DEFECT_REPLACEMENT_DECISION, TWO_DEFECT_LITERAL_DECISION].includes(value.history.carry_decision) ||
     (!CURRENT_AUTHORITY_SCAN && (coverageState === 'NEW') !== (value.history.baseline_test_set_id === null))) throw new Error(message);
@@ -2520,7 +2523,7 @@ function currentReviewProcedure(value, page, sourceCache, message) {
     const nodeSpans = currentReviewExactArray(node.spans, message).map((span) => currentReviewSpan(span, allowedFiles, sourceCache, message));
     if (!nodeSpans.length && !(nodeCoverage === 'CHANGED' && node.status === 'STALE' && node.history && (node.history.baseline_target ||
       (CURRENT_AUTHORITY_SCAN && CURRENT_REVIEW_RELOCATIONS.has(node.history.carry_decision))))) throw new Error(message);
-    vvExactKeys(node.history, ['baseline_level', 'baseline_target', 'baseline_status', 'carry_decision'], message);
+    vvExactKeys(node.history, boundCurrentProcedure ? Object.keys(node.history) : ['baseline_level', 'baseline_target', 'baseline_status', 'carry_decision'], message);
     if ((!CURRENT_HOST_REVIEW_CARRY.has(node.history.carry_decision) && !(CURRENT_AUTHORITY_SCAN && CURRENT_REVIEW_RELOCATIONS.has(node.history.carry_decision))) ||
       [TWO_DEFECT_REPLACEMENT_DECISION, TWO_DEFECT_LITERAL_DECISION].includes(node.history.carry_decision)) throw new Error(message);
     const nodeSourceFile = currentReviewPath(node.source_file, message);
@@ -2575,13 +2578,14 @@ function loadCurrentHostDocsReview() {
     const packageBytes = vvRepositoryFile(CURRENT_HOST_REVIEW_FILE, 'invalid current Host review package').bytes;
     if (!packageBytes.length || packageBytes.length > VV_MAX_HISTORICAL_SOURCE_BYTES || packageBytes.includes(0)) throw new Error('invalid current Host review package');
     const data = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(packageBytes));
-    CURRENT_AUTHORITY_SCAN = loadCurrentHostReviewTransition({ read: ref => vvRepositoryFile(ref, 'invalid authority scan input').bytes, model: data });
+    CURRENT_AUTHORITY_SCAN = loadCurrentHostReviewTransition({ read: ref => vvRepositoryFile(ref, 'invalid authority scan input').bytes, exists: ref => fs.existsSync(path.join(VV_REPOSITORY_ROOT, vvSafeRepositoryPath(ref, 'invalid authority scan path'))), model: data });
     if (CURRENT_AUTHORITY_SCAN) validateAuthorityScanPredecessors(CURRENT_AUTHORITY_SCAN);
+    const expectedPrimaryRoutes = CURRENT_AUTHORITY_SCAN?.taxRetirement ? 43 : 44;
     vvExactKeys(data, ['schema_version', 'record_type', 'generated_at', 'source', 'history', 'pages', 'support_layers', 'counts', 'corrections'], 'invalid current Host review package');
     if (data.schema_version !== '1.0' || data.record_type !== 'HOST_DOCS_CURRENT_REVIEW' || !/^\d{4}-\d\d-\d\dT/.test(data.generated_at)) throw new Error('invalid current Host review package');
     vvExactKeys(data.source, ['repository', 'revision', 'tree', 'primary_route_count', 'cli_support_layer_count', 'sdk_support_layer_count', 'source_manifest'], 'invalid current Host review source');
     if (data.source.repository !== 'vast-ai/docs' || data.source.revision !== CURRENT_HOST_REVIEW_REVISION ||
-      !/^[a-f0-9]{40}$/.test(data.source.tree) || data.source.primary_route_count !== 44 ||
+      !/^[a-f0-9]{40}$/.test(data.source.tree) || data.source.primary_route_count !== expectedPrimaryRoutes ||
       data.source.cli_support_layer_count !== 18 || data.source.sdk_support_layer_count !== 15) throw new Error('invalid current Host review source');
     const expectedTree = execFileSync('git', ['-C', VV_REPOSITORY_ROOT, 'rev-parse', `${CURRENT_HOST_REVIEW_REVISION}^{tree}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     if (data.source.tree !== expectedTree) throw new Error('stale current Host review source tree');
@@ -2650,11 +2654,11 @@ function loadCurrentHostDocsReview() {
       return page;
     });
     const pageRoutes = new Set(pages.map((page) => page.route));
-    if (pages.length !== 44 || pageRoutes.size !== pages.length || manifest.filter((item) => item.kind === 'PRIMARY').length !== 44 ||
+    if (pages.length !== expectedPrimaryRoutes || pageRoutes.size !== pages.length || manifest.filter((item) => item.kind === 'PRIMARY').length !== expectedPrimaryRoutes ||
       pages.some((page) => !manifest.some((item) => item.kind === 'PRIMARY' && item.route === page.route && item.file === page.sourceFile && item.sha256 === page.sourceSha256)) ||
       pages.some((page) => page.dependencies.some((dependency) => !manifest.some((item) => item.kind === 'RENDERED_DEPENDENCY' && item.route === page.route && item.file === dependency.sourceFile && item.sha256 === dependency.sourceSha256)))) throw new Error('invalid current Host review page inventory');
     const navigation = currentHostNavigationInventory();
-    if (navigation.length !== 44 || navigation.some((item) => !pageRoutes.has(item.route))) throw new Error('stale current Host review navigation');
+    if (navigation.length !== expectedPrimaryRoutes || navigation.some((item) => !pageRoutes.has(item.route))) throw new Error('stale current Host review navigation');
     const supportLayers = currentReviewExactArray(data.support_layers, 'invalid current Host review support').map((row) => {
       vvExactKeys(row, ['support_id', 'layer', 'route', 'source_file', 'source_sha256', 'fragment_file', 'fragment_sha256', 'central_reference_file', 'central_reference_route', 'central_reference_sha256', 'classification', 'workflow', 'status', 'coverage_state', 'evidence_refs', 'claim_limit'], 'invalid current Host review support');
       if (!['CLI', 'SDK'].includes(row.layer) || row.classification !== 'CENTRAL_REFERENCE_SUPPORT_LAYER' || row.workflow !== false || !['UNCHANGED_EXACT', 'CHANGED'].includes(row.coverage_state)) throw new Error('invalid current Host review support');

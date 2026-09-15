@@ -28,7 +28,7 @@ def without_nodes(node): return {k:v for k,v in node.items() if k!='nodes'}
 def project(root: Path, frozen_source_overrides=None):
     root=root.resolve();pre=prior_module();utils=pre.prior_module()
     frozen_source_overrides = frozen_source_overrides or {}
-    def read(ref): return frozen_source_overrides.get(ref, utils.safe(root,ref).read_bytes())
+    def read(ref): return frozen_source_overrides[ref] if ref in frozen_source_overrides else utils.safe(root,ref).read_bytes()
     def pin(ref,wanted):
         raw=read(ref);req(sha(raw)==wanted,'digest drift '+ref);return raw
     registry=json.loads(pin(REGISTRY,REGISTRY_SHA256))

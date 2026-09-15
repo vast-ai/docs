@@ -137,7 +137,7 @@ test('export carries the shared queue without changing any claim status, lanes, 
     for(const artifact of registry.artifacts)assert.ok(payload.files[artifact.path],artifact.path);
   }
   if(payload.evidence_reuse_transition) {
-    assert.equal(payload.current_result_ref,(payload.final_owner_transition||payload.hardware_operator_transition||payload.verification_storage_transition||payload.recovery_earnings_transition||payload.setup_metrics_transition||payload.teams_console_transition||payload.diagnostics_ssh_transition||payload.continuation_transition||payload.evidence_reuse_transition).result_ref);
+    assert.equal(payload.current_result_ref,(payload.tax_retirement_transition||payload.final_owner_transition||payload.hardware_operator_transition||payload.verification_storage_transition||payload.recovery_earnings_transition||payload.setup_metrics_transition||payload.teams_console_transition||payload.diagnostics_ssh_transition||payload.continuation_transition||payload.evidence_reuse_transition).result_ref);
     for(const ref of [payload.evidence_reuse_transition.registry_ref,payload.evidence_reuse_transition.baseline_ref,
       payload.evidence_reuse_transition.result_ref,payload.source_family_transition.result_ref,payload.closure_transition.result_ref])assert.ok(payload.files[ref],ref);
     const registry=JSON.parse(payload.files[payload.evidence_reuse_transition.registry_ref].text);
@@ -198,7 +198,7 @@ async function runWholeTemplate(payload,hash='') {
   const elements=new Map();
   for(const match of template.matchAll(/<([a-z][\w-]*)\b([^>]*\bid="([^"]+)"[^>]*)>/gi)) {
     if(match[3].includes('${'))continue;
-    elements.set(match[3],{id:match[3],tagName:match[1].toUpperCase(),attributes:match[2],hidden:/\bhidden\b/.test(match[2]),textContent:'',innerHTML:'',value:'',style:{},options:[],listeners:{},
+    elements.set(match[3],{id:match[3],tagName:match[1].toUpperCase(),attributes:match[2],hidden:/\bhidden\b/.test(match[2]),textContent:'',innerHTML:'',value:'',style:{},dataset:{},options:match[3]==='page'?[{text:'All',value:''}]:[],listeners:{},
       add(option){this.options.push(option);},addEventListener(name,callback){this.listeners[name]=callback;},scrollIntoView(){this.scrolled=true;},showModal(){this.open=true;},close(){this.open=false;},
       querySelector(){return null;},get selectedOptions(){return [{text:this.options.find(option=>option.value===this.value)?.text||this.value||'All'}];}});
   }
@@ -222,7 +222,7 @@ async function runWholeTemplate(payload,hash='') {
 test('whole offline script initializes with preserved owner questions, defaults to issues and keeps all ledger navigation and evidence controls', async () => {
   const before=JSON.stringify(model),{payload}=buildReport();
   const {context,elements}=await runWholeTemplate(payload);
-  assert.equal(elements.get('issue-owner-count').textContent,payload.final_owner_transition?'3 + 8':8);
+  assert.equal(elements.get('issue-owner-count').textContent,payload.tax_retirement_transition?'3 + 7':payload.final_owner_transition?'3 + 8':8);
   assert.equal(elements.get('issue-workflow-count').textContent,payload.hardware_operator_transition?11:payload.verification_storage_transition?12:13);
   if(payload.final_owner_transition){assert.match(elements.get('priority-cards').innerHTML,/No current FAIL/);for(const id of ['HOST-AMD-LISTING-COMPATIBILITY','HOST-CPU-ARCHITECTURE-REQUIREMENTS','HOST-TEAM-EARNINGS-PAYOUT-POLICY'])assert.ok(elements.get('issue-owner-list').innerHTML.includes(id));}else assert.match(elements.get('priority-cards').innerHTML,/CUR-11f83626486ada1d/);
   assert.match(elements.get('issue-owner-list').innerHTML,/HQ-RENTAL-AVAILABILITY/);
@@ -242,9 +242,10 @@ test('whole offline script initializes with preserved owner questions, defaults 
   vm.runInContext("location.hash='#claims';handleReviewHash();",context);
   assert.equal(elements.get('claims').hidden,false);
   assert.equal(elements.get('overview').hidden,true);
-  vm.runInContext("location.hash='#claim-CUR-11f83626486ada1d';handleReviewHash();",context);
+  vm.runInContext("location.hash='#claim-MCL-335de916e219e04a';handleReviewHash();",context);
   assert.match(elements.get('results-count').textContent,/1 matching passages/);
-  assert.match(elements.get('claim-list').innerHTML,/data-passage="CUR-11f83626486ada1d"/);
+  assert.match(elements.get('claim-list').innerHTML,/data-passage="MCL-335de916e219e04a"/);
+  if(payload.tax_retirement_transition){vm.runInContext("location.hash='#claim-CUR-11f83626486ada1d';handleReviewHash();",context);assert.match(elements.get('viewer-body').innerHTML,/RETIRED_HOST_TAX_GUIDE/);assert.ok(!elements.get('issue-owner-list').innerHTML.includes('HQ-VAST-TAX-HANDLING'));}
   vm.runInContext("location.hash='#overview';handleReviewHash();",context);
   assert.equal(elements.get('claims').hidden,true);
   vm.runInContext("goToClaims();showWorkflow('workflow:/host/how-to-self-test');",context);
@@ -260,7 +261,7 @@ test('whole offline script initializes with preserved owner questions, defaults 
     assert.ok(payload.files['verification/evidence/2026-09-09-host-ssh-jupyter-selftest-attempt-01/selftest-normal-preflight-01.json']);
   }else assert.match(elements.get('viewer-body').innerHTML,/preflight|reliability/i);
   assert.match(elements.get('viewer-body').innerHTML,/data-artifact=/);
-  vm.runInContext("showPassage('CUR-11f83626486ada1d');",context);
+  vm.runInContext("showPassage('MCL-335de916e219e04a');",context);
   assert.match(elements.get('viewer-body').innerHTML,/source-line highlight/);
   assert.equal(JSON.stringify(model),before);
 });

@@ -151,10 +151,10 @@ def project(root: Path, frozen_source_overrides=None) -> dict[str, Any]:
         require(prior['spans'] and all(span['source_file'] == prior['spans'][0]['source_file'] for span in prior['spans']), 'cleanup spans must be in one exact source file')
         source_file = prior['spans'][0]['source_file']
         require(observation['claim_id'] == cid and observation['before_sha256'] == entry['before_sha256'] and observation['text'] == prior['text'] and observation['text_sha256'] == digest(prior['text'].encode()), 'observation claim identity drift')
-        require(observation['source_file'] == source_file and observation['spans'] == prior['spans'] and observation['source_sha256'] == digest((frozen_source_overrides or {}).get(source_file, safe(root, source_file).read_bytes())), 'observation source/span drift')
+        require(observation['source_file'] == source_file and observation['spans'] == prior['spans'] and observation['source_sha256'] == digest((frozen_source_overrides[source_file] if source_file in (frozen_source_overrides or {}) else safe(root, source_file).read_bytes())), 'observation source/span drift')
         require(observation['method'] in METHODS and artifact['method'] == 'MIXED_REPOSITORY_LOCAL_EDITORIAL_CHECKS' and observation['finding'] == entry['review_rationale'] and observation['limits'] == entry['limits'], 'observation rationale/limits drift')
         require(observation['candidate_record'] == candidates.get(cid), 'raw candidate record substitution')
-        current_source = (frozen_source_overrides or {}).get(source_file, safe(root, source_file).read_bytes()).decode()
+        current_source = (frozen_source_overrides[source_file] if source_file in (frozen_source_overrides or {}) else safe(root, source_file).read_bytes()).decode()
         require(isinstance(observation['context'], str) and observation['context'] in current_source and isinstance(observation['expected'], str) and observation['expected'].strip() and isinstance(observation['observed'], str) and observation['observed'].strip(), 'raw contextual expected/observed evidence missing')
         require(isinstance(observation['links'], list), 'navigation evidence must be a list')
         require(isinstance(entry['review_rationale'], str) and entry['review_rationale'].strip() and isinstance(entry['limits'], str) and entry['limits'].strip(), 'rationale/limits required')

@@ -299,10 +299,11 @@ def load_inputs(root: Path, frozen_source_overrides: Mapping[str, bytes] | None 
             require(path not in changes, 'redundant source transition ' + path)
         before_lines, after_lines = before.decode().splitlines(), after.decode().splitlines()
         sources[path] = {'before_lines':before_lines,'after_lines':after_lines,'changed':changed,'sha256':digest(after),'map':equality_map(before_lines,after_lines)}
+    navigation_bytes = overrides.pop('docs.json') if 'docs.json' in overrides else safe_path(root,'docs.json').read_bytes()
     require(not overrides and set(sources) == set(manifest) and len(sources) == 144, 'incomplete frozen source population')
     # A changed navigation configuration must not silently add/drop Host pages
     # while the producer retains the old denominator.
-    docs=read_json(safe_path(root,'docs.json').read_bytes(),'docs.json')
+    docs=read_json(navigation_bytes,'docs.json')
     host_tabs=[tab for tab in docs.get('navigation',{}).get('tabs',[]) if tab.get('tab')=='Host']
     require(len(host_tabs)==1,'expected one current Host navigation tab')
     def routes(value: Any) -> list[str]:
