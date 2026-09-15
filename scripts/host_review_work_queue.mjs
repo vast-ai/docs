@@ -29,7 +29,7 @@ const typeGroups = {
   Editorial: ['EDITORIAL_NAVIGATION_PREAMBLE','EDITORIAL_SCOPE_OR_LEAD_IN','EDITORIAL_STATIC_API_ROUTING'],
   'Published source or rule': ['PRODUCT_DESCRIPTION','GOVERNING_REQUIREMENT','PUBLISHED_SOURCE_CLAUSE','REVIEWED_POLICY_RULE','PROGRAM_ELIGIBILITY_OR_BENEFIT','PUBLISHED_FINANCIAL_RULE','PUBLISHED_FINANCIAL_GUIDANCE_DESCRIPTION','PUBLICATION_DESCRIPTION','PUBLISHED_TERMS_SUMMARY','TAX_OR_REPORTING_ASSERTION','REVIEWED_POLICY_REFERENCE','HIGH_LEVEL_PRODUCT_DESCRIPTION'],
   'Technical declaration': ['DECLARED_INTERFACE_OR_UNIT','REVIEWED_TECHNICAL_DECLARATION','IMPLEMENTATION_OR_CONCEPT','SUPPORT_SCOPE_WITH_TECHNICAL_CONTEXT','REVIEWED_DIAGNOSTIC_RECIPE','REVIEWED_INTERFACE_OR_PRODUCT_GUIDANCE'],
-  'Technical behavior or workflow': ['ACCOUNT_CONFIGURATION_OR_PERMISSION','IMPLEMENTED_BEHAVIOR','CONTRACT_TERMS_AND_IMPLEMENTED_EFFECT','RUNTIME_BEHAVIOR','UI_SURFACE_OR_WORKFLOW','REVIEWED_UI_PROVIDER_OPTION','REVIEWED_SETUP_INSTRUCTION','INTERFACE_WITH_BACKEND_EFFECT','VOLUME_ATOMIC_CLAIM','VERIFICATION_ENFORCEMENT','REVIEWED_BEHAVIOR_DESCRIPTION','RUNTIME_DIAGNOSTIC_GUIDANCE'],
+  'Technical behavior or workflow': ['ACCOUNT_CONFIGURATION_OR_PERMISSION','IMPLEMENTED_BEHAVIOR','CONTRACT_TERMS_AND_IMPLEMENTED_EFFECT','RUNTIME_BEHAVIOR','UI_SURFACE_OR_WORKFLOW','REVIEWED_UI_PROVIDER_OPTION','REVIEWED_SETUP_INSTRUCTION','INTERFACE_WITH_BACKEND_EFFECT','VOLUME_ATOMIC_CLAIM','VERIFICATION_ENFORCEMENT','REVIEWED_BEHAVIOR_DESCRIPTION','RUNTIME_DIAGNOSTIC_GUIDANCE','REVIEWED_CREDENTIAL_STORAGE_WORKFLOW'],
 };
 const reviewTypes = new Map(Object.entries(typeGroups).flatMap(([label, classes]) => classes.map(kind => [kind,label])));
 const lanes = new Set(['INCLUDED_SCREENSHOT_INSPECTION','STATIC_CONTEXT_REVIEW','REPOSITORY_STATIC_CHECK','CANONICAL_IMPLEMENTATION_SOURCE','RUNTIME_OR_UI_OBSERVATION','AUTHORITATIVE_DOCUMENTATION_CITATION','ACCOUNTABLE_OWNER_CONFIRMATION','PRODUCT_PUBLICATION_SOURCE','PRIMARY_ENGINEERING_SOURCE','PUBLISHED_VENDOR_DOCUMENTATION']);
@@ -91,8 +91,8 @@ export function buildHostReviewQueue(claims) {
  * Page grouping is deliberately transparent: it asserts no shared root cause.
  * UNVALIDATED alone never creates a finding or workflow follow-up.
  */
-export function buildHostReviewIssues({pages, ownerQuestions, originalFindings = [], sourceFamilyTransitions = [], evidenceReuseTransitions = [], continuationTransitions = [], diagnosticsSshTransitions = [], teamsConsoleTransitions = [], setupMetricsTransitions = [], recoveryEarningsTransitions = [], verificationStorageTransitions = []}) {
-  if (!Array.isArray(pages) || !Array.isArray(ownerQuestions) || !Array.isArray(sourceFamilyTransitions) || !Array.isArray(evidenceReuseTransitions) || !Array.isArray(continuationTransitions) || !Array.isArray(diagnosticsSshTransitions) || !Array.isArray(teamsConsoleTransitions) || !Array.isArray(setupMetricsTransitions) || !Array.isArray(recoveryEarningsTransitions) || !Array.isArray(verificationStorageTransitions)) throw new Error('Issue view requires current pages, validated owner questions and explicit review transitions');
+export function buildHostReviewIssues({pages, ownerQuestions, originalFindings = [], sourceFamilyTransitions = [], evidenceReuseTransitions = [], continuationTransitions = [], diagnosticsSshTransitions = [], teamsConsoleTransitions = [], setupMetricsTransitions = [], recoveryEarningsTransitions = [], verificationStorageTransitions = [], hardwareOperatorTransitions = []}) {
+  if (!Array.isArray(pages) || !Array.isArray(ownerQuestions) || !Array.isArray(sourceFamilyTransitions) || !Array.isArray(evidenceReuseTransitions) || !Array.isArray(continuationTransitions) || !Array.isArray(diagnosticsSshTransitions) || !Array.isArray(teamsConsoleTransitions) || !Array.isArray(setupMetricsTransitions) || !Array.isArray(recoveryEarningsTransitions) || !Array.isArray(verificationStorageTransitions) || !Array.isArray(hardwareOperatorTransitions)) throw new Error('Issue view requires current pages, validated owner questions and explicit review transitions');
   const claims = pages.flatMap(page => page.claims);
   const ids = new Set(claims.map(claim => claim.id));
   if (ids.size !== claims.length) throw new Error('Issue view requires distinct passage IDs');
@@ -101,7 +101,7 @@ export function buildHostReviewIssues({pages, ownerQuestions, originalFindings =
   // same occurrence supersedes its earlier follow-up, including a later PASS
   // or FAIL; it must not leave an obsolete UNVALIDATED card on the landing page.
   const latestTransitions = new Map();
-  for (const batch of [sourceFamilyTransitions, evidenceReuseTransitions, continuationTransitions, diagnosticsSshTransitions, teamsConsoleTransitions, setupMetricsTransitions, recoveryEarningsTransitions, verificationStorageTransitions]) {
+  for (const batch of [sourceFamilyTransitions, evidenceReuseTransitions, continuationTransitions, diagnosticsSshTransitions, teamsConsoleTransitions, setupMetricsTransitions, recoveryEarningsTransitions, verificationStorageTransitions, hardwareOperatorTransitions]) {
     const seen = new Set();
     for (const entry of batch) {
       if (!entry?.claim_id || seen.has(entry.claim_id)) throw new Error('Issue view requires distinct transition IDs within each review');

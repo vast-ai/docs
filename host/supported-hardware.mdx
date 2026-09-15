@@ -22,34 +22,34 @@ A typical Vast host needs:
 
 - Native Ubuntu Server; check the architecture guidance below before selecting x86_64/AMD64 or ARM64 hardware.
 - Same-type GPUs.
-- Supported NVIDIA GPUs, or the AMD families listed below.
-- More than 7 GiB VRAM per GPU.
-- AVX-capable CPU.
-- At least one physical CPU core per visible/listed GPU. Hyperthreads do not count.
+- NVIDIA Maxwell or newer GPUs for the current verification path. Confirm AMD listing compatibility separately before choosing an AMD host.
+- More than 7 GiB VRAM per GPU for CLI self-test preflight; also review the published verification requirements.
+- An AVX-capable x86_64 CPU. For ARM64, clarify the published AVX requirement with Vast before choosing the hardware.
+- At least two physical CPU cores per listed GPU for the current verification requirements. Hyperthreads do not count as physical cores.
 - Enough system RAM for the GPU tier.
-- Fast SSD/NVMe storage, with at least 128 GB per GPU as a listing baseline.
+- Fast SSD/NVMe storage with at least a 200 GB dedicated Docker partition, plus capacity for the workloads you plan to offer.
 - Public inbound networking with direct TCP and UDP port forwarding.
 
 ## GPU Support
 
 | Vendor | Guidance |
 | --- | --- |
-| NVIDIA | 10-series or newer. Newer datacenter, workstation, and recent consumer GPUs are more attractive to renters. |
+| NVIDIA | Maxwell or newer for the current verification path. Check current demand by GPU model; newer hardware does not guarantee rentals. |
 | AMD | MI25 or newer Radeon Instinct, Radeon VII, Radeon Pro VII, Radeon RX 7900 GRE/XT/XTX, and Radeon Pro W7900/W7800. Other 6000-series or newer Radeon RX/Pro W GPUs may work, but may not appear in standard ROCm filters. |
 
 Avoid mixed GPU models unless Vast explicitly documents support for that setup.
 
 If a new GPU model is not listed or searchable yet, ask Vast to add it through support or the [host community channels](/host/community).
 
-## Minimum Listing Baseline
+## Hardware Planning
 
 | Area | Baseline |
 | --- | --- |
 | OS | Ubuntu 24.04 LTS preferred; Ubuntu 22.04 also works. |
 | Machine use | Dedicated host machine while rented. |
-| CPU | AVX-capable, with at least one physical core per listed GPU. |
-| System RAM | At least 4 GB per GPU as a listing baseline; high-VRAM GPUs may need more. |
-| Storage | Fast SSD/NVMe, at least 128 GB per GPU. |
+| CPU | At least two physical cores per GPU for current verification requirements. Use an AVX-capable x86_64 CPU; clarify the published ARM64/AVX requirement before choosing ARM64. |
+| System RAM | At least 95% of total GPU VRAM for the current verification requirements; plan further capacity for the intended workload. |
+| Storage | Fast SSD/NVMe with at least a 200 GB dedicated Docker partition, sized further for the intended workloads. |
 | PCIe | Enough lanes/bandwidth for the GPUs; avoid unstable risers, power, and BIOS layouts. |
 | Network | Reliable public inbound connectivity for the configured port range. |
 
@@ -65,7 +65,7 @@ Avoid reducing GPU count, RAM, disk, or other capacity after the machine is crea
 
 Docker storage should be fast, predictable, and mounted before Docker starts. Vast uses XFS project quotas for per-container storage limits. See [Storage Setup](/host/storage-setup).
 
-Hosts also need public inbound connectivity. CGNAT, double NAT without a real public forwarding path, blocked ports, IPv6-only service, LAN-only port forwarding, packet loss, or unstable upload can prevent listing, self-test, or rentals. See [Network & Ports](/host/network-ports).
+Hosts need public inbound connectivity for supported direct access. CGNAT, double NAT without a public forwarding path, blocked ports, IPv6-only service, LAN-only forwarding, packet loss or unstable upload can break connectivity checks or renter access even when a machine is listed. See [Network & Ports](/host/network-ports).
 
 ## Unsupported Or Discouraged Setups
 
@@ -73,7 +73,7 @@ Hosts also need public inbound connectivity. CGNAT, double NAT without a real pu
 | --- | --- |
 | Windows or WSL as the host OS | Vast hosting is built for native Linux hosts. |
 | ARM or GB10-class systems | The published setup lists ARM64 but also specifies AVX. Confirm architecture-specific requirements and GB10 support with Vast before choosing this path. |
-| Mixed GPU models | Complicates offers, verification, and renter expectations. |
+| Mixed GPU models | Current verification requirements call for identical GPU models in a machine. |
 | Low-VRAM or very old GPUs | The CLI preflight requires more than 7 GiB VRAM per GPU. Check [GPU Market Metrics](/host/market-metrics) for the model before buying. |
 | Gaming/workstation use during rentals | Avoid workloads that compete with renter work; see the [Hosting Agreement’s noninterference rule](https://cloud.vast.ai/host/agreement). |
 | No public inbound networking | Connectivity checks and renter access can fail. |

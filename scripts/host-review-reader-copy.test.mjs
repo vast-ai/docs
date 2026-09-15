@@ -3,13 +3,19 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {hostReviewReaderCopy} from './host_review_reader_copy.mjs';
 import {buildReport, sanitize} from './export_host_review_html.mjs';
-const model=JSON.parse(fs.readFileSync(new URL('../verification/current-host-docs-review.json',import.meta.url)));
-const claims=model.pages.flatMap(p=>p.claims);
+const currentModel=JSON.parse(fs.readFileSync(new URL('../verification/current-host-docs-review.json',import.meta.url)));
+const currentClaims=currentModel.pages.flatMap(p=>p.claims);
 const cleanupPredecessor=new URL('../verification/evidence/2026-09-11-host-review-cleanup-attempt-01/before-current-host-docs-review.json',import.meta.url);
-const clarificationCohortModel=fs.existsSync(cleanupPredecessor)?JSON.parse(fs.readFileSync(cleanupPredecessor)):model;
+// Historical formatter contracts retain their actual 2013-record source state.
+// The separate export assertion below checks the current complete model.
+const model=JSON.parse(fs.readFileSync(cleanupPredecessor));
+const claims=model.pages.flatMap(p=>p.claims);
+const clarificationCohortModel=model;
 const clarificationCohortClaims=clarificationCohortModel.pages.flatMap(p=>p.claims);
 const quickstart=claims.find(c=>c.id==='MCL-790d76c6e2bea8fa');
-const calculator=claims.find(c=>c.id==='MCL-18f04c2ae7ee95b4');
+const calculatorBefore=claims.find(c=>c.id==='MCL-18f04c2ae7ee95b4');
+const calculatorPatch=JSON.parse(fs.readFileSync(new URL('../verification/current-host-review-cleanup.json',import.meta.url))).transitions.find(x=>x.claim_id===calculatorBefore.id).after;
+const calculator={...calculatorBefore,...calculatorPatch};
 const clarification=JSON.parse(fs.readFileSync(new URL('../verification/evidence/2026-09-10-host-clarification-sweep-attempt-01/root-policy-runtime-decisions-01.json',import.meta.url)));
 const finalClarification=JSON.parse(fs.readFileSync(new URL('../verification/current-host-clarification.json',import.meta.url)));
 const clarificationBaseline=JSON.parse(fs.readFileSync(new URL('../verification/evidence/2026-09-10-host-clarification-sweep-attempt-01/before-review.json',import.meta.url)));
@@ -51,7 +57,7 @@ test('calculator link has bounded completion criteria, separate from output vali
  assert.match(copy.proofGuide.limit,/not requirements for closing this link entry/);
  assert.equal(copy.status,undefined);
  assert.equal(calculator.status,'UNVALIDATED');
- assert.deepEqual(claims.filter(c=>hostReviewReaderCopy(c).proofGuide).map(c=>c.id),[calculator.id]);
+ assert.deepEqual(claims.map(c=>c.id===calculator.id?calculator:c).filter(c=>hostReviewReaderCopy(c).proofGuide).map(c=>c.id),[calculator.id]);
 });
 test('calculator-specific copy fails closed when the passage or finding changes',()=>{
  for(const change of [
@@ -81,9 +87,9 @@ test('offline reader uses the same formatter, preserving recorded facts',()=>{
  const report=buildReport();
  for(const [i,c] of report.payload.claims.entries()){
   assert.deepEqual(c.reader_copy,hostReviewReaderCopy(c));
-  assert.equal(c.status,claims[i].status);
-  assert.equal(c.rationale,sanitize(claims[i].rationale));
-  assert.equal(c.next_action,sanitize(claims[i].next_action));
+  assert.equal(c.status,currentClaims[i].status);
+  assert.equal(c.rationale,sanitize(currentClaims[i].rationale));
+  assert.equal(c.next_action,currentClaims[i].next_action===null?null:sanitize(currentClaims[i].next_action));
  }
 });
 test('added claim-specific limits and changed source wording bypass the specific override',()=>{
@@ -201,7 +207,7 @@ test('clarification cohorts use their recorded source, advice, link and setup re
 });
 test('current cleanup state remains distinct from the frozen clarification cohort',()=>{
  if(!fs.existsSync(new URL('../verification/current-host-review-cleanup.json',import.meta.url)))return;
- const current=claims.find(c=>c.id==='MCL-054a98ae8bf901da'),cohort=reviewedClaim('MCL-054a98ae8bf901da');
+ const current=currentClaims.find(c=>c.id==='MCL-054a98ae8bf901da'),cohort=reviewedClaim('MCL-054a98ae8bf901da');
  assert.equal(current.status,'NOT_APPLICABLE');assert.notEqual(current.status,cohort.status);
 });
 test('only the five exact retained policy examples request an acknowledgement',()=>{
