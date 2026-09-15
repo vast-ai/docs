@@ -4,9 +4,9 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {sourceOrigin,projectTeamsConsoleReview,loadTeamsConsoleReview,TEAMS_CONSOLE_PATH as REG,TEAMS_CONSOLE_SHA256 as PIN,TEAMS_CONSOLE_ATTEMPT as A} from './current_host_teams_console_review.mjs';
-import {beforeTeamsConsole} from './closure_historical_test_sources.mjs';
+import {beforeSetupMetrics,beforeTeamsConsole} from './closure_historical_test_sources.mjs';
 import {buildHostReviewIssues} from './host_review_work_queue.mjs';
-const read=p=>fs.readFileSync(new URL('../'+p,import.meta.url)),exists=p=>fs.existsSync(new URL('../'+p,import.meta.url));
+const rawRead=p=>fs.readFileSync(new URL('../'+p,import.meta.url)),read=beforeSetupMetrics(rawRead),exists=p=>{try{read(p);return true;}catch(error){if(error.code==='ENOENT')return false;throw error;}};
 const sha=x=>crypto.createHash('sha256').update(x).digest('hex'),index=m=>new Map(m.pages.flatMap(p=>p.claims.map(c=>[c.id,c]))),omit=(o,keys)=>Object.fromEntries(Object.entries(o).filter(([k])=>!keys.includes(k)));
 async function reseal(registry,change){const r=structuredClone(registry);change(r);const bytes=Buffer.from(JSON.stringify(r)),source=read('scripts/current_host_teams_console_review.mjs').toString().replace(PIN,sha(bytes)).replace("'./current_host_diagnostics_ssh_review.mjs'",JSON.stringify(new URL('./current_host_diagnostics_ssh_review.mjs',import.meta.url).href));const m=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));return ()=>m.projectTeamsConsoleReview({read:p=>p===REG?bytes:read(p),exists});}
 test('an absent successor preserves the older lane but a marked model without its registry fails',()=>{
@@ -17,7 +17,7 @@ test('an absent successor preserves the older lane but a marked model without it
 test('all 121 accepted decisions have Python/JS parity, preserve 1887 other claims and retain prior 318/358 history',()=>{
  const registry=JSON.parse(read(REG)),model=JSON.parse(read('verification/current-host-docs-review.json')),before=JSON.parse(beforeTeamsConsole(read)('verification/current-host-docs-review.json'));
  const projected=projectTeamsConsoleReview({read,exists});assert.deepEqual(projected.model,model);assert.deepEqual(loadTeamsConsoleReview({read,exists,model}).model,model);
- const py=JSON.parse(execFileSync('python3',['-c',"import json,sys;from pathlib import Path;sys.path.insert(0,'scripts');import current_host_teams_console_review as m;print(json.dumps(m.project(Path.cwd())))"],{cwd:new URL('../',import.meta.url),maxBuffer:64*1024*1024}));assert.deepEqual(py,model);
+ const py=JSON.parse(execFileSync('python3',['-c',"import json,sys;from pathlib import Path;sys.path.insert(0,'scripts');import current_host_teams_console_review as m;r=Path.cwd();p=r/'verification/current-host-setup-metrics-review.json';overrides={s['path']:(r/s['before_artifact']['path']).read_bytes() for s in json.loads(p.read_text())['sources']} if p.exists() else {};print(json.dumps(m.project(r,frozen_source_overrides=overrides)))"],{cwd:new URL('../',import.meta.url),maxBuffer:64*1024*1024}));assert.deepEqual(py,model);
  const old=index(before),current=index(model),selected=new Set(registry.transitions.map(t=>t.claim_id));assert.equal(selected.size,121);assert.equal(current.size,2008);let unchanged=0;
  for(const[id,c]of current){const prior=old.get(id);if(!selected.has(id)){assert.deepEqual(omit(c,['spans']),omit(prior,['spans']),id);unchanged++;continue;}
   assert.deepEqual(omit(c.history,['teams_console_review']),prior.history,id);assert.equal(c.history.teams_console_review.prior_status,prior.status);

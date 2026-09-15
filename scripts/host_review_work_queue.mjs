@@ -32,7 +32,7 @@ const typeGroups = {
   'Technical behavior or workflow': ['ACCOUNT_CONFIGURATION_OR_PERMISSION','IMPLEMENTED_BEHAVIOR','CONTRACT_TERMS_AND_IMPLEMENTED_EFFECT','RUNTIME_BEHAVIOR','UI_SURFACE_OR_WORKFLOW','REVIEWED_UI_PROVIDER_OPTION','REVIEWED_SETUP_INSTRUCTION','INTERFACE_WITH_BACKEND_EFFECT','VOLUME_ATOMIC_CLAIM','VERIFICATION_ENFORCEMENT','REVIEWED_BEHAVIOR_DESCRIPTION','RUNTIME_DIAGNOSTIC_GUIDANCE'],
 };
 const reviewTypes = new Map(Object.entries(typeGroups).flatMap(([label, classes]) => classes.map(kind => [kind,label])));
-const lanes = new Set(['STATIC_CONTEXT_REVIEW','REPOSITORY_STATIC_CHECK','CANONICAL_IMPLEMENTATION_SOURCE','RUNTIME_OR_UI_OBSERVATION','AUTHORITATIVE_DOCUMENTATION_CITATION','ACCOUNTABLE_OWNER_CONFIRMATION','PRODUCT_PUBLICATION_SOURCE','PRIMARY_ENGINEERING_SOURCE','PUBLISHED_VENDOR_DOCUMENTATION']);
+const lanes = new Set(['INCLUDED_SCREENSHOT_INSPECTION','STATIC_CONTEXT_REVIEW','REPOSITORY_STATIC_CHECK','CANONICAL_IMPLEMENTATION_SOURCE','RUNTIME_OR_UI_OBSERVATION','AUTHORITATIVE_DOCUMENTATION_CITATION','ACCOUNTABLE_OWNER_CONFIRMATION','PRODUCT_PUBLICATION_SOURCE','PRIMARY_ENGINEERING_SOURCE','PUBLISHED_VENDOR_DOCUMENTATION']);
 const field = (claim, snake, camel) => claim[snake] ?? claim[camel];
 export function describeHostReview(claim) {
   const required = field(claim, 'required_evidence_types', 'requiredEvidenceTypes');
@@ -91,8 +91,8 @@ export function buildHostReviewQueue(claims) {
  * Page grouping is deliberately transparent: it asserts no shared root cause.
  * UNVALIDATED alone never creates a finding or workflow follow-up.
  */
-export function buildHostReviewIssues({pages, ownerQuestions, originalFindings = [], sourceFamilyTransitions = [], evidenceReuseTransitions = [], continuationTransitions = [], diagnosticsSshTransitions = [], teamsConsoleTransitions = []}) {
-  if (!Array.isArray(pages) || !Array.isArray(ownerQuestions) || !Array.isArray(sourceFamilyTransitions) || !Array.isArray(evidenceReuseTransitions) || !Array.isArray(continuationTransitions) || !Array.isArray(diagnosticsSshTransitions) || !Array.isArray(teamsConsoleTransitions)) throw new Error('Issue view requires current pages, validated owner questions and explicit review transitions');
+export function buildHostReviewIssues({pages, ownerQuestions, originalFindings = [], sourceFamilyTransitions = [], evidenceReuseTransitions = [], continuationTransitions = [], diagnosticsSshTransitions = [], teamsConsoleTransitions = [], setupMetricsTransitions = []}) {
+  if (!Array.isArray(pages) || !Array.isArray(ownerQuestions) || !Array.isArray(sourceFamilyTransitions) || !Array.isArray(evidenceReuseTransitions) || !Array.isArray(continuationTransitions) || !Array.isArray(diagnosticsSshTransitions) || !Array.isArray(teamsConsoleTransitions) || !Array.isArray(setupMetricsTransitions)) throw new Error('Issue view requires current pages, validated owner questions and explicit review transitions');
   const claims = pages.flatMap(page => page.claims);
   const ids = new Set(claims.map(claim => claim.id));
   if (ids.size !== claims.length) throw new Error('Issue view requires distinct passage IDs');
@@ -101,7 +101,7 @@ export function buildHostReviewIssues({pages, ownerQuestions, originalFindings =
   // same occurrence supersedes its earlier follow-up, including a later PASS
   // or FAIL; it must not leave an obsolete UNVALIDATED card on the landing page.
   const latestTransitions = new Map();
-  for (const batch of [sourceFamilyTransitions, evidenceReuseTransitions, continuationTransitions, diagnosticsSshTransitions, teamsConsoleTransitions]) {
+  for (const batch of [sourceFamilyTransitions, evidenceReuseTransitions, continuationTransitions, diagnosticsSshTransitions, teamsConsoleTransitions, setupMetricsTransitions]) {
     const seen = new Set();
     for (const entry of batch) {
       if (!entry?.claim_id || seen.has(entry.claim_id)) throw new Error('Issue view requires distinct transition IDs within each review');

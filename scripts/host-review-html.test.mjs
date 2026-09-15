@@ -1,7 +1,8 @@
+import {projectTeamsConsoleReview} from './current_host_teams_console_review.mjs';
 import {projectDiagnosticsSshReview} from './current_host_diagnostics_ssh_review.mjs';
 import {projectContinuationReview} from './current_host_continuation_review.mjs';
 import {projectEvidenceReuseReview} from './current_host_evidence_reuse_review.mjs';
-import {beforeContinuation,beforeDiagnosticsSsh,beforeTeamsConsole} from './closure_historical_test_sources.mjs';
+import {beforeContinuation,beforeDiagnosticsSsh,beforeTeamsConsole,beforeSetupMetrics} from './closure_historical_test_sources.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,7 +19,7 @@ const app=html.match(/<script>([\s\S]*?)<\/script>/)[1];
 const model=JSON.parse(fs.readFileSync(new URL('../verification/current-host-docs-review.json',import.meta.url)));
 const inputClaims=model.pages.flatMap(p=>p.claims);
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
-const currentResultTransition=payload.teams_console_transition||payload.diagnostics_ssh_transition||payload.continuation_transition||payload.evidence_reuse_transition||payload.source_family_transition||payload.closure_transition||payload.payout_invoice_transition||payload.payout_terms_transition||payload.payout_provider_transition||payload.cleanup_transition||payload.jurisdiction_transition||payload.terms_transition;
+const currentResultTransition=payload.setup_metrics_transition||payload.teams_console_transition||payload.diagnostics_ssh_transition||payload.continuation_transition||payload.evidence_reuse_transition||payload.source_family_transition||payload.closure_transition||payload.payout_invoice_transition||payload.payout_terms_transition||payload.payout_provider_transition||payload.cleanup_transition||payload.jurisdiction_transition||payload.terms_transition;
 const jurisdictionIds=new Map([
  ['CUR-708c718cf735c8b2','Advice checked'],['CUR-555543e9b2ceddb4','Advice checked'],['CUR-2ead4eda972e84b0','Advice checked'],
  ['MCL-8fe2020c0e7efe26','Advice and rule checked'],
@@ -111,7 +112,7 @@ test('eight jurisdiction source and advice cards retain exact labels, current so
 test('current reviewed residuals show their actual source scope without claiming proof',()=>{
  const sourceFunctions=app.slice(app.indexOf('function authorityScanHTML('),app.indexOf('function twoDefectTransitionHTML('));
  const escapeHTML=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- const selected=payload.claims.filter(claim=>{const scan=payload.authority_scan?.transitions[claim.id];return (scan?.sourceFamily||scan?.evidenceReuse||scan?.continuation||scan?.diagnosticsSsh||scan?.teamsConsole)&&['FAIL','UNVALIDATED'].includes(claim.status);});
+ const selected=payload.claims.filter(claim=>{const scan=payload.authority_scan?.transitions[claim.id];return (scan?.sourceFamily||scan?.evidenceReuse||scan?.continuation||scan?.diagnosticsSsh||scan?.teamsConsole||scan?.setupMetrics)&&['FAIL','UNVALIDATED'].includes(claim.status);});
  assert.deepEqual(selected.map(claim=>claim.id).sort(),[
   'MCL-b106578dbaccc269','MCL-1221941af8a7a4fe',
   'MCL-d8c581b080df635b','MCL-c569a7d52ef2d67c','MCL-14fafb4770a2b16f','MCL-71aa2b81147538fb',
@@ -286,6 +287,10 @@ test('current authority summary is not mislabeled as new operational execution',
    assert.ok(rows.includes(`data-artifact="${payload.evidence_reuse_transition.result_ref}"`));
    assert.ok(rows.includes(`${payload.evidence_reuse_transition.reviewed_claims} passages reviewed; ${payload.evidence_reuse_transition.wording_corrections} wording corrections`));
    assert.match(rows,/Earlier source-family review/);
+  }
+  if(payload.setup_metrics_transition){
+   assert.ok(rows.includes(`data-artifact="${payload.setup_metrics_transition.result_ref}"`));
+   assert.ok(rows.includes(`${payload.setup_metrics_transition.reviewed_claims} passages reviewed; ${payload.setup_metrics_transition.wording_corrections} wording corrections`));
   }
   if(payload.continuation_transition){
    assert.ok(rows.includes(`data-artifact="${payload.continuation_transition.result_ref}"`));
@@ -591,25 +596,26 @@ test('active authority scan retains per-claim predecessor and bounded source bin
  const continuation=payload.continuation_transition;
  const diagnosticsSsh=payload.diagnostics_ssh_transition;
  const teamsConsole=payload.teams_console_transition;
+ const setupMetrics=payload.setup_metrics_transition;
  const rawRead=ref=>fs.readFileSync(new URL('../'+ref,import.meta.url));
  const read=beforeContinuation(rawRead);
  const latestFrozen=evidenceReuse?new Map(JSON.parse(read(evidenceReuse.registry_ref)).sources.map(source=>[source.path,read(source.before_artifact.path)])):new Map();
- const baselineRefs=[scan.baseline_ref,...(teamsConsole?[teamsConsole.baseline_ref]:[]),...(diagnosticsSsh?[diagnosticsSsh.baseline_ref]:[]),...(continuation?[continuation.baseline_ref]:[]),...(evidenceReuse?[evidenceReuse.baseline_ref]:[]),...(sourceFamily?[sourceFamily.baseline_ref]:[]),...(closure?[closure.baseline_ref]:[]),...(clarification?[clarification.baseline_ref]:[]),...(terms?[terms.baseline_ref]:[]),...(jurisdiction?[jurisdiction.baseline_ref]:[]),...(cleanup?[cleanup.baseline_ref]:[]),...(payload.payout_provider_transition?[payload.payout_provider_transition.baseline_ref]:[]),...(payoutTerms?[payoutTerms.baseline_ref]:[]),...(payoutInvoice?[payoutInvoice.baseline_ref]:[])];
+ const baselineRefs=[scan.baseline_ref,...(setupMetrics?[setupMetrics.baseline_ref]:[]),...(teamsConsole?[teamsConsole.baseline_ref]:[]),...(diagnosticsSsh?[diagnosticsSsh.baseline_ref]:[]),...(continuation?[continuation.baseline_ref]:[]),...(evidenceReuse?[evidenceReuse.baseline_ref]:[]),...(sourceFamily?[sourceFamily.baseline_ref]:[]),...(closure?[closure.baseline_ref]:[]),...(clarification?[clarification.baseline_ref]:[]),...(terms?[terms.baseline_ref]:[]),...(jurisdiction?[jurisdiction.baseline_ref]:[]),...(cleanup?[cleanup.baseline_ref]:[]),...(payload.payout_provider_transition?[payload.payout_provider_transition.baseline_ref]:[]),...(payoutTerms?[payoutTerms.baseline_ref]:[]),...(payoutInvoice?[payoutInvoice.baseline_ref]:[])];
  const predecessorsByBaseline=new Map(baselineRefs.map(ref=>{
   assert.ok(payload.files[ref],ref);
   const before=JSON.parse(payload.files[ref].text);
-  if(ref===teamsConsole?.baseline_ref||ref===diagnosticsSsh?.baseline_ref||ref===continuation?.baseline_ref||ref===sourceFamily?.baseline_ref||ref===evidenceReuse?.baseline_ref){
+  if(ref===setupMetrics?.baseline_ref||ref===teamsConsole?.baseline_ref||ref===diagnosticsSsh?.baseline_ref||ref===continuation?.baseline_ref||ref===sourceFamily?.baseline_ref||ref===evidenceReuse?.baseline_ref){
    // This successor retains a complete hash inventory rather than another full
    // model copy. Replay the existing sealed predecessor against its before files.
-   const frozen=ref===teamsConsole?.baseline_ref||ref===diagnosticsSsh?.baseline_ref||ref===continuation?.baseline_ref?new Map():new Map(latestFrozen);
+   const frozen=ref===setupMetrics?.baseline_ref||ref===teamsConsole?.baseline_ref||ref===diagnosticsSsh?.baseline_ref||ref===continuation?.baseline_ref?new Map():new Map(latestFrozen);
    if(ref===sourceFamily?.baseline_ref){
     const registry=JSON.parse(read(sourceFamily.registry_ref));
     for(const source of registry.sources)frozen.set(source.path,read(source.before_artifact.path));
     const amendment=JSON.parse(read('verification/evidence/2026-09-15-host-unvalidated-source-families-attempt-01/owner-context-amendment.json'));
     frozen.set('verification/current-host-owner-questions.json',read(amendment.before_artifact.path));
    }
-   const projector=ref===teamsConsole?.baseline_ref?projectDiagnosticsSshReview:ref===diagnosticsSsh?.baseline_ref?projectContinuationReview:ref===continuation?.baseline_ref?projectEvidenceReuseReview:ref===evidenceReuse?.baseline_ref?projectSourceFamilyReview:projectClosureCorrection;
-   const baselineRead=ref===teamsConsole?.baseline_ref?beforeTeamsConsole(rawRead):ref===diagnosticsSsh?.baseline_ref?beforeDiagnosticsSsh(rawRead):read;
+   const projector=ref===setupMetrics?.baseline_ref?projectTeamsConsoleReview:ref===teamsConsole?.baseline_ref?projectDiagnosticsSshReview:ref===diagnosticsSsh?.baseline_ref?projectContinuationReview:ref===continuation?.baseline_ref?projectEvidenceReuseReview:ref===evidenceReuse?.baseline_ref?projectSourceFamilyReview:projectClosureCorrection;
+   const baselineRead=ref===setupMetrics?.baseline_ref?beforeSetupMetrics(rawRead):ref===teamsConsole?.baseline_ref?beforeTeamsConsole(rawRead):ref===diagnosticsSsh?.baseline_ref?beforeDiagnosticsSsh(rawRead):read;
    const prior=projector({read:ref=>frozen.get(ref)||baselineRead(ref),exists:ref=>fs.existsSync(new URL('../'+ref,import.meta.url))}).model;
    const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
    const priorClaims=prior.pages.flatMap(page=>page.claims);
@@ -628,7 +634,7 @@ test('active authority scan retains per-claim predecessor and bounded source bin
    assert.ok(closure?.retired_claims.some(retired=>retired.claim_id===transition.previous?.id&&retired.replaced_by===id),'only an exact retained checklist retirement may use another predecessor ID');
   }
   assert.deepEqual(transition.previous,predecessors.get(transition.previous?.id||id));
-  assert.equal(transition.registryRef,transition.baselineRef===teamsConsole?.baseline_ref?teamsConsole.registry_ref:transition.baselineRef===diagnosticsSsh?.baseline_ref?diagnosticsSsh.registry_ref:transition.baselineRef===continuation?.baseline_ref?continuation.registry_ref:transition.baselineRef===evidenceReuse?.baseline_ref?evidenceReuse.registry_ref:transition.baselineRef===sourceFamily?.baseline_ref?sourceFamily.registry_ref:transition.baselineRef===closure?.baseline_ref?closure.registry_ref:transition.baselineRef===payoutInvoice?.baseline_ref?payoutInvoice.registry_ref:transition.baselineRef===payoutTerms?.baseline_ref?payoutTerms.registry_ref:transition.baselineRef===payload.payout_provider_transition?.baseline_ref?payload.payout_provider_transition.registry_ref:transition.baselineRef===scan.baseline_ref?scan.registry_ref:transition.baselineRef===jurisdiction?.baseline_ref?jurisdiction.registry_ref:transition.baselineRef===terms?.baseline_ref?terms.registry_ref:transition.baselineRef===clarification?.baseline_ref?clarification.registry_ref:cleanup?.registry_ref);
+  assert.equal(transition.registryRef,transition.baselineRef===setupMetrics?.baseline_ref?setupMetrics.registry_ref:transition.baselineRef===teamsConsole?.baseline_ref?teamsConsole.registry_ref:transition.baselineRef===diagnosticsSsh?.baseline_ref?diagnosticsSsh.registry_ref:transition.baselineRef===continuation?.baseline_ref?continuation.registry_ref:transition.baselineRef===evidenceReuse?.baseline_ref?evidenceReuse.registry_ref:transition.baselineRef===sourceFamily?.baseline_ref?sourceFamily.registry_ref:transition.baselineRef===closure?.baseline_ref?closure.registry_ref:transition.baselineRef===payoutInvoice?.baseline_ref?payoutInvoice.registry_ref:transition.baselineRef===payoutTerms?.baseline_ref?payoutTerms.registry_ref:transition.baselineRef===payload.payout_provider_transition?.baseline_ref?payload.payout_provider_transition.registry_ref:transition.baselineRef===scan.baseline_ref?scan.registry_ref:transition.baselineRef===jurisdiction?.baseline_ref?jurisdiction.registry_ref:transition.baselineRef===terms?.baseline_ref?terms.registry_ref:transition.baselineRef===clarification?.baseline_ref?clarification.registry_ref:cleanup?.registry_ref);
   for(const basis of transition.basis){assert.ok(payload.files[basis.artifactRef]);assert.ok(basis.support_rationale);if(basis.kind==='GOVERNING_SOURCE'){assert.ok(basis.excerpt);assert.match(basis.text_pointer,/^\//);}}
  }
  if(jurisdiction)for(const id of jurisdictionIds.keys())assert.ok(scan.transitions[id].auditHistory.length,`predecessor source history retained: ${id}`);
@@ -640,7 +646,7 @@ test('active authority scan retains per-claim predecessor and bounded source bin
    assert.deepEqual(transition.previous,phase45.get(id));
   }
  }
- assert.match(payload.current_result_ref,teamsConsole?/host-continuation-teams-console-attempt-01\/result\.md$/:diagnosticsSsh?/host-continuation-diagnostics-ssh-attempt-01\/result\.md$/:continuation?/host-continuation-88-attempt-01\/result\.md$/:evidenceReuse?/host-evidence-reuse-source-review-attempt-01\/result-02\.md$/:sourceFamily?/host-unvalidated-source-families-attempt-01\/result\.md$/:closure?/host-unvalidated-evidence-attempt-02\/result\.md$/:payload.payout_invoice_transition?/payout-invoice-correction-attempt-01\/result\.md$/:payload.payout_terms_transition?/payout-terms-correction-attempt-01\/result\.md$/:payload.payout_provider_transition?/payout-provider-correction-attempt-01\/result\.md$/:payload.cleanup_transition?/host-review-cleanup-attempt-01\/result\.md$/:jurisdiction?/host-jurisdiction-authority-attempt-01\/result\.md$/:terms?/host-terms-binding-attempt-01\/result\.md$/:/host-authority-scan-attempt-01\/result\.md$/);
+ assert.match(payload.current_result_ref,setupMetrics?/host-continuation-setup-metrics-attempt-01\/result\.md$/:teamsConsole?/host-continuation-teams-console-attempt-01\/result\.md$/:diagnosticsSsh?/host-continuation-diagnostics-ssh-attempt-01\/result\.md$/:continuation?/host-continuation-88-attempt-01\/result\.md$/:evidenceReuse?/host-evidence-reuse-source-review-attempt-01\/result-02\.md$/:sourceFamily?/host-unvalidated-source-families-attempt-01\/result\.md$/:closure?/host-unvalidated-evidence-attempt-02\/result\.md$/:payload.payout_invoice_transition?/payout-invoice-correction-attempt-01\/result\.md$/:payload.payout_terms_transition?/payout-terms-correction-attempt-01\/result\.md$/:payload.payout_provider_transition?/payout-provider-correction-attempt-01\/result\.md$/:payload.cleanup_transition?/host-review-cleanup-attempt-01\/result\.md$/:jurisdiction?/host-jurisdiction-authority-attempt-01\/result\.md$/:terms?/host-terms-binding-attempt-01\/result\.md$/:/host-authority-scan-attempt-01\/result\.md$/);
  assert.match(app,/Source review adds no runtime execution/);
 });
 test('clarification metadata reports bounded changed claim and node context only',()=>{

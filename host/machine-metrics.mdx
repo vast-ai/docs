@@ -16,17 +16,17 @@ Machine Metrics is a monitoring dashboard for the machines you host on Vast. It 
 ## Why use it
 
 **Machine health:**
-- Confirm a machine is online, reporting, and healthy before or after a rental
+- Review reported machine activity and health indicators before or after a rental; check the current machine status separately because metrics can lag.
 - Catch hardware problems early, such as a GPU running hot or clocking down
 
 **Troubleshooting:**
 - Investigate a client complaint about a slow, unresponsive, or underperforming machine
-- See whether containers on the machine are running cleanly or crash looping
+- Investigate repeated container stops or restarts, then check logs and exit status to determine the cause
 - Track down performance issues or unexpected drops in throughput
 
 ## Opening the dashboard
 
-Open [Machine Metrics](https://cloud.vast.ai/host/machine-metrics/) in the Host section of the console, then pick a machine from the **Machine ID** dropdown.
+Open [Machine Metrics](https://cloud.vast.ai/host/machine-metrics/) in the Host section of the console, then pick a machine from the **Machine** dropdown.
 
 You can also open a specific machine from **Host → Machines** with the **View metrics** option on the machine card.
 
@@ -48,7 +48,7 @@ The Vast daemon collects the following data from your machines:
 | CPU, memory, GPU, disk, and network counters | Every second |
 | Container state | Every 15 seconds |
 
-Samples are batched on the machine and uploaded periodically, at a rate that depends on how much data the machine is producing. If the machine goes offline, its data is saved locally and uploaded when it reconnects, so an outage appears as a gap that fills in later. A very long outage eventually loses its oldest data.
+Samples are batched on the machine and uploaded periodically, at a rate that depends on how much data the machine is producing. If uploads are interrupted, locally retained samples can be uploaded when the machine reconnects. Gaps can fill in for those retained samples; data that was never collected or was lost from the local buffer cannot be recovered this way. A very long interruption can lose the oldest buffered data.
 
 <Note>
 This is not a real-time tool. The page loads the window ending at the moment you opened it and does not advance while the tab stays open, and the most recent data can be hours behind. Reload the page to pull in whatever has arrived since.
@@ -67,18 +67,18 @@ The chart covers the last 7 days by default. Every metric has a button above it:
 | CPU I/O Wait | Time accounted to waiting for I/O. High values are a reason to investigate storage alongside disk metrics and workload behavior; this counter alone does not identify the bottleneck |
 | Idle CPU | Time the CPU had nothing to do |
 | CPU Steal | Time the CPU was ready to run but the hypervisor gave the cycles to someone else. Only meaningful if the machine is itself a virtual guest; it stays at zero on bare metal |
-| Load (1m) | Average number of processes running or waiting to run over the last minute. Compare it against the machine's core count: a load well above the core count means work is queuing |
+| Load (1m) | Average number of runnable tasks and tasks in uninterruptible wait, such as disk I/O, over the last minute. Compare it with the available logical CPU count, but also inspect I/O wait: a high load does not by itself prove CPU saturation |
 
 ### Memory
 
 | Metric | What it means |
 | --- | --- |
 | Total Memory | Usable RAM reported by the operating system, excluding reserved memory and kernel binary code |
-| Free Memory | RAM not in use for anything at all. This normally sits low on a healthy machine and is not a problem on its own |
+| Free Memory | RAM currently free. A low value alone does not establish memory pressure; also check Available Memory, which accounts for reclaimable capacity |
 | Available Memory | Estimated RAM available for new applications without swapping, including reclaimable cache. Prefer it to Free Memory when checking available capacity |
 | Cached | File cache, including tmpfs and shared memory, kept in RAM. Some cache can be reclaimed under memory pressure; Cached is not all immediately available RAM |
 | Buffers | Temporary memory used for raw disk blocks |
-| Free Swap / Total Swap | Swap space on disk. Steady swap use means the machine is short on RAM and paging to disk, which is slow |
+| Free Swap / Total Swap | Unused and total configured swap capacity. Occupied swap alone does not show active paging; inspect swap-in/swap-out rates and Available Memory before attributing slowness to memory pressure |
 | Processes | Total number of processes on the machine |
 
 ### GPU, disk, and network
@@ -95,9 +95,9 @@ Expand the tab with the arrow on its right to chart each device separately. This
 
 | Tab | Per-device metrics | Notes |
 | --- | --- | --- |
-| GPU | Utilization, Memory Utilization, Used Memory, Total Memory, Temperature, Power, SM Clock, Memory Clock | Utilization is the share of time the GPU was busy, not how much of its compute was used. SM Clock dropping while Temperature sits at its ceiling is thermal throttling; SM Clock dropping while Power is pinned at its limit is the power cap |
+| GPU | Utilization, Memory Utilization, Used Memory, Total Memory, Temperature, Power, SM Clock, Memory Clock | Utilization is the share of the sample period when a GPU kernel was executing, not the fraction of compute capacity used. Falling SM Clock near a temperature or power limit can suggest throttling; check NVIDIA clock-event reasons to distinguish thermal, power and other limits |
 | Disk | Utilization, Read and Write IOPS, Read and Write Speed | Utilization estimates time with I/O active. IOPS counts operations per second; read and write speed measure bytes transferred per second |
-| Network | RX and TX throughput, RX and TX Packets, RX and TX Errors, RX and TX Drops | RX is traffic in, TX is traffic out. Errors and drops are counted per sample rather than accumulated, so a healthy interface reads a flat zero; anything sitting above it points at a cable, NIC, or upstream problem |
+| Network | RX and TX throughput, RX and TX Packets, RX and TX Errors, RX and TX Drops | RX is traffic in and TX is traffic out. Errors and drops are shown per sample rather than as lifetime totals. Investigate nonzero counts alongside interface and system diagnostics: drops can also result from resource limits, protocol handling or filtering, so these counters alone do not identify a cable, NIC or upstream fault |
 
 <Frame caption="The GPU tab with its per-device grid expanded">
   <img src="/images/machine-metrics-gpu-grid-light.webp" className="block dark:hidden" alt="Machine Metrics GPU tab showing eight GPUs, each with utilization, memory, temperature, power, and clock metrics" />
@@ -114,7 +114,7 @@ To move around the timeline:
 
 - **Drag** to pan through time, or **scroll** to zoom in and out around the cursor
 - Use the **zoom in** and **zoom out** buttons in the toolbar for fixed steps
-- **Reset** returns to the default 7-day window and the default set of metrics
+- **Reset view and filters** returns to the default 7-day window and the default set of metrics
 - **All off** clears the chart. **All on** turns on the CPU, memory, and summary metrics, but leaves per-device series off so the chart does not fill with one line per GPU
 
 Zooming in loads finer-grained data, down to per-second samples over short windows.
@@ -125,7 +125,7 @@ Below the chart, a timeline shows container activity for the time range you are 
 
 | Legend | What it shows |
 | --- | --- |
-| exists (stopped) | A thin gray line spanning the container's life. It existed on the machine but was not running |
+| exists (stopped) | A thin gray lifeline spans the container’s recorded existence. Portions without a running bar indicate time when it existed on the machine but was not running |
 | running | A solid blue bar over the periods the container was actually running |
 | running (vm) | The same, in purple, for a container running as a VM |
 | intermittent (zoom in) | A striped bar covering several runs and the gaps between them, too close together to draw separately at this zoom |
@@ -135,22 +135,22 @@ Below the chart, a timeline shows container activity for the time range you are 
   <img src="/images/machine-metrics-containers-dark.webp" className="hidden dark:block" alt="Container timeline showing several short runs at different times and one container whose run ends before its life line does" />
 </Frame>
 
-Hover a row for the container's status, last reported state, first and last seen times, how long it existed, and its run count and total running time. Click a run to zoom the chart to it and line the rental up with the GPU, memory, and network activity behind it.
+Hover a row to inspect its recorded container details. When metadata is available, these include status, last reported state, first and last seen times, duration, run count and total running time; a row can instead report **no data**. Click a run to zoom the chart to it and compare the rental with GPU, memory and network activity.
 
 <Note>
-A striped bar is a zoom artifact, not a problem. Zoom in to see the real pattern: restarts every few seconds are a crash loop, while a few runs spread over days is normal rental activity.
+A striped bar combines runs that are too close together to draw separately at the current zoom. Zoom in to inspect the pattern. Frequent short runs can be a reason to investigate repeated exits or restarts, but the timeline alone does not distinguish a crash loop from intentional activity; check container logs and exit status.
 </Note>
 
 ## Troubleshooting
 
 | Symptom | Where to look |
 | --- | --- |
-| A GPU running hot or throttling | Expand the GPU grid and compare Temperature, Power, and SM Clock per card. One card hotter and clocking lower than the rest points at cooling or seating rather than at the workload |
-| Clients keep leaving the machine | Find the rental in the Containers timeline and zoom into it. Short runs repeating back to back are a crash loop |
-| Unexplained slowness | High CPU I/O Wait alongside disk utilization points at storage. High CPU Steal means the machine is itself a virtual guest and its hypervisor is oversubscribed, so it stays at zero on bare metal |
+| A GPU running hot or throttling | Expand the GPU grid and compare Temperature, Power, SM Clock and utilization per card. Investigate cooling, power limits and workload differences, and check NVIDIA clock-event reasons before assigning a cause |
+| Clients keep leaving the machine | Find the relevant container activity in the Containers timeline and zoom into it. Repeated short runs warrant checking logs and exit status; the timeline alone does not establish a crash loop or why a client left |
+| Unexplained slowness | Investigate high CPU I/O Wait alongside disk metrics and workload behavior. CPU Steal reflects CPU time unavailable to a virtual guest; high values warrant examining host scheduling, but do not by themselves prove oversubscription |
 | Bandwidth complaints | Chart Total RX and Total TX over the rental window, then expand the Network grid to check errors and drops on the interface |
-| The machine looks idle | GPU utilization near zero through a rental usually means the client's workload is not using the GPUs |
-| No data at all for a machine | It has most likely not reported yet. Check that it is online and running a current Vast daemon, and contact support if it stays empty |
+| The machine looks idle | GPU utilization near zero indicates little GPU-kernel execution in the reported samples. Check whether the workload is using the GPUs or is waiting on other work before drawing a conclusion |
+| No data at all for a machine | Reports may be missing or delayed. Check that the machine is online and running a current Vast daemon, and contact support if the chart stays empty |
 | The chart stops short of right now | Expected. The page does not follow the clock. Reload it |
 
 ## Limitations

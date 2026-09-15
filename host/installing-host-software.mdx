@@ -26,7 +26,7 @@ Complete [Hardware Prep](/host/hardware-prep), [Storage Setup](/host/storage-set
 
 Copy the current command from the official [Vast host setup page](https://cloud.vast.ai/host/setup/).
 
-The command can include an account-specific machine installation key. Do not reuse commands from old notes, shell history, screenshots, third-party guides, or another account. A regular API key is not a setup-page installation key.
+The command can include account-specific authorization material for machine installation. Copy it from the current setup page for the intended account. Do not reuse old commands or substitute a different account’s credential. Do not assume a separately configured API key is an interchangeable substitute; obtain the current command from Setup for the intended account.
 
 For team-owned hosts, switch into the intended team context before opening the setup page or copying the command. See [Host Teams](/host/host-teams#install-in-the-right-context).
 
@@ -55,7 +55,7 @@ The wizard checks account access, OS/GPU readiness, storage, network ports, netw
 For SSH installs, keep the session open or use `tmux`.
 </Tip>
 
-If the wizard stops at NVIDIA/CUDA checks, repair the driver, reboot, confirm `nvidia-smi` shows every GPU, then rerun the wizard.
+If the wizard stops at NVIDIA/CUDA checks, inspect the reported failure and confirm that the driver supports the installed GPUs and required CUDA runtime. Repair the driver if needed, reboot if the driver change requires it, and confirm `nvidia-smi` sees the expected GPUs before rerunning the wizard.
 
 <span id="headless-fallback" aria-hidden="true" />
 ## Headless Fallback
@@ -70,11 +70,12 @@ Use the TUI when possible. If the SSH terminal cannot drive it reliably, use the
 Example:
 
 ```bash
-mkdir -p ~/vast-install
-cd ~/vast-install
-wget https://console.vast.ai/install -O install
-read -rsp "Paste fresh Vast host setup key: " VAST_HOST_KEY
-echo
+mkdir -p ~/vast-install &&
+cd ~/vast-install &&
+wget https://console.vast.ai/install -O install &&
+IFS= read -r -s -p "Paste current Vast host setup key: " VAST_HOST_KEY &&
+printf '\n' &&
+[ -n "$VAST_HOST_KEY" ] &&
 sudo python3 ./install "$VAST_HOST_KEY" \
   --no-driver \
   --docker-partition /dev/mapper/vg1-lv--1 \
@@ -100,16 +101,16 @@ Common causes:
 - Blocked ports or low upload speed.
 - Storage quota/filesystem mismatch.
 
-Refresh the setup page, copy a fresh command, confirm host account access, and rerun the wizard. Use the wizard error, installer log, and daemon logs to decide what to fix.
+Use the wizard error, installer log, and daemon logs to identify and address the failed check. Confirm the intended host account, refresh the setup page and copy its current command before retrying the wizard.
 
 <span id="identify-4xx" aria-hidden="true" />
 ### Daemon identify or API 4xx errors
 
-If the installer or daemon logs show an HTTP 4xx while registering or identifying the machine, work through these causes in order:
+If the installer or daemon logs show an HTTP 4xx while registering or identifying the machine, retain the response and check the following possible causes:
 
-1. **Truncated or mangled setup key.** Always copy the full command with the setup page's copy button; a partial paste fails authentication. Get a fresh command and rerun.
+1. **Truncated or mangled setup command.** Use the setup page’s copy button to obtain the complete current command for the intended account. Check for a partial paste or unintended edits before retrying; use the actual response to investigate any remaining authentication error.
 2. **Setup command or key rejected.** Refresh the setup page and copy its current installer command before retrying. Do not infer the key lifetime or account-agreement state from an HTTP 403 alone.
-3. **Account not converted to a host account.** The API rejects machines from client-only accounts. See [Host Account and Agreement](/host/account-hosting-agreement#agreement-stuck).
+3. **Account hosting setup incomplete.** Confirm that you selected the intended host account and completed its hosting agreement flow. See [Host Account and Agreement](/host/account-hosting-agreement#agreement-stuck).
 4. **Stale installer.** If you are reusing a downloaded installer, return to the setup page and download its current version before retrying. Retain the failing URL and HTTP response from the log if the fresh installer still fails.
 
 If the log shows a local driver, Docker, or cgroup error rather than an API 4xx, use the general causes above and [Host Diagnostics](/host/common-errors-diagnostics#logs).

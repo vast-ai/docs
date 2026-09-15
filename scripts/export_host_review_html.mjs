@@ -12,6 +12,7 @@ import { PAYOUT_PATH } from './current_host_payout_provider_correction.mjs';
 import { PAYOUT_TERMS_PATH } from './current_host_payout_terms_correction.mjs';
 import { CLOSURE_PATH } from './current_host_closure_correction.mjs';
 import { SOURCE_FAMILY_PATH, SOURCE_FAMILY_ATTEMPT } from './current_host_source_family_review.mjs';
+import { SETUP_METRICS_PATH, SETUP_METRICS_ATTEMPT } from './current_host_setup_metrics_review.mjs';
 import { TEAMS_CONSOLE_PATH, TEAMS_CONSOLE_ATTEMPT } from './current_host_teams_console_review.mjs';
 import { DIAGNOSTICS_SSH_PATH, DIAGNOSTICS_SSH_ATTEMPT } from './current_host_diagnostics_ssh_review.mjs';
 import { CONTINUATION_PATH, CONTINUATION_ATTEMPT } from './current_host_continuation_review.mjs';
@@ -352,7 +353,7 @@ export function buildReport() {
   const model = JSON.parse(bytes);
   const ownerQuestions = requireHostReviewOwnerQuestions({ read, model, modelSha256: sha(bytes) });
   const authorityScan = loadCurrentHostReviewTransition({ read, model });
-  const selectedResult = authorityScan?.teamsConsole?.resultRef || authorityScan?.diagnosticsSsh?.resultRef || authorityScan?.continuation?.resultRef || authorityScan?.evidenceReuse?.resultRef || authorityScan?.sourceFamily?.resultRef || authorityScan?.closure?.resultRef || (authorityScan?.payoutInvoice ? payoutInvoiceResultPath : (authorityScan?.payoutTerms ? payoutTermsResultPath : (authorityScan?.payoutProvider ? payoutProviderResultPath : (authorityScan?.cleanup?.resultRef || (authorityScan?.jurisdiction ? `${JURISDICTION_ATTEMPT}/result.md` : authorityScan?.terms ? `${TERMS_ATTEMPT}/result.md` : authorityScan ? `${AUTHORITY_SCAN_ATTEMPT}/result.md` : currentResultPath)))));
+  const selectedResult = authorityScan?.setupMetrics?.resultRef || authorityScan?.teamsConsole?.resultRef || authorityScan?.diagnosticsSsh?.resultRef || authorityScan?.continuation?.resultRef || authorityScan?.evidenceReuse?.resultRef || authorityScan?.sourceFamily?.resultRef || authorityScan?.closure?.resultRef || (authorityScan?.payoutInvoice ? payoutInvoiceResultPath : (authorityScan?.payoutTerms ? payoutTermsResultPath : (authorityScan?.payoutProvider ? payoutProviderResultPath : (authorityScan?.cleanup?.resultRef || (authorityScan?.jurisdiction ? `${JURISDICTION_ATTEMPT}/result.md` : authorityScan?.terms ? `${TERMS_ATTEMPT}/result.md` : authorityScan ? `${AUTHORITY_SCAN_ATTEMPT}/result.md` : currentResultPath)))));
   const claims = model.pages.flatMap(page => page.claims.map(claim => ({ ...claim, route: page.route, page_title: page.title })));
   const ids = new Set(claims.map(c => c.id));
   if (ids.size !== claims.length || claims.length !== model.counts.claims) throw new Error('Claim inventory mismatch');
@@ -548,6 +549,19 @@ export function buildReport() {
     for (const source of review.registry.sources) add(source.before_artifact.path, source.before_artifact.sha256);
     for (const artifact of review.registry.artifacts) add(artifact.path, artifact.sha256);
   }
+  if (authorityScan?.setupMetrics) {
+    const review = authorityScan.setupMetrics;
+    add(SETUP_METRICS_PATH, review.registrySha256);
+    add(`${SETUP_METRICS_ATTEMPT}/inventory.json`, authorityScan.artifactHashes.get(`${SETUP_METRICS_ATTEMPT}/inventory.json`));
+    add(review.registry.scope.path, review.registry.scope.sha256);
+    add(review.baseline, review.baselineSha256);
+    add(review.resultRef);
+    // The successor registry explicitly lists its approved, shareable records.
+    // Preserve earlier source-family/closure evidence above; never crawl raw
+    // captures or infer a new evidence scope from files present on disk.
+    for (const source of review.registry.sources) add(source.before_artifact.path, source.before_artifact.sha256);
+    for (const artifact of review.registry.artifacts) add(artifact.path, artifact.sha256);
+  }
   for (const ref of installationIntake.artifactRefs) add(ref);
   add(currentResultPath); add(currentAuthorityBaselinePath); add(claimCorrectionResultPath);
   for (const ref of currentAttemptArtifacts) add(ref);
@@ -581,7 +595,8 @@ export function buildReport() {
       evidenceReuseTransitions: authorityScan?.evidenceReuse?.registry.transitions || [],
       continuationTransitions: authorityScan?.continuation?.registry.transitions || [],
       diagnosticsSshTransitions: authorityScan?.diagnosticsSsh?.registry.transitions || [],
-      teamsConsoleTransitions: authorityScan?.teamsConsole?.registry.transitions || []}), (_, value) => typeof value === 'string' ? sanitize(value) : value)),
+      teamsConsoleTransitions: authorityScan?.teamsConsole?.registry.transitions || [],
+      setupMetricsTransitions: authorityScan?.setupMetrics?.registry.transitions || []}), (_, value) => typeof value === 'string' ? sanitize(value) : value)),
     owner_questions: JSON.parse(JSON.stringify({ registry_ref: ownerQuestions.registryRef, registry_sha256: ownerQuestions.registrySha256,
       questions: ownerQuestions.questions }, (_, value) => typeof value === 'string' ? sanitize(value) : value)),
     cleanup_transition: authorityScan?.cleanup ? {registry_ref: 'verification/current-host-review-cleanup.json', registry_sha256: authorityScan.cleanup.registrySha256,
@@ -628,6 +643,12 @@ export function buildReport() {
       reviewed_claims:authorityScan.teamsConsole.registry.transitions.length,
       wording_corrections:authorityScan.teamsConsole.registry.transitions.filter(entry => entry.decision === 'correction').length,
       limit:authorityScan.teamsConsole.registry.limits} : null,
+    setup_metrics_transition: authorityScan?.setupMetrics ? {registry_ref:SETUP_METRICS_PATH, attempt_ref:SETUP_METRICS_ATTEMPT,
+      registry_sha256:authorityScan.setupMetrics.registrySha256, baseline_ref:authorityScan.setupMetrics.baseline,
+      baseline_sha256:authorityScan.setupMetrics.baselineSha256, result_ref:authorityScan.setupMetrics.resultRef,
+      reviewed_claims:authorityScan.setupMetrics.registry.transitions.length,
+      wording_corrections:authorityScan.setupMetrics.registry.transitions.filter(entry => entry.decision === 'correction').length,
+      limit:authorityScan.setupMetrics.registry.limits} : null,
     closure_transition: authorityScan?.closure ? {registry_ref:CLOSURE_PATH, registry_sha256:authorityScan.closure.registrySha256,
       baseline_ref:authorityScan.closure.baseline, baseline_sha256:authorityScan.closure.baselineSha256,
       result_ref:authorityScan.closure.resultRef, changed_claims:authorityScan.closure.registry.transitions.length,

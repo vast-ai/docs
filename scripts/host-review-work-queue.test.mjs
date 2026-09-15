@@ -100,6 +100,11 @@ test('export carries the shared queue without changing any claim status, lanes, 
     assert.equal(payload.current_result_ref,payload.cleanup_transition.result_ref);
     for(const ref of [payload.cleanup_transition.registry_ref,payload.cleanup_transition.baseline_ref,...payload.cleanup_transition.context_refs])assert.ok(payload.files[ref],ref);
   }
+  if(payload.setup_metrics_transition) {
+    const review=payload.setup_metrics_transition;assert.equal(review.reviewed_claims,117);
+    for(const ref of [review.registry_ref,review.baseline_ref,review.result_ref])assert.ok(payload.files[ref],ref);
+    for(const artifact of JSON.parse(payload.files[review.registry_ref].text).artifacts)assert.ok(payload.files[artifact.path],artifact.path);
+  }
   if(payload.teams_console_transition) {
     const review=payload.teams_console_transition;assert.equal(review.reviewed_claims,121);
     for(const ref of [review.registry_ref,review.baseline_ref,review.result_ref])assert.ok(payload.files[ref],ref);
@@ -117,7 +122,7 @@ test('export carries the shared queue without changing any claim status, lanes, 
     for(const artifact of registry.artifacts)assert.ok(payload.files[artifact.path],artifact.path);
   }
   if(payload.evidence_reuse_transition) {
-    assert.equal(payload.current_result_ref,(payload.teams_console_transition||payload.diagnostics_ssh_transition||payload.continuation_transition||payload.evidence_reuse_transition).result_ref);
+    assert.equal(payload.current_result_ref,(payload.setup_metrics_transition||payload.teams_console_transition||payload.diagnostics_ssh_transition||payload.continuation_transition||payload.evidence_reuse_transition).result_ref);
     for(const ref of [payload.evidence_reuse_transition.registry_ref,payload.evidence_reuse_transition.baseline_ref,
       payload.evidence_reuse_transition.result_ref,payload.source_family_transition.result_ref,payload.closure_transition.result_ref])assert.ok(payload.files[ref],ref);
     const registry=JSON.parse(payload.files[payload.evidence_reuse_transition.registry_ref].text);

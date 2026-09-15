@@ -43,17 +43,20 @@ sudo python3 ./install "$VAST_HOST_KEY" --ports 40000 40799
 For an installed host:
 
 ```bash
-echo -n "40000-40799" | sudo tee /var/lib/vastai_kaalia/host_port_range
+# Apply network changes during planned maintenance after reviewing active rentals.
+printf %s "40000-40799" | sudo tee /var/lib/vastai_kaalia/host_port_range &&
+sudo cat /var/lib/vastai_kaalia/host_port_range &&
 sudo systemctl restart vastai.service
-sudo tail -n 50 /var/lib/vastai_kaalia/kaalia.log | grep host_port_range
+# Inspect daemon output separately for startup or network errors.
+sudo tail -n 50 /var/lib/vastai_kaalia/kaalia.log
 ```
 
-The log should show `host_port_range: 40000 40799`.
+Confirm that the stored range is `40000-40799` and matches your router/firewall rules. Check daemon logs for errors after the restart, then test reachability from outside the LAN; reading back the file does not prove that forwarding works.
 
 <span id="cgnat-starlink-ipv6" aria-hidden="true" />
 ## CGNAT, Starlink, IPv6-Only, Or No Public IP
 
-Vast instances need public inbound TCP and UDP reachability. CGNAT, double NAT without a real public forwarding path, many residential Starlink setups, incompatible IPv6-only service, blocked inbound ports, or no public inbound IP are not supported for hosting because renters and self-test must be able to reach the machine directly.
+Vast hosting requires a public IPv4 address with inbound TCP and UDP forwarding for the configured direct-port range. CGNAT and shared ISP addresses are not supported by the published setup requirements. With double NAT or an IPv6-only service, establish a working public IPv4 forwarding path before listing; an outbound internet connection alone is insufficient.
 
 Compare your router WAN IP with your public IP and test from outside the LAN. If the router does not have a public inbound address or cannot forward the configured ports to the host, use a network connection that provides public inbound connectivity before listing the machine.
 
@@ -118,7 +121,7 @@ During self-test, troubleshoot the exact public IP and port reported by the CLI,
 
 ## Connectivity Failures
 
-Self-test timeouts and `Port Networking Issues` usually mean a network-path problem. [`vericode=8`](/host/glossary#vericode) means a host-facing machine error is present; use the exact visible message to confirm whether it is the port-networking case. See [Self-Test Reference: vericode=8](/host/self-test-reference#vericode-8) and [no response for 120s](/host/self-test-reference#no-response-120s).
+`Port Networking Issues` indicates that the platform’s inbound port-reachability check could not connect. A self-test timeout can also involve a missing progress server, a crashed container, or a stalled test; inspect the reported stage and logs. [`vericode=8`](/host/glossary#vericode) means a host-facing machine error is present; use the exact visible message to identify the cause. See [Self-Test Reference: vericode=8](/host/self-test-reference#vericode-8) and [no response for 120s](/host/self-test-reference#no-response-120s).
 
 ## Related Pages
 
