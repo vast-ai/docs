@@ -91,8 +91,8 @@ export function buildHostReviewQueue(claims) {
  * Page grouping is deliberately transparent: it asserts no shared root cause.
  * UNVALIDATED alone never creates a finding or workflow follow-up.
  */
-export function buildHostReviewIssues({pages, ownerQuestions, originalFindings = [], sourceFamilyTransitions = [], evidenceReuseTransitions = [], continuationTransitions = []}) {
-  if (!Array.isArray(pages) || !Array.isArray(ownerQuestions) || !Array.isArray(sourceFamilyTransitions) || !Array.isArray(evidenceReuseTransitions) || !Array.isArray(continuationTransitions)) throw new Error('Issue view requires current pages, validated owner questions and explicit review transitions');
+export function buildHostReviewIssues({pages, ownerQuestions, originalFindings = [], sourceFamilyTransitions = [], evidenceReuseTransitions = [], continuationTransitions = [], diagnosticsSshTransitions = []}) {
+  if (!Array.isArray(pages) || !Array.isArray(ownerQuestions) || !Array.isArray(sourceFamilyTransitions) || !Array.isArray(evidenceReuseTransitions) || !Array.isArray(continuationTransitions) || !Array.isArray(diagnosticsSshTransitions)) throw new Error('Issue view requires current pages, validated owner questions and explicit review transitions');
   const claims = pages.flatMap(page => page.claims);
   const ids = new Set(claims.map(claim => claim.id));
   if (ids.size !== claims.length) throw new Error('Issue view requires distinct passage IDs');
@@ -101,7 +101,7 @@ export function buildHostReviewIssues({pages, ownerQuestions, originalFindings =
   // same occurrence supersedes its earlier follow-up, including a later PASS
   // or FAIL; it must not leave an obsolete UNVALIDATED card on the landing page.
   const latestTransitions = new Map();
-  for (const batch of [sourceFamilyTransitions, evidenceReuseTransitions, continuationTransitions]) {
+  for (const batch of [sourceFamilyTransitions, evidenceReuseTransitions, continuationTransitions, diagnosticsSshTransitions]) {
     const seen = new Set();
     for (const entry of batch) {
       if (!entry?.claim_id || seen.has(entry.claim_id)) throw new Error('Issue view requires distinct transition IDs within each review');

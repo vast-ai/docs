@@ -1,0 +1,2665 @@
+DCGM Diagnostics
+#
+Overview
+#
+The NVIDIA Validation Suite (NVVS) is now called DCGM Diagnostics. As of DCGM v1.5,
+running NVVS as a standalone utility is now deprecated and all the functionality (including command line options)
+is available via the DCGM command-line utility (‘dcgmi’). For brevity, the rest of the document may use DCGM Diagnostics and NVVS interchangeably.
+DCGM Diagnostic Goals
+#
+DCGM Diagnostics are designed to:
+Provide a system-level tool, in production environments, to assess cluster
+readiness levels before a workload is deployed.
+Facilitate multiple run modes:
+Interactive via an administrator or user in plain text.
+Scripted via another tool with easily parseable output.
+Provide multiple test timeframes to facilitate different preparedness or failure conditions:
+Level 1 tests to use as a readiness metric
+Level 2 tests to use as an epilogue on failure
+Level 3 and Level 4 tests to be run by an administrator as post-mortem
+Integrate the following concepts into a single tool to discover deployment, system
+software and hardware configuration issues, basic diagnostics, integration issues, and relative system performance.
+Deployment and Software Issues
+NVML library access and versioning
+CUDA library access and versioning
+Software conflicts
+Hardware Issues and Diagnostics
+Pending Page Retirements
+PCIe interface checks
+NVLink interface checks
+Framebuffer and memory checks
+Compute engine checks
+Integration Issues
+PCIe replay counter checks
+Topological limitations
+Permissions, driver, and cgroups checks
+Basic power and thermal constraint checks
+Stress Checks
+Power and thermal stress
+Throughput stress
+Constant relative system performance
+Maximum relative system performance
+Memory Bandwidth
+Provide troubleshooting help
+Easily integrate into Cluster Scheduler and Cluster Management applications
+Reduce downtime and failed GPU jobs
+Beyond the Scope of the DCGM Diagnostics
+#
+DCGM Diagnostics are not designed to:
+Provide comprehensive hardware diagnostics
+Actively fix problems
+Replace the field diagnosis tools. Please refer to
+http://docs.nvidia.com/deploy/hw-field-diag/index.html
+for that process.
+Facilitate any RMA process. Please refer to
+http://docs.nvidia.com/deploy/rma-process/index.html
+for those procedures.
+Run Levels and Tests
+#
+The following table describes which tests are run at each Level in DCGM Diagnostics.
+Plugin
+Test name (measured on Hopper GPU systems)
+r1 (Short)
+< 2.5 Seconds.
+r2 (Medium)
+< 2.5 mins on 4 GPU systems, < 10.5 mins on 8 GPU systems.
+r3 (Long)
+< 10 mins on 4 GPU systems, < 35 mins on 8 GPU systems.
+r4 (Extra Long)
+< 45 mins on 4 GPU systems, < 2.25 hours on 8 GPU systems.
+Software
+software
+Yes
+Yes
+Yes
+Yes
+PCIe + NVLink
+pcie
+Yes
+Yes
+Yes
+GPU Memory
+memory
+Yes
+Yes
+Yes
+Memory Bandwidth
+memory_bandwidth
+Yes
+Yes
+Yes
+Diagnostics
+diagnostic
+Yes
+Yes
+Targeted Stress
+targeted_stress
+Yes
+Yes
+Targeted Power
+targeted_power
+Yes
+Yes
+NVBandwidth
+nvbandwidth
+Yes
+Yes
+NCCL Tests
+nccl_tests
+Yes
+Yes
+Memory Stress
+memtest
+Yes
+Input EDPp
+pulse
+Yes
+Getting Started with DCGM Diagnostics
+#
+Command Line options
+#
+The various command line options are designed to control general execution parameters,
+whereas detailed changes to execution behavior are contained within the configuration files
+detailed in the next section.
+The following table lists the various options supported by DCGM Diagnostics:
+Short option
+Long option
+Parameter
+Description
+-g
+--group
+groupId
+The device group ID to query.
+--host
+IP/FQDN
+Connects to specified IP or fully-qualified domain
+name. To connect to a host engine that was
+started with -d (unix socket), prefix the unix
+socket filename with
+unix://
+. [default =
+localhost
+]
+-h
+--help
+Displays usage information and exits.
+-r
+--run
+diag
+Run a diagnostic. (Note: higher numbered tests
+include all beneath.):
+1 - Quick (System Validation
+2 - Medium (Extended System Validation)
+3 - Long (System HW Diagnostics)
+4 - Extended (Longer-running System HW Diagnostics)
+Specific tests to run may be specified by name,
+and multiple tests may be specified as a comma
+separated list. For example, the command:
+dcgmi diag -r “pcie,diagnostic”
+would run the PCIe and Diagnostic tests
+together.
+-p
+--parameters
+test_name.variable_name=variable_name
+Test parameters to set for this run.
+-c
+--configfile
+full/path/to/config/file
+Path to the configuration file.
+-f
+--fakeGpuListfakeGpuList
+A comma-separated list of the fake gpus on which
+the diagnostic should run. For internal/testing
+use only. Cannot be used with
+-g/-i
+.
+-i
+--entity-id
+entityId
+A comma-separated list of GPU and CPU entities on which the
+diagnostic should run. Cannot be used with
+-g
+.
+Bare numbers are interpreted as GPU IDs.
+-v
+-verbose
+Show information and warnings for each test.
+statsonfail
+Only output the statistics files if there was a
+failure
+--debugLogFiledebug
+file
+--statspath
+plugin statistics path
+Write the plugin statistics to the given path rather than the current
+directory
+-d
+--debugLevel
+debug level
+Debug level (One of NONE, FATAL, ERROR, WARN,
+INFO, DEBUG, VERB). Default: DEBUG. The logfile
+can be specified by the –debugLogFile
+parameter.
+-j
+--json
+Print the output in a json format.
+--clocksevent-mask
+Specify which clocks event reasons should be
+ignored. You can provide a comma separated list
+of reasons. For example, specifying ‘HW_SLOWDOWN
+,SW_THERMAL’ would ignore the HW_SLOWDOWN and
+SW_THERMAL reasons. Alternatively, you
+can specify the integer value of the ignore
+bitmask. For the bitmask, multiple reasons may be
+specified by the sum of their bit masks. For
+example, specifying ‘40’ would ignore the
+HW_SLOWDOWN and SW_THERMAL reasons.
+Valid clocks event reasons and their corresponding
+bitmasks (given in parentheses) are:
+HW_SLOWDOWN (8)
+SW_THERMAL (32)
+HW_THERMAL (64)
+HW_POWER_BRAKE (128)
+--throttle-mask
+Deprecated: please use
+--clocksevent-mask
+instead.
+--fail-early
+Enable early failure checks for the Targeted Power
+, Targeted Stress, and Diagnostic
+tests. When enabled, these tests check for a
+failure once every 5 seconds (can be modified by
+the –check-interval parameter) while the test is
+running instead of a single check performed after
+the test is complete. Disabled by default.
+--check-intervalfailure
+check interval
+Specify the interval (in seconds)
+at which the early failure checks should occur
+for the Targeted Power, Targeted Stress, SM
+Stress, and Diagnostic tests when early failure
+checks are enabled. Default is once every 5
+seconds. Interval must be between 1 and 300
+--iterations
+iterations
+Specify a number of iterations of the diagnostic
+to run consecutively. (Must be greater than 0.)
+-t
+--timeout
+timeout
+Specify a timeout in seconds for the execution of the diagnostic.
+The default is unlimited.
+--ignoreErrorCodes
+error codes
+Specify diagnostic error codes to ignore on supported entities. For
+example,
+--ignoreErrorCodes
+"28,140"
+ignores error codes 28 and
+140 on all entities, while
+--ignoreErrorCodes
+"gpu0:28;gpu1:140"
+ignores error 28 on GPU 0 and error 140 on GPU 1.
+--ignore_rest
+Ignores the rest of the labeled arguments
+following this flag.
+Configuration File
+#
+The DCGM Diagnostics (
+dcgmi
+diag
+) configuration file is a
+YAML
+-formatted text file
+controlling the various tests and the execution parameters.
+The general format of the configuration file is shown below:
+version:
+spec: dcgm-diag-v1
+skus:
+- name: GPU-name
+id: GPU part number
+test_name1:
+test_parameter1: value
+test_parameter2: value
+test_name2:
+test_parameter1: value
+test_parameter2: value
+A standard configuration file for H100 would look like below:
+version: "@CMAKE_PROJECT_VERSION@"
+spec: dcgm-diag-v1
+skus:
+- name: H100 80GB PCIe
+id: 2331
+targeted_power:
+is_allowed: true
+starting_matrix_dim: 1024.0
+target_power: 350.0
+use_dgemm: false
+targeted_stress:
+is_allowed: true
+use_dgemm: false
+target_stress: 15375
+sm_stress:
+is_allowed: true
+target_stress: 15375.0
+use_dgemm: false
+pcie:
+is_allowed: true
+h2d_d2h_single_pinned:
+min_pci_generation: 3.0
+min_pci_width: 16.0
+h2d_d2h_single_unpinned:
+min_pci_generation: 3.0
+min_pci_width: 16.0
+memory:
+is_allowed: true
+l1cache_size_kb_per_sm: 192.0
+diagnostic:
+is_allowed: true
+matrix_dim: 8192.0
+memory_bandwidth:
+is_allowed: true
+minimum_bandwidth: 1230000
+pulse_test:
+is_allowed: true
+Environment
+#
+The
+nv-hostengine
+program accepts environment variables that control diagnostic execution. See
+environ(7)
+to learn about environment variables.
+NVVS_BIN_PATH
+Indicates the directory that diagnostic should search for the
+nvvs
+binary used to execute tests.
+NVVS_HANGDETECT_DISABLE
+When set, disables the diagnostic hang detection system. Hang detection is enabled by default and monitors diagnostic processes and threads for unresponsive behavior.
+NVVS_HANGDETECT_EXPIRY_SEC
+Sets the timeout period (in seconds) after which inactive diagnostic threads/processes are considered hung. Values must be at least 120 seconds and also be divisible by 60 (e.g., 120, 180, 300, 360).
+NVVS_PLUGIN_DIR
+Indicates the directory that diagnostic should search for plugins. The directory must be readable and traversable by
+nvvs
+.
+Exit Codes
+#
+The dcgmi command-line program returns exit codes that match internal errors
+from the
+dcgmReturn_t
+enumeration. However, while
+these are non-positive numbers (with zero indicating success), exit codes are
+non-negative so they are returned as the unsigned eight bit representation of
+the two’s complement error code. For example,
+-1
+would be returned as
+255
+.
+Furthermore, caught signals are indicated in the return code as 128 plus the
+value of the signal.
+While any value from
+dcgmReturn_t
+could
+theoretically be returned, the following are the ones currently used in
+dcgmi
+and its modules:
+Value
+Symbol
+Description
+0
+DCGM_ST_OK
+Success
+255
+DCGM_ST_BADPARAM
+A bad parameter was passed to a function
+253
+DCGM_ST_GENERIC_ERROR
+A generic, unspecified error
+252
+DCGM_ST_MEMORY
+An out of memory error occurred
+251
+DCGM_ST_NOT_CONFIGURED
+Setting not configured
+250
+DCGM_ST_NOT_SUPPORTED
+Feature not supported
+249
+DCGM_ST_INIT_ERROR
+DCGM Init error
+248
+DCGM_ST_NVML_ERROR
+When NVML returns error
+246
+DCGM_ST_UNINITIALIZED
+Object is in undefined state
+244
+DCGM_ST_VER_MISMATCH
+Version mismatch between received and understood API
+243
+DCGM_ST_UNKNOWN_FIELD
+Unknown field id
+242
+DCGM_ST_NO_DATA
+No data is available
+240
+DCGM_ST_NOT_WATCHED
+The given field id is not being updated by the cache manager
+237
+DCGM_ST_RESET_REQUIRED
+GPU requires a reset
+236
+DCGM_ST_FUNCTION_NOT_FOUND
+The function that was requested was not found (bindings only error)
+235
+DCGM_ST_CONNECTION_NOT_VALID
+The connection to the host engine is not valid any longer
+233
+DCGM_ST_GROUP_INCOMPATIBLE
+The GPUs of the provided group are not compatible with each other for
+the requested operation
+232
+DCGM_ST_MAX_LIMIT
+Max limit reached for the object
+231
+DCGM_ST_LIBRARY_NOT_FOUND
+DCGM library could not be found
+227
+DCGM_ST_REQUIRES_ROOT
+This operation cannot be performed when the host engine is running as
+non-root
+226
+DCGM_ST_NVVS_ERROR
+DCGM GPU Diagnostic was successfully executed, but reported an error.
+225
+DCGM_ST_INSUFFICIENT_SIZE
+An input argument is not large enough
+223
+DCGM_ST_MODULE_NOT_LOADED
+This request is serviced by a module of DCGM that is not currently loaded
+221
+DCGM_ST_GROUP_IS_EMPTY
+This group is empty and the requested operation is not valid on an
+empty group
+217
+DCGM_ST_DIAG_ALREADY_RUNNING
+A diag instance is already running, cannot run a new diag until the
+current one finishes.
+215
+DCGM_ST_DIAG_BAD_LAUNCH
+Error while launching the DCGM GPU Diagnostic
+209
+DCGM_ST_CHILD_NOT_KILLED
+Couldn’t kill a child process within the retries
+207
+DCGM_ST_INSUFFICIENT_RESOURCES
+Not enough resources available
+205
+DCGM_ST_NVVS_ISOLATE_ERROR
+The diagnostic returned an error that indicates the need for isolation
+204
+DCGM_ST_NVVS_BINARY_NOT_FOUND
+The NVVS binary was not found in the specified location
+203
+DCGM_ST_NVVS_KILLED
+The NVVS process was killed by a signal
+202
+DCGM_ST_PAUSED
+The hostengine and all modules are paused
+201
+DCGM_ST_ALREADY_INITIALIZED
+The object is already initialized
+198
+DCGM_ST_NVVS_NO_AVAILABLE_TEST
+The NVVS returns no available tests (NVVS_ST_TEST_NOT_FOUND)
+143
+Signal SIGTERM
+The program was terminated
+131
+Signal SIGQUIT
+The progam was asked to quit
+130
+Sigal SIGINT
+The program was interrupted
+129
+Signal SIGHUP
+The communication link was terminate
+As more plugins get created, this list may grow.
+Usage Examples
+#
+Custom Configuration File
+#
+The default configuration file can be overridden using the
+-c
+option.
+$
+dcgmi
+diag
+-r
+2
+-c
+custom-diag-tests.yaml
+where desired tests and parameters are included in the
+custom-diag-tests.yaml
+file.
+Tests and Parameters
+#
+Specific tests and parameters can be directly specified when running diagnostics:
+$
+dcgmi
+diag
+-r
+targeted_power
+-p
+targeted_power.target_power
+=
+300
+.0
+Iterations
+#
+DCGM also supports running tests suites in loops using the
+--iterations
+option. Using this
+option allows for increasing the runtime duration of the tests.
+$
+dcgmi
+diag
+-r
+pcie
+--iterations
+3
+Logging
+#
+By default, DCGM emits debugging information into logs that are stored under
+/var/log/nvidia-dcgm/nvvs.log
+.
+DCGM also provides a JSON output of the results of the tests, which allows for processing by various tools.
+$
+dcgmi
+diag
+-r
+pcie
+-j
+...
+{
+"category": "Integration",
+"tests": [
+{
+"name": "pcie",
+"results": [
+{
+"entity_group": "GPU",
+"entity_group_id": 1,
+"entity_id": 0,
+"info": [
+"GPU to Host bandwidth:\t\t13.53 GB/s",
+"Host to GPU bandwidth:\t\t12.05 GB/s",
+"bidirectional bandwidth:\t23.69 GB/s",
+"GPU to Host latency:\t\t0.791 us",
+"Host to GPU latency:\t\t1.201 us",
+"bidirectional latency:\t\t1.468 us"
+],
+"status": "Pass"
+}
+],
+"test_summary": {
+"status": "Pass"
+}
+}
+]
+}
+...
+Overview of Plugins
+#
+The NVIDIA Validation Suite consists of a series of plugins that are each designed to accomplish a different goal.
+Deployment Plugin
+#
+The deployment plugin’s purpose is to verify the compute environment is ready to run CUDA applications
+and is able to load the NVML library.
+Preconditions
+#
+LD_LIBRARY_PATH must include the path to the CUDA libraries, which for version X.Y of CUDA is normally
+/usr/local/cuda-X.Y/lib64
+, which can be set by running
+export
+LD_LIBRARY_PATH=/usr/local/cuda-X.Y/lib64
+The Linux nouveau driver must not be running, and should be blacklisted since it will conflict with the NVIDIA driver
+Configuration Parameters
+#
+None at this time.
+Stat Outputs
+#
+None at this time.
+Failure
+#
+The plugin will fail if:
+The corresponding device nodes for the target GPU(s) are being blocked by the operating system (e.g. cgroups)
+or exist without r/w permissions for the current user.
+The NVML library libnvidia-ml.so cannot be loaded
+The CUDA runtime libraries cannot be Loaded
+The nouveau driver is found to be loaded
+Any pages are pending retirement on the target GPU(s)
+Any pending row remaps or failed row remappings on the target GPU(s).
+Any other graphics processes are running on the target GPU(s) while the plugin runs
+Diagnostic Plugin
+#
+Overview
+#
+The Diagnostic plugin is part of the level 3 tests. It performs large matrix multiplies while
+copying data to various addresses in the frame buffer and checking that the data can be written
+and read correctly.
+This test performs large matrix multiplications; by default it will alternate running these
+multiplications at all available among 64, 32, and 16-bit precisions. It will also walk the frame
+buffer, writing values to different addresses and making sure that the values are written and read
+correctly.
+Test Description
+#
+This process will stress the GPU by having it draw a large amount of power and provide a high-level
+of throughput for five minutes (by default). During this process, the GPU will be monitored for all
+standard errors (XIDs, temperature violations, uncorrectable memory errors, etc.) as well as the
+correctness of data being written and read.
+Supported Parameters
+#
+The following table lists the global parameters for the diagnostic plugin:
+Parameter Name
+Type
+Default
+Description
+max_sbe_errors
+Double
+Blank
+This is the threshold beyond which SBE’s are treated as errors.
+test_duration
+Double
+180.0
+This is the time in seconds that the test should run.
+use_doubles
+String
+False
+This indicates doubles should be used instead of floats.
+temperature_max
+Double
+30.0
+This is the maximum temperature in degrees allowed during the test.
+is_allowed
+Bool
+False
+This is whether the specified test is allowed to run.
+matrix_dim
+Double
+2048.0 (8192.0 for Blackwell and newer)
+This is the starting dimension of the matrix used for S/Dgemm.
+precision
+String
+Half
+Single
+Double
+This is the precision to use: half, single, or double
+gflops_tolerance_pcnt
+Double
+0.0
+This is the percent of mean below which gflops are treated as errors. The mean is the mean for all GPUs on the system.
+always_use_tensor
+Bool
+False (True for Blackwell and newer)
+Instructs CUDA to use Tensor cores for calculations where possible.
+tolerance_pcnt
+Double
+0.0
+This is the percent of mean below which both clock speed and power usage would be treated as errors. If specified with clocks_tolerance_pcnt or power_tolerance_pcnt, those settings take precedence.
+clocks_tolerance_pcnt
+Double
+0.0
+This is the percent of mean below which clock speed would be treated as errors. The mean is the mean clock speed throughout the test for each GPU on the system.
+power_tolerance_pcnt
+Double
+0.0
+This is the percent of mean below which power usage would be treated as errors. The mean is the mean power usage throughout the test for each GPU on the system.
+Sample Commands
+#
+Run a quick diagnostic:
+Run the diagnostic for 5 minutes:
+$
+dcgmi
+diag
+-r
+3
+-p
+diagnostic.test_duration
+=
+300
+.0
+Run the diagnostic, stopping if max temperature exceeds 28 degrees:
+$
+dcgmi
+diag
+-r
+3
+-p
+diagnostic.temperature_max
+=
+28
+.0
+Run the diagnostic, with a smaller starting dimension for matrix operations:
+$
+dcgmi
+diag
+-r
+3
+-p
+diagnostic.matrix_dim
+=
+1024
+.0
+Run the diagnostic, reporting an error if a GPU reports gflops not within 60% of the mean gflops across all GPUs:
+$
+dcgmi
+diag
+-r
+3
+-p
+diagnostic.gflops_tolerance_pcnt
+=
+0
+.60
+Run the diagnostic, using double precision:
+$
+dcgmi
+diag
+-r
+3
+-p
+diagnostic.precision
+=
+double
+Failure Conditions
+#
+The test will fail if unrecoverable memory errors, temperature violations, or XIDs occur during the test.
+PCIe - GPU Bandwidth Plugin
+#
+Overview
+#
+The PCIe plugin’s purpose is to stress the communication from the host to the GPUs as well as among the GPUs
+on the system. It checks for p2p (peer-to-peer) correctness, any errors or replays while writing the data,
+and can be used to measure the bandwidth and latency to and from the GPUs and the host.
+Preconditions
+#
+None
+Sub tests
+#
+The plugin consists of several self-tests that each measure a different aspect of bandwidth or latency.
+Each subtest has either a pinned/unpinned pair or a p2p enabled/p2p disabled pair of identical tests.
+Pinned/unpinned tests use either pinned or unpinned memory when copying data between the host and the GPUs.
+This plugin will use NvLink to communicate between GPUs when possible. Otherwise, communication between
+GPUs will occur over PCIe
+Each sub test is represented with a tag that is used both for specifying configuration parameters for
+the sub test and for outputting stats for the sub test. P2p enabled/p2p disabled tests enable or disable
+GPUs writing and reading to and from each other directly rather than through the PCIe bus.
+Sub Test Tag
+Pinned/Unpinned
+P2P Enabled/P2P Disabled
+Description
+h2d_d2h_single_pinned
+Pinned
+Device <-> Host Bandwidth, one GPU at a time
+h2d_d2h_single_unpinned
+Unpinned
+Device <-> Host Bandwidth, one GPU at a time
+h2d_d2h_latency_pinned
+Pinned
+Device <-> Host Latency, one GPU at a time
+h2d_d2h_latency_unpinned
+Unpinned
+Device <-> Host Latency, one GPU at a time
+p2p_bw_p2p_enabled
+P2P Enabled
+Device <-> Device bandwidth one GPU pair at a time
+p2p_bw_p2p_disabled
+P2P Disabled
+Device <-> Device bandwidth one GPU pair at a time
+p2p_bw_concurrent_p2p_enabled
+P2P Enabled
+Device <-> Device bandwidth, concurrently,
+focusing on bandwidth between GPUs between GPUs likely to be
+directly connected to each other -> for each (index / 2) and (index / 2)+1
+p2p_bw_concurrent_p2p_disabled
+P2P Disabled
+Device <-> Device bandwidth, concurrently,
+focusing on bandwidth between GPUs between GPUs likely to be
+directly connected to each other -> for each (index / 2) and (index / 2)+1
+1d_exch_bw_p2p_enabled
+P2P Enabled
+Device <-> Device bandwidth, concurrently, focusing on bandwidth
+between gpus, every GPU either sending to the gpu with the index higher
+than itself (l2r) or to the gpu with the index lower than itself (r2l)
+1d_exch_bw_p2p_disabled
+P2P Disabled
+Device <-> Device bandwidth, concurrently, focusing on bandwidth between gpus,
+every GPU either sending to the gpu with the index higher than itself (l2r) or
+to the gpu with the index lower than itself (r2l)
+p2p_latency_p2p_enabled
+P2P Enabled
+Device <-> Device Latency, one GPU pair at a time
+p2p_latency_p2p_disabled
+P2P Disabled
+Device <-> Device Latency, one GPU pair at a time
+The following table lists the global parameters for the PCIe plugin.
+Parameter Name
+Type
+Default
+Description
+test_pinned
+Bool
+True
+Include subtests that test using pinned memory.
+test_unpinned
+Bool
+True
+Include subtests that test using unpinned memory.
+test_p2p_on
+Bool
+True
+Run relevant subtests with peer to peer (P2P) memory transfers between GPUs enabled.
+test_p2p_off
+Bool
+True
+Run relevant subtests with peer to peer (P2P) memory transfers between GPUs disabled.
+max_pcie_replays
+Float
+80.0
+Maximum number of PCIe replays to allow per GPU for the duration of this plugin. This is based on an expected replay rate less than per minute for PCIe Gen 3.0, assuming this plugin will run for less than a minute and allowing 10x as many replays before failure.
+The following table lists the parameters to specific subtests for the PCIe plugin.
+Parameter Name
+Default
+Sub Tests
+Description
+min_bandwidth
+0
+h2d_d2h_single_pinned, h2d_d2h_single_unpinned, h2d_d2h_concurrent_pinned, h2d_d2h_concurrent_unpinned
+Minimum bandwidth in GB/s that must be reached for this sub-test to pass.
+max_latency
+100,000
+h2d_d2h_latency_pinned, h2d_d2h_latency_unpinned
+Latency in microseconds that cannot be exceeded for this sub-test to pass.
+min_pci_generation
+1.0
+h2d_d2h_single_pinned, h2d_d2h_single_unpinned
+Minimum allowed PCI generation that the GPU must be at or exceed for this sub-test to pass.
+min_pci_width
+1.0
+h2d_d2h_single_pinned, h2d_d2h_single_unpinned
+Minimum allowed PCI width that the GPU must be at or exceed for this sub-test to pass. For example, 16x = 16.0.
+GPU Memory Plugin
+#
+Overview
+#
+The GPU Memory Plugin is a hardware diagnostic test that validates GPU memory integrity and functionality. It performs comprehensive memory testing to detect hardware faults, ECC errors, and memory corruption issues on NVIDIA GPUs.
+Test Description
+#
+The memory plugin consists of two main test components:
+Main Memory Test
+Purpose: Tests GPU memory allocation, writing, and reading operations
+Process:
+Allocates a significant portion of GPU memory (default 75% of total memory)
+Writes specific test patterns to memory using CUDA kernels
+Reads back the data and verifies integrity
+Uses 5 different test patterns: 0x00, 0xAA, 0x55, 0xFF, 0x00
+Detects memory mismatches and ECC errors
+L1 Cache Test
+Purpose: Tests L1 cache functionality and detects cache-related issues
+Requirements:
+Compute capability 7.0 or higher
+L1 cache size ≤ 256KB per SM
+Controlled by parameter
+l1_is_allowed
+Process: Performs cache operations and validates data integrity
+Supported Parameters
+#
+The following table lists the global parameters for the memory plugin.
+Parameter Name
+Type
+Default
+Description
+is_allowed
+Bool
+When unspecified, DCGM will search configuration files for an appropriate default for the specified GPU; if no entry is found, the parameter defaults to false.
+Specifies whether or not this test is allowed to run.
+The following table lists the parameters for the main memory test.
+Parameter Name
+Type
+Default
+Description
+minimum_allocation_percentage
+Double
+75.0
+Minimum percentage of GPU memory to allocate (0.0-100.0).
+max_free_memory_mb
+Double
+0.0
+Maximum amount of GPU memory which will be allocated for memory testing, specified in megabytes (MB). Supersedes minimum_allocation_percentage. If not specified,
+the test will allocate value of minimum_allocation_percentage for the GPU memory.
+The following table lists the parameters for the l1 cache test.
+Parameter Name
+Type
+Default
+Description
+l1_is_allowed
+Bool
+When unspecified, DCGM will search configuration files for an appropriate default for the specified GPU; if no entry is found, the parameter defaults to false.
+Enables/disables the L1 cache subtest.
+test_loops
+Double
+0
+Number of test loops.
+test_duration
+Double
+1.0
+Duration of L1 cache test in seconds (0 = run for test_loops).
+inner_iterations
+Double
+1024
+Number of inner iterations per test.
+log_len
+Double
+8192
+Length of error log for L1 cache test.
+dump_miscompares
+Bool
+True
+Whether to dump miscompare details.
+l1cache_size_kb_per_sm
+Double
+0
+L1 cache size per SM in KB.
+Sample Commands
+#
+Basic Memory Test
+$
+dcgmi
+diag
+-r
+memory
+-p
+"memory.is_allowed=True"
+With L1 Cache Test Enabled
+$
+dcgmi
+diag
+-r
+memory
+-p
+"memory.is_allowed=True;memory.l1_is_allowed=True"
+Controlling Memory Allocation with max_free_memory_mb
+$
+dcgmi
+diag
+-r
+memory
+-p
+"memory.is_allowed=True;memory.max_free_memory_mb=0.1"
+$
+dcgmi
+diag
+-r
+memory
+-p
+"memory.is_allowed=True;memory.max_free_memory_mb=512"
+$
+dcgmi
+diag
+-r
+memory
+-p
+"memory.is_allowed=True;memory.max_free_memory_mb=100"
+Failure Conditions
+#
+Memory Allocation Failure (
+DCGM_FR_MEMORY_ALLOC
+)
+Cannot allocate the minimum required percentage of GPU memory.
+Memory Mismatch (
+DCGM_FR_MEMORY_MISMATCH
+)
+Data written to memory doesn’t match data read back
+CUDA Double-Bit Error (
+DCGM_FR_CUDA_DBE
+)
+CUDA detects uncorrectable double-bit ECC error
+L1 Cache Miscompare (
+DCGM_FR_L1TAG_MISCOMPARE
+)
+L1 cache test detects data corruption
+Targeted Power Plugin
+#
+Overview
+#
+The Targeted Power plugin is part of the level 3 and higher tests. Its goal is to drive a GPU towards TDP power usage and sustain that throughout the test in order to ensure that the GPU can perform under a power load. This is achieved by using matrix sizes and gemms that are emprically determined to sustain the required power load on the GPU.
+Test Description
+#
+This test’s core purpose is to sustain a high level of power usage. It relies on CUDA and performs large matrix multiplications simultaneously on each GPU in order to keep the GPUs busy and drawing power. Each GPU has a large workload that is sustained throughout the test; the workload does not pulse.
+Supported Parameters
+#
+The following table lists the global parameters for the targeted power plugin:
+Parameter Name
+Type
+Default
+Description
+test_duration
+Double
+120.0
+This is the time in seconds that the test should run.
+target_power
+Double
+Defaults to the GPU’s Thermal Design Power (TDP) - 1. For example, a GPU with a max power draw of 400.0 W would have a target of 399.0 watts.
+This is the target power that the test is attempting to achieve for this device.
+target_power_min_ratio
+Double
+75.0
+The minimum percentage of the target power that must be reached for the test to be considered passing.
+use_dgemm
+Bool
+True
+If set to true, the test will use 64 bit precision in its matrix multiplications instead of 32 bit.
+is_allowed
+Bool
+False
+Specifies whether or not this test is allowed to run.
+Sample Commands
+#
+Run the power test for 10 minutes:
+$
+dcgmi
+diag
+-r
+targeted_power
+-p
+targeted_power.test_duration
+=
+600
+.0
+Run the level 3 diagnostic with a 5 minute targeted power test:
+$
+dcgmi
+diag
+-r
+3
+-p
+targeted_power.test_duration
+=
+300
+.0
+Run the target power test targeting 200 W of power usage:
+$
+dcgmi
+diag
+-r
+targeted_power
+-p
+targeted_power.target_power
+=
+200
+.0
+Run the level 4 test, skipping targeted power:
+$
+dcgmi
+diag
+-r
+4
+-p
+targeted_power.is_allowed
+=
+false
+Run the targeted power test, using single precision (32 bit):
+$
+dcgmi
+diag
+-r
+targeted_power
+-p
+targeted_power.use_dgemm
+=
+false
+Failure Conditions
+#
+The test will fail if we cannot reach at least target_power_min_ratio (75% by default) of the target_power (TDP - 1 by default) during the test.
+The test will fail if unrecoverable memory errors, temperature violations, or XIDs occur during the test.
+Targeted Stress Plugin
+#
+Overview
+#
+The Targeted Stress plugin is part of the level 3 tests. The plugin maintains a
+constant stress level on the GPU by continuously queuing matrix operations and
+adjusting the workload to achieve the target performance.
+This test is designed to stress the GPU at a specific performance target rather than maximum stress,
+allowing for controlled performance testing and validation of GPU stability under sustained load.
+Test Description
+#
+The Targeted Stress plugin performs the following operations:
+Matrix Multiplication Operations
+: Continuously runs GEMM (General Matrix Multiply) operations
+using cuBLAS, alternating between single precision (SGEMM) and double precision (DGEMM) based on configuration.
+Performance Targeting
+: Monitors actual GPU performance and adjusts the workload to maintain
+the specified target performance level in GFLOPS.
+Multi-Stream Processing
+: Utilizes multiple CUDA streams per GPU to pipeline operations and
+maximize GPU utilization while maintaining the target stress level.
+Performance Validation
+: Ensures that the achieved performance meets the minimum ratio threshold
+of the target performance, accounting for memory transfer overhead.
+Health Monitoring
+: Continuously monitors GPU health metrics including temperature, memory errors,
+PCIe replays, and other standard error conditions.
+Supported Parameters
+#
+The following table lists the global parameters for the targeted stress plugin:
+Parameter Name
+Type
+Default
+Description
+test_duration
+Double
+30.0
+Duration of the test in seconds.
+target_stress
+Double
+100.0
+Target performance level in GFLOPS that the test should maintain.
+target_perf_min_ratio
+Double
+0.95
+Minimum ratio of achieved performance to target performance (0.0 to 1.0).
+temperature_max
+Double
+Blank
+Maximum allowed temperature in degrees Celsius during the test.
+is_allowed
+Bool
+See description
+Whether the targeted stress test is allowed to run. Must be “True” for the test to execute.
+Note: When unspecified, DCGM searches for configuration files for the specified GPU; if no configuration is found,
+the parameter defaults to “False”.
+use_dgemm
+Bool
+True
+Use double precision GEMM (DGEMM) instead of single precision (SGEMM).
+cuda_streams_per_gpu
+Double
+8.0
+Number of CUDA streams to use per GPU for pipelining operations.
+ops_per_stream_queue
+Double
+100.0
+Number of operations to queue per stream before waiting for completion.
+max_pcie_replays
+Double
+160.0
+Maximum allowed PCIe replay count during the test.
+max_memory_clock
+Double
+0.0
+Maximum allowed memory clock frequency (0.0 = no limit).
+max_graphics_clock
+Double
+0.0
+Maximum allowed graphics clock frequency (0.0 = no limit).
+max_sbe_errors
+Double
+Blank
+Threshold beyond which SBE (Single Bit Error) count constitutes a failure.
+Sample Commands
+#
+Run a quick targeted stress test for 2 minutes:
+$
+dcgmi
+diag
+-r
+targeted_stress
+-p
+targeted_stress.test_duration
+=
+120
+.0
+Run the targeted stress test targeting 200 GFLOPS performance:
+$
+dcgmi
+diag
+-r
+targeted_stress
+-p
+targeted_stress.target_stress
+=
+200
+.0
+Run the targeted stress test with single precision operations:
+$
+dcgmi
+diag
+-r
+targeted_stress
+-p
+targeted_stress.use_dgemm
+=
+False
+Run the targeted stress test with stricter performance requirements (90% of target):
+$
+dcgmi
+diag
+-r
+targeted_stress
+-p
+targeted_stress.target_perf_min_ratio
+=
+0
+.90
+Run the targeted stress test with temperature limit of 85°C:
+$
+dcgmi
+diag
+-r
+targeted_stress
+-p
+targeted_stress.temperature_max
+=
+85
+.0
+Run the targeted stress test with custom stream configuration:
+$
+dcgmi
+diag
+-r
+targeted_stress
+-p
+targeted_stress.cuda_streams_per_gpu
+=
+4
+.0
+-p
+targeted_stress.ops_per_stream_queue
+=
+50
+.0
+Run the targeted stress test as part of level 3 diagnostics:
+$
+dcgmi
+diag
+-r
+targeted_stress
+-p
+targeted_stress.test_duration
+=
+120
+.0
+Failure Conditions
+#
+The test will fail if achieved performance is below the minimum ratio threshold (
+target_perf_min_ratio
+, 95% by default) of the target performance (
+target_stress
+, 100 GFLOPS by default) during the test.
+The test will fail if unrecoverable memory errors, SBE count exceeds the specified threshold (
+max_sbe_errors
+), temperature violations, or XIDs occur during the test.
+The test will fail if PCIe replay count exceeds the specified maximum (
+max_pcie_replays
+, 160 by default) during the test.
+The test will fail if memory or graphics clock frequencies exceed specified limits (
+max_memory_clock
+and
+max_graphics_clock
+) during the test.
+Memtest Diagnostic
+#
+Overview
+#
+Beginning with 2.4.0 DCGM diagnostics support an additional level 4
+diagnostics (
+-r
+4
+). The first of these additional diagnostics is memtest.
+Similar to
+memtest86
+,
+the DCGM memtest will exercise GPU memory with various test patterns.
+These patterns each given a separate test and can be enabled and
+disabled by administrators.
+Test Descriptions
+#
+Note
+Test runtimes refer to average seconds per single iteration on a
+single A100 40gb GPU.
+Test0 [Walking 1 bit]
+- This test changes one bit at a time in
+memory to see if it goes to a different memory location. It is designed
+to test the address wires. Runtime: ~3 seconds.
+Test1 [Address check]
+- Each Memory location is filled with its own
+address followed by a check to see if the value in each memory location
+still agrees with the address. Runtime: < 1 second.
+Test 2 [Moving inversions, ones&zeros]
+- This test uses the moving
+inversions algorithm from memtest86 with patterns of all ones and zeros.
+Runtime: ~4 seconds.
+Test 3 [Moving inversions, 8 bit pat]
+- Same as test 1 but uses a 8
+bit wide pattern of “walking” ones and zeros. Runtime: ~4 seconds.
+Test 4 [Moving inversions, random pattern]
+- Same algorithm as test
+1 but the data pattern is a random number and it’s complement. A total
+of 60 patterns are used. The random number sequence is different with
+each pass so multiple passes can increase effectiveness. Runtime: ~2
+seconds.
+Test 5 [Block move, 64 moves]
+- This test moves blocks of memory.
+Memory is initialized with shifting patterns that are inverted every 8
+bytes. Then these blocks of memory are moved around. After the moves are
+completed the data patterns are checked. Runtime: ~1 second.
+Test 6 [Moving inversions, 32 bit pat]
+- This is a variation of the
+moving inversions algorithm that shifts the data pattern left one bit
+for each successive address. To use all possible data patterns 32 passes
+are made during the test. Runtime: ~155 seconds.
+Test 7 [Random number sequence]
+- A 1MB block of memory is
+initialized with random patterns. These patterns and their complements
+are used in moving inversion tests with rest of memory. Runtime: ~2 seconds.
+Test 8 [Modulo 20, random pattern]
+- A random pattern is generated.
+This pattern is used to set every 20th memory location in memory. The
+rest of the memory location is set to the compliment of the pattern.
+Repeat this for 20 times and each time the memory location to set the
+pattern is shifted right. Runtime: ~10 seconds.
+Test 9 [Bit fade test, 2 patterns]
+- The bit fade test initializes
+all memory with a pattern and then sleeps for 1 minute. Then memory is
+examined to see if any memory bits have changed. All ones and all zero
+patterns are used. Runtime: ~244 seconds.
+Test10 [Memory stress]
+- A random pattern is generated and a large
+kernel is launched to set all memory to the pattern. A new read and
+write kernel is launched immediately after the previous write kernel to
+check if there is any errors in memory and set the memory to the
+compliment. This process is repeated for 1000 times for one pattern. The
+kernel is written as to achieve the maximum bandwidth between the global
+memory and GPU. Runtime: ~6 seconds.
+Note
+By default Test7 and Test10 alternate for a period of 10 minutes. If any
+errors are detected the diagnostic will fail.
+Supported Parameters
+#
+Parameter
+Syntax
+Default
+test0
+boolean
+false
+test1
+boolean
+false
+test2
+boolean
+false
+test3
+boolean
+false
+test4
+boolean
+false
+test5
+boolean
+false
+test6
+boolean
+false
+test7
+boolean
+true
+test8
+boolean
+false
+test9
+boolean
+false
+test10
+boolean
+true
+test_duration
+seconds
+600
+Sample Commands
+#
+Run test7 and test10 for 10 minutes (this is the default):
+$
+dcgmi
+diag
+-r
+4
+Run each test serially for 1 hour then display results:
+$
+dcgmi
+diag
+-r
+4
+\
+-p
+memtest.test0
+=
+true
+\;
+memtest.test1
+=
+true
+\;
+memtest.test2
+=
+true
+\;
+memtest.test3
+=
+true
+\;
+memtest.test4
+=
+true
+\;
+memtest.test5
+=
+true
+\;
+memtest.test6
+=
+true
+\;
+memtest.test7
+=
+true
+\;
+memtest.test8
+=
+true
+\;
+memtest.test9
+=
+true
+\;
+memtest.test10
+=
+true
+\;
+memtest.test_duration
+=
+3600
+Run test0 for one minute 10 times, displaying the results each minute:
+$
+dcgmi
+diag
+\
+--iterations
+10
+\
+-r
+4
+\
+-p
+memtest.test0
+=
+true
+\;
+memtest.test7
+=
+false
+\;
+memtest.test10
+=
+false
+\;
+memtest.test_duration
+=
+60
+Pulse Test Diagnostic
+#
+Overview
+#
+The Pulse Test is part of the new level 4 tests. The pulse test is meant to fluctuate
+the power usage to create spikes in current flow on the board to ensure that the power
+supply is fully functional and can handle wide fluctuations in current.
+Test Description
+#
+By default, the test runs kernels with high transiency in order to create spikes in the current
+running to the GPU. Default parameters have been verified to create worst-case scenario failures
+by measuring with oscilloscopes.
+The test iteratively runs different kernels while tweaking internal parameters to ensure that
+spikes are produced; work across GPU is synchronized to create extra stress on the power supply.
+Parameter
+Description
+Default
+test_duration
+Seconds to spend on an iteration. This is
+not the exact amount of time the test will
+take.
+60
+patterns
+Specify a comman-separated list of pattern
+indices the pulse test should use.
+Valid indices depend on the type of SKU.
+Hopper: 0-22
+Ampere / Volta/ Ada: 0-20
+All
+Note
+In some cases with DCGM 2.4 and DCGM 3.0, users may encounter the following
+issue with running the Pulse test:
+| Pulse Test | Fail - All |
+| Warning | GPU 0There was an internal error during the t |
+| | est: 'The pulse test exited with non-zero sta |
+| | tus 1', GPU 0There was an internal error duri |
+| | ng the test: 'The pulse test reported the err |
+| | or: Exception raised during execution: Faile |
+| | d opening file ubergemm.log for writing: Perm |
+| | ission denied terminate called after throwing |
+| | an instance of 'boost::wrapexcept<boost::pro |
+| | perty_tree::xml_parser::xml_parser_error>' |
+| | what(): result.xml: cannot open file ' |
+When running GPU diagnostics, by default, DCGM drops privileges and uses a (unprivileged) service
+account to run the diagnostics. If the service account does not have write access to the directory
+where diagnostics are run, then users may encounter this issue. To summarize, the issue happens when
+both these conditions are true:
+The
+nvidia-dcgm
+service is active and the
+nv-hostengine
+process is running (and no changes
+have been made to DCGM’s default install configurations)
+The users attempts to run
+dcgmi
+diag
+-r
+4
+. In this case,
+dcgmi
+diag
+connects to the running
+nv-hostengine
+(which was started by default under
+/root
+) and thus the Pulse test is unable to
+create any logs.
+This issue will be fixed in a future release of DCGM. In the meantime, users can do either of the
+following to work-around the issue:
+Stop the
+nvidia-dcgm
+service before running the pulse_test
+$
+sudo
+systemctl
+stop
+nvidia-dcgm
+Now run the
+pulse_test
+:
+$
+dcgmi
+diag
+-r
+pulse_test
+Restart the
+nvidia-dcgm
+service once the diagnostics are completed:
+$
+sudo
+systemctl
+restart
+nvidia-dcgm
+Edit the
+systemd
+unit service file to include a
+WorkingDirectory
+option, so that
+the service is started in a location writeable by the
+nvidia-dcgm
+user (be sure that the
+directory shown in the example below
+/tmp/dcgm-temp
+is created):
+[Service]
+...
+WorkingDirectory=/tmp/dcgm-temp
+ExecStart=/usr/bin/nv-hostengine -n --service-account nvidia-dcgm
+...
+Reload the systemd configuration and start the
+nvidia-dcgm
+service:
+$
+sudo
+systemctl
+daemon-reload
+$
+sudo
+systemctl
+start
+nvidia-dcgm
+Sample Commands
+#
+Run the entire diagnostic suite, including the pulse test:
+$
+dcgmi
+diag
+-r
+4
+Run just the pulse test:
+$
+dcgmi
+diag
+-r
+pulse_test
+Run just the pulse test, but at a lower frequency:
+$
+dcgmi
+diag
+-r
+pulse_test
+-p
+pulse_test.freq0
+=
+3000
+Run just the pulse test at a lower frequency and for a shorter time:
+$
+dcgmi
+diag
+-r
+pulse_test
+-p
+"pulse_test.freq0=5000;pulse_test.test_duration=180"
+Failure Conditions
+#
+The pulse test will fail if the power supply unit cannot handle the spikes in the current.
+It will also fail if unrecoverable memory errors, temperature violations, or XIDs occur during the test.
+NVBandwidth Plugin
+#
+Overview
+#
+The NVBandwidth plugin is part of the level 3 and higher tests. NVBandwidth
+performs bandwidth measurements on NVIDIA GPUs on a single host.
+Test Description
+#
+NVBandwidth measures bandwidth for various memcpy patterns across different
+links using copy engine or kernel copy methods. nvbandwidth reports current
+measured bandwidth on your system. Additional system-specific tuning may be
+required to achieve maximal peak bandwidth. Tests are performed on GPUs on a
+single host only.  For more information, please see
+NVIDIA/nvbandwidth
+.
+Supported Products
+#
+DCGM will run the NVbandwidth test on the following GPU products:
+NVIDIA A800 (20bd)
+NVIDIA B100 (197f)
+NVIDIA B200 (1999, 199b, 20da)
+NVIDIA B300 (20e6)
+NVIDIA GH100-88K-A1
+NVIDIA GH100-888K (2342, 237f)
+NVIDIA H100 144GB HBM3
+NVIDIA H100 80GB HBM3
+NVIDIA H100NVL (2321, 233a)
+NVIDIA H200 (2335, 233b)
+NVIDIA H20A
+NVIDIA H20B
+NVIDIA H20 HBM3e
+NVIDIA H20 NVL16
+NVIDIA L2
+NVIDIA L20
+NVIDIA L20A
+NVIDIA L30
+NVIDIA L40S
+NVIDIA P2021
+NVIDIA PG153 SKU 210
+NVIDIA RTX 2000 Ada Generation
+NVIDIA RTX6000D
+Supported Parameters
+#
+The following table lists the global parameters for this plugin:
+Parameter Name
+Type
+Default
+Description
+testcases
+string
+The list of specific testcases to run, separated by
+,
+, e.g.:
+0,1,2
+.
+is_allowed
+Bool
+False
+Specifies whether or not this test is allowed to run.
+Sample Commands
+#
+Run the test with default parameters:
+$
+dcgmi
+diag
+-r
+nvbandwidth
+Run the test, specifying only testcase 1
+$
+dcgmi
+diag
+-r
+nvbandwidth
+-p
+nvbandwidth.testcases
+=
+1
+Run the test, specifying multiple testcases
+$
+dcgmi
+diag
+-r
+nvbandwidth
+-p
+nvbandwidth.testcases
+=
+1
+,2,3
+Run the level 3 test, indicating the nvbandwidth test should be allowed to run:
+$
+dcgmi
+diag
+-r
+3
+-p
+nvbandwidth.is_allowed
+=
+true
+Failure Conditions
+#
+The test will fail if the
+nvbandwidth
+executable cannot be found.
+The test will fail if current memory copy utilization (
+MCUTIL
+) is over 10% or cannot be retrieved.
+The test will fail if an error is encountered during nvbandwidth execution.
+Automating Responses to DCGM Diagnostic Failures
+#
+Overview
+#
+Automating workflows based on DCGM diagnostics can enable sites to handle
+GPU errors more efficiently. Additional data for determining the severity
+of errors and potential next steps is available using either the API or
+by parsing the JSON returned on the CLI. Besides simply reporting human
+readable strings of which errors occurred during the diagnostic, each
+error also includes a specific ID, Severity, and Category that can be
+useful when deciding how to handle the failure.
+The latest versions of these enums can be found in
+dcgm_errors.h
+.
+Error Category Enum
+VALUE
+DCGM_FR_EC_NONE
+0
+DCGM_FR_EC_PERF_THRESHOLD
+1
+DCGM_FR_EC_PERF_VIOLATION
+2
+DCGM_FR_EC_SOFTWARE_CONFIG
+3
+DCGM_FR_EC_SOFTWARE_LIBRARY
+4
+DCGM_FR_EC_SOFTWARE_XID
+5
+DCGM_FR_EC_SOFTWARE_CUDA
+6
+DCGM_FR_EC_SOFTWARE_EUD
+7
+DCGM_FR_EC_SOFTWARE_OTHER
+8
+DCGM_FR_EC_HARDWARE_THERMAL
+9
+DCGM_FR_EC_HARDWARE_MEMORY
+10
+DCGM_FR_EC_HARDWARE_NVLINK
+11
+DCGM_FR_EC_HARDWARE_NVSWITCH
+12
+DCGM_FR_EC_HARDWARE_PCIE
+13
+DCGM_FR_EC_HARDWARE_POWER
+14
+DCGM_FR_EC_HARDWARE_OTHER
+15
+DCGM_FR_EC_INTERNAL_OTHER
+16
+Error Severity Enum
+VALUE
+DCGM_ERROR_NONE
+0
+DCGM_ERROR_MONITOR
+1
+DCGM_ERROR_ISOLATE
+2
+DCGM_ERROR_UNKNOWN
+3
+DCGM_ERROR_TRIAGE
+4
+DCGM_ERROR_CONFIG
+5
+DCGM_ERROR_RESET
+6
+Error Enum
+Value
+Severity
+Category
+DCGM_FR_OK
+0
+DCGM_ERROR_UNKNOWN
+DCGM_FR_EC_NONE
+DCGM_FR_UNKNOWN
+1
+DCGM_ERROR_UNKNOWN
+DCGM_FR_EC_NONE
+DCGM_FR_UNRECOGNIZED
+2
+DCGM_ERROR_UNKNOWN
+DCGM_FR_EC_NONE
+DCGM_FR_PCI_REPLAY_RATE
+3
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_PCIE
+DCGM_FR_VOLATILE_DBE_DETECTED
+4
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_MEMORY
+DCGM_FR_VOLATILE_SBE_DETECTED
+5
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_HARDWARE_MEMORY
+DCGM_FR_PENDING_PAGE_RETIREMENTS
+6
+DCGM_ERROR_RESET
+DCGM_FR_EC_HARDWARE_MEMORY
+DCGM_FR_RETIRED_PAGES_LIMIT
+7
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_MEMORY
+DCGM_FR_RETIRED_PAGES_DBE_LIMIT
+8
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_MEMORY
+DCGM_FR_CORRUPT_INFOROM
+9
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_HARDWARE_OTHER
+DCGM_FR_CLOCKS_EVENT_THERMAL
+10
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_HARDWARE_THERMAL
+DCGM_FR_POWER_UNREADABLE
+11
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_HARDWARE_POWER
+DCGM_FR_CLOCKS_EVENT_POWER
+12
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_HARDWARE_POWER
+DCGM_FR_NVLINK_ERROR_THRESHOLD
+13
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_NVLINK
+DCGM_FR_NVLINK_DOWN
+14
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_HARDWARE_NVLINK
+DCGM_FR_NVSWITCH_FATAL_ERROR
+15
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_NVSWITCH
+DCGM_FR_NVSWITCH_NON_FATAL_ERROR
+16
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_HARDWARE_NVSWITCH
+DCGM_FR_NVSWITCH_DOWN
+17
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_HARDWARE_NVSWITCH
+DCGM_FR_NO_ACCESS_TO_FILE
+18
+DCGM_ERROR_CONFIG
+DCGM_FR_EC_SOFTWARE_OTHER
+DCGM_FR_NVML_API
+19
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_SOFTWARE_LIBRARY
+DCGM_FR_DEVICE_COUNT_MISMATCH
+20
+DCGM_ERROR_CONFIG
+DCGM_FR_EC_SOFTWARE_OTHER
+DCGM_FR_BAD_PARAMETER
+21
+DCGM_ERROR_UNKNOWN
+DCGM_FR_EC_INTERNAL_OTHER
+DCGM_FR_CANNOT_OPEN_LIB
+22
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_SOFTWARE_LIBRARY
+DCGM_FR_DENYLISTED_DRIVER
+23
+DCGM_ERROR_CONFIG
+DCGM_FR_EC_SOFTWARE_CONFIG
+DCGM_FR_NVML_LIB_BAD
+24
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_SOFTWARE_LIBRARY
+DCGM_FR_GRAPHICS_PROCESSES
+25
+DCGM_ERROR_RESET
+DCGM_FR_EC_SOFTWARE_OTHER
+DCGM_FR_HOSTENGINE_CONN
+26
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_INTERNAL_OTHER
+DCGM_FR_FIELD_QUERY
+27
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_INTERNAL_OTHER
+DCGM_FR_BAD_CUDA_ENV
+28
+DCGM_ERROR_CONFIG
+DCGM_FR_EC_SOFTWARE_CUDA
+DCGM_FR_PERSISTENCE_MODE
+29
+DCGM_ERROR_CONFIG
+DCGM_FR_EC_SOFTWARE_OTHER
+DCGM_FR_LOW_BANDWIDTH
+30
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_HARDWARE_PCIE
+DCGM_FR_HIGH_LATENCY
+31
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_HARDWARE_PCIE
+DCGM_FR_CANNOT_GET_FIELD_TAG
+32
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_INTERNAL_OTHER
+DCGM_FR_FIELD_VIOLATION
+33
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_OTHER
+DCGM_FR_FIELD_THRESHOLD
+34
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_PERF_VIOLATION
+DCGM_FR_FIELD_VIOLATION_DBL
+35
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_PERF_VIOLATION
+DCGM_FR_FIELD_THRESHOLD_DBL
+36
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_PERF_VIOLATION
+DCGM_FR_UNSUPPORTED_FIELD_TYPE
+37
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_INTERNAL_OTHER
+DCGM_FR_FIELD_THRESHOLD_TS
+38
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_PERF_THRESHOLD
+DCGM_FR_FIELD_THRESHOLD_TS_DBL
+39
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_PERF_THRESHOLD
+DCGM_FR_THERMAL_VIOLATIONS
+40
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_HARDWARE_THERMAL
+DCGM_FR_THERMAL_VIOLATIONS_TS
+41
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_HARDWARE_THERMAL
+DCGM_FR_TEMP_VIOLATION
+42
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_HARDWARE_THERMAL
+DCGM_FR_CLOCKS_EVENT_VIOLATION
+43
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_HARDWARE_OTHER
+DCGM_FR_INTERNAL
+44
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_INTERNAL_OTHER
+DCGM_FR_PCIE_GENERATION
+45
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_HARDWARE_PCIE
+DCGM_FR_PCIE_WIDTH
+46
+DCGM_ERROR_CONFIG
+DCGM_FR_EC_HARDWARE_PCIE
+DCGM_FR_ABORTED
+47
+DCGM_ERROR_CONFIG
+DCGM_FR_EC_SOFTWARE_OTHER
+DCGM_FR_TEST_DISABLED
+48
+DCGM_ERROR_CONFIG
+DCGM_FR_EC_SOFTWARE_CONFIG
+DCGM_FR_CANNOT_GET_STAT
+49
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_INTERNAL_OTHER
+DCGM_FR_STRESS_LEVEL
+50
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_PERF_THRESHOLD
+DCGM_FR_CUDA_API
+51
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_SOFTWARE_CUDA
+DCGM_FR_FAULTY_MEMORY
+52
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_MEMORY
+DCGM_FR_CANNOT_SET_WATCHES
+53
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_INTERNAL_OTHER
+DCGM_FR_CUDA_UNBOUND
+54
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_SOFTWARE_CUDA
+DCGM_FR_ECC_DISABLED
+55
+DCGM_ERROR_CONFIG
+DCGM_FR_EC_HARDWARE_MEMORY
+DCGM_FR_MEMORY_ALLOC
+56
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_SOFTWARE_OTHER
+DCGM_FR_CUDA_DBE
+57
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_MEMORY
+DCGM_FR_MEMORY_MISMATCH
+58
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_MEMORY
+DCGM_FR_CUDA_DEVICE
+59
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_SOFTWARE_CUDA
+DCGM_FR_ECC_UNSUPPORTED
+60
+DCGM_ERROR_CONFIG
+DCGM_FR_EC_HARDWARE_MEMORY
+DCGM_FR_ECC_PENDING
+61
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_HARDWARE_MEMORY
+DCGM_FR_MEMORY_BANDWIDTH
+62
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_PERF_THRESHOLD
+DCGM_FR_TARGET_POWER
+63
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_HARDWARE_POWER
+DCGM_FR_API_FAIL
+64
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_SOFTWARE_OTHER
+DCGM_FR_API_FAIL_GPU
+65
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_SOFTWARE_OTHER
+DCGM_FR_CUDA_CONTEXT
+66
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_SOFTWARE_CUDA
+DCGM_FR_DCGM_API
+67
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_INTERNAL_OTHER
+DCGM_FR_CONCURRENT_GPUS
+68
+DCGM_ERROR_CONFIG
+DCGM_FR_EC_SOFTWARE_CONFIG
+DCGM_FR_TOO_MANY_ERRORS
+69
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_SOFTWARE_OTHER
+DCGM_FR_NVLINK_CRC_ERROR_THRESHOLD
+70
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_NVLINK
+DCGM_FR_NVLINK_ERROR_CRITICAL
+71
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_NVLINK
+DCGM_FR_ENFORCED_POWER_LIMIT
+72
+DCGM_ERROR_CONFIG
+DCGM_FR_EC_HARDWARE_POWER
+DCGM_FR_MEMORY_ALLOC_HOST
+73
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_SOFTWARE_OTHER
+DCGM_FR_GPU_OP_MODE
+74
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_SOFTWARE_CONFIG
+DCGM_FR_NO_MEMORY_CLOCKS
+75
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_HARDWARE_MEMORY
+DCGM_FR_NO_GRAPHICS_CLOCKS
+76
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_HARDWARE_OTHER
+DCGM_FR_HAD_TO_RESTORE_STATE
+77
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_SOFTWARE_OTHER
+DCGM_FR_L1TAG_UNSUPPORTED
+78
+DCGM_ERROR_CONFIG
+DCGM_FR_EC_SOFTWARE_OTHER
+DCGM_FR_L1TAG_MISCOMPARE
+79
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_MEMORY
+DCGM_FR_ROW_REMAP_FAILURE
+80
+DCGM_ERROR_RESET
+DCGM_FR_EC_HARDWARE_MEMORY
+DCGM_FR_UNCONTAINED_ERROR
+81
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_SOFTWARE_XID
+DCGM_FR_EMPTY_GPU_LIST
+82
+DCGM_ERROR_CONFIG
+DCGM_FR_EC_SOFTWARE_CONFIG
+DCGM_FR_DBE_PENDING_PAGE_RETIREMENTS
+83
+DCGM_ERROR_RESET
+DCGM_FR_EC_HARDWARE_MEMORY
+DCGM_FR_UNCORRECTABLE_ROW_REMAP
+84
+DCGM_ERROR_RESET
+DCGM_FR_EC_HARDWARE_MEMORY
+DCGM_FR_PENDING_ROW_REMAP
+85
+DCGM_ERROR_RESET
+DCGM_FR_EC_HARDWARE_MEMORY
+DCGM_FR_BROKEN_P2P_MEMORY_DEVICE
+86
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_OTHER
+DCGM_FR_BROKEN_P2P_WRITER_DEVICE
+87
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_OTHER
+DCGM_FR_NVSWITCH_NVLINK_DOWN
+88
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_NVLINK
+DCGM_FR_EUD_BINARY_PERMISSIONS
+89
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_SOFTWARE_EUD
+DCGM_FR_EUD_NON_ROOT_USER
+90
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_SOFTWARE_EUD
+DCGM_FR_EUD_SPAWN_FAILURE
+91
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_SOFTWARE_EUD
+DCGM_FR_EUD_TIMEOUT
+92
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_SOFTWARE_EUD
+DCGM_FR_EUD_ZOMBIE
+93
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_SOFTWARE_EUD
+DCGM_FR_EUD_NON_ZERO_EXIT_CODE
+94
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_SOFTWARE_EUD
+DCGM_FR_EUD_TEST_FAILED
+95
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_SOFTWARE_EUD
+DCGM_FR_FILE_CREATE_PERMISSIONS
+96
+DCGM_ERROR_CONFIG
+DCGM_FR_EC_SOFTWARE_CONFIG
+DCGM_FR_PAUSE_RESUME_FAILED
+97
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_INTERNAL_OTHER
+DCGM_FR_PCIE_H_REPLAY_VIOLATION
+98
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_PCIE
+DCGM_FR_GPU_EXPECTED_NVLINKS_UP
+99
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_HARDWARE_NVLINK
+DCGM_FR_NVSWITCH_EXPECTED_NVLINKS_UP
+100
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_HARDWARE_NVLINK
+DCGM_FR_XID_ERROR
+101
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_SOFTWARE_XID
+DCGM_FR_SBE_VIOLATION
+102
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_MEMORY
+DCGM_FR_DBE_VIOLATION
+103
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_MEMORY
+DCGM_FR_PCIE_REPLAY_VIOLATION
+104
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_PCIE
+DCGM_FR_SBE_THRESHOLD_VIOLATION
+105
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_MEMORY
+DCGM_FR_DBE_THRESHOLD_VIOLATION
+106
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_MEMORY
+DCGM_FR_PCIE_REPLAY_THRESHOLD_VIOLATION
+107
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_PCIE
+DCGM_FR_CUDA_FM_NOT_INITIALIZED
+108
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_SOFTWARE_CUDA
+DCGM_FR_SXID_ERROR
+109
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_SOFTWARE_XID
+DCGM_FR_GFLOPS_THRESHOLD_VIOLATION
+110
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_PERF_VIOLATION
+DCGM_FR_NAN_VALUE
+111
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_MEMORY
+DCGM_FR_FABRIC_MANAGER_TRAINING_ERROR
+112
+DCGM_ERROR_CONFIG
+DCGM_FR_EC_SOFTWARE_CUDA
+DCGM_FR_BROKEN_P2P_PCIE_MEMORY_DEVICE
+113
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_PCIE
+DCGM_FR_BROKEN_P2P_PCIE_WRITER_DEVICE
+114
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_PCIE
+DCGM_FR_BROKEN_P2P_NVLINK_MEMORY_DEVICE
+115
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_NVLINK
+DCGM_FR_BROKEN_P2P_NVLINK_WRITER_DEVICE
+116
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_NVLINK
+DCGM_FR_TEST_SKIPPED
+117
+DCGM_ERROR_CONFIG
+DCGM_FR_EC_SOFTWARE_CONFIG
+DCGM_FR_SRAM_THRESHOLD
+118
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_MEMORY
+DCGM_FR_NVLINK_EFFECTIVE_BER_THRESHOLD
+119
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_NVLINK
+DCGM_FR_FALLEN_OFF_BUS
+120
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_OTHER
+DCGM_FR_NVLINK_SYMBOL_BER_THRESHOLD
+121
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_NVLINK
+DCGM_FR_IMEX_UNHEALTHY
+122
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_SOFTWARE_OTHER
+DCGM_FR_FABRIC_PROBE_STATE
+123
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_HARDWARE_NVLINK
+DCGM_FR_BINARY_PERMISSIONS
+124
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_SOFTWARE_OTHER
+DCGM_FR_GPU_RECOVERY_RESET
+125
+DCGM_ERROR_RESET
+DCGM_FR_EC_HARDWARE_OTHER
+DCGM_FR_GPU_RECOVERY_REBOOT
+126
+DCGM_ERROR_ISOLATE
+DCGM_FR_EC_HARDWARE_OTHER
+DCGM_FR_GPU_RECOVERY_DRAIN_P2P
+127
+DCGM_ERROR_RESET
+DCGM_FR_EC_HARDWARE_OTHER
+DCGM_FR_GPU_RECOVERY_DRAIN_RESET
+128
+DCGM_ERROR_RESET
+DCGM_FR_EC_HARDWARE_OTHER
+DCGM_FR_NCCL_ERROR
+129
+DCGM_ERROR_RESET
+DCGM_FR_EC_HARDWARE_OTHER
+DCGM_FR_RETEST_REQUESTED
+130
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_SOFTWARE_OTHER
+DCGM_FR_CONTAINED_ERROR
+131
+DCGM_ERROR_MONITOR
+DCGM_FR_EC_SOFTWARE_XID
+DCGM_FR_UNCORRECTABLE_ROW_REMAP_LIMIT
+132
+DCGM_ERROR_TRIAGE
+DCGM_FR_EC_HARDWARE_MEMORY
+These relationships are codified in
+dcgm_errors.c
+.
+In general, DCGM has high confidence that errors with the ISOLATE and
+RESET severities should be handled immediately. Other severities may
+require more site-specific analysis, a re-run of the diagnostic, or a
+scanning of DCGM and system logs to determine the best course of action.
+Gathering and recording the failure types and rates over time can give
+datacenters insight into the best way to automate handling of GPU
+diagnostic errors.
+Memory Bandwidth Plugin
+#
+Overview
+#
+The Memory Bandwidth plugin tests and validates the memory bandwidth performance of individual NVIDIA GPUs.
+It measures how fast each GPU can read from and write to its own memory, which is critical for applications
+that require high memory throughput.
+The plugin targets the following aspects of GPU memory performance:
+Memory Bandwidth: Measures the rate at which data can be read from and written to GPU memory within a single GPU
+Memory Subsystem Stability: Validates that the memory subsystem can handle sustained high-bandwidth operations without errors
+Memory Performance Validation: Ensures the GPU meets expected memory performance thresholds
+Test Description
+#
+This test performs memory bandwidth measurements using the STREAM benchmark’s TRIAD operation. It allocates
+large memory arrays on each GPU and runs intensive memory operations to stress the memory subsystem. During
+this process, the GPU will be monitored for memory errors, CUDA errors, and performance thresholds.
+The test runs multiple iterations with different memory access patterns to find the optimal configuration for
+each GPU and measure the sustainable memory bandwidth. It validates that each GPU can achieve the specified
+minimum bandwidth threshold, ensuring the memory subsystem is performing as expected for high-bandwidth workloads.
+The Memory Bandwidth plugin implements the STREAM benchmark, which consists of four main memory operations:
+COPY: a(i) = b(i) - Simple memory copy operation
+SCALE: a(i) = q*b(i) - Memory copy with scaling
+SUM: a(i) = b(i) + c(i) - Memory copy with addition
+TRIAD: a(i) = b(i) + q*c(i) - Memory copy with scaling and addition
+The plugin focuses on the TRIAD operation, which is the most memory-intensive and provides the best measure
+of sustainable memory bandwidth. This operation is chosen because it requires reading from two memory locations
+and writing to a third, represents a common pattern in scientific computing and data processing, provides the
+most comprehensive measure of memory bandwidth, and tests both read and write operations simultaneously.
+The test allocates memory based on the configured memory size parameter (default: 67,108,864 elements × 4 bytes x 3 arrays = 756MB per GPU allocated), runs
+TRIAD operations with different memory access patterns, measures bandwidth for each configuration, finds optimal
+performance and compares against the minimum threshold, and reports results including achieved bandwidth and any
+errors encountered.
+The test validates that each GPU can achieve the specified minimum bandwidth threshold, ensuring the memory subsystem
+is performing as expected for high-bandwidth workloads.
+Preconditions
+#
+NVIDIA GPU with CUDA support
+CUDA driver and runtime installed
+DCGM host engine running
+GPU memory must be available for allocation
+Parameters
+#
+The following table lists the parameters for the Memory Bandwidth plugin.
+Parameter Name
+Type
+Default
+Description
+minimum_bandwidth
+Double
+100.0
+Minimum bandwidth in MB/s that must be achieved for the test to pass.
+is_allowed
+String
+See description
+Whether this test is allowed to run. Must be “True” for the test to execute.
+Note: When unspecified, DCGM searches for configuration files for the specified GPU; if no configuration is found,
+the parameter defaults to “False”.
+max_sbe_errors
+Double
+DCGM_FP64_BLANK
+Threshold for single-bit error (SBE) detection. If set, the test will fail if SBE count exceeds this threshold.
+run_if_gom_enabled
+String
+“True”
+Whether to run the test if GPU Operating Mode (GOM) is enabled.
+logfile
+String
+“stats_membw.json”
+Output file for test statistics and results.
+logfile_type
+Double
+0.0
+Type of log file output format.
+memory_size_mb
+Double
+756.0
+Total memory size in MB to allocate for the bandwidth test. Must be between 6 MB (minimum) and 756 MB (maximum).
+When not specified, defaults to 756 MB. This is the total memory size for all arrays a, b, and c.
+ignore_error_codes
+String
+“”
+Comma-separated list of DCGM field result (
+DCGM_FR_*
+) error codes to ignore during test execution. These are specific
+error codes defined by the DCGM framework that can be suppressed if they are expected.
+Test Categories
+#
+The Memory Bandwidth plugin belongs to the following test categories:
+Stress: Performs intensive operations to validate system stability under load
+Sample Commands
+#
+Run a basic memory bandwidth test:
+$
+dcgmi
+diag
+-r
+memory_bandwidth
+-p
+"memory_bandwidth.is_allowed=True"
+Run the test with a custom minimum bandwidth threshold:
+$
+dcgmi
+diag
+-r
+memory_bandwidth
+-p
+"memory_bandwidth.is_allowed=True;memory_bandwidth.minimum_bandwidth=500"
+Run the test with a custom log file:
+$
+dcgmi
+diag
+-r
+memory_bandwidth
+-p
+"memory_bandwidth.is_allowed=True;memory_bandwidth.logfile=my_membw_test.json"
+Run the test with multiple parameters:
+$
+dcgmi
+diag
+-r
+memory_bandwidth
+-p
+"memory_bandwidth.is_allowed=True;memory_bandwidth.minimum_bandwidth=300;memory_bandwidth.logfile=detailed_membw.json"
+Failure Conditions
+#
+The test will fail if the achieved bandwidth is below the minimum bandwidth threshold
+The test will fail if unrecoverable memory errors or CUDA errors occur during the test
+The test will fail if the SBE error count exceeds the
+max_sbe_errors
+threshold (when set)
+NCCL Tests Plugin
+#
+Important
+This plugin will not be available unless the required environment variable is set. See the Configuration section in the Prerequisites section for details.
+Overview
+#
+NCCL (pronounced “Nickel”) is a library providing inter-GPU communication primitives that are topology-aware and can be easily integrated into applications. NCCL Tests check both the performance and the correctness of NCCL operations. For more information about NCCL and its test suite, see the
+NCCL documentation
+and the
+NCCL Tests repository
+.
+The NCCL Tests plugin, part of the diag Level 3 tests, validates system readiness for NCCL-based workloads by testing communication correctness on single-node systems.
+Note
+: This plugin only runs single-node NCCL tests and does not require MPI support. Multi-node NCCL tests are not currently supported.
+Prerequisites
+#
+Before running the NCCL Tests plugin, ensure the following prerequisites are met:
+Software Requirements
+:
+NCCL library (
+libnccl.so
+) - not bundled with DCGM, must be installed separately.
+NCCL Tests project - not bundled with DCGM, must be built/installed separately from the NCCL Tests repository.
+CUDA toolkit (required by NCCL).
+Permissions
+:
+NCCL Library
+: Read permission (dynamically loaded, not directly executed by the plugin)
+NCCL Test Binary
+: The following permissions are required based on how DCGM is running:
+When running as non-root
+:
+Must be a regular file (not a directory, device, or pipe etc…).
+Must have read and execute permissions.
+When running as root
+(additional security checks enforced):
+Must be owned by root user and root group (
+uid
+0
+,
+gid
+0
+).
+Must not be writable by group or other users.
+Must be executable by the owner.
+Must be a regular file (not a directory, device, or pipe etc…).
+Symlinks are automatically resolved to their canonical path before validation.
+Configuration
+:
+The
+DCGM_NCCL_TESTS_BIN_PATH
+environment variable must be set to a valid directory containing the NCCL test binaries before starting nv-hostengine or nvidia-dcgm service.
+The plugin will be gracefully disabled and skipped if this environment variable is not set or points to an invalid directory.
+Test Description
+#
+The NCCL Tests plugin validates NCCL functionality on the system by executing test binaries from the NCCL Tests project. These tests verify that NCCL collective communication operations work correctly across the GPUs in the system.
+Plugin Validation
+:
+The plugin performs the following validation checks:
+Binary Execution
+: Verifies the test binary can be launched successfully.
+Exit Code Check
+: Ensures the binary exits with code 0 (non-zero exit codes result in test failure)
+Output Parsing and Validation
+: If the binary executes successfully, the plugin parses the test output and validates that NCCL operations completed correctly without errors.
+Supported Parameters
+#
+The following table lists the parameters for the NCCL Tests plugin:
+Parameter Name
+Type
+Default
+Description
+is_allowed
+Bool
+True
+Specifies whether this test is allowed to run. When set to False, the test will be skipped.
+Environment Variables
+:
+The plugin requires the following environment variables:
+DCGM_NCCL_TESTS_BIN_PATH
+: Path to the directory containing NCCL test binaries (e.g.,
+/opt/nccl-tests/bin
+or
+/usr/local/nccl-tests/build
+)
+If this environment variable is not set, the plugin will be gracefully disabled and will not appear in the diagnostic output.
+Sample Commands
+#
+Configure environment variables for DCGM running as a systemd service:
+#
+Add
+environment
+variables
+via
+systemd
+override
+$
+sudo
+systemctl
+edit
+nvidia-dcgm
+#
+Add
+the
+following
+lines
+in
+the
+editor
+that
+opens:
+[Service]
+Environment="DCGM_NCCL_TESTS_BIN_PATH=/path/to/nccl-tests/"
+#
+Save
+and
+exit,
+then
+restart
+the
+service
+$
+sudo
+systemctl
+restart
+nvidia-dcgm
+#
+Run
+the
+NCCL
+tests
+$
+dcgmi
+diag
+-r
+nccl_tests
+Run the NCCL tests as a standalone diagnostic with custom binary location:
+#
+Set
+environment
+variables
+and
+run
+nv-hostengine
+$
+export
+DCGM_NCCL_TESTS_BIN_PATH
+=
+/path/to/nccl-tests/
+$
+nv-hostengine
+#
+Run
+the
+NCCL
+tests
+$
+dcgmi
+diag
+-r
+nccl_tests
+Run the level 3 diagnostic including the NCCL tests (assuming nv-hostengine is running with the environment variables set):
+$
+dcgmi
+diag
+-r
+3
+Failure Conditions
+#
+The plugin will report a failure if:
+The test binary cannot be executed or exits with a non-zero status code.
+When running DCGM as root, the binary fails security checks (incorrect ownership or permissions).
+The test output cannot be parsed correctly.
+Any of the validation criteria described in the
+Plugin Validation
+section are not met.
+Runtime
+#
+The NCCL Tests plugin typically completes in a few minutes, depending on:
+The number of GPUs in the system
+The interconnect topology and bandwidth
+Systems with more GPUs or slower interconnects may take longer to complete the test.

@@ -9,11 +9,14 @@ import { loadPayoutProviderCorrection } from './current_host_payout_provider_cor
 import { loadPayoutTermsCorrection } from './current_host_payout_terms_correction.mjs';
 import { loadClosureCorrection } from './current_host_closure_correction.mjs';
 import { loadPayoutInvoiceCorrection } from './current_host_payout_invoice_correction.mjs';
+import { loadDiagnosticsSshReview } from './current_host_diagnostics_ssh_review.mjs';
 import { loadContinuationReview } from './current_host_continuation_review.mjs';
 import { loadEvidenceReuseReview } from './current_host_evidence_reuse_review.mjs';
 import { loadSourceFamilyReview } from './current_host_source_family_review.mjs';
 
 export function loadCurrentHostReviewTransition({read, model, exists}) {
+  const diagnosticsSsh = loadDiagnosticsSshReview({read, model, exists});
+  if (diagnosticsSsh) return diagnosticsSsh;
   const continuation = loadContinuationReview({read, model, exists});
   if (continuation) return continuation;
   const evidenceReuse = loadEvidenceReuseReview({read, model, exists});
