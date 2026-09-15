@@ -25,9 +25,10 @@ def prior_module():
 def index(model): return {c['id']:c for p in model['pages'] for c in p['claims']}
 def without_nodes(node): return {k:v for k,v in node.items() if k!='nodes'}
 
-def project(root: Path):
+def project(root: Path, frozen_source_overrides=None):
     root=root.resolve();pre=prior_module()
-    def read(ref): return pre.safe(root,ref).read_bytes()
+    frozen_source_overrides = frozen_source_overrides or {}
+    def read(ref): return frozen_source_overrides.get(ref, pre.safe(root,ref).read_bytes())
     def pin(ref,wanted):
         raw=read(ref);req(sha(raw)==wanted,'digest drift '+ref);return raw
     registry=json.loads(pin(REGISTRY,REGISTRY_SHA256))
@@ -59,7 +60,7 @@ def project(root: Path):
         if ref not in before:pin(ref,wanted)
     amendment=json.loads(pin(ATTEMPT+'/owner-context-amendment.json',OWNER_AMENDMENT_SHA256))
     owner_before=pin(amendment['before_artifact']['path'],amendment['before_artifact']['sha256'])
-    baseline=pre.project(root,frozen_source_overrides={**before,OWNER:owner_before})
+    baseline=pre.project(root,frozen_source_overrides={**frozen_source_overrides,**before,OWNER:owner_before})
     req(objhash(baseline)==baseline_check['baseline_model_canonical_sha256'],'complete predecessor differs from baseline')
     old=index(baseline)
     req({cid:objhash(c) for cid,c in old.items()}==baseline_check['claim_hashes'],'baseline claim inventory')

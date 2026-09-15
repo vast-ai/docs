@@ -95,7 +95,7 @@ If you are starting from a raw disk, create a partition first. The [Headless Ins
 <span id="fstab-example" aria-hidden="true" />
 ## Example fstab Line
 
-Use the disk UUID, not a device name like `/dev/nvme0n1p1`:
+Use the filesystem UUID, not a device name like `/dev/nvme0n1p1`:
 
 ```text
 UUID=a1b2c3d4-e5f6-7890-abcd-ef1234567890  /var/lib/docker  xfs  rw,auto,pquota,nofail  0  0
@@ -116,14 +116,14 @@ The mount should be XFS, include `pquota` or `prjquota`, and show project quota 
 
 One NVMe is simplest. Multiple NVMes in RAID0 can improve capacity and throughput, but RAID0 has no redundancy: one failed drive can break the array.
 
-Redundant RAID layouts only help if you know when a device has failed. Set up disk health monitoring and failure notifications for the RAID layer, NVMe/SMART health, and any controller or storage software you use. Without notifications, a degraded array can leave you blind until another failure causes downtime or data loss.
+Monitor redundant RAID arrays so you notice a failed device and can restore redundancy. Configure health checks and failure notifications for the RAID layer, NVMe/SMART health, and any storage controller or software you use. An unnoticed degraded array can suffer downtime or data loss if further failures exceed its remaining redundancy.
 
 Pick the layout that matches your reliability goals, then monitor it like production storage.
 
 <span id="pquota-error" aria-hidden="true" />
 ## Docker pquota Error
 
-`--storage-opt is supported only for overlay over xfs with pquota` means Docker storage is not on XFS with project quotas.
+`--storage-opt is supported only for overlay over xfs with pquota` means Docker could not use the required XFS project-quota backing storage. Check the actual Docker mount, filesystem type, and quota options:
 
 Move Docker's data root to a correctly mounted XFS filesystem, verify quotas, then restart Docker and the host software.
 

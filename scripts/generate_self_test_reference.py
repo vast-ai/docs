@@ -213,7 +213,7 @@ def preflight_threshold(check: dict[str, Any], system_ram_cap_mib: int) -> str:
     if check_id == "system.ram":
         return f"System RAM >= min(0.95 * total GPU VRAM, {system_ram_cap_mib:,} MiB)"
     if check_id == "cpu.cores":
-        return "Physical CPU cores >= listed GPUs"
+        return "`offer.cpu_cores` >= 2 × `num_gpus`"
     if check_id == "network.direct_ports.recommended_max":
         return "direct ports <= 64 * listed GPUs"
     return f"{check.get('operator', '')} {check.get('required', '')} {check.get('unit', '')}".strip()
@@ -226,8 +226,8 @@ def preflight_purpose(check: dict[str, Any]) -> str:
         return "The CLI flags counts above 64 ports per listed GPU as an advisory about oversized mappings."
     if check["id"] == "cpu.cores":
         return (
-            "The tester expects at least one physical CPU core per listed GPU. "
-            "Hyperthreads/logical CPUs do not count as physical cores."
+            "The CLI checks the reported offer core count against twice the listed GPU count. "
+            "This check does not establish how `offer.cpu_cores` was measured."
         )
     return check["purpose"]
 
@@ -238,7 +238,7 @@ def preflight_remediation(check: dict[str, Any]) -> str:
     if check["id"] == "cuda.version":
         return "Update the NVIDIA driver/CUDA stack, then confirm the machine is listed and healthy in the Console."
     if check["id"] == "cpu.cores":
-        return "Add physical CPU cores or reduce the listed GPU count for this offer."
+        return "Check the reported core count and GPU count; add CPU capacity or reduce the listed GPU count if this preflight gate is unmet."
     return check["remediation"]
 
 
@@ -246,9 +246,9 @@ def runtime_thresholds(system_ram_cap_mib: int) -> dict[str, str]:
     return {
         "image_started": "The runtime container starts and writes the first progress event.",
         "system_requirements": (
-            "Each GPU has at least 98% free VRAM; system RAM is at least "
+            "For each visible GPU, PyTorch allocated plus reserved memory must be at most 2% of its reported VRAM; system RAM is at least "
             f"95% of total GPU VRAM capped at {system_ram_cap_mib:,} MiB; "
-            "there is at least 1 visible physical CPU core per visible GPU. "
+            "there are at least 2 physical CPU cores per visible GPU, counted with `psutil.cpu_count(logical=False)`. "
             "Hyperthreads/logical CPUs do not count as physical cores."
         ),
         "resnet": "A CUDA ResNet18 workload completes on the visible GPU set at any tested batch size.",

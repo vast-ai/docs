@@ -64,7 +64,7 @@ The chart covers the last 7 days by default. Every metric has a button above it:
 | --- | --- |
 | User CPU | Time spent running programs, including your clients' workloads |
 | System CPU | Time spent in the kernel on the programs' behalf: syscalls, drivers, filesystem and network work |
-| CPU I/O Wait | Time the CPU sat idle with a disk read or write still outstanding. High I/O wait points at storage as the bottleneck, not the processor |
+| CPU I/O Wait | Time accounted to waiting for I/O. High values are a reason to investigate storage alongside disk metrics and workload behavior; this counter alone does not identify the bottleneck |
 | Idle CPU | Time the CPU had nothing to do |
 | CPU Steal | Time the CPU was ready to run but the hypervisor gave the cycles to someone else. Only meaningful if the machine is itself a virtual guest; it stays at zero on bare metal |
 | Load (1m) | Average number of processes running or waiting to run over the last minute. Compare it against the machine's core count: a load well above the core count means work is queuing |
@@ -73,11 +73,11 @@ The chart covers the last 7 days by default. Every metric has a button above it:
 
 | Metric | What it means |
 | --- | --- |
-| Total Memory | RAM installed and visible to the operating system |
+| Total Memory | Usable RAM reported by the operating system, excluding reserved memory and kernel binary code |
 | Free Memory | RAM not in use for anything at all. This normally sits low on a healthy machine and is not a problem on its own |
-| Available Memory | RAM that new work can actually claim, including cache the kernel can reclaim. **This is the number to watch**, not Free Memory |
-| Cached | File contents the kernel is keeping in RAM to avoid re-reading them from disk. Reclaimed automatically when something needs the memory |
-| Buffers | Kernel bookkeeping for block devices, usually small |
+| Available Memory | Estimated RAM available for new applications without swapping, including reclaimable cache. Prefer it to Free Memory when checking available capacity |
+| Cached | File cache, including tmpfs and shared memory, kept in RAM. Some cache can be reclaimed under memory pressure; Cached is not all immediately available RAM |
+| Buffers | Temporary memory used for raw disk blocks |
 | Free Swap / Total Swap | Swap space on disk. Steady swap use means the machine is short on RAM and paging to disk, which is slow |
 | Processes | Total number of processes on the machine |
 
@@ -96,7 +96,7 @@ Expand the tab with the arrow on its right to chart each device separately. This
 | Tab | Per-device metrics | Notes |
 | --- | --- | --- |
 | GPU | Utilization, Memory Utilization, Used Memory, Total Memory, Temperature, Power, SM Clock, Memory Clock | Utilization is the share of time the GPU was busy, not how much of its compute was used. SM Clock dropping while Temperature sits at its ceiling is thermal throttling; SM Clock dropping while Power is pinned at its limit is the power cap |
-| Disk | Utilization, Read and Write IOPS, Read and Write Speed | Utilization is the share of time the disk had a request in flight. IOPS counts operations per second, speed counts bytes |
+| Disk | Utilization, Read and Write IOPS, Read and Write Speed | Utilization estimates time with I/O active. IOPS counts operations per second; read and write speed measure bytes transferred per second |
 | Network | RX and TX throughput, RX and TX Packets, RX and TX Errors, RX and TX Drops | RX is traffic in, TX is traffic out. Errors and drops are counted per sample rather than accumulated, so a healthy interface reads a flat zero; anything sitting above it points at a cable, NIC, or upstream problem |
 
 <Frame caption="The GPU tab with its per-device grid expanded">

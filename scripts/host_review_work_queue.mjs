@@ -91,14 +91,26 @@ export function buildHostReviewQueue(claims) {
  * Page grouping is deliberately transparent: it asserts no shared root cause.
  * UNVALIDATED alone never creates a finding or workflow follow-up.
  */
-export function buildHostReviewIssues({pages, ownerQuestions, originalFindings = [], sourceFamilyTransitions = []}) {
-  if (!Array.isArray(pages) || !Array.isArray(ownerQuestions) || !Array.isArray(sourceFamilyTransitions)) throw new Error('Issue view requires current pages, validated owner questions and explicit source-family transitions');
+export function buildHostReviewIssues({pages, ownerQuestions, originalFindings = [], sourceFamilyTransitions = [], evidenceReuseTransitions = []}) {
+  if (!Array.isArray(pages) || !Array.isArray(ownerQuestions) || !Array.isArray(sourceFamilyTransitions) || !Array.isArray(evidenceReuseTransitions)) throw new Error('Issue view requires current pages, validated owner questions and explicit review transitions');
   const claims = pages.flatMap(page => page.claims);
   const ids = new Set(claims.map(claim => claim.id));
   if (ids.size !== claims.length) throw new Error('Issue view requires distinct passage IDs');
   const currentClaims = new Map(pages.flatMap(page => page.claims.map(claim => [claim.id, {claim, page}])));
+  // Adjudications arrive in historical order. A later complete review of the
+  // same occurrence supersedes its earlier follow-up, including a later PASS
+  // or FAIL; it must not leave an obsolete UNVALIDATED card on the landing page.
+  const latestTransitions = new Map();
+  for (const batch of [sourceFamilyTransitions, evidenceReuseTransitions]) {
+    const seen = new Set();
+    for (const entry of batch) {
+      if (!entry?.claim_id || seen.has(entry.claim_id)) throw new Error('Issue view requires distinct transition IDs within each review');
+      seen.add(entry.claim_id);
+      latestTransitions.set(entry.claim_id, entry);
+    }
+  }
   const sourceIds = new Set();
-  const sourceFollowUps = sourceFamilyTransitions.filter(entry => entry?.decision === 'residual' && entry.after?.status === 'UNVALIDATED').map(entry => {
+  const sourceFollowUps = [...latestTransitions.values()].filter(entry => entry?.decision === 'residual' && entry.after?.status === 'UNVALIDATED').map(entry => {
     const current = currentClaims.get(entry.claim_id);
     if (!current || sourceIds.has(entry.claim_id) || current.claim.status !== 'UNVALIDATED' ||
         entry.after.text !== current.claim.text || typeof entry.after.next_action !== 'string' || !entry.after.next_action.trim() ||
@@ -107,8 +119,28 @@ export function buildHostReviewIssues({pages, ownerQuestions, originalFindings =
     const {claim, page} = current;
     // Quick-lookup rows use their literal diagnostic name; prose uses its heading.
     const title = /^\|\s*`([^`]+)`\s*\|/.exec(claim.text)?.[1] || claim.headings?.at(-1) || page.title;
-    return {id: `source:${claim.id}`, claimId: claim.id, route: page.route, title, nextAction: entry.after.next_action};
+    // This one earlier occurrence predates explicit topic metadata. The new
+    // review names both AutoSort occurrences as the same source question.
+    const topic = entry.residual_topic || (claim.id === 'MCL-b106578dbaccc269'
+      ? {key: 'HOST-AUTOSORT-DEFINITION', title: 'Confirm AutoSort ranking and randomness'}
+      : {key: `passage:${claim.id}`, title});
+    if (typeof topic.key !== 'string' || !topic.key.trim() || typeof topic.title !== 'string' || !topic.title.trim()) throw new Error('Issue view residual topic is invalid');
+    return {id: `source:${claim.id}`, claimId: claim.id, route: page.route, title, literal: claim.text,
+      nextAction: entry.after.next_action, topicKey: topic.key, topicTitle: topic.title};
   });
+  const topicMap = new Map();
+  for (const item of sourceFollowUps) {
+    let topic = topicMap.get(item.topicKey);
+    if (!topic) {
+      topic = {id: `source-topic:${item.topicKey}`, key: item.topicKey, title: item.topicTitle, routes: [], claimIds: [], passages: []};
+      topicMap.set(item.topicKey, topic);
+    }
+    if (topic.title !== item.topicTitle) throw new Error('Issue view residual topic titles disagree');
+    if (!topic.routes.includes(item.route)) topic.routes.push(item.route);
+    topic.claimIds.push(item.claimId);
+    topic.passages.push(item);
+  }
+  const sourceFollowUpTopics = [...topicMap.values()];
   const ownerIds = new Set();
   const questions = ownerQuestions.map(question => {
     if (!question.id || ownerIds.has(question.id) || !Array.isArray(question.relatedClaims) || question.relatedClaims.some(claim => !ids.has(claim.id))) throw new Error('Issue view owner mapping is invalid');
@@ -135,7 +167,7 @@ export function buildHostReviewIssues({pages, ownerQuestions, originalFindings =
       unassignedClaimIds: blocked.filter(claim => !questions.some(question => question.claimIds.includes(claim.id))).map(claim => claim.id),
     });
   }
-  return {corrections, questions, workflows, sourceFollowUps,
+  return {corrections, questions, workflows, sourceFollowUps, sourceFollowUpTopics,
     counts: {correctionTopics: corrections.length, correctionPassages: corrections.reduce((sum,group) => sum + group.claimIds.length,0),
       ownerQuestions: questions.length, workflowPageGroups: workflows.length,
       recordedProcedures: workflows.reduce((sum,group) => sum + group.procedures.length,0),

@@ -46,7 +46,7 @@ Results:
 | --- | --- |
 | `on` | VM support is enabled. |
 | `off` | VM support is disabled, a previous test failed, or the status helper could not read its configuration. |
-| `pending` | No enablement attempt has completed; the host may be evaluated when idle. |
+| `pending` | The helper did not read a completed-attempt marker (`y`). The marker may be absent, unreadable, or contain a different value; this result alone does not establish when an enablement attempt will run. |
 
 These values describe VM configuration state only. They do not confirm that the Host is idle or that a VM workload is healthy.
 
@@ -72,13 +72,13 @@ In BIOS, enable virtualization and IOMMU/VT-d/AMD-Vi options.
 
 ## Kernel Options
 
-Edit `/etc/default/grub` and add the appropriate IOMMU option plus NVIDIA modeset disablement:
+Edit `/etc/default/grub` without removing existing boot options. For the Intel example below, add `intel_iommu=on` and the Vast VM setting `nvidia_drm.modeset=0`:
 
 ```text
 GRUB_CMDLINE_LINUX="intel_iommu=on nvidia_drm.modeset=0"
 ```
 
-Use `amd_iommu=on` instead of `intel_iommu=on` on AMD platforms.
+On AMD platforms, enable virtualization and IOMMU in firmware and verify IOMMU groups before retrying VM enablement. Supported AMD IOMMUs normally initialize without `amd_iommu=on`; Linux 6.8 does not implement that value. Follow the [Ubuntu IOMMU checks](https://ubuntu.com/server/docs/how-to/graphics/gpu-virtualization-with-qemu-kvm/) if groups are missing.
 
 Some hosts may also need:
 

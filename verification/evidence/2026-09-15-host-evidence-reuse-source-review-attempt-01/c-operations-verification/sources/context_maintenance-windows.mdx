@@ -1,0 +1,108 @@
+---
+title: "Maintenance Windows"
+sidebarTitle: "Maintenance Windows"
+description: "How hosts plan maintenance without disrupting active contracts."
+"canonical": "/host/maintenance-windows"
+personas:
+  - pro-operator
+  - headless-operator
+---
+
+<div className="persona-chips"><span className="persona-chip">Pro Operator</span><span className="persona-chip">Headless / DC</span></div>
+
+Use maintenance windows to plan host work without surprising active renters.
+
+<span id="before-maintenance" aria-hidden="true" />
+## Before Maintenance
+
+Plan maintenance around active rentals and stored workloads. [Hosting Agreement — Operation and Maintenance](https://cloud.vast.ai/host/agreement) requires preventative and remedial maintenance when an Authorized User is not actively using the hardware; no running instances alone does not establish that every commitment is over. Unlisting prevents new rental contracts, but it does not end existing contracts.
+
+Check the machine before you change its listing state:
+
+```bash
+vastai show machines
+vastai show machine <machine-id>
+```
+
+<Note>
+  Review active rental and storage commitments before planning downtime. Follow the availability and maintenance requirements in the [Hosting Agreement — Operation and Maintenance](https://cloud.vast.ai/host/agreement).
+</Note>
+
+<span id="planned-maintenance" aria-hidden="true" />
+## Planned Maintenance
+
+Before changing an offer’s end date for planned work, review existing rental dates and use the maintenance workflow below to plan downtime. Do not assume changing the offer’s date makes the machine safe to stop. The following commands edit offer expiration:
+
+```bash
+vastai list machine <machine-id> --end_date MM/DD/YYYY
+```
+
+For multiple machines, use the fleet command:
+
+```bash
+vastai list machines <machine-id-1> <machine-id-2> --end_date MM/DD/YYYY --retry 6
+```
+
+Unlist the machine to prevent new rentals. Review existing rental and storage commitments separately before taking it offline.
+
+```bash
+vastai unlist machine <machine-id>
+```
+
+See [vastai list machine](/cli/reference/list-machine), [vastai list machines](/cli/reference/list-machines), and [vastai unlist machine](/cli/reference/unlist-machine).
+
+<span id="schedule-window" aria-hidden="true" />
+## Schedule An Unplanned Window
+
+<Frame caption="Machine maintenance form with start time, duration, and reason fields.">
+  ![Machine maintenance scheduling form](/images/host-maintenance-window.webp)
+</Frame>
+
+If you must take the machine down unexpectedly, schedule a maintenance window so clients are notified and can save their work. The start date is Unix epoch seconds in UTC, and the duration is in hours.
+
+```bash
+vastai schedule maint <machine-id> --sdate <unix-start> --duration <hours> --maintenance_category software
+```
+
+Example:
+
+```bash
+vastai schedule maint 8207 --sdate 1782950400 --duration 2 --maintenance_category power
+```
+
+Maintenance categories are `power`, `internet`, `disk`, `gpu`, `software`, or `other`. See [vastai schedule maint](/cli/reference/schedule-maint).
+
+<Frame caption="Maintenance reason options available in the machine maintenance form.">
+  ![Machine maintenance reason options](/images/host-maintenance-reason.webp)
+</Frame>
+
+<span id="check-cancel" aria-hidden="true" />
+## Check Or Cancel Maintenance
+
+Check scheduled maintenance for one or more machines:
+
+```bash
+vastai show maints --ids <machine-id>
+vastai show maints --ids <machine-id-1>,<machine-id-2>
+```
+
+Cancel scheduled maintenance for a machine:
+
+```bash
+vastai cancel maint <machine-id>
+```
+
+See [vastai show maints](/cli/reference/show-maints) and [vastai cancel maint](/cli/reference/cancel-maint).
+
+<span id="automatic-updates" aria-hidden="true" />
+## Should I disable automatic updates?
+
+Avoid unattended kernel or GPU driver changes during active rentals. Driver and kernel updates can break running jobs or leave the host in a driver/library mismatch state until rebooted. Plan updates during maintenance windows, then verify `nvidia-smi`, Docker GPU access, and self-test behavior before accepting new rentals.
+
+## Related pages
+
+| Topic | Read next |
+| --- | --- |
+| Contract and offer end dates | [Hosting Overview](/host/hosting-overview#offer-end-date) |
+| Reliability impact of downtime | [Reliability & Uptime](/host/reliability-uptime) |
+| Removing a machine entirely | [Removing or Recreating Machines](/host/removing-recreating-machines) |

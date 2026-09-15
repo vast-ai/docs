@@ -1928,3 +1928,13 @@ independent privacy review scanned the frozen files, 190 archive entries and
 The signed content commit 95b7165 and existing draft PR185 now match remotely.
 Current model/status counts are unchanged. Two large-file warnings did not
 prevent the push. This is publication, not merge, CI approval or Host acceptance.
+
+## 2026-09-15: Next309 passage review
+
+The next309 consist of73 already-evidence-linked candidates and254 source/static candidates with18 overlap, across36 pages. Links are candidates for proof review, not adjudications. No prior statuses changed at intake.
+
+Root read all309 full literals and checked their exact source spans. Fresh retained Hanran CON1518 answers support Ubuntu24.04 preference/22.04 viability, XFS quota enforcement, and reliability>0.9 policy. Cross-family wording conflicts remain under adjudication; these source findings are not yet model promotions.
+
+## Evidence reuse and duplicate reconciliation — 2026-09-15
+
+Suitable published product definitions, exact primary implementation, static advice/navigation review and retained bounded observations resolved many generic runtime-only review entries. Two extra self-test bullets repeated the corrected CPU/VRAM defects and were reconciled. Four platform one-core statements remain an explicit CPU-policy source conflict, grouped into one question. The API-key file-permission defect is visible from retained evidence. The 2,008-item ledger remains passage coverage, not an issue or acceptance denominator.

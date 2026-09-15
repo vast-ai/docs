@@ -1,0 +1,31 @@
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {projectEvidenceReuseReview} from '../../../scripts/current_host_evidence_reuse_review.mjs';
+const A='verification/evidence/2026-09-15-host-evidence-reuse-source-review-attempt-01';
+const read=p=>fs.readFileSync(p), sha=x=>crypto.createHash('sha256').update(x).digest('hex');
+const canon=x=>JSON.stringify(x&&typeof x==='object'?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);
+const sorted=x=>Array.isArray(x)?x.map(sorted):x&&typeof x==='object'?Object.fromEntries(Object.keys(x).sort().map(k=>[k,sorted(x[k])])):x;
+const canonicalSha=x=>sha(JSON.stringify(sorted(x)));
+const amendment=JSON.parse(read(A+'/root-owner-role-amendment.json'));
+const model=JSON.parse(read('verification/current-host-docs-review.json'));
+const js=projectEvidenceReuseReview({read,exists:p=>fs.existsSync(p)});
+assert.deepEqual(js.model,model);
+const py=JSON.parse(execFileSync('python3',['-c',"import json,sys;from pathlib import Path;sys.path.insert(0,'scripts');import current_host_evidence_reuse_review as m;print(json.dumps(m.project(Path.cwd())))"],{maxBuffer:24*1024*1024}));
+assert.deepEqual(py,model);
+const rollback=structuredClone(model), claims=new Map(rollback.pages.flatMap(p=>p.claims.map(c=>[c.id,c])));
+for(const change of amendment.changes){
+ const c=claims.get(change.id);assert.equal(c.owner_role,change.after_owner_role);assert.equal(canonicalSha(c),change.after_claim_canonical_sha256);
+ c.owner_role=change.before_owner_role;assert.equal(canonicalSha(c),change.before_claim_canonical_sha256);
+}
+assert.equal(sha(JSON.stringify(rollback,null,2)+'\n'),amendment.before_model_sha256);
+const registry=JSON.parse(read('verification/current-host-evidence-reuse-review.json'));
+const oldRegistry=structuredClone(registry);
+for(const change of amendment.changes)oldRegistry.transitions.find(t=>t.claim_id===change.id).after.owner_role=change.before_owner_role;
+oldRegistry.scope=amendment.before_scope;
+oldRegistry.artifacts=oldRegistry.artifacts.filter(x=>x.path!==A+'/root-owner-role-amendment.json');
+assert.equal(sha(JSON.stringify(oldRegistry)+'\n'),amendment.before_registry_sha256);
+const owners=JSON.parse(read('verification/current-host-owner-questions.json'));assert.equal(owners.model_sha256,sha(read('verification/current-host-docs-review.json')));
+const result={recorded_at_utc:new Date().toISOString(),result:'PASS',checks:['Python/JS full-model projection parity','Exactly four owner_role field changes reproduce previous full model SHA when reverted','Four canonical before/after claim hashes','Registry changes exactly four labels, accepted scope pointer, and retained amendment artifact','Owner-question model binding matches'],prior_model_sha256:amendment.before_model_sha256,prior_registry_sha256:amendment.before_registry_sha256,model_sha256:sha(read('verification/current-host-docs-review.json')),registry_sha256:sha(read('verification/current-host-evidence-reuse-review.json')),scope:registry.scope,amendment_sha256:sha(read(A+'/root-owner-role-amendment.json')),claim_ids:amendment.changes.map(x=>x.id),counts:model.counts.claim_statuses,command:'node '+A+'/owner-role-check.mjs',check_script_sha256:sha(read(A+'/owner-role-check.mjs')),limits:'Owner routing amendment only. No new source or runtime validation; retained historical checks remain applicable.'};
+fs.writeFileSync(A+'/owner-role-check.json',JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify(result));

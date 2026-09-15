@@ -4,11 +4,11 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {projectSourceFamilyReview,loadSourceFamilyReview,SOURCE_FAMILY_PATH,SOURCE_FAMILY_SHA256,SOURCE_FAMILY_ATTEMPT as A} from './current_host_source_family_review.mjs';
-import {beforeSourceFamily} from './closure_historical_test_sources.mjs';
+import {beforeEvidenceReuse,beforeSourceFamily} from './closure_historical_test_sources.mjs';
 import {loadHostReviewOwnerQuestions} from './host_review_owner_questions.mjs';
 import {buildHostReviewIssues} from './host_review_work_queue.mjs';
 
-const read=ref=>fs.readFileSync(new URL('../'+ref,import.meta.url)),exists=ref=>fs.existsSync(new URL('../'+ref,import.meta.url));
+const liveRead=ref=>fs.readFileSync(new URL('../'+ref,import.meta.url)),read=beforeEvidenceReuse(liveRead),exists=ref=>fs.existsSync(new URL('../'+ref,import.meta.url));
 const model=JSON.parse(read('verification/current-host-docs-review.json')),registry=JSON.parse(read(SOURCE_FAMILY_PATH));
 const historicalRead=beforeSourceFamily(read),before=JSON.parse(historicalRead('verification/current-host-docs-review.json'));
 const index=m=>new Map(m.pages.flatMap(p=>p.claims.map(c=>[c.id,c]))),claims=index(model),old=index(before);
@@ -26,7 +26,7 @@ async function withRegistry(change){
 
 test('358 accepted occurrences project identically in Python and JavaScript, preserving the other 1650 claim objects apart from relocated spans',()=>{
  assert.deepEqual(projected.model,model);assert.deepEqual(loadSourceFamilyReview({read,model,exists}).model,model);
- const py=JSON.parse(execFileSync('python3',['-c',"import json,sys;from pathlib import Path;sys.path.insert(0,'scripts');import current_host_source_family_review as m;print(json.dumps(m.project(Path.cwd())))"],{cwd:new URL('../',import.meta.url),maxBuffer:20*1024*1024}));
+ const py=JSON.parse(execFileSync('python3',['-c',"import json,sys;from pathlib import Path;sys.path.insert(0,'scripts');import current_host_source_family_review as m;r=Path.cwd();p=r/'verification/current-host-evidence-reuse-review.json';reg=json.loads(p.read_text()) if p.exists() else {'sources':[]};frozen={s['path']:(r/s['before_artifact']['path']).read_bytes() for s in reg['sources']};print(json.dumps(m.project(r,frozen_source_overrides=frozen)))"],{cwd:new URL('../',import.meta.url),maxBuffer:20*1024*1024}));
  assert.deepEqual(py,model);assert.equal(claims.size,2008);assert.deepEqual(model.counts.claim_statuses,{BLOCKED:21,FAIL:4,NOT_APPLICABLE:89,PASS:744,UNVALIDATED:1150});
  const ids=new Set(registry.transitions.map(t=>t.claim_id));assert.equal(ids.size,358);let unselected=0;
  for(const[id,claim]of claims){const prior=old.get(id);if(!ids.has(id)){assert.deepEqual(omit(claim,['spans']),omit(prior,['spans']),id);unselected++;continue;}

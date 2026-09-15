@@ -11,7 +11,7 @@ personas:
 
 <div className="persona-chips"><span className="persona-chip">Pro Operator</span><span className="persona-chip">Headless / DC</span></div>
 
-Self-test checks whether a listed host is ready for verification and temporary diagnostic rentals.
+Self-test checks a listed machine against the CLI’s preflight requirements and attempts a temporary diagnostic rental. It does not by itself establish platform verification or readiness for every renter workload.
 
 <Note>
 Passing self-test makes a machine eligible for verification. It does not guarantee verification, search placement, or rentals.
@@ -46,16 +46,16 @@ Before renting the temporary diagnostic instance, the CLI checks whether the mac
 - GPU VRAM is greater than 7 GB per GPU.
 - System RAM is close to total GPU VRAM, capped around 2 TB for very high-VRAM machines.
 
-These are the same gates as the platform verification requirements. The canonical list lives in [Verification Stages: requirements](/host/verification-stages#additional-requirements-for-verification); if the numbers here ever differ, that page wins.
+These are diagnostic preflight checks implemented by the CLI. Compare the [Self-Test Reference](/host/self-test-reference) with the published [verification requirements](/host/verification-stages#additional-requirements-for-verification); a difference needs source/version clarification and does not change the check your installed tester executes.
 
-Inside the temporary self-test image, checks include:
+The CLI and temporary self-test image perform checks that include:
 
 - HTTPS progress endpoint reachability.
 - UDP echo on the mapped UDP port.
 - PyTorch/CUDA import and GPU visibility.
-- Each GPU has at least 98% free VRAM.
-- Enough host RAM is available.
-- At least one visible physical CPU core per visible GPU.
+- For each visible GPU, PyTorch allocated plus reserved memory must be at most 2% of its reported VRAM.
+- Total system RAM meeting the image’s minimum requirement.
+- The image requires at least two physical CPU cores per visible GPU, using `psutil.cpu_count(logical=False)`.
 - CUDA ResNet workload across all visible GPUs.
 - GPU memory allocation, including ECC-capable memory allocation checks where applicable.
 - NCCL initialization and synchronization across visible GPUs; see [`nccl_failed`](/host/self-test-reference#nccl-failed) if this stage fails.

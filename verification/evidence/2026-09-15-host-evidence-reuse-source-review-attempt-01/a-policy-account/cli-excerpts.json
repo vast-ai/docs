@@ -1,0 +1,61 @@
+{
+  "record_type": "EXACT_PINNED_CLI_SOURCE_EXCERPTS",
+  "excerpts": [
+    {
+      "id": "listing-args",
+      "repository": "vast-ai/vast-cli",
+      "revision": "1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc",
+      "source_file": "vastai/cli/commands/machines.py",
+      "source_sha256": "1c58876ada8c3912550396a6b2862e5de565c68b53c84554eb368e2140dc66d3",
+      "url": "https://github.com/vast-ai/vast-cli/blob/1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc/vastai/cli/commands/machines.py#L230-L258",
+      "line_start": 230,
+      "line_end": 258,
+      "text": "@parser.command(\n    argument(\"id\", help=\"id of machine to list\", type=int),\n    argument(\"-g\", \"--price_gpu\", help=\"per gpu rental price in $/hour  (price for active instances)\", type=float),\n    argument(\"-s\", \"--price_disk\",\n             help=\"storage price in $/GB/month (price for inactive instances), default: $0.10/GB/month\", type=float),\n    argument(\"-u\", \"--price_inetu\", help=\"price for internet upload bandwidth in $/GB\", type=float),\n    argument(\"-d\", \"--price_inetd\", help=\"price for internet download bandwidth in $/GB\", type=float),\n    argument(\"-b\", \"--price_min_bid\", help=\"per gpu minimum bid price floor in $/hour\", type=float),\n    argument(\"-r\", \"--discount_rate\", help=\"Max long term prepay discount rate fraction, default: 0.4 \", type=float),\n    argument(\"-m\", \"--min_chunk\", help=\"minimum amount of gpus (default: 1)\", type=int, default=1),\n    argument(\"-e\", \"--end_date\", help=\"contract offer expiration - the available until date (optional, in unix float timestamp or MM/DD/YYYY format)\", type=str),\n    argument(\"-l\", \"--duration\", help=\"Updates end_date daily to be duration from current date. Cannot be combined with end_date. Format is: `n days`, `n weeks`, `n months`, `n years`, or total intended duration in seconds.\"),\n    argument(\"-v\", \"--vol_size\", help=\"Size for volume contract offer. Defaults to half of available disk. Set 0 to not create a volume contract offer.\", type=int),\n    argument(\"-z\", \"--vol_price\", help=\"Price for disk on volume contract offer. Defaults to price_disk. Invalid if vol_size is 0.\", type=float),\n    usage=\"vastai list machine ID [options]\",\n    help=\"[Host] list a machine for rent\",\n    epilog=deindent(\"\"\"\n        Performs the same action as pressing the \"LIST\" button on the site https://cloud.vast.ai/host/machines.\n        On the end date the listing will expire and your machine will unlist. However any existing client jobs will still remain until ended by their owners.\n        Once you list your machine and it is rented, it is extremely important that you don't interfere with the machine in any way.\n        If your machine has an active client job and then goes offline, crashes, or has performance problems, this could permanently lower your reliability rating.\n        We strongly recommend you test the machine first and only list when ready.\n\n        Raising any resource price above the current contract price writes a\n        pending row to `pending_price_increases` for each affected client.\n        Clients review and accept those rows via the console or\n        `vastai show pending-price-increases`; auto-extend stops at the old\n        price until they accept.\n    \"\"\")"
+    },
+    {
+      "id": "listing-api",
+      "repository": "vast-ai/vast-cli",
+      "revision": "1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc",
+      "source_file": "vastai/api/machines.py",
+      "source_sha256": "6724080bf611369580e1328a17867383d1b3e72c2f459efcccb038e7109c2b92",
+      "url": "https://github.com/vast-ai/vast-cli/blob/1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc/vastai/api/machines.py#L49-L106",
+      "line_start": 49,
+      "line_end": 106,
+      "text": "def list_machine(client: VastClient, id: int, price_gpu: float = None,\n                 price_disk: float = None, price_inetu: float = None,\n                 price_inetd: float = None, price_min_bid: float = None,\n                 min_chunk: int = None, end_date: float = None,\n                 discount_rate: float = None, duration: str = None,\n                 vol_size: int = None, vol_price: float = None) -> dict:\n    \"\"\"List a machine for rent (create offers).\n\n    Args:\n        client: VastClient instance.\n        id: Machine ID.\n        price_gpu: Per GPU rental price in $/hour.\n        price_disk: Storage price in $/GB/month.\n        price_inetu: Price for upload bandwidth in $/GB.\n        price_inetd: Price for download bandwidth in $/GB.\n        price_min_bid: Per GPU minimum bid price floor in $/hour.\n        min_chunk: Minimum number of GPUs.\n        end_date: Contract offer expiration as unix epoch timestamp.\n        discount_rate: Max long-term prepay discount rate fraction.\n        duration: Duration string or seconds.\n        vol_size: Volume contract offer size in GB.\n        vol_price: Volume disk price.\n\n    Returns:\n        Response dict.\n    \"\"\"\n    json_blob = {\n        \"machine\": id,\n        \"price_gpu\": price_gpu,\n        \"price_disk\": price_disk,\n        \"price_inetu\": price_inetu,\n        \"price_inetd\": price_inetd,\n        \"price_min_bid\": price_min_bid,\n        \"min_chunk\": min_chunk,\n        \"end_date\": end_date,\n        \"credit_discount_max\": discount_rate,\n        \"duration\": duration,\n        \"vol_size\": vol_size,\n        \"vol_price\": vol_price,\n    }\n    r = client.put(\"/machines/create_asks/\", json_data=json_blob)\n    r.raise_for_status()\n    return r.json()\n\n\ndef unlist_machine(client: VastClient, id: int) -> dict:\n    \"\"\"Unlist a listed machine (remove all offers).\n\n    Args:\n        client: VastClient instance.\n        id: Machine ID.\n\n    Returns:\n        Response dict.\n    \"\"\"\n    r = client.delete(f\"/machines/{id}/asks/\")\n    r.raise_for_status()\n    return r.json()"
+    },
+    {
+      "id": "sdk-self-test",
+      "repository": "vast-ai/vast-cli",
+      "revision": "1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc",
+      "source_file": "vastai/sdk.py",
+      "source_sha256": "5dc8fa638e084ae1fec0b3feb1948bbd292b257a6ee97005c8742e8149adf718",
+      "url": "https://github.com/vast-ai/vast-cli/blob/1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc/vastai/sdk.py#L1191-L1197",
+      "line_start": 1191,
+      "line_end": 1197,
+      "text": "    def list_volumes(self, ids, **kwargs) -> dict:\n        \"\"\"List disk space for rent as volumes on multiple machines.\"\"\"\n        return storage.list_volumes(self.client, ids=ids, **kwargs)\n\n    def self_test_machine(self, machine_id, **kwargs):\n        \"\"\"Perform a self-test on the specified machine.\"\"\"\n        raise NotImplementedError(\"self_test_machine requires CLI\")"
+    },
+    {
+      "id": "team-members",
+      "repository": "vast-ai/vast-cli",
+      "revision": "1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc",
+      "source_file": "vastai/cli/commands/teams.py",
+      "source_sha256": "95243c2f0ed31b790454ebf126ce52e6e94667ddb9d85a6667f1fd295e3d7259",
+      "url": "https://github.com/vast-ai/vast-cli/blob/1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc/vastai/cli/commands/teams.py#L151-L188",
+      "line_start": 151,
+      "line_end": 188,
+      "text": "@parser.command(\n    argument(\"--email\", help=\"email of user to be invited\", type=str),\n    argument(\"--role\", help=\"role of user to be invited\", type=str),\n    usage=\"vastai invite member --email EMAIL --role ROLE\",\n    help=\"Invite a team member\",\n)\ndef invite__member(args):\n    \"\"\"Invite a team member.\"\"\"\n    client = get_client(args)\n    result = teams_api.invite_member(client, email=args.email, role=args.role)\n    if result:\n        print(f\"successfully invited {args.email} to your current team\")\n\n\n@parser.command(\n    usage=\"vastai show members\",\n    help=\"Show your team members\",\n)\ndef show__members(args):\n    \"\"\"Show team members.\"\"\"\n    client = get_client(args)\n    result = teams_api.show_members(client)\n    if args.raw:\n        return result\n    else:\n        print(result)\n\n\n@parser.command(\n    argument(\"id\", help=\"id of user to remove\", type=int),\n    usage=\"vastai remove member ID\",\n    help=\"Remove a team member\",\n)\ndef remove__member(args):\n    \"\"\"Remove a team member.\"\"\"\n    client = get_client(args)\n    result = teams_api.remove_member(client, id=args.id)\n    print(result)"
+    },
+    {
+      "id": "pricing-guidance",
+      "repository": "vast-ai/vast-cli",
+      "revision": "1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc",
+      "source_file": "vastai/cli/commands/price_increase.py",
+      "source_sha256": "4618c7764dc6ef9d5a91b07ebfc945359af2830c721104a57ba04f84445604b7",
+      "url": "https://github.com/vast-ai/vast-cli/blob/1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc/vastai/cli/commands/price_increase.py#L127-L145",
+      "line_start": 127,
+      "line_end": 145,
+      "text": "@parser.command(\n    argument(\"-q\", \"--quiet\", action=\"store_true\",\n             help=\"print only pending_price_increase_id values, one per line\"),\n    usage=\"vastai show pending-price-increases [OPTIONS]\",\n    help=\"List pending price-increase challenges for the authenticated user\",\n    epilog=deindent(\"\"\"\n        Lists every pending price-increase challenge the backend has open for\n        you. Each row shows the per-resource old -> new prices and the cutover\n        boundary: the new rate applies only after each contract's current\n        end_date — your remaining time on the current term is billed at the\n        original price.\n\n        Pipe the pending IDs to `vastai accept price-increase` or\n        `vastai reject price-increase` (use --quiet for one ID per line):\n\n            vastai show pending-price-increases --quiet\n    \"\"\"),\n)\ndef show__pending_price_increases(args):"
+    }
+  ],
+  "limit": "Source declarations and client payloads only. No new CLI/SDK, account, rental, pricing or daemon execution."
+}

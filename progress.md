@@ -2289,3 +2289,13 @@ Updated the PR description with current evidence, 26 remaining corrections,
 separate external registers and reviewer setup. PR remains open/draft; no merge
 or acceptance. GitHub accepted the retained large HTML/patch with warnings.
 Result: verification/evidence/2026-09-14-host-docs-publish-attempt-01/result.md.
+
+## 2026-09-15: Next309 passage review
+
+Started the authorized309-candidate batch from clean signed61fbb47; froze current literals, before-source files and baseline hashes. Initial root-level git status was run outside the repository; corrected to the explicit integration checkout, which was clean.
+
+## Evidence reuse batch integration — 2026-09-15
+
+The original 309 review and nine bounded adjacent/residual records are integrated as 318 decisions. There are 47 exact wording corrections on 17 pages; UNVALIDATED decreased from 1,150 to 851. Prior history/evidence and all procedure statuses remain. Final checks, signed local commit and bounded graph receipt accompany the handoff; no new Host/account/paid run or publication.
+
+Final verification: sealed source-model parity and preservation passed; all 4,237 earlier evidence files are unchanged. Renderer has 51 focused tests with passing coverage across retained runs. The final actual browser check passed all 122 assertions, including the 19 individual source dialogs, preserved results, final owner labels and corrected passage deep link. Browser/renderer records pin the exact model and HTML bytes.

@@ -28,7 +28,7 @@ Do not accept a changed fingerprint if you cannot explain why it changed.
 
 ## Step 1: Update The System
 
-For SSH-only installs, use noninteractive `apt-get` so provider image config prompts do not block the session:
+For SSH-only installs, the following `apt-get` commands use noninteractive debconf answers and predefined dpkg conffile choices. Review the upgrade output; package scripts can still fail or require attention:
 
 ```bash
 sudo apt-get update
@@ -38,7 +38,7 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get $APT_OPTS dist-upgrade -y
 sudo DEBIAN_FRONTEND=noninteractive apt-get $APT_OPTS install -y update-manager-core
 ```
 
-This keeps existing local config files if Ubuntu asks about files such as `/etc/issue` during an SSH upgrade.
+For changed configuration files, `--force-confdef` takes the default dpkg action; `--force-confold` keeps the existing file when no default is available. Review important local configuration files after the upgrade.
 
 If you did not select the HWE kernel during install, install it now:
 
@@ -241,13 +241,15 @@ Use `--no-driver` only after `nvidia-smi` shows all GPUs. Replace the Docker sto
 Do not change kernel boot parameters during a normal Docker-only install unless you are fixing a specific driver problem or enabling [VM support](/host/vms). If you are preparing VM support, edit `/etc/default/grub` and add the VM-related options for your CPU platform:
 
 ```text
-GRUB_CMDLINE_LINUX="amd_iommu=on nvidia_drm.modeset=0"
+# Preserve other existing GRUB_CMDLINE_LINUX options.
+# AMD: enable IOMMU in firmware and verify IOMMU groups.
+GRUB_CMDLINE_LINUX="nvidia_drm.modeset=0"
 ```
 
 | Option | Purpose |
 | --- | --- |
-| `amd_iommu=on` | Enables IOMMU on AMD CPUs; needed for [VM support](/host/vms) and PCIe passthrough. |
-| `intel_iommu=on` | Use this instead of `amd_iommu=on` on Intel platforms. |
+| AMD IOMMU | Enable virtualization and IOMMU in firmware, then verify IOMMU groups before [VM setup](/host/vms). Linux 6.8 does not define `amd_iommu=on` as an enabling option. |
+| `intel_iommu=on` | Enables the Intel IOMMU driver on supported Intel platforms; firmware virtualization/IOMMU must also be configured. |
 | `nvidia_drm.modeset=0` | Disables NVIDIA kernel modesetting for VM compatibility. |
 
 Apply the changes:
@@ -283,7 +285,7 @@ sudo reboot
 After reboot, check everything is healthy:
 
 ```bash
-# Check NVMe is mounted to /var/lib/docker
+# Check Docker storage capacity, mount, and project quotas
 df -h /var/lib/docker
 findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS
 sudo xfs_quota -x -c "state" /var/lib/docker

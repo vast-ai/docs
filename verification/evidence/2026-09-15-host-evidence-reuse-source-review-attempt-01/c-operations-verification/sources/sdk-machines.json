@@ -1,0 +1,18 @@
+{
+  "repository": "vast-ai/vast-cli",
+  "revision": "1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc",
+  "path": "vastai/sdk.py",
+  "full_source_sha256": "5dc8fa638e084ae1fec0b3feb1948bbd292b257a6ee97005c8742e8149adf718",
+  "excerpts": [
+    {
+      "start": 53,
+      "end": 88,
+      "text": "class VastAI:\n    \"\"\"High-level SDK for the Vast.ai platform.\n\n    Wraps the low-level api/ modules behind a single object with one method\n    per API operation.  Every method delegates to the corresponding module\n    function, passing ``self.client`` (a :class:`VastClient`) along with any\n    caller-supplied arguments.\n\n    Args:\n        api_key: Vast.ai API key.  When omitted, the key is resolved from\n            ``VAST_API_KEY``, then ``$XDG_CONFIG_HOME/vastai/vast_api_key``\n            (falling back to ``~/.config/vastai/vast_api_key``), then the\n            legacy ``~/.vast_api_key``.\n        server_url: Base URL of the Vast.ai API server.\n        retry: Number of retries on transient HTTP errors.\n        raw: If *True*, return raw JSON dicts instead of formatted output.\n        explain: If *True*, print request details for debugging.\n        quiet: If *True*, suppress informational output.\n        curl: If *True*, print equivalent curl commands instead of executing.\n    \"\"\"\n\n    def __init__(\n        self,\n        api_key: Optional[str] = None,\n        server_url: Optional[str] = None,\n        retry: int = 3,\n        raw: bool = False,\n        explain: bool = False,\n        quiet: bool = False,\n        curl: bool = False,\n    ):\n        resolved_key = _resolve_api_key(_APIKEY_SENTINEL if api_key is None else api_key)\n        self.client = VastClient(resolved_key, server_url, retry, explain, curl)\n        self.raw = raw\n        self.quiet = quiet\n"
+    },
+    {
+      "start": 474,
+      "end": 508,
+      "text": "    def show_machines(self) -> list[dict]:\n        \"\"\"Return all hosted machines.\"\"\"\n        return machines.show_machines(self.client)\n\n    def show_machine(self, id: int) -> dict:\n        \"\"\"Return details of a single machine.\n\n        The underlying ``GET /machines/{id}`` endpoint returns a one-element\n        list; this wrapper unwraps it so callers get a single machine dict.\n        Raises ``ValueError`` if the backend returns zero or multiple rows.\n        \"\"\"\n        result = machines.show_machine(self.client, id)\n        if not isinstance(result, list):\n            return result\n        if not result:\n            raise ValueError(f\"Machine {id} not found\")\n        if len(result) > 1:\n            raise ValueError(f\"Expected 1 machine for id={id}, got {len(result)}\")\n        return result[0]\n\n    def show_maints(self, ids) -> list[dict]:\n        \"\"\"Show maintenance information for machines.\"\"\"\n        return machines.show_maints(self.client, ids)\n\n    def list_machine(self, id: int, **kwargs) -> dict:\n        \"\"\"List a machine for rent with optional pricing parameters.\"\"\"\n        return machines.list_machine(self.client, id, **kwargs)\n\n    def list_machines(self, ids, **kwargs) -> list[dict]:\n        \"\"\"List multiple machines for rent.\"\"\"\n        results = []\n        for mid in ids:\n            results.append(machines.list_machine(self.client, mid, **kwargs))\n        return results\n"
+    }
+  ]
+}

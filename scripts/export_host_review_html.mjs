@@ -12,6 +12,7 @@ import { PAYOUT_PATH } from './current_host_payout_provider_correction.mjs';
 import { PAYOUT_TERMS_PATH } from './current_host_payout_terms_correction.mjs';
 import { CLOSURE_PATH } from './current_host_closure_correction.mjs';
 import { SOURCE_FAMILY_PATH, SOURCE_FAMILY_ATTEMPT } from './current_host_source_family_review.mjs';
+import { EVIDENCE_REUSE_PATH, EVIDENCE_REUSE_ATTEMPT } from './current_host_evidence_reuse_review.mjs';
 import { PAYOUT_INVOICE_PATH } from './current_host_payout_invoice_correction.mjs';
 import { loadCurrentHostReviewTransition } from './current_host_review_transition.mjs';
 import { hostReviewReaderCopy } from './host_review_reader_copy.mjs';
@@ -102,6 +103,19 @@ export function sanitize(value) {
     .replace(/\b(?:AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,})\b/g, '[redacted-token]')
     .replace(/\b((?:machine|instance|offer|account|user|host)(?:[-_ ]?id)?(?:\s*(?:[:=#]|is))?\s*`?)(\d{4,})(`?)/gi, (s,p,n,e) => n === '12345' || /^0+$/.test(n) ? s : `${p}[redacted-identifier]${e}`)
     .replace(/((?:["']?(?:machine|instance|offer|account|user|host)[_-]id["']?\s*[:=]\s*["']?))(\d{4,})(["']?)/gi, (s,p,n,e) => n === '12345' || /^0+$/.test(n) ? s : `${p}[redacted-identifier]${e}`);
+}
+
+// JSON evidence keeps its original formatting and valid escape sequences. Mask
+// decoded string tokens, then re-escape only changed values; raw source digests
+// still identify the retained file, while display digests identify this copy.
+export function sanitizeArtifact(ref, text) {
+  if (!ref.endsWith('.json')) return sanitize(text);
+  try { JSON.parse(text); } catch { return sanitize(text); }
+  return text.replace(/"(?:\\.|[^"\\])*"/g, token => {
+    const decoded = JSON.parse(token), display = sanitize(decoded);
+    return display === decoded ? token : JSON.stringify(display);
+  }).replace(/("(?:machine|instance|offer|account|user|host)[_-]id"\s*:\s*)("?)(\d{4,})\2(?=\s*[,}])/gi,
+    (all, prefix, quote, number) => number === '12345' || /^0+$/.test(number) ? all : `${prefix}"[redacted-identifier]"`);
 }
 
 function sameJson(left, right) { return JSON.stringify(left) === JSON.stringify(right); }
@@ -335,7 +349,7 @@ export function buildReport() {
   const model = JSON.parse(bytes);
   const ownerQuestions = requireHostReviewOwnerQuestions({ read, model, modelSha256: sha(bytes) });
   const authorityScan = loadCurrentHostReviewTransition({ read, model });
-  const selectedResult = authorityScan?.sourceFamily?.resultRef || authorityScan?.closure?.resultRef || (authorityScan?.payoutInvoice ? payoutInvoiceResultPath : (authorityScan?.payoutTerms ? payoutTermsResultPath : (authorityScan?.payoutProvider ? payoutProviderResultPath : (authorityScan?.cleanup?.resultRef || (authorityScan?.jurisdiction ? `${JURISDICTION_ATTEMPT}/result.md` : authorityScan?.terms ? `${TERMS_ATTEMPT}/result.md` : authorityScan ? `${AUTHORITY_SCAN_ATTEMPT}/result.md` : currentResultPath)))));
+  const selectedResult = authorityScan?.evidenceReuse?.resultRef || authorityScan?.sourceFamily?.resultRef || authorityScan?.closure?.resultRef || (authorityScan?.payoutInvoice ? payoutInvoiceResultPath : (authorityScan?.payoutTerms ? payoutTermsResultPath : (authorityScan?.payoutProvider ? payoutProviderResultPath : (authorityScan?.cleanup?.resultRef || (authorityScan?.jurisdiction ? `${JURISDICTION_ATTEMPT}/result.md` : authorityScan?.terms ? `${TERMS_ATTEMPT}/result.md` : authorityScan ? `${AUTHORITY_SCAN_ATTEMPT}/result.md` : currentResultPath)))));
   const claims = model.pages.flatMap(page => page.claims.map(claim => ({ ...claim, route: page.route, page_title: page.title })));
   const ids = new Set(claims.map(c => c.id));
   if (ids.size !== claims.length || claims.length !== model.counts.claims) throw new Error('Claim inventory mismatch');
@@ -347,7 +361,7 @@ export function buildReport() {
     const raw = read(ref);
     if (raw.includes(0)) throw new Error(`Binary evidence excluded: ${ref}`);
     if (expected && sha(raw) !== expected) throw new Error(`Source no longer matches snapshot: ${ref}`);
-    const text = raw.toString('utf8'), display = sanitize(text);
+    const text = raw.toString('utf8'), display = sanitizeArtifact(ref, text);
     files.set(ref, { ref, sha256: sha(raw), display_sha256: sha(display), masked: text !== display, text: display });
   };
   for (const p of model.pages) {
@@ -483,6 +497,17 @@ export function buildReport() {
     for (const source of review.registry.sources) add(source.before_artifact.path, source.before_artifact.sha256);
     for (const artifact of review.registry.artifacts) add(artifact.path, artifact.sha256);
   }
+  if (authorityScan?.evidenceReuse) {
+    const review = authorityScan.evidenceReuse;
+    add(EVIDENCE_REUSE_PATH, review.registrySha256);
+    add(review.baseline, review.baselineSha256);
+    add(review.resultRef);
+    // The successor registry explicitly lists its approved, shareable records.
+    // Preserve earlier source-family/closure evidence above; never crawl raw
+    // captures or infer a new evidence scope from files present on disk.
+    for (const source of review.registry.sources) add(source.before_artifact.path, source.before_artifact.sha256);
+    for (const artifact of review.registry.artifacts) add(artifact.path, artifact.sha256);
+  }
   for (const ref of installationIntake.artifactRefs) add(ref);
   add(currentResultPath); add(currentAuthorityBaselinePath); add(claimCorrectionResultPath);
   for (const ref of currentAttemptArtifacts) add(ref);
@@ -512,7 +537,8 @@ export function buildReport() {
     counts: model.counts, current_result_ref: selectedResult, claim_correction_history_ref: claimCorrectionResultPath,
     work_queue: buildHostReviewQueue(claims),
     issues: JSON.parse(JSON.stringify(buildHostReviewIssues({pages: model.pages, ownerQuestions: ownerQuestions.questions,
-      originalFindings: authorityScan?.closure?.registry.original_findings || [], sourceFamilyTransitions: authorityScan?.sourceFamily?.registry.transitions || []}), (_, value) => typeof value === 'string' ? sanitize(value) : value)),
+      originalFindings: authorityScan?.closure?.registry.original_findings || [], sourceFamilyTransitions: authorityScan?.sourceFamily?.registry.transitions || [],
+      evidenceReuseTransitions: authorityScan?.evidenceReuse?.registry.transitions || []}), (_, value) => typeof value === 'string' ? sanitize(value) : value)),
     owner_questions: JSON.parse(JSON.stringify({ registry_ref: ownerQuestions.registryRef, registry_sha256: ownerQuestions.registrySha256,
       questions: ownerQuestions.questions }, (_, value) => typeof value === 'string' ? sanitize(value) : value)),
     cleanup_transition: authorityScan?.cleanup ? {registry_ref: 'verification/current-host-review-cleanup.json', registry_sha256: authorityScan.cleanup.registrySha256,
@@ -532,7 +558,14 @@ export function buildReport() {
     source_family_transition: authorityScan?.sourceFamily ? {registry_ref:SOURCE_FAMILY_PATH, registry_sha256:authorityScan.sourceFamily.registrySha256,
       baseline_ref:authorityScan.sourceFamily.baseline, baseline_sha256:authorityScan.sourceFamily.baselineSha256,
       result_ref:authorityScan.sourceFamily.resultRef, reviewed_claims:authorityScan.sourceFamily.registry.transitions.length,
+      wording_corrections:authorityScan.sourceFamily.registry.transitions.filter(entry => entry.decision === 'correction').length,
       limit:authorityScan.sourceFamily.registry.limits} : null,
+    evidence_reuse_transition: authorityScan?.evidenceReuse ? {registry_ref:EVIDENCE_REUSE_PATH, attempt_ref:EVIDENCE_REUSE_ATTEMPT,
+      registry_sha256:authorityScan.evidenceReuse.registrySha256, baseline_ref:authorityScan.evidenceReuse.baseline,
+      baseline_sha256:authorityScan.evidenceReuse.baselineSha256, result_ref:authorityScan.evidenceReuse.resultRef,
+      reviewed_claims:authorityScan.evidenceReuse.registry.transitions.length,
+      wording_corrections:authorityScan.evidenceReuse.registry.transitions.filter(entry => entry.decision === 'correction').length,
+      limit:authorityScan.evidenceReuse.registry.limits} : null,
     closure_transition: authorityScan?.closure ? {registry_ref:CLOSURE_PATH, registry_sha256:authorityScan.closure.registrySha256,
       baseline_ref:authorityScan.closure.baseline, baseline_sha256:authorityScan.closure.baselineSha256,
       result_ref:authorityScan.closure.resultRef, changed_claims:authorityScan.closure.registry.transitions.length,

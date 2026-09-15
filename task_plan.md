@@ -7,6 +7,22 @@ reviewable procedure, step, claim, attempt, correction, and retest evidence.
 
 ## Current Phase
 
+Phase 58: evidence reuse and source review, integrated locally 2026-09-15.
+Plan and final result: verification/evidence/2026-09-15-host-evidence-reuse-source-review-attempt-01/.
+Reviewed the frozen 309 candidates plus five adjacent diagnostic/configuration
+corrections and four unchanged CPU-policy residuals. Final318 scope includes
+47 wording corrections across 17 pages. Current 1,042 PASS/3 FAIL/21 BLOCKED/
+91 N/A/851 UNVALIDATED. The reviewer groups repeated residuals and retains
+previous 358-passage / 69-correction source-review history and earlier correction cycles. Source and
+runtime evidence remain limited to the exact records that support each passage.
+Final renderer/browser checks are recorded with this batch. The signed local
+commit is followed by a bounded graph refresh; its
+bounded post-commit Graphify refresh receipt lives outside the docs repository at
+research/host-docs-meeting-20260914/reconciliation/evidence-reuse-graph-20260915/.
+No push, merge or human acceptance is implied by this batch.
+
+The earlier phases below are historical records.
+
 Phase 57: clearer reviewer handoff, completed locally 2026-09-14.
 Plan: verification/evidence/2026-09-14-host-review-handoff-attempt-01/plan.md.
 Make open checks prominent, keep the selected owner questions visible, and

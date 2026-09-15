@@ -99,6 +99,15 @@ test('export carries the shared queue without changing any claim status, lanes, 
     assert.equal(payload.current_result_ref,payload.cleanup_transition.result_ref);
     for(const ref of [payload.cleanup_transition.registry_ref,payload.cleanup_transition.baseline_ref,...payload.cleanup_transition.context_refs])assert.ok(payload.files[ref],ref);
   }
+  if(payload.evidence_reuse_transition) {
+    assert.equal(payload.current_result_ref,payload.evidence_reuse_transition.result_ref);
+    for(const ref of [payload.evidence_reuse_transition.registry_ref,payload.evidence_reuse_transition.baseline_ref,
+      payload.evidence_reuse_transition.result_ref,payload.source_family_transition.result_ref,payload.closure_transition.result_ref])assert.ok(payload.files[ref],ref);
+    const registry=JSON.parse(payload.files[payload.evidence_reuse_transition.registry_ref].text);
+    for(const artifact of registry.artifacts)assert.ok(payload.files[artifact.path],artifact.path);
+    assert.deepEqual(payload.issues.sourceFollowUpTopics.flatMap(topic=>topic.claimIds).sort(),payload.issues.sourceFollowUps.map(item=>item.claimId).sort());
+    assert.equal(new Set(payload.issues.sourceFollowUps.map(item=>item.claimId)).size,payload.issues.sourceFollowUps.length);
+  }
 });
 
 test('production offline filters and grouped rendering retain every matching passage and independent proof controls', () => {
@@ -125,7 +134,7 @@ test('issues view uses only recorded findings and prerequisites, preserving ever
   const bytes=fs.readFileSync(new URL('verification/current-host-docs-review.json',root));
   const owner=loadHostReviewOwnerQuestions({read:ref=>fs.readFileSync(new URL(ref,root)),model,modelSha256:createHash('sha256').update(bytes).digest('hex')});
   const before=JSON.stringify(model), projection=buildHostReviewIssues({pages:model.pages,ownerQuestions:owner.questions});
-  assert.deepEqual(projection.counts,{correctionTopics:2,correctionPassages:4,ownerQuestions:8,workflowPageGroups:13,recordedProcedures:14,blockedPassages:21});
+  assert.deepEqual(projection.counts,{correctionTopics:2,correctionPassages:3,ownerQuestions:8,workflowPageGroups:13,recordedProcedures:14,blockedPassages:21});
   assert.deepEqual(projection.corrections.flatMap(group=>group.claimIds).sort(),claims.filter(c=>c.status==='FAIL').map(c=>c.id).sort());
   assert.deepEqual(projection.workflows.flatMap(group=>group.claimIds).sort(),claims.filter(c=>c.status==='BLOCKED').map(c=>c.id).sort());
   const parents=projection.workflows.flatMap(group=>group.procedures);
@@ -177,6 +186,11 @@ test('whole offline script initializes with eight owner questions, defaults to i
   assert.match(elements.get('priority-cards').innerHTML,/CUR-11f83626486ada1d/);
   assert.match(elements.get('issue-owner-list').innerHTML,/HQ-RENTAL-AVAILABILITY/);
   assert.match(elements.get('issue-workflow-list').innerHTML,/page-based fallback/);
+  assert.equal(elements.get('issue-source-count').textContent,payload.issues.sourceFollowUpTopics.length);
+  for(const topic of payload.issues.sourceFollowUpTopics) {
+    assert.ok(elements.get('issue-source-list').innerHTML.includes(topic.title.replaceAll('&','&amp;')));
+    for(const id of topic.claimIds)assert.ok(elements.get('issue-source-list').innerHTML.includes(`data-issue-claim="${id}"`),id);
+  }
   assert.equal(elements.has('correction-progress'),false,'a historical 26-item queue is not overall project progress');
   assert.doesNotMatch(read('scripts/templates/host-docs-review.html'),/of \$\{issues\.originalFindings\.total\}/);
   assert.equal(elements.get('coverage').hidden,true);
