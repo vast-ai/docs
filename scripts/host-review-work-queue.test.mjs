@@ -35,7 +35,7 @@ test('every current occurrence belongs to exactly one actionable category; suppo
   assert.equal(queue.buckets.find(b=>b.id==='triage').count,0,'new current classes need explicit review mapping');
   assert.equal(queue.buckets.find(b=>b.id==='completed').count,claims.filter(c=>['PASS','NOT_APPLICABLE'].includes(c.status)).length);
   const cohort=claims.filter(c=>['PUBLISHED_FINANCIAL_GUIDANCE_DESCRIPTION','PUBLICATION_DESCRIPTION','PUBLISHED_TERMS_SUMMARY','REVIEWED_UI_PROVIDER_OPTION'].includes(c.classification));
-  assert.equal(cohort.length,11);
+  assert.equal(cohort.length,17);
   assert.ok(cohort.every(c=>describeHostReview(c).completed&&!describeHostReview(c).needsTriage));
   assert.equal(cohort.filter(c=>c.classification==='REVIEWED_UI_PROVIDER_OPTION').every(c=>describeHostReview(c).type==='Technical behavior or workflow'),true);
   assert.equal(cohort.filter(c=>c.classification!=='REVIEWED_UI_PROVIDER_OPTION').every(c=>describeHostReview(c).type==='Published source or rule'),true);
@@ -115,4 +115,85 @@ test('production offline filters and grouped rendering retain every matching pas
   assert.match(controls['results-count'].textContent,/3 matching passages/);
   controls['work-category'].value='correction';vm.runInNewContext(source+'\napplyFilters();',context);
   assert.match(controls['claim-list'].innerHTML,/claim-THREE/);assert.doesNotMatch(controls['claim-list'].innerHTML,/claim-ONE|claim-TWO/);
+});
+
+test('issues view uses only recorded findings and prerequisites, preserving every fallback and overlapping owner question', async () => {
+  const {buildHostReviewIssues} = await import('./host_review_work_queue.mjs');
+  const {loadHostReviewOwnerQuestions} = await import('./host_review_owner_questions.mjs');
+  const {createHash} = await import('node:crypto');
+  const bytes=fs.readFileSync(new URL('verification/current-host-docs-review.json',root));
+  const owner=loadHostReviewOwnerQuestions({read:ref=>fs.readFileSync(new URL(ref,root)),model,modelSha256:createHash('sha256').update(bytes).digest('hex')});
+  const before=JSON.stringify(model), projection=buildHostReviewIssues({pages:model.pages,ownerQuestions:owner.questions});
+  assert.deepEqual(projection.counts,{correctionTopics:1,correctionPassages:2,ownerQuestions:8,workflowPageGroups:13,recordedProcedures:14,blockedPassages:21});
+  assert.deepEqual(projection.corrections.flatMap(group=>group.claimIds).sort(),claims.filter(c=>c.status==='FAIL').map(c=>c.id).sort());
+  assert.deepEqual(projection.workflows.flatMap(group=>group.claimIds).sort(),claims.filter(c=>c.status==='BLOCKED').map(c=>c.id).sort());
+  const parents=projection.workflows.flatMap(group=>group.procedures);
+  assert.equal(parents.filter(procedure=>procedure.status==='FAIL').length,1);
+  assert.equal(parents.find(procedure=>procedure.id==='TS-ST-E01').recorded_nodes.filter(node=>node.status==='FAIL').length,4);
+  assert.ok(projection.corrections[0].ownerQuestionIds.includes('HQ-VAST-TAX-HANDLING'));
+  assert.ok(projection.workflows.some(group=>group.unassignedClaimIds.length));
+  assert.equal(JSON.stringify(model),before);
+  const fallback=buildHostReviewIssues({pages:[{route:'/host/new',title:'New page',claims:[{...sample,id:'new-block',status:'BLOCKED'}, {...sample,id:'new-uv'}]}],ownerQuestions:[]});
+  assert.deepEqual(fallback.workflows[0].unassignedClaimIds,['new-block']);
+  assert.deepEqual(fallback.workflows[0].claimIds,['new-block']);
+  assert.equal(fallback.corrections.length,0);
+  assert.equal(fallback.workflows[0].procedures.length,0);
+});
+
+// Execute the entire production script, not a hand-picked function slice. The
+// small DOM double exposes the APIs used here; root also checks a real browser.
+function runWholeTemplate(payload,hash='') {
+  const template=read('scripts/templates/host-docs-review.html');
+  const elements=new Map();
+  for(const match of template.matchAll(/<([a-z][\w-]*)\b([^>]*\bid="([^"]+)"[^>]*)>/gi)) {
+    if(match[3].includes('${'))continue;
+    elements.set(match[3],{id:match[3],tagName:match[1].toUpperCase(),attributes:match[2],hidden:/\bhidden\b/.test(match[2]),textContent:'',innerHTML:'',value:'',style:{},options:[],listeners:{},
+      add(option){this.options.push(option);},addEventListener(name,callback){this.listeners[name]=callback;},scrollIntoView(){this.scrolled=true;},showModal(){this.open=true;},close(){this.open=false;},
+      querySelector(){return null;},get selectedOptions(){return [{text:this.options.find(option=>option.value===this.value)?.text||this.value||'All'}];}});
+  }
+  elements.get('report-data').textContent=JSON.stringify(payload);
+  elements.get('status').value='OPEN';elements.get('queue-view').value='individual';
+  const listeners={},windowListeners={};
+  const document={getElementById:id=>elements.get(id)||null,querySelectorAll:selector=>{
+    if(selector==='[data-coverage-view]'||selector==='[data-issues-view]')return [...elements.values()].filter(element=>element.attributes.includes(selector.slice(1,-1)));
+    return [];
+  },addEventListener:(name,callback)=>(listeners[name]??=[]).push(callback)};
+  const context=vm.createContext({document,window:{addEventListener:(name,callback)=>(windowListeners[name]??=[]).push(callback),print(){}},location:{hash},URL,
+    Option:function(text,value){this.text=text;this.value=value;},console});
+  const script=template.match(/<script>\s*([\s\S]*?)<\/script>/)[1];
+  vm.runInContext(script,context,{timeout:20000});
+  return {context,elements,listeners,windowListeners};
+}
+
+test('whole offline script initializes with eight owner questions, defaults to issues and keeps all ledger navigation and evidence controls', () => {
+  const before=JSON.stringify(model),{payload}=buildReport();
+  const {context,elements}=runWholeTemplate(payload);
+  assert.equal(elements.get('issue-owner-count').textContent,8);
+  assert.equal(elements.get('issue-workflow-count').textContent,13);
+  assert.match(elements.get('priority-cards').innerHTML,/CUR-11f83626486ada1d/);
+  assert.match(elements.get('issue-owner-list').innerHTML,/HQ-RENTAL-AVAILABILITY/);
+  assert.match(elements.get('issue-workflow-list').innerHTML,/page-based fallback/);
+  assert.equal(elements.has('correction-progress'),false,'a historical 26-item queue is not overall project progress');
+  assert.doesNotMatch(read('scripts/templates/host-docs-review.html'),/of \$\{issues\.originalFindings\.total\}/);
+  assert.equal(elements.get('coverage').hidden,true);
+  assert.equal(elements.get('claims').hidden,true);
+  assert.equal(elements.get('overview').hidden,false);
+  assert.equal(elements.get('coverage-unvalidated').textContent,'1,506');
+  vm.runInContext("location.hash='#claims';handleReviewHash();",context);
+  assert.equal(elements.get('claims').hidden,false);
+  assert.equal(elements.get('overview').hidden,true);
+  vm.runInContext("location.hash='#claim-CUR-11f83626486ada1d';handleReviewHash();",context);
+  assert.match(elements.get('results-count').textContent,/1 matching passages/);
+  assert.match(elements.get('claim-list').innerHTML,/data-passage="CUR-11f83626486ada1d"/);
+  vm.runInContext("location.hash='#overview';handleReviewHash();",context);
+  assert.equal(elements.get('claims').hidden,true);
+  vm.runInContext("goToClaims();showWorkflow('workflow:/host/how-to-self-test');",context);
+  assert.equal(elements.get('claims').hidden,false);
+  assert.match(elements.get('viewer-body').innerHTML,/TS-ST-E01/);
+  assert.match(elements.get('viewer-body').innerHTML,/Open source page/);
+  assert.match(elements.get('viewer-body').innerHTML,/preflight|reliability/i);
+  assert.match(elements.get('viewer-body').innerHTML,/data-artifact=/);
+  vm.runInContext("showPassage('CUR-11f83626486ada1d');",context);
+  assert.match(elements.get('viewer-body').innerHTML,/source-line highlight/);
+  assert.equal(JSON.stringify(model),before);
 });

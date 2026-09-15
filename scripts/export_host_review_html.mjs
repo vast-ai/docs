@@ -14,7 +14,7 @@ import { CLOSURE_PATH } from './current_host_closure_correction.mjs';
 import { PAYOUT_INVOICE_PATH } from './current_host_payout_invoice_correction.mjs';
 import { loadCurrentHostReviewTransition } from './current_host_review_transition.mjs';
 import { hostReviewReaderCopy } from './host_review_reader_copy.mjs';
-import { buildHostReviewQueue, describeHostReview } from './host_review_work_queue.mjs';
+import { buildHostReviewQueue, buildHostReviewIssues, describeHostReview } from './host_review_work_queue.mjs';
 import { OWNER_QUESTIONS_PATH, requireHostReviewOwnerQuestions } from './host_review_owner_questions.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -492,10 +492,12 @@ export function buildReport() {
     return out;
   });
   const payload = {
-    export_version: 1, snapshot_at: model.generated_at, export_date: authorityScan?.jurisdiction ? '2026-09-11' : '2026-09-10',
+    export_version: 1, snapshot_at: model.generated_at, export_date: '2026-09-15',
     input: { ref: inputPath, sha256: sha(bytes), revision: model.source.revision, tree: model.source.tree },
     counts: model.counts, current_result_ref: selectedResult, claim_correction_history_ref: claimCorrectionResultPath,
     work_queue: buildHostReviewQueue(claims),
+    issues: JSON.parse(JSON.stringify(buildHostReviewIssues({pages: model.pages, ownerQuestions: ownerQuestions.questions,
+      originalFindings: authorityScan?.closure?.registry.original_findings || []}), (_, value) => typeof value === 'string' ? sanitize(value) : value)),
     owner_questions: JSON.parse(JSON.stringify({ registry_ref: ownerQuestions.registryRef, registry_sha256: ownerQuestions.registrySha256,
       questions: ownerQuestions.questions }, (_, value) => typeof value === 'string' ? sanitize(value) : value)),
     cleanup_transition: authorityScan?.cleanup ? {registry_ref: 'verification/current-host-review-cleanup.json', registry_sha256: authorityScan.cleanup.registrySha256,

@@ -32,7 +32,7 @@ const typeGroups = {
   'Technical behavior or workflow': ['ACCOUNT_CONFIGURATION_OR_PERMISSION','IMPLEMENTED_BEHAVIOR','CONTRACT_TERMS_AND_IMPLEMENTED_EFFECT','RUNTIME_BEHAVIOR','UI_SURFACE_OR_WORKFLOW','REVIEWED_UI_PROVIDER_OPTION','REVIEWED_SETUP_INSTRUCTION','INTERFACE_WITH_BACKEND_EFFECT','VOLUME_ATOMIC_CLAIM','VERIFICATION_ENFORCEMENT','REVIEWED_BEHAVIOR_DESCRIPTION','RUNTIME_DIAGNOSTIC_GUIDANCE'],
 };
 const reviewTypes = new Map(Object.entries(typeGroups).flatMap(([label, classes]) => classes.map(kind => [kind,label])));
-const lanes = new Set(['REPOSITORY_STATIC_CHECK','CANONICAL_IMPLEMENTATION_SOURCE','RUNTIME_OR_UI_OBSERVATION','AUTHORITATIVE_DOCUMENTATION_CITATION','ACCOUNTABLE_OWNER_CONFIRMATION','PRODUCT_PUBLICATION_SOURCE']);
+const lanes = new Set(['STATIC_CONTEXT_REVIEW','REPOSITORY_STATIC_CHECK','CANONICAL_IMPLEMENTATION_SOURCE','RUNTIME_OR_UI_OBSERVATION','AUTHORITATIVE_DOCUMENTATION_CITATION','ACCOUNTABLE_OWNER_CONFIRMATION','PRODUCT_PUBLICATION_SOURCE']);
 const field = (claim, snake, camel) => claim[snake] ?? claim[camel];
 export function describeHostReview(claim) {
   const required = field(claim, 'required_evidence_types', 'requiredEvidenceTypes');
@@ -41,9 +41,9 @@ export function describeHostReview(claim) {
   const unknown = type === 'Needs triage' || statusLabel === 'Needs triage' || !Array.isArray(required) || required.some(item => !lanes.has(item)) || (!required.length && type !== 'Editorial');
   const completed = !unknown && ['PASS','NOT_APPLICABLE'].includes(claim.status);
   const bucket = unknown ? 'triage' : completed ? 'completed' : claim.status === 'FAIL' ? 'correction' : claim.status === 'BLOCKED' ? 'blocked' :
-    required.includes('RUNTIME_OR_UI_OBSERVATION') ? 'technical' : required.some(item => item !== 'REPOSITORY_STATIC_CHECK') ? 'source' :
+    required.includes('RUNTIME_OR_UI_OBSERVATION') ? 'technical' : required.some(item => !['REPOSITORY_STATIC_CHECK','STATIC_CONTEXT_REVIEW'].includes(item)) ? 'source' :
       required.length || type === 'Editorial' ? 'documentation' : 'triage';
-  const scopeLabel = completed && claim.status === 'PASS' && required?.length === 1 && required[0] === 'REPOSITORY_STATIC_CHECK'
+  const scopeLabel = completed && claim.status === 'PASS' && required?.length === 1 && ['REPOSITORY_STATIC_CHECK','STATIC_CONTEXT_REVIEW'].includes(required[0])
     ? ({Advice:'Advice checked',Navigation:'Links and wording checked',Calculation:'Calculation checked',Editorial:'Wording checked'}[type] || 'Repository check completed') : '';
   return {type, classification: claim.classification || '', status: claim.status, statusLabel, scopeLabel, bucket, completed, needsTriage: bucket === 'triage'};
 }
@@ -85,4 +85,48 @@ export function buildHostReviewQueue(claims) {
     sharedWordingGroups: groups.filter(group => group.occurrenceIds.length > 1).length,
     sharedWordingOccurrences: groups.filter(group => group.occurrenceIds.length > 1).reduce((sum,group) => sum + group.occurrenceIds.length,0),
     countMeaning: 'Counts are passages, not unique questions. Shared wording does not mean the same proven fact. Each passage keeps its own evidence and review status.'};
+}
+
+/** A review landing page, not another adjudication or a release-gate count.
+ * Page grouping is deliberately transparent: it asserts no shared root cause.
+ * UNVALIDATED alone never creates a finding or workflow follow-up.
+ */
+export function buildHostReviewIssues({pages, ownerQuestions, originalFindings = []}) {
+  if (!Array.isArray(pages) || !Array.isArray(ownerQuestions)) throw new Error('Issue view requires current pages and validated owner questions');
+  const claims = pages.flatMap(page => page.claims);
+  const ids = new Set(claims.map(claim => claim.id));
+  if (ids.size !== claims.length) throw new Error('Issue view requires distinct passage IDs');
+  const ownerIds = new Set();
+  const questions = ownerQuestions.map(question => {
+    if (!question.id || ownerIds.has(question.id) || !Array.isArray(question.relatedClaims) || question.relatedClaims.some(claim => !ids.has(claim.id))) throw new Error('Issue view owner mapping is invalid');
+    ownerIds.add(question.id);
+    return {id: question.id, claimIds: question.relatedClaims.map(claim => claim.id),
+      routes: [...new Set(question.relatedClaims.map(claim => claim.route))]};
+  });
+  const corrections = [], workflows = [];
+  for (const page of pages) {
+    const failIds = page.claims.filter(claim => claim.status === 'FAIL').map(claim => claim.id);
+    if (failIds.length) corrections.push({id: `correction:${page.route}`, route: page.route, title: page.title,
+      claimIds: failIds, ownerQuestionIds: questions.filter(question => question.claimIds.some(id => failIds.includes(id))).map(question => question.id)});
+    const blocked = page.claims.filter(claim => claim.status === 'BLOCKED');
+    // Use only top-level procedure outcomes; child failures are detail, not extra issues.
+    const procedures = (page.procedures || []).filter(procedure => ['FAIL','BLOCKED'].includes(procedure.status)).map(procedure => ({
+      id: procedure.id, title: procedure.title, status: procedure.status, coverage_state: procedure.coverage_state,
+      spans: procedure.spans, limits: procedure.limits, history: procedure.history,
+      recorded_nodes: (procedure.nodes || []).filter(node => ['FAIL','BLOCKED'].includes(node.status)),
+    }));
+    if (blocked.length || procedures.length) workflows.push({id: `workflow:${page.route}`, route: page.route, title: page.title,
+      claimIds: blocked.map(claim => claim.id), procedures,
+      ownerQuestionIds: questions.filter(question => question.claimIds.some(id => blocked.some(claim => claim.id === id))).map(question => question.id),
+      // Explicit fallbacks ensure a new/unmapped BLOCKED record cannot disappear.
+      unassignedClaimIds: blocked.filter(claim => !questions.some(question => question.claimIds.includes(claim.id))).map(claim => claim.id),
+    });
+  }
+  return {corrections, questions, workflows,
+    counts: {correctionTopics: corrections.length, correctionPassages: corrections.reduce((sum,group) => sum + group.claimIds.length,0),
+      ownerQuestions: questions.length, workflowPageGroups: workflows.length,
+      recordedProcedures: workflows.reduce((sum,group) => sum + group.procedures.length,0),
+      blockedPassages: workflows.reduce((sum,group) => sum + group.claimIds.length,0)},
+    originalFindings: {total: originalFindings.length, addressed: originalFindings.filter(finding => finding.disposition === 'CORRECT_NOW').length},
+    limit: 'These lists overlap and are not a total issue count or an automatic release gate. Recorded prerequisites may have changed. Reuse existing evidence and reassess the gap before deciding whether another check is needed. Unvalidated passage coverage remains in the full ledger.'};
 }
