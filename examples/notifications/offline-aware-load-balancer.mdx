@@ -1,0 +1,317 @@
+---
+title: "Route Around Offline Instances with a Simple Load Balancer"
+slug: "vast-notifications-offline-aware-load-balancer"
+createdAt: "Wed Sep 09 2026 00:00:00 GMT+0000 (Coordinated Universal Time)"
+updatedAt: "Wed Sep 09 2026 00:00:00 GMT+0000 (Coordinated Universal Time)"
+---
+
+import WebhookAutomationSetup from '/snippets/notifications/webhook-automation-setup.mdx';
+
+Use this example to keep a serving pool healthy when a machine fails. Vast.ai sends an **Instance offline** notification when a host machine stops reporting; the handler below drops the affected instances from a minimal HTTP load balancer immediately, rents a replacement on a different machine, and re-admits it only after your own readiness probe passes.
+
+This page builds on the receiver pattern from [Send Notifications to Slack](/examples/notifications/slack-webhook). For the companion example that handles scheduled host maintenance, see [Migrate an Instance Before Scheduled Maintenance](/examples/notifications/maintenance-migration).
+
+<WebhookAutomationSetup />
+
+## What Happens Without This
+
+You serve a model from several instances behind a load balancer. One machine fails or its host takes it offline. Your balancer keeps sending it traffic until a health check eventually times out, and every request routed there in the meantime fails.
+
+Vast.ai sends an **Instance offline** notification when the host machine stops reporting. This tutorial uses that push signal to drop the dead instance from rotation immediately, rent a replacement on a different machine, and add it back to the pool only when your own readiness probe says the model is loaded.
+
+The balancer here is a minimal HTTP proxy in Python, kept small so the event handling is visible. In production you would apply the same handlers to whatever proxy you already run.
+
+## How the Events Fit Together
+
+| Event | `data` fields | Your action |
+| --- | --- | --- |
+| `instance_offline` | `instance_ids[]`, `machine_ids[]` | Drain every listed instance; avoid the listed machines when replacing |
+| `instance_online` | `instance_id`, `machine_id` | The offline instance recovered: probe it, then restore |
+| `instance_started` | `instance_id`, `machine_id` | A new rental is running for the first time: probe it, then admit |
+| `instance_resumed` | `instance_id`, `machine_id`, `actual_status` | Left "Scheduling"; only probe if `actual_status` is `running` |
+| `instance_stopped` | `instance_id` | Drain |
+| `instance_deleted` | `instance_id` | Remove from the pool |
+
+Two details matter here:
+
+- **`instance_offline` is plural.** When a machine goes down, every instance you had on it is reported in one delivery. That is why the payload carries `machine_ids` as well: the failure is correlated, and a replacement rented onto the same machine will fail the same way.
+- **No event means "your model is ready."** `instance_online` and `instance_started` mean the platform can see the container. Gate re-admission on your own readiness probe.
+
+## Write the Load Balancer
+
+Create `balancer.py`. It holds the pool, runs a proxy on port 9000, and registers handlers with the shared receiver.
+
+```python
+#!/usr/bin/env python3
+import itertools
+import os
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+import requests
+from vastai import VastAI
+
+from receiver import on, serve
+
+vast = VastAI(api_key=os.environ["VAST_API_KEY"])
+
+POOL_LABEL = os.environ.get("POOL_LABEL", "inference")   # label on every replica instance
+MODEL_PORT = os.environ.get("MODEL_PORT", "8000")        # port your model server listens on
+READY_PATH = os.environ.get("READY_PATH", "/health")
+PROXY_PORT = int(os.environ.get("PROXY_PORT", "9000"))
+POOL_SIZE = int(os.environ.get("POOL_SIZE", "3"))
+BLACKLIST_TTL = 3600
+
+POOL: dict[int, dict] = {}       # instance_id -> {"url": str, "machine_id": int, "healthy": bool}
+BLACKLIST: dict[int, float] = {} # machine_id -> expires_at
+_lock = threading.Lock()
+_rr = itertools.count()
+
+
+# ---- pool bookkeeping -------------------------------------------------------
+
+def instance_url(inst: dict) -> str | None:
+    ports = (inst.get("ports") or {}).get(f"{MODEL_PORT}/tcp") or []
+    if not inst.get("public_ipaddr") or not ports:
+        return None
+    return f"http://{inst['public_ipaddr']}:{ports[0]['HostPort']}"
+
+
+def ready(url: str) -> bool:
+    try:
+        return requests.get(url + READY_PATH, timeout=3).status_code == 200
+    except requests.RequestException:
+        return False
+
+
+def drain(instance_id: int, reason: str) -> None:
+    with _lock:
+        if instance_id in POOL:
+            POOL[instance_id]["healthy"] = False
+    print(f"drained {instance_id}: {reason}", flush=True)
+
+
+def remove(instance_id: int) -> None:
+    with _lock:
+        POOL.pop(instance_id, None)
+    print(f"removed {instance_id}", flush=True)
+
+
+def admit_when_ready(instance_id: int, attempts: int = 60, interval: int = 10) -> None:
+    """Probe your readiness endpoint until it passes, then put the instance in rotation."""
+    for _ in range(attempts):
+        inst = vast.show_instance(id=instance_id)
+        url = instance_url(inst)
+        if inst.get("actual_status") == "running" and url and ready(url):
+            with _lock:
+                POOL[instance_id] = {"url": url, "machine_id": inst["machine_id"], "healthy": True}
+            print(f"admitted {instance_id} at {url}", flush=True)
+            return
+        time.sleep(interval)
+    print(f"gave up waiting for {instance_id} to become ready", flush=True)
+
+
+def healthy_urls() -> list[str]:
+    with _lock:
+        return [r["url"] for r in POOL.values() if r["healthy"]]
+
+
+def active_machines() -> list[int]:
+    now = time.time()
+    with _lock:
+        expired = [m for m, t in BLACKLIST.items() if t < now]
+        for m in expired:
+            del BLACKLIST[m]
+        return list(BLACKLIST) + [r["machine_id"] for r in POOL.values()]
+
+
+# ---- capacity ---------------------------------------------------------------
+
+def rent_replica(exclude_machines: list[int]) -> None:
+    """Rent one more replica, never on a blacklisted machine or one already in the pool."""
+    offers = vast.search_offers(
+        query=f"{os.environ['OFFER_QUERY']} rentable=true", order="dph", limit=20
+    )
+    offer = next((o for o in offers if o["machine_id"] not in exclude_machines), None)
+    if offer is None:
+        print("no eligible offers; pool stays short", flush=True)
+        return
+    result = vast.create_instance(
+        id=offer["id"],
+        image=os.environ["MODEL_IMAGE"],
+        disk=float(os.environ.get("MODEL_DISK_GB", "40")),
+        label=POOL_LABEL,
+        direct=True,
+        env=f"-p {MODEL_PORT}:{MODEL_PORT}",
+        onstart_cmd=os.environ.get("MODEL_START_CMD"),
+    )
+    print(f"rented replacement {result['new_contract']} on machine {offer['machine_id']}", flush=True)
+    # admission happens when instance_started arrives, or via the periodic probe
+
+
+def bootstrap_pool() -> None:
+    """On startup, adopt existing replicas and top the pool up to POOL_SIZE."""
+    for inst in vast.show_instances():
+        if inst.get("label") == POOL_LABEL:
+            threading.Thread(target=admit_when_ready, args=(inst["id"],), daemon=True).start()
+    with _lock:
+        short = POOL_SIZE - sum(1 for i in vast.show_instances() if i.get("label") == POOL_LABEL)
+    for _ in range(max(0, short)):
+        rent_replica(active_machines())
+
+
+def periodic_probe() -> None:
+    """Backstop: webhooks are at-least-once, not instant. Re-check the pool every 30s."""
+    while True:
+        time.sleep(30)
+        with _lock:
+            snapshot = list(POOL.items())
+        for iid, r in snapshot:
+            ok = ready(r["url"])
+            with _lock:
+                if iid in POOL:
+                    POOL[iid]["healthy"] = ok
+
+
+# ---- webhook handlers -------------------------------------------------------
+
+@on("instance_offline")
+def on_instance_offline(evt: dict) -> None:
+    d = evt.get("data") or {}
+    lost = [i for i in d.get("instance_ids", []) if i in POOL]
+    for iid in lost:
+        drain(iid, "instance_offline")
+    with _lock:
+        for mid in d.get("machine_ids", []):
+            BLACKLIST[mid] = time.time() + BLACKLIST_TTL
+    for _ in lost:
+        rent_replica(active_machines())
+
+
+@on("instance_online")
+def on_instance_online(evt: dict) -> None:
+    iid = (evt.get("data") or {}).get("instance_id")
+    if iid in POOL:
+        threading.Thread(target=admit_when_ready, args=(iid,), daemon=True).start()
+
+
+@on("instance_started")
+def on_instance_started(evt: dict) -> None:
+    iid = (evt.get("data") or {}).get("instance_id")
+    inst = vast.show_instance(id=iid)
+    if inst.get("label") == POOL_LABEL:
+        threading.Thread(target=admit_when_ready, args=(iid,), daemon=True).start()
+
+
+@on("instance_resumed")
+def on_instance_resumed(evt: dict) -> None:
+    d = evt.get("data") or {}
+    if d.get("actual_status") != "running":          # may have left Scheduling into stopped/exited
+        return
+    if d.get("instance_id") in POOL:
+        threading.Thread(target=admit_when_ready, args=(d["instance_id"],), daemon=True).start()
+
+
+@on("instance_stopped")
+def on_instance_stopped(evt: dict) -> None:
+    iid = (evt.get("data") or {}).get("instance_id")
+    if iid in POOL:
+        drain(iid, "instance_stopped")
+
+
+@on("instance_deleted")
+def on_instance_deleted(evt: dict) -> None:
+    iid = (evt.get("data") or {}).get("instance_id")
+    if iid in POOL:
+        remove(iid)
+
+
+# ---- the proxy --------------------------------------------------------------
+
+class Proxy(BaseHTTPRequestHandler):
+    def do_POST(self):
+        body = self.rfile.read(int(self.headers.get("Content-Length", "0") or "0"))
+        urls = healthy_urls()
+        if not urls:
+            self.send_response(503); self.end_headers(); return
+        target = urls[next(_rr) % len(urls)]
+        try:
+            r = requests.post(target + self.path, data=body, timeout=120,
+                              headers={"Content-Type": self.headers.get("Content-Type", "application/json")})
+        except requests.RequestException:
+            for iid, rec in list(POOL.items()):       # mark the replica we just failed on
+                if rec["url"] == target:
+                    drain(iid, "request failed")
+            self.send_response(502); self.end_headers(); return
+        self.send_response(r.status_code)
+        self.send_header("Content-Type", r.headers.get("Content-Type", "application/json"))
+        self.send_header("Content-Length", str(len(r.content)))
+        self.end_headers()
+        self.wfile.write(r.content)
+
+    def log_message(self, fmt, *args):
+        pass
+
+
+if __name__ == "__main__":
+    bootstrap_pool()
+    threading.Thread(target=periodic_probe, daemon=True).start()
+    threading.Thread(
+        target=lambda: ThreadingHTTPServer(("0.0.0.0", PROXY_PORT), Proxy).serve_forever(),
+        daemon=True,
+    ).start()
+    print(f"proxy on :{PROXY_PORT}", flush=True)
+    serve()
+```
+
+What each part does:
+
+- **Drain first, replace second.** On `instance_offline` the handler removes the listed instances from rotation before it does anything else. Renting the replacement is slower and happens after.
+- **The blacklist is keyed by machine, not instance.** `rent_replica` skips any offer on a machine that failed in the last hour and any machine already hosting a replica. Two replicas on one machine are not redundant.
+- **Re-admission always goes through `admit_when_ready`.** Every "it is back" event, from any source, ends in your readiness probe. The event decides *when to look*; the probe decides *whether to serve*.
+- **The periodic probe is a backstop, not the primary signal.** It catches the case where a delivery was delayed or the receiver was restarted.
+
+## Run It
+
+Set the environment for your model server. This example assumes a vLLM-style server on port 8000 with a `/health` route:
+
+```bash
+export VAST_API_KEY VAST_WEBHOOK_SECRET
+export OFFER_QUERY='gpu_name=RTX_4090 num_gpus=1 dph<=0.6 inet_down>=500'
+export MODEL_IMAGE='vllm/vllm-openai:latest'
+export MODEL_START_CMD='python3 -m vllm.entrypoints.openai.api_server --model <your model> --port 8000'
+export POOL_SIZE=3
+python3 balancer.py
+```
+
+Send a request through the proxy:
+
+```bash
+curl -sS http://127.0.0.1:9000/v1/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model": "<your model>", "prompt": "Hello", "max_tokens": 8}'
+```
+
+Then simulate a machine loss for one of your replicas. Use the instance and machine IDs from `vastai show instances`:
+
+```bash
+python3 simulate.py instance_offline \
+  '{"instance_ids": [<replica instance id>], "machine_ids": [<its machine id>]}'
+```
+
+The log should show `drained`, then `rented replacement`, and, once the new replica's `instance_started` delivery arrives and the probe passes, `admitted`. Requests through the proxy keep succeeding throughout. Destroy the drained instance yourself when you are done testing; the handler does not delete instances the platform says are offline, because they may come back.
+
+## What This Does Not Cover
+
+- **Streaming responses.** The proxy buffers the whole response. Use it as a model for the event handling, not as your production proxy.
+- **Pool size after recovery.** If a drained instance comes back online and passes the probe, the pool is temporarily one replica over `POOL_SIZE`. Decide whether to keep the extra capacity or destroy the newer one.
+- **Scheduled maintenance.** `upcoming_downtime` gives you the same machine ID hours in advance. Pair this tutorial with [Migrate an Instance Before Scheduled Maintenance](/examples/notifications/maintenance-migration): rent the replacement before the window, then drain the old replica gracefully.
+
+## Production Notes
+
+- Run the receiver on an always-on host with a stable HTTPS URL, not on a rented GPU instance.
+- Persist any state that must survive a restart: pending migrations in Tutorial 1, the pool and blacklist in Tutorial 2.
+- Keep a periodic reconciliation against `GET /api/v0/instances/` as a backstop. Webhook delivery is at-least-once and can be delayed by retries.
+- Rotate the webhook secret if it is ever exposed, and update `VAST_WEBHOOK_SECRET` before the next delivery.
+- Before depending on any `data` field, confirm it with a test delivery or a simulated event. The set of fields per event is documented in [Notification Webhooks](/guides/reference/notification-webhooks) and may grow over time.
