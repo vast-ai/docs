@@ -220,6 +220,10 @@ def preflight_threshold(check: dict[str, Any], system_ram_cap_mib: int) -> str:
 
 
 def preflight_purpose(check: dict[str, Any]) -> str:
+    if check["id"] == "gpu.ram":
+        return "The verification workload requires more than 7 GiB of VRAM per GPU."
+    if check["id"] == "network.direct_ports.recommended_max":
+        return "The CLI flags counts above 64 ports per listed GPU as an advisory about oversized mappings."
     if check["id"] == "cpu.cores":
         return (
             "The tester expects at least one physical CPU core per listed GPU. "
@@ -229,6 +233,8 @@ def preflight_purpose(check: dict[str, Any]) -> str:
 
 
 def preflight_remediation(check: dict[str, Any]) -> str:
+    if check["id"] == "network.direct_ports.recommended_max":
+        return "This is advisory only, not a self-test gate. Keep enough direct ports for self-test and normal workloads, and review very large unused ranges."
     if check["id"] == "cuda.version":
         return "Update the NVIDIA driver/CUDA stack, then confirm the machine is listed and healthy in the Console."
     if check["id"] == "cpu.cores":
@@ -246,7 +252,7 @@ def runtime_thresholds(system_ram_cap_mib: int) -> dict[str, str]:
             "Hyperthreads/logical CPUs do not count as physical cores."
         ),
         "resnet": "A CUDA ResNet18 workload completes on the visible GPU set at any tested batch size.",
-        "ecc": "The test allocates 95% of total memory on each visible GPU.",
+        "ecc": "The test targets approximately 95% of total memory on each visible GPU and passes only if the allocations succeed.",
         "nccl": "At least 1 GPU is visible and all NCCL ranks initialize and synchronize on one machine.",
         "stress_gpu_burn": "stress-ng and gpu-burn run together for 60 seconds and both exit with code 0.",
         "final_summary": "The runtime reports the overall pass/fail result and exit code.",
@@ -257,7 +263,7 @@ NO_OFFER_ROOT_STATE_COPY = {
     "currently_rented": "Visible offers exist and one or more are already rented.",
     "deverified_or_below_threshold": "Visible offers exist but host reliability, verification state, vericode, or error metadata points to a host quality gate.",
     "api_permission_failed": "The API key or account could not read the machine or offer state required by self-test.",
-    "zero_active_offers": "The machine is visible, but no active on-demand offers are listed for it.",
+    "zero_active_offers": "The machine lookup is visible, but no on-demand offers were returned to this API account. This is a likely state, not proof that no offers exist.",
     "offline_or_not_listed": "The machine is not visible to the account or appears offline/not listed.",
     "unknown_no_rentable_offer": "Visible offers exist, but the payload does not expose a specific non-rentable reason.",
 }
@@ -440,14 +446,19 @@ def render_image_table(image_config: dict[str, Any], image_catalog: dict[str, di
     for version in image_config["versions"]:
         details = image_catalog.get(version, {})
         image = f"{image_config['repo']}:{image_config['prefix']}-{version}"
+        target = details.get("targets", "").split(";", 1)[0]
+        if version == "11.8":
+            target += "; legacy GPU target"
+        if version == "13.3":
+            target += "; PyTorch index `cu132`"
         lines.append(
             "| "
             + " | ".join(
                 [
-                    code(image),
-                    cell(details.get("torch", "")),
-                    cell(details.get("targets", "")),
-                    cell(details.get("platforms", "")),
+                    code(image) + " (CLI-selected tag)",
+                    cell("Build pin: " + details.get("torch", "")),
+                    cell("Build target: " + target),
+                    cell("Build platforms: " + details.get("platforms", "")),
                 ]
             )
             + " |"
@@ -504,10 +515,10 @@ def render_result_interpretation() -> str:
             "",
             "| Result | What it means | What to do next |",
             "| --- | --- | --- |",
-            "| Normal pass | Minimum requirements passed and the runtime workload passed. The machine is eligible for verification, subject to the normal platform verification process. | Keep the host stable and listed. Verification is still automated and not guaranteed immediately. |",
+            "| Normal pass | The CLI preflight checks and runtime workload passed. This result alone does not guarantee platform verification. | Keep the host stable and listed. Verification remains automated and also depends on the platform’s other criteria. |",
             "| Normal preflight failure | The CLI found one or more requirement failures before renting a temporary instance. | Fix the measured values shown in the CLI, then rerun without `--ignore-requirements`. |",
-            "| Runtime failure | The CLI rented a temporary instance, started the self-test image, and a runtime stage failed or timed out. | Use the failure code, last runtime stage, and diagnostic bundle to identify the failing subsystem. |",
-            "| Pass with `--ignore-requirements` | The runtime workload passed, but minimum requirement checks were skipped. This does not qualify the machine for verification. | Treat this as runtime validation only. Rerun without `--ignore-requirements` to see qualification status. |",
+            "| Runtime failure | The CLI could not complete instance creation, startup, progress collection, or a runtime test stage. The failure code and stage show how far the run reached. | Use the failure code, last reported stage, and available diagnostic bundle to choose the next check. |",
+            "| Pass with `--ignore-requirements` | The runtime workload passed, but the CLI did not enforce its preflight requirements as a pass/fail gate. This does not qualify the machine for verification. | Treat this as runtime validation only. Rerun without `--ignore-requirements` to check the normal preflight gate. |",
             "",
             "<Tip>",
             "If you use `--ignore-requirements`, still review any requirement diagnostics from a normal run. A runtime pass proves the container workload can run; it does not prove the machine meets the verification gate.",
@@ -524,14 +535,14 @@ def render_ports_guidance() -> str:
             "The self-test needs direct public connectivity to the temporary instance. The progress service runs inside the self-test container on `5000/tcp`, but the CLI connects to the mapped external public IP and external port reported by the instance.",
             "",
             "- Minimum gate: at least 3 direct ports per listed GPU.",
-            "- Useful cap: each instance can use up to 64 ports. Mapping more than 64 ports per listed GPU is usually unnecessary and is not a self-test requirement.",
+            "- Advisory: the CLI flags more than 64 direct ports per listed GPU as an oversized mapping. This advisory does not fail the self-test.",
             "- Port forwarding should target the host's LAN address, not its public address.",
             "- Keep TCP and UDP forwarding symmetric where your network setup requires both protocols.",
             "- If the CLI reports a tested external IP:port, troubleshoot that external mapping first.",
             "- If the host and CLI are on the same LAN, a local failure to reach the public IP can be NAT hairpinning. Retest from an outside network before assuming the port is closed globally.",
             "",
             "<Note>",
-            "The CLI can report the external progress port it tested when that mapping is available. A full list of exactly which direct ports failed still requires backend or daemon-side exposure.",
+            "The CLI can report the external progress port it tested when that mapping is available. That result is not a scan of every direct port; the self-test does not provide a per-port failure list for the entire configured range.",
             "</Note>",
         ]
     )
@@ -543,9 +554,9 @@ def render_no_response_guidance() -> str:
             '<span id="no-response-120s" aria-hidden="true" />',
             "### No Response Or Progress Timeout",
             "",
-            "A `no response` or progress timeout means the CLI could not get usable progress from the temporary self-test instance after it was created. This is usually a connectivity or startup problem, not a generic verification decision.",
+            "A `no response` or progress timeout means the CLI did not receive usable progress from the temporary self-test instance. Check whether the endpoint was never reachable, returned no output, or became unreachable after connecting; then use the failure code and last stage to guide diagnosis.",
             "",
-            "Common causes:",
+            "Possible causes to check:",
             "",
             "- Router or firewall forwards the external port to the wrong LAN IP.",
             "- The external TCP port is closed, blocked, or not hairpin-accessible from the CLI's network.",
@@ -570,15 +581,15 @@ def render_not_rentable_guidance() -> str:
             '<span id="machine-not-rentable" aria-hidden="true" />',
             "### Not Found Or Not Rentable",
             "",
-            "The old `not found or not rentable` wording hid several different states. The newer CLI tries to disambiguate the state before giving guidance.",
+            "The CLI uses visible offer and machine state to suggest a likely reason before giving guidance. Treat the reported root state as a diagnostic hint, with the confidence and evidence shown in the output.",
             "",
-            "Typical root causes:",
+            "Possible states inferred from CLI-visible data:",
             "",
             "- The machine is currently rented.",
-            "- The machine is visible but has zero active on-demand offers.",
+            "- The machine is visible, but no active on-demand offers are visible to the API account.",
             "- The machine is offline, unlisted, or not visible to the API account.",
             "- The machine is deverified, below the reliability threshold, or has offer-side error metadata.",
-            "- The API key can authenticate but does not have permission to inspect the required host or offer state.",
+            "- The API key or account cannot inspect the required host or offer state; check both key validity and permissions.",
             "",
             "Start with the machine page in the Console. Check whether the host is online, listed, already rented, below the reliability gate, missing an active on-demand offer, or being viewed from an account that cannot see the host state.",
         ]
@@ -606,7 +617,7 @@ def render_nccl_guidance() -> str:
             '<span id="nccl-failed" aria-hidden="true" />',
             "### `nccl_failed` Deep Dive",
             "",
-            "`nccl_failed` means the temporary self-test instance could not initialize and synchronize NCCL workers across the visible GPUs. It is a multi-GPU communication failure, not proof of one specific root cause.",
+            "`nccl_failed` is the CLI’s NCCL-related failure classification, based on the runtime stage or error text. Inspect the original error and last stage: the code alone does not prove that NCCL initialized, that more than one GPU was visible, or that one specific subsystem caused the failure.",
             "",
             "Start with the support bundle, confirm every GPU is visible to `nvidia-smi` and Docker, then check driver/CUDA/PyTorch/NCCL compatibility, peer-to-peer communication, PCIe/NVLink topology, Xid errors, GPU resets, and bus errors.",
             "",
@@ -627,7 +638,7 @@ def render_bundle_boundary(support: dict[str, Any]) -> str:
         [
             "## Diagnostic Bundles",
             "",
-            "When a self-test fails, the CLI builds a redacted diagnostic tarball unless bundle creation is disabled.",
+            "When a self-test fails, the CLI attempts to build a redacted diagnostic tarball unless bundle creation is disabled. Check the reported path or bundle-creation warning.",
             "",
             "- Default output directory: `" + support["default_bundle_dir"] + "`.",
             "- Disable automatic bundles with `--no-support-bundle` or `VAST_SELF_TEST_SUPPORT_BUNDLE=0`.",
@@ -641,7 +652,7 @@ def render_bundle_boundary(support: dict[str, Any]) -> str:
             "When the CLI is run from a laptop or other third-party machine, it cannot collect host-local files such as `/var/lib/vastai_kaalia/kaalia.log*`, `dmesg`, `journalctl`, `/etc/docker/daemon.json`, or `/proc/mounts` from the Vast host. Those artifacts require running the helper on the actual host or adding a future daemon/backend log-collection feature.",
             "</Warning>",
             "",
-            f"Text artifacts are capped at {support['max_text_bytes']:,} bytes and log artifacts are capped at {support['max_log_bytes']:,} bytes. Obvious API keys, tokens, passwords, and related secrets are redacted, but hosts should still review the tarball before sharing it with support.",
+            f"The bundle uses {support['max_text_bytes']:,}-byte truncation limits for collected text/log content; truncation notices can add bytes, and JSON artifacts are not uniformly capped by that limit. It redacts recognized secret fields, assignments, and explicitly supplied secrets, but hosts should still review the tarball before sharing it with support.",
         ]
     )
 
@@ -677,12 +688,12 @@ def render_page(vast_cli: Path, self_test: Path) -> str:
         f"  Source: {self_test_ref['label']} {self_test_ref['branch']}@{self_test_ref['commit']} dirty={self_test_ref['dirty']}.",
         "*/}",
         "",
-        "The host self-test is the quickest way to check whether a listed machine can pass Vast.ai's minimum verification gate and run the runtime workload used by the tester.",
+        "The host self-test checks a listed machine against the CLI’s preflight requirements and runs a temporary diagnostic workload.",
         "",
-        "When you run `vastai self-test machine <machine>`, the CLI selects a rentable offer for that machine, checks minimum requirements, rents one temporary diagnostic instance, starts the self-test image, polls the runtime progress endpoint, reports the result, and destroys the temporary instance.",
+        "When you run `vastai self-test machine <machine>`, the CLI selects a rentable offer for that machine and checks its preflight requirements. If those checks pass, it rents one temporary diagnostic instance, starts the self-test image, polls its progress endpoint, reports the result, and attempts to destroy the instance. Check any cleanup warning and destroy the temporary instance manually if cleanup failed.",
         "",
         "<Note>",
-        "Passing this self-test makes a machine eligible for verification, but it does not guarantee that the machine will be verified immediately. Verification also depends on ongoing health, reliability, supply and demand, and platform policy.",
+        "Passing this self-test alone does not guarantee verification. The platform also evaluates ongoing health, reliability, supply and demand, and its other verification criteria.",
         "</Note>",
         "",
         "<Warning>",
@@ -693,7 +704,7 @@ def render_page(vast_cli: Path, self_test: Path) -> str:
         "",
         "## Preflight Checks",
         "",
-        "These checks run before the CLI rents the temporary self-test instance. Failed required checks stop the normal flow before billing starts.",
+        "These checks run before the CLI rents the temporary self-test instance. Failed required checks stop the normal flow before that instance is created.",
         "",
         render_preflight_table(cli["preflight_checks"], system_ram_cap_mib),
         "",

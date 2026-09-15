@@ -1,0 +1,61 @@
+@parser.command(
+    argument("id", help="id of machine to schedule maintenance for", type=int),
+    argument("--sdate", help="maintenance start date in unix epoch time (UTC seconds)", type=float),
+    argument("--duration", help="maintenance duration in hours", type=float),
+    argument("--maintenance_category", help="(optional) can be one of [power, internet, disk, gpu, software, other]", type=str, default="not provided"),
+    usage="vastai schedule maintenance id [--sdate START_DATE --duration DURATION --maintenance_category MAINTENANCE_CATEGORY]",
+    help="[Host] Schedule upcoming maint window",
+    epilog=deindent("""
+        The proper way to perform maintenance on your machine is to wait until all active contracts have expired or the machine is vacant.
+        For unplanned or unscheduled maintenance, use this schedule maint command. That will notify the client that you have to take the machine down and that they should save their work.
+        You can specify a date, duration, reason and category for the maintenance.
+
+        Example: vastai schedule maint 8207 --sdate 1677562671 --duration 0.5 --maintenance_category "power"
+    """),
+    )
+def schedule__maint(args):
+    """Schedule upcoming maintenance window."""
+    from datetime import datetime, timezone
+    from vastai.cli.util import string_to_unix_epoch
+
+    dt = datetime.fromtimestamp(args.sdate, tz=timezone.utc)
+    print(f"Scheduling maintenance window starting {dt} lasting {args.duration} hours")
+    print(f"This will notify all clients of this machine.")
+    ok = input("Continue? [y/n] ")
+    if ok.strip().lower() != "y":
+        return
+
+    if args.explain:
+        print("request json: ")
+        print({"client_id": "me", "sdate": args.sdate, "duration": args.duration,
+               "maintenance_category": args.maintenance_category})
+
+    client = get_client(args)
+    machines_api.schedule_maint(client, id=args.id, sdate=string_to_unix_epoch(args.sdate),
+                                duration=args.duration, maintenance_category=args.maintenance_category)
+    print(f"Maintenance window scheduled for {dt} success")
+
+
+@parser.command(
+    argument("id", help="id of machine to cancel maintenance(s) for", type=int),
+    usage="vastai cancel maint id",
+    help="[Host] Cancel maint window",
+    epilog=deindent("""
+        For deleting a machine's scheduled maintenance window(s), use this cancel maint command.
+        Example: vastai cancel maint 8207
+    """),
+    )
+def cancel__maint(args):
+    """Cancel scheduled maintenance window(s)."""
+    print(f"Cancelling scheduled maintenance window(s) for machine {args.id}.")
+    ok = input("Continue? [y/n] ")
+    if ok.strip().lower() != "y":
+        return
+
+    if args.explain:
+        print("request json: ")
+        print({"client_id": "me", "machine_id": args.id})
+
+    client = get_client(args)
+    machines_api.cancel_maint(client, id=args.id)
+    print(f"Cancel maintenance window(s) scheduled for machine {args.id} success")

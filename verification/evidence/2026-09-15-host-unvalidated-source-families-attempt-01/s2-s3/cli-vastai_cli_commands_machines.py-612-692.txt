@@ -1,0 +1,81 @@
+@parser.command(
+    argument("machine_id", help="Machine ID", type=str),
+    argument("--instance-id", help="Instance ID to pull Vast instance logs from", type=int),
+    argument("--output-dir", help="Directory for the diagnostic bundle (default: /tmp)", type=str),
+    argument(
+        "--include-local-host-artifacts",
+        action="store_true",
+        help="Include local OS/kaalia artifacts; only use when running on the actual Vast host",
+    ),
+    usage=(
+        "vastai dump-logs <machine_id> [--instance-id INSTANCE_ID] "
+        "[--output-dir DIR] [--include-local-host-artifacts]"
+    ),
+    help="[Host] Bundle self-test diagnostics for support",
+    epilog=deindent("""
+        Creates a redacted diagnostic tarball containing CLI-visible self-test
+        evidence. If --instance-id is provided, the command also pulls container
+        and daemon logs from the Vast instance logs API.
+
+        Local OS/kaalia artifacts are only collected with
+        --include-local-host-artifacts. Use that option only when running this
+        command on the actual host machine; from a laptop, it would collect the
+        laptop's logs instead.
+
+        Example:
+         vastai dump-logs 12345 --instance-id 67890
+    """),
+)
+def dump_logs(args):
+    run_started_at = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    cli_output = [f"Manual diagnostic bundle requested for machine {args.machine_id}."]
+    extra_files = {}
+    extra_errors = []
+    if args.instance_id:
+        client = get_client(args)
+        cli_output.append(f"Requested Vast instance logs for instance {args.instance_id}.")
+        instance_files, instance_errors = collect_instance_log_artifacts(client, args.instance_id)
+        extra_files.update(instance_files)
+        extra_errors.extend(instance_errors)
+    else:
+        cli_output.append("No --instance-id provided; Vast instance logs were not requested.")
+
+    if not args.include_local_host_artifacts:
+        cli_output.append(
+            "Local host OS/kaalia artifacts were not collected. Use "
+            "--include-local-host-artifacts only when running on the actual host."
+        )
+
+    try:
+        bundle = create_support_bundle(
+            machine_id=args.machine_id,
+            output_dir=args.output_dir,
+            result={
+                "machine_id": args.machine_id,
+                "stage": "manual_dump_logs",
+                "reason": "Manual diagnostic bundle requested with vastai dump-logs.",
+                "instance_id": args.instance_id,
+                "includes_local_host_artifacts": args.include_local_host_artifacts,
+            },
+            cli_output=cli_output,
+            extra_files=extra_files,
+            extra_errors=extra_errors,
+            run_started_at=run_started_at,
+            command=sys.argv,
+            secrets=[getattr(args, "api_key", None), os.environ.get("VAST_API_KEY")],
+            include_local_host_artifacts=args.include_local_host_artifacts,
+        )
+    except Exception as e:
+        error = _diagnostic_error(e)
+        if getattr(args, "raw", False):
+            return {
+                "success": False,
+                "machine_id": args.machine_id,
+                "error": f"Failed to create diagnostic bundle: {error}",
+            }
+        print(f"WARNING: failed to create diagnostic bundle: {error}")
+        sys.exit(1)
+    if getattr(args, "raw", False):
+        return bundle
+    for line in format_bundle_summary(bundle):
+        print(line)

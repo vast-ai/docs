@@ -11,11 +11,13 @@ import { JURISDICTION_PATH, JURISDICTION_ATTEMPT } from './current_host_jurisdic
 import { PAYOUT_PATH } from './current_host_payout_provider_correction.mjs';
 import { PAYOUT_TERMS_PATH } from './current_host_payout_terms_correction.mjs';
 import { CLOSURE_PATH } from './current_host_closure_correction.mjs';
+import { SOURCE_FAMILY_PATH, SOURCE_FAMILY_ATTEMPT } from './current_host_source_family_review.mjs';
 import { PAYOUT_INVOICE_PATH } from './current_host_payout_invoice_correction.mjs';
 import { loadCurrentHostReviewTransition } from './current_host_review_transition.mjs';
 import { hostReviewReaderCopy } from './host_review_reader_copy.mjs';
 import { buildHostReviewQueue, buildHostReviewIssues, describeHostReview } from './host_review_work_queue.mjs';
 import { OWNER_QUESTIONS_PATH, requireHostReviewOwnerQuestions } from './host_review_owner_questions.mjs';
+import {encodeHostReviewPayload, decodeHostReviewPayload} from './host_review_payload.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const inputPath = 'verification/current-host-docs-review.json';
@@ -333,7 +335,7 @@ export function buildReport() {
   const model = JSON.parse(bytes);
   const ownerQuestions = requireHostReviewOwnerQuestions({ read, model, modelSha256: sha(bytes) });
   const authorityScan = loadCurrentHostReviewTransition({ read, model });
-  const selectedResult = authorityScan?.closure?.resultRef || (authorityScan?.payoutInvoice ? payoutInvoiceResultPath : (authorityScan?.payoutTerms ? payoutTermsResultPath : (authorityScan?.payoutProvider ? payoutProviderResultPath : (authorityScan?.cleanup?.resultRef || (authorityScan?.jurisdiction ? `${JURISDICTION_ATTEMPT}/result.md` : authorityScan?.terms ? `${TERMS_ATTEMPT}/result.md` : authorityScan ? `${AUTHORITY_SCAN_ATTEMPT}/result.md` : currentResultPath)))));
+  const selectedResult = authorityScan?.sourceFamily?.resultRef || authorityScan?.closure?.resultRef || (authorityScan?.payoutInvoice ? payoutInvoiceResultPath : (authorityScan?.payoutTerms ? payoutTermsResultPath : (authorityScan?.payoutProvider ? payoutProviderResultPath : (authorityScan?.cleanup?.resultRef || (authorityScan?.jurisdiction ? `${JURISDICTION_ATTEMPT}/result.md` : authorityScan?.terms ? `${TERMS_ATTEMPT}/result.md` : authorityScan ? `${AUTHORITY_SCAN_ATTEMPT}/result.md` : currentResultPath)))));
   const claims = model.pages.flatMap(page => page.claims.map(claim => ({ ...claim, route: page.route, page_title: page.title })));
   const ids = new Set(claims.map(c => c.id));
   if (ids.size !== claims.length || claims.length !== model.counts.claims) throw new Error('Claim inventory mismatch');
@@ -468,6 +470,19 @@ export function buildReport() {
       'independent-projector-review.json']) add(`${evidenceAttempt}/${name}`);
 
   }
+  if (authorityScan?.sourceFamily) {
+    const review = authorityScan.sourceFamily;
+    add(SOURCE_FAMILY_PATH, review.registrySha256);
+    add(review.scope.path, review.scope.sha256);
+    add(review.baseline, review.baselineSha256);
+    add(review.resultRef);
+    for (const name of ['inventory.json', 'owner-context-amendment.json', 'plan.md'])
+      add(`${SOURCE_FAMILY_ATTEMPT}/${name}`, authorityScan.artifactHashes.get(`${SOURCE_FAMILY_ATTEMPT}/${name}`));
+    const amendment = JSON.parse(read(`${SOURCE_FAMILY_ATTEMPT}/owner-context-amendment.json`));
+    add(amendment.before_artifact.path, amendment.before_artifact.sha256);
+    for (const source of review.registry.sources) add(source.before_artifact.path, source.before_artifact.sha256);
+    for (const artifact of review.registry.artifacts) add(artifact.path, artifact.sha256);
+  }
   for (const ref of installationIntake.artifactRefs) add(ref);
   add(currentResultPath); add(currentAuthorityBaselinePath); add(claimCorrectionResultPath);
   for (const ref of currentAttemptArtifacts) add(ref);
@@ -497,7 +512,7 @@ export function buildReport() {
     counts: model.counts, current_result_ref: selectedResult, claim_correction_history_ref: claimCorrectionResultPath,
     work_queue: buildHostReviewQueue(claims),
     issues: JSON.parse(JSON.stringify(buildHostReviewIssues({pages: model.pages, ownerQuestions: ownerQuestions.questions,
-      originalFindings: authorityScan?.closure?.registry.original_findings || []}), (_, value) => typeof value === 'string' ? sanitize(value) : value)),
+      originalFindings: authorityScan?.closure?.registry.original_findings || [], sourceFamilyTransitions: authorityScan?.sourceFamily?.registry.transitions || []}), (_, value) => typeof value === 'string' ? sanitize(value) : value)),
     owner_questions: JSON.parse(JSON.stringify({ registry_ref: ownerQuestions.registryRef, registry_sha256: ownerQuestions.registrySha256,
       questions: ownerQuestions.questions }, (_, value) => typeof value === 'string' ? sanitize(value) : value)),
     cleanup_transition: authorityScan?.cleanup ? {registry_ref: 'verification/current-host-review-cleanup.json', registry_sha256: authorityScan.cleanup.registrySha256,
@@ -514,6 +529,10 @@ export function buildReport() {
       terms_ref: authorityScan.payoutTerms.terms, terms_sha256: authorityScan.payoutTerms.termsSha256,
       faq_ref: authorityScan.payoutTerms.faq, faq_sha256: authorityScan.payoutTerms.faqSha256,
       result_ref: payoutTermsResultPath, changed_claims: 2, limit: 'Published Terms text and attributed payout guidance only; no payout/provider adjudication, enforceability decision, Hosting Agreement priority, or independent backend/runtime absence is inferred.'} : null,
+    source_family_transition: authorityScan?.sourceFamily ? {registry_ref:SOURCE_FAMILY_PATH, registry_sha256:authorityScan.sourceFamily.registrySha256,
+      baseline_ref:authorityScan.sourceFamily.baseline, baseline_sha256:authorityScan.sourceFamily.baselineSha256,
+      result_ref:authorityScan.sourceFamily.resultRef, reviewed_claims:authorityScan.sourceFamily.registry.transitions.length,
+      limit:authorityScan.sourceFamily.registry.limits} : null,
     closure_transition: authorityScan?.closure ? {registry_ref:CLOSURE_PATH, registry_sha256:authorityScan.closure.registrySha256,
       baseline_ref:authorityScan.closure.baseline, baseline_sha256:authorityScan.closure.baselineSha256,
       result_ref:authorityScan.closure.resultRef, changed_claims:authorityScan.closure.registry.transitions.length,
@@ -567,12 +586,14 @@ export function buildReport() {
     support_layers: model.support_layers,
     files: Object.fromEntries(files),
   };
-  const json = JSON.stringify(payload).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+  const json = JSON.stringify(encodeHostReviewPayload(payload));
   const template = fs.readFileSync(path.join(root, 'scripts/templates/host-docs-review.html'), 'utf8');
   if (template.split('/*__REPORT_DATA__*/').length !== 2) throw new Error('Expected exactly one data slot');
+  if (template.split('/*__REPORT_DECODER__*/').length !== 2) throw new Error('Expected exactly one decoder slot');
   const html = template
     .replace('__INPUT_SHA256__', payload.input.sha256)
-    .replace('/*__REPORT_DATA__*/', () => json);
+    .replace('/*__REPORT_DATA__*/', () => json)
+    .replace('/*__REPORT_DECODER__*/', () => decodeHostReviewPayload.toString());
   return { html, payload, manifest: {
     schema_version: 1, export_date: payload.export_date, input: payload.input,
     html_sha256: sha(html), counts: payload.counts,

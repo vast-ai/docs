@@ -1,0 +1,78 @@
+        f"Inspect all visible offers with: vastai search offers 'machine_id={machine_id} rentable=any rented=any'."
+    ]
+
+    search_status = _http_status(search_error)
+    lookup_status, lookup_rows = _machine_lookup_status(machine_lookup)
+    lookup_status_code = machine_lookup.get("status_code") if isinstance(machine_lookup, dict) else None
+
+    if search_status in (401, 403) or lookup_status in ("permission_denied", "unauthorized") or lookup_status_code in (401, 403):
+        if search_status:
+            evidence.append(f"Offer search failed with HTTP {search_status}.")
+        if lookup_status_code:
+            evidence.append(f"Machine lookup failed with HTTP {lookup_status_code}.")
+        evidence.append("The API key or account could not read the required machine/offer state.")
+        suggested_steps = [
+            "Check that the API key is valid and has permission to read offers and hosted machines.",
+            "Retry after logging in with an account that owns or can inspect this host.",
+        ]
+        return {
+            "root_state": ROOT_API_PERMISSION_FAILED,
+            "confidence": "high",
+            "evidence": evidence,
+            "suggested_steps": suggested_steps,
+        }
+
+    if offers:
+        evidence.append(f"Found {len(offers)} visible offer(s), but none were currently rentable.")
+        rented_offers = [offer for offer in offers if offer.get("rented") is True]
+        if rented_offers:
+            evidence.append(f"{len(rented_offers)} visible offer(s) are marked rented=true.")
+            suggested_steps = [
+                "Wait for the current rental to end, then retry the self-test.",
+                suggested_steps[0],
+            ]
+            return {
+                "root_state": ROOT_CURRENTLY_RENTED,
+                "confidence": "medium",
+                "evidence": evidence,
+                "suggested_steps": suggested_steps,
+            }
+
+        state_evidence = []
+        for offer in offers:
+            reliability = safe_float(offer.get("reliability"))
+            vericode = offer.get("vericode")
+            verified = offer.get("verified")
+            verification = offer.get("verification")
+            error_description = offer.get("error_description")
+            if reliability and reliability <= 0.90:
+                state_evidence.append(f"Offer reliability is {reliability}, which is at or below the 0.90 self-test threshold.")
+            if vericode not in (None, "", 0, "0"):
+                state_evidence.append(f"Offer reports vericode={vericode}.")
+            if verified is False:
+                state_evidence.append("Offer is marked verified=false.")
+            if isinstance(verification, str) and verification.lower() not in ("", "verified", "true"):
+                state_evidence.append(f"Offer verification state is {verification}.")
+            if error_description:
+                state_evidence.append(f"Offer error_description is {error_description}.")
+
+        if state_evidence:
+            evidence.extend(state_evidence)
+            suggested_steps = [
+                "Resolve the host verification or reliability issue, then wait for the offer state to refresh.",
+                suggested_steps[0],
+            ]
+            return {
+                "root_state": ROOT_DEVERIFIED_OR_BELOW_THRESHOLD,
+                "confidence": "medium",
+                "evidence": evidence,
+                "suggested_steps": suggested_steps,
+            }
+
+        evidence.append("Visible offers exist, but their payload did not expose a specific non-rentable reason.")
+        suggested_steps = [
+            "Refresh the marketplace/host state and retry shortly.",
+            suggested_steps[0],
+        ]
+        return {
+            "root_state": ROOT_UNKNOWN_NO_RENTABLE_OFFER,

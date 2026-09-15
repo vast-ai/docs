@@ -25,7 +25,7 @@ function currentClaims(model) {
   return new Map(rows.map((row) => [row.claim.id, row]));
 }
 
-function validateRelatedClaim(value, claims) {
+function validateRelatedClaim(value, claims, contextLinks = []) {
   exactKeys(value, ['claim_id', 'route', 'headings', 'source_links'], 'related claim');
   const claimId = requiredText(value.claim_id, 'claim ID');
   const row = claims.get(claimId);
@@ -33,7 +33,7 @@ function validateRelatedClaim(value, claims) {
     JSON.stringify(value.headings) !== JSON.stringify(row.claim.headings)) throw new Error(`Owner-question related claim drift: ${claimId}`);
   if (!Array.isArray(value.source_links)) throw new Error(`Invalid owner-question source links: ${claimId}`);
   const currentLinks = (claimField(row.claim, 'source_refs', 'sourceRefs') || []).map(ref => ref.path);
-  if (new Set(value.source_links).size !== value.source_links.length || value.source_links.some(link => typeof link !== 'string' || !currentLinks.includes(link))) {
+  if (new Set(value.source_links).size !== value.source_links.length || value.source_links.some(link => typeof link !== 'string' || (!currentLinks.includes(link) && !contextLinks.includes(link)))) {
     throw new Error(`Owner-question current source link drift: ${claimId}`);
   }
   return { id: claimId, route: row.page.route, headings: [...row.claim.headings], sourceLinks: [...value.source_links],
@@ -51,6 +51,12 @@ export function loadHostReviewOwnerQuestions({ read, model, modelSha256 }) {
       registry.model_ref !== 'verification/current-host-docs-review.json' || registry.model_sha256 !== modelSha256 ||
       !Array.isArray(registry.questions) || registry.questions.length === 0) throw new Error('Owner-question registry is missing, stale, or invalid');
     const claims = currentClaims(model), ids = new Set();
+    let contextAmendment;
+    if ((model.corrections || []).some(item => item.id === 'HOST-SOURCE-FAMILY-REVIEW-01')) {
+      const amendmentBytes = read('verification/evidence/2026-09-15-host-unvalidated-source-families-attempt-01/owner-context-amendment.json');
+      if (hash(amendmentBytes) !== '01482cf7725940c5d84f06774c886ee10c358837b532557f99b8a43de40dd5a5') throw new Error('Owner-question context amendment drift');
+      contextAmendment = JSON.parse(amendmentBytes);
+    }
     const questions = registry.questions.map(question => {
       exactKeys(question, ['id', 'status', 'proposed_teams', 'question', 'required_decision_or_source', 'related_claims', 'coverage_gaps'], 'record');
       const id = requiredText(question.id, 'ID');
@@ -59,9 +65,12 @@ export function loadHostReviewOwnerQuestions({ read, model, modelSha256 }) {
         !Array.isArray(question.related_claims) || !question.related_claims.length || !Array.isArray(question.coverage_gaps) ||
         question.coverage_gaps.some(gap => typeof gap !== 'string' || !gap.trim())) throw new Error(`Invalid owner-question record: ${id}`);
       ids.add(id);
+      const amended = contextAmendment?.question_id === id;
+      if (amended && JSON.stringify(question) !== JSON.stringify(contextAmendment.after)) throw new Error('Owner-question amended context drift');
       return { id, status: 'UNVALIDATED', proposedTeams: [...question.proposed_teams], question: requiredText(question.question, 'question'),
         requiredDecisionOrSource: requiredText(question.required_decision_or_source, 'required decision or source'),
-        relatedClaims: question.related_claims.map(item => validateRelatedClaim(item, claims)), coverageGaps: [...question.coverage_gaps] };
+        relatedClaims: question.related_claims.map(item => validateRelatedClaim(item, claims,
+          amended ? contextAmendment.after.related_claims.find(value => value.claim_id === item.claim_id).source_links : [])), coverageGaps: [...question.coverage_gaps] };
     });
     return { available: true, registryRef: OWNER_QUESTIONS_PATH, registrySha256: hash(bytes), questions };
   } catch (error) {

@@ -9,8 +9,11 @@ import { loadPayoutProviderCorrection } from './current_host_payout_provider_cor
 import { loadPayoutTermsCorrection } from './current_host_payout_terms_correction.mjs';
 import { loadClosureCorrection } from './current_host_closure_correction.mjs';
 import { loadPayoutInvoiceCorrection } from './current_host_payout_invoice_correction.mjs';
+import { loadSourceFamilyReview } from './current_host_source_family_review.mjs';
 
 export function loadCurrentHostReviewTransition({read, model, exists}) {
+  const sourceFamily = loadSourceFamilyReview({read, model, exists});
+  if (sourceFamily) return sourceFamily;
   const closure = loadClosureCorrection({read, model, exists});
   if (closure) return closure;
   const payoutInvoice = loadPayoutInvoiceCorrection({read, model, exists});

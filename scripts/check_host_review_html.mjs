@@ -19,7 +19,7 @@ const expectedCounts={...currentModel.counts.claim_statuses,OPEN:openClaims.leng
 const runtimeCount=openClaims.filter(c=>c.required_evidence_types.includes('RUNTIME_OR_UI_OBSERVATION')).length;
 const result={timestamp:new Date().toISOString(),scope:'Standalone HTML presentation and setup-source inspection; no product behavior or fresh network installation',html_sha256:crypto.createHash('sha256').update(fs.readFileSync(path.join(root,'verification/host-docs-review.html'))).digest('hex'),checks:[]};
 function run(args){return JSON.parse(execFileSync('agent-browser',['--session',session,'--json',...args],{encoding:'utf8',maxBuffer:5000000,timeout:45000}));}
-function evaluate(script){const response=run(['eval','-b',Buffer.from(`(()=>{${script}})()`).toString('base64')]);if(!response.success)throw new Error(JSON.stringify(response.error));return response.data.result;}
+function evaluate(script){const response=run(['eval','-b',Buffer.from(`(async()=>{if(!await window.hostReviewReady)throw Error('Offline report initialization failed');${script}})()`).toString('base64')]);if(!response.success)throw new Error(JSON.stringify(response.error));return response.data.result;}
 function check(name,fn){try{result.checks.push({name,status:'PASS',observation:fn()});}catch(e){result.checks.push({name,status:'FAIL',error:sanitize(e.message)});}}
 check('deterministic data and setup-source tests',()=>sanitize(execFileSync(process.execPath,['--test','scripts/host-review-html.test.mjs'],{cwd:root,encoding:'utf8',maxBuffer:1000000}).trim()));
 try {
@@ -27,13 +27,13 @@ run(['open',pathToFileURL(path.join(root,'verification/host-docs-review.html')).
 run(['set','offline','on']);
 check('plain-language account finding, next step and exact raw details',()=>evaluate(`
  document.getElementById('search').value='MCL-790d76c6e2bea8fa';document.getElementById('search').dispatchEvent(new Event('input'));
- const card=document.querySelector('.claim'),data=JSON.parse(document.getElementById('report-data').textContent),claim=data.claims.find(c=>c.id==='MCL-790d76c6e2bea8fa');
+ const card=document.querySelector('.claim'),data=await window.hostReviewReady,claim=data.claims.find(c=>c.id==='MCL-790d76c6e2bea8fa');
  if(!card.innerText.includes(claim.reader_copy.finding)||!card.innerText.includes(claim.reader_copy.nextStep))throw Error('Plain copy missing');
  if(/permission enforcement|state transition|terminal proof|Remaining gap/.test(card.innerText))throw Error('Audit jargon visible');
  const raw=card.querySelector('.raw-details');if(raw.open||!raw.textContent.includes(claim.rationale)||!raw.textContent.includes(claim.next_action))throw Error('Raw details lost or expanded');
  document.getElementById('clear').click();return {id:claim.id,status:claim.status,finding:claim.reader_copy.finding,next:claim.reader_copy.nextStep};`));
 check('policy requests preserve open citations and basic descriptions need no rental',()=>evaluate(`
- const data=JSON.parse(document.getElementById('report-data').textContent),seen=[];
+ const data=await window.hostReviewReady,seen=[];
  const selectedIds=new Set(['MCL-b61d15c0282ef567','MCL-c59caa4cd52bcc1f','MCL-af1c482a08b09316','MCL-393941d0e9be9d31','MCL-03c73e4182b1e7fe','MCL-3b10b5e64ee55003','MCL-e12ac9f6be2ce502']);
  const selected=data.claims.filter(c=>selectedIds.has(c.id));
  for(const claim of selected){
@@ -53,7 +53,7 @@ check('offline initial load and no resource dependencies',()=>evaluate(`
  if(performance.getEntriesByType('resource').length)throw Error('Network resources');
  return {initial:document.getElementById('results-count').textContent,resources:0,location:location.protocol};`));
 check('all current pages and claims reachable by page filter and pagination',()=>evaluate(`
- const data=JSON.parse(document.getElementById('report-data').textContent),seen=[];
+ const data=await window.hostReviewReady,seen=[];
  document.getElementById('status').value='ALL';
  for(const p of data.pages){document.getElementById('page').value=p.route;document.getElementById('page').dispatchEvent(new Event('change'));
  do{seen.push(...[...document.querySelectorAll('.claim')].map(el=>el.id.slice(6)));if(document.getElementById('next').disabled)break;document.getElementById('next').click();}while(true);}
@@ -66,7 +66,7 @@ check('all status totals and both evidence registers',()=>evaluate(`
  document.querySelector('[data-workstream="source"]').click();const sourceCount=document.getElementById('results-count').textContent;
  document.getElementById('clear').click();return {statuses:counts,runtime:${runtimeCount},source:sourceCount};`));
 check('actionable categories partition every passage and shared wording retains individual controls',()=>evaluate(`
- const data=JSON.parse(document.getElementById('report-data').textContent),queue=data.work_queue,seen=[];
+ const data=await window.hostReviewReady,queue=data.work_queue,seen=[];
  if(queue.total!==data.claims.length||queue.buckets.reduce((sum,b)=>sum+b.count,0)!==data.claims.length)throw Error('Queue partition');
  document.getElementById('status').value='ALL';
  for(const bucket of queue.buckets){const input=document.getElementById('work-category');input.value=bucket.id;input.dispatchEvent(new Event('change'));const ids=[];
@@ -85,7 +85,7 @@ check('search, empty state, priority action and owner selection',()=>evaluate(`
  const role=document.getElementById('owner');role.value='Product, Finance, and Legal owner';role.dispatchEvent(new Event('change'));
  document.getElementById('clear').click();return {search,emptyState:true,priorityPage:true,ownerFilter:true};`));
 check('self-test, VM and verification passage locations; evidence dialogs preserve context',()=>evaluate(`
- const data=JSON.parse(document.getElementById('report-data').textContent);const observations=[];
+ const data=await window.hostReviewReady;const observations=[];
  for(const route of ['/host/how-to-self-test','/host/vms','/host/verification-stages']){
   document.getElementById('status').value='ALL';document.getElementById('page').value=route;document.getElementById('page').dispatchEvent(new Event('change'));
   const first=document.querySelector('.claim'),id=first.id.slice(6),c=data.claims.find(c=>c.id===id);first.querySelector('[data-passage]').click();
@@ -98,7 +98,7 @@ check('self-test, VM and verification passage locations; evidence dialogs preser
   const body=document.getElementById('viewer-body').textContent;if(!body.includes(c.page_title)||!body.includes('Limit:')||!body.includes(data.files[ref].sha256))throw Error('Evidence context '+ref);document.getElementById('close-viewer').click();}
  document.getElementById('clear').click();return {passages:observations,contextualEvidenceRecords:refs.length};`));
 check('selected proof opens only its exact check with passage context and product sources stay separate',()=>evaluate(`
- const data=JSON.parse(document.getElementById('report-data').textContent),groups=[data.supplemental_live_checks.mapped_claims,data.current_readonly_checks.mapped_claims,data.readonly_command_proofs||[]];let checks=0;
+ const data=await window.hostReviewReady,groups=[data.supplemental_live_checks.mapped_claims,data.current_readonly_checks.mapped_claims,data.readonly_command_proofs||[]];let checks=0;
  for(const mapped of groups)for(const m of mapped){document.getElementById('clear').click();document.getElementById('status').value='ALL';document.getElementById('search').value=m.claim_id;document.getElementById('search').dispatchEvent(new Event('input'));
  const card=document.querySelector('.claim');if(!card)throw Error('Missing mapped claim '+m.claim_id);card.querySelector(':scope>details').open=true;
  if(!card.textContent.includes('What we actually tested:')||!card.textContent.includes(m.coverage.level))throw Error('Coverage label');
@@ -113,7 +113,7 @@ check('selected proof opens only its exact check with passage context and produc
  if(!product.textContent.includes('not a runtime test'))throw Error('Product/runtime distinction');
  document.getElementById('clear').click();return {mappedClaims:groups.reduce((n,m)=>n+m.length,0),exactCheckControls:checks,publicSources:3};`));
 check('authority scan source controls select each exact excerpt and foreground the human source locator',()=>evaluate(`
- const data=JSON.parse(document.getElementById('report-data').textContent);if(!data.authority_scan)return {scope:'No authority scan in this dated input',controls:0};
+ const data=await window.hostReviewReady;if(!data.authority_scan)return {scope:'No authority scan in this dated input',controls:0};
  let count=0,sameSourcePairs=0;
  for(const [id,transition]of Object.entries(data.authority_scan.transitions)){
   if(!transition.basis.length)continue;document.getElementById('clear').click();document.getElementById('status').value='ALL';document.getElementById('search').value=id;document.getElementById('search').dispatchEvent(new Event('input'));

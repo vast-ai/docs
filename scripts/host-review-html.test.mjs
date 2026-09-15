@@ -4,13 +4,15 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import vm from 'node:vm';
 import { buildReport, sanitize } from './export_host_review_html.mjs';
+import {readEmbeddedHostReviewPayload, decodeHostReviewPayload, encodeHostReviewPayload} from './host_review_payload.mjs';
+import {projectClosureCorrection} from './current_host_closure_correction.mjs';
 
 const {html,payload,manifest}=buildReport();
 const app=html.match(/<script>([\s\S]*?)<\/script>/)[1];
 const model=JSON.parse(fs.readFileSync(new URL('../verification/current-host-docs-review.json',import.meta.url)));
 const inputClaims=model.pages.flatMap(p=>p.claims);
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
-const currentResultTransition=payload.closure_transition||payload.payout_invoice_transition||payload.payout_terms_transition||payload.payout_provider_transition||payload.cleanup_transition||payload.jurisdiction_transition||payload.terms_transition;
+const currentResultTransition=payload.source_family_transition||payload.closure_transition||payload.payout_invoice_transition||payload.payout_terms_transition||payload.payout_provider_transition||payload.cleanup_transition||payload.jurisdiction_transition||payload.terms_transition;
 const jurisdictionIds=new Map([
  ['CUR-708c718cf735c8b2','Advice checked'],['CUR-555543e9b2ceddb4','Advice checked'],['CUR-2ead4eda972e84b0','Advice checked'],
  ['MCL-8fe2020c0e7efe26','Advice and rule checked'],
@@ -28,7 +30,7 @@ test('all current occurrences retain identity, status, source and bounded text',
   assert.equal(c.text,sanitize(original.text));
   assert.deepEqual(c.spans,original.spans);
   assert.equal(c.rationale,sanitize(original.rationale));
-  assert.equal(c.next_action,sanitize(original.next_action));
+  assert.equal(c.next_action,typeof original.next_action==='string'?sanitize(original.next_action):original.next_action);
   assert.deepEqual(c.required_evidence_types,original.required_evidence_types);
  }
  assert.deepEqual(payload.counts.claim_statuses,model.counts.claim_statuses);
@@ -98,6 +100,25 @@ test('eight jurisdiction source and advice cards retain exact labels, current so
    assert.ok(shown.body.includes(escapeHTML(basis.support_rationale)),claim.id);
    if(basis.sourceUrl)assert.ok(shown.body.includes(`href="${escapeHTML(basis.sourceUrl)}"`),claim.id);
   }
+ }
+});
+test('reviewed source-family residuals show their actual source scope without claiming proof',()=>{
+ const sourceFunctions=app.slice(app.indexOf('function authorityScanHTML('),app.indexOf('function twoDefectTransitionHTML('));
+ const escapeHTML=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const selected=payload.claims.filter(claim=>payload.authority_scan?.transitions[claim.id]?.sourceFamily&&['FAIL','UNVALIDATED'].includes(claim.status));
+ assert.equal(selected.length,4);
+ for(const claim of selected){
+  const scan=payload.authority_scan.transitions[claim.id],basis=scan.basis[0];
+  let shown;const context={report:payload,claim,claimMap:new Map([[claim.id,claim]]),escapeHTML,pill:status=>status,showDialog:(_,body)=>{shown=body;}};
+  const card=vm.runInNewContext(sourceFunctions+'\nauthorityScanHTML(claim);',context);
+  assert.match(card,/Source scope:/);assert.ok(card.includes(escapeHTML(claim.rationale)));
+  assert.doesNotMatch(card,/What (?:the|this) source proves/);
+  vm.runInNewContext(sourceFunctions+`\nshowSourceBasis(${JSON.stringify(claim.id)},'0');`,context);
+  assert.match(shown,/Source scope:/);assert.ok(shown.includes(escapeHTML(claim.rationale)));
+  assert.doesNotMatch(shown,/What (?:the|this) source proves/);
+  assert.ok(shown.includes(escapeHTML(basis.excerpt)));
+  assert.ok(shown.includes(payload.files[basis.artifactRef].sha256));
+  assert.ok(shown.includes(escapeHTML(scan.remaining)));
  }
 });
 test('all citation-lane FAIL records are visibly distinct from the two documentation defects',()=>{
@@ -226,13 +247,24 @@ test('current read-only map binds exact claims and capture digests without adjud
  for(const ref of ['account-observations-01.json','vm-helper-source-retest-02.json','local-key-storage-limitations-02.json'])assert.ok(payload.files[`verification/evidence/2026-09-08-host-client-unblocking-attempt-01/${ref}`]);
 });
 test('current authority summary is not mislabeled as new operational execution',()=>{
- if(payload.jurisdiction_transition){assert.match(app,/jurisdictionActive/);assert.match(app,/const latestChecks=payoutInvoiceActive[\s\S]*: payoutTermsActive[\s\S]*: report\.payout_provider_transition[\s\S]*: report\.cleanup_transition[\s\S]*: jurisdictionActive/);}
+ if(payload.jurisdiction_transition){assert.match(app,/jurisdictionActive/);assert.match(app,/const latestChecks=sourceFamilyActive[\s\S]*: payoutInvoiceActive[\s\S]*: payoutTermsActive[\s\S]*: report\.payout_provider_transition[\s\S]*: report\.cleanup_transition[\s\S]*: jurisdictionActive/);}
  if(payload.payout_invoice_transition){assert.match(app,/Published payout and invoice guidance/);assert.match(app,/does not test invoice generation or payment processing/);}
  if(payload.payout_terms_transition){assert.match(app,/Published payout Terms and FAQ guidance/);assert.match(app,/backend\/runtime behavior/);}
  if(payload.payout_provider_transition){assert.match(app,/Evidence update: 14 Sep 2026/);assert.match(app,/No payment, fee, account-state or bank-transfer rule was verified/);}
  assert.match(app,/Published Terms source check/);assert.match(app,/This source check adds no runtime execution/);
  assert.match(app,/Current full-inventory review/);assert.match(app,/Source review adds no runtime execution/);
  assert.doesNotMatch(app,/const latestChecks=\[\['Bounded operational evidence/);
+ if(payload.source_family_transition){
+  const elements={'evidence-update-label':{},'check-rows':{}};
+  vm.runInNewContext(app.slice(app.indexOf('const jurisdictionActive='),app.indexOf("$('support-rows')")),{report:payload,$:id=>elements[id],escapeHTML:value=>String(value)});
+  assert.equal(elements['evidence-update-label'].textContent,'Evidence update: 15 Sep 2026');
+  const rows=elements['check-rows'].innerHTML;
+  assert.match(rows,/358 passages reviewed; 69 wording corrections/);
+  assert.ok(rows.includes(`data-artifact="${payload.source_family_transition.result_ref}"`));
+  assert.ok(rows.includes(`data-artifact="${payload.closure_transition.result_ref}"`));
+  assert.match(rows,/Earlier correction and evidence review/);
+  assert.doesNotMatch(rows,/Published payout and invoice guidance/);
+ }
 });
 
 test('current result and two registers replace dated aggregate history in the visible report',()=>{
@@ -394,12 +426,25 @@ test('all evidence and source passage references are embedded with digests',()=>
   assert.ok(!f.ref.includes('private-evidence')&&!f.ref.includes('.orchestra'));
  }
 });
-test('embedding is lossless JSON without executable data',()=>{
+test('gzip embedding preserves the entire decoded JSON without executable data and stays below the existing 100 MiB limit',async()=>{
  const data=html.match(/<script id="report-data" type="application\/json">([\s\S]*?)<\/script>/)[1];
- assert.deepEqual(JSON.parse(data),payload);
+ assert.equal(JSON.parse(data).encoding,'gzip-base64');
+ assert.deepEqual(await readEmbeddedHostReviewPayload(html),payload);
+ assert.ok(Buffer.byteLength(html)<100*1024*1024);
  assert.ok(!data.includes('<')&&!data.includes('>')&&!data.includes('&'));
  assert.equal((html.match(/<script\b/g)||[]).length,2);
  for(const m of html.matchAll(/<script>([\s\S]*?)<\/script>/g))assert.doesNotThrow(()=>new vm.Script(m[1]));
+});
+test('malformed encoding and unsupported decompression fail with a visible offline initialization message',async()=>{
+ for(const envelope of [{encoding:'unknown',data:'AAAA'},{encoding:'gzip-base64',data:'!!!'},{encoding:'gzip-base64',data:'AAAA'}]) {
+  await assert.rejects(()=>decodeHostReviewPayload(envelope));
+ }
+ const notice={textContent:'Loading',hidden:false};
+ const context=vm.createContext({window:{},document:{getElementById:id=>id==='report-data'?{textContent:JSON.stringify(encodeHostReviewPayload({}))}:notice},DecompressionStream:undefined});
+ vm.runInContext(app,context);
+ assert.equal(await context.window.hostReviewReady,null);
+ assert.equal(notice.hidden,false);
+ assert.match(notice.textContent,/could not be opened.*cannot decompress/);
 });
 test('single-file report has no remote assets or network code',()=>{
  assert.doesNotMatch(html,/<(?:script|img|iframe)\b[^>]*\bsrc=/i);
@@ -480,10 +525,25 @@ test('active authority scan retains per-claim predecessor and bounded source bin
  const payoutTerms=payload.payout_terms_transition;
  const payoutInvoice=payload.payout_invoice_transition;
  const closure=payload.closure_transition;
- const baselineRefs=[scan.baseline_ref,...(closure?[closure.baseline_ref]:[]),...(clarification?[clarification.baseline_ref]:[]),...(terms?[terms.baseline_ref]:[]),...(jurisdiction?[jurisdiction.baseline_ref]:[]),...(cleanup?[cleanup.baseline_ref]:[]),...(payload.payout_provider_transition?[payload.payout_provider_transition.baseline_ref]:[]),...(payoutTerms?[payoutTerms.baseline_ref]:[]),...(payoutInvoice?[payoutInvoice.baseline_ref]:[])];
+ const sourceFamily=payload.source_family_transition;
+ const baselineRefs=[scan.baseline_ref,...(sourceFamily?[sourceFamily.baseline_ref]:[]),...(closure?[closure.baseline_ref]:[]),...(clarification?[clarification.baseline_ref]:[]),...(terms?[terms.baseline_ref]:[]),...(jurisdiction?[jurisdiction.baseline_ref]:[]),...(cleanup?[cleanup.baseline_ref]:[]),...(payload.payout_provider_transition?[payload.payout_provider_transition.baseline_ref]:[]),...(payoutTerms?[payoutTerms.baseline_ref]:[]),...(payoutInvoice?[payoutInvoice.baseline_ref]:[])];
  const predecessorsByBaseline=new Map(baselineRefs.map(ref=>{
   assert.ok(payload.files[ref],ref);
   const before=JSON.parse(payload.files[ref].text);
+  if(ref===sourceFamily?.baseline_ref){
+   // This successor retains a complete hash inventory rather than another full
+   // model copy. Replay the existing sealed predecessor against its before files.
+   const read=ref=>fs.readFileSync(new URL('../'+ref,import.meta.url));
+   const registry=JSON.parse(read(sourceFamily.registry_ref));
+   const frozen=new Map(registry.sources.map(source=>[source.path,read(source.before_artifact.path)]));
+   const amendment=JSON.parse(read('verification/evidence/2026-09-15-host-unvalidated-source-families-attempt-01/owner-context-amendment.json'));
+   frozen.set('verification/current-host-owner-questions.json',read(amendment.before_artifact.path));
+   const prior=projectClosureCorrection({read:ref=>frozen.get(ref)||read(ref),exists:ref=>fs.existsSync(new URL('../'+ref,import.meta.url))}).model;
+   const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
+   const priorClaims=prior.pages.flatMap(page=>page.claims);
+   assert.deepEqual(Object.fromEntries(priorClaims.map(claim=>[claim.id,hash(JSON.stringify(canonical(claim)))])),before.claim_hashes);
+   return [ref,new Map(priorClaims.map(claim=>[claim.id,JSON.parse(JSON.stringify(claim,(_,value)=>typeof value==='string'?sanitize(value):value))]))];
+  }
   return [ref,new Map(before.pages.flatMap(p=>p.claims).map(c=>[c.id,c]))];
  }));
  if(clarification)assert.equal(payload.files[clarification.baseline_ref].sha256,clarification.baseline_sha256);
@@ -496,7 +556,7 @@ test('active authority scan retains per-claim predecessor and bounded source bin
    assert.ok(closure?.retired_claims.some(retired=>retired.claim_id===transition.previous?.id&&retired.replaced_by===id),'only an exact retained checklist retirement may use another predecessor ID');
   }
   assert.deepEqual(transition.previous,predecessors.get(transition.previous?.id||id));
-  assert.equal(transition.registryRef,transition.baselineRef===closure?.baseline_ref?closure.registry_ref:transition.baselineRef===payoutInvoice?.baseline_ref?payoutInvoice.registry_ref:transition.baselineRef===payoutTerms?.baseline_ref?payoutTerms.registry_ref:transition.baselineRef===payload.payout_provider_transition?.baseline_ref?payload.payout_provider_transition.registry_ref:transition.baselineRef===scan.baseline_ref?scan.registry_ref:transition.baselineRef===jurisdiction?.baseline_ref?jurisdiction.registry_ref:transition.baselineRef===terms?.baseline_ref?terms.registry_ref:transition.baselineRef===clarification?.baseline_ref?clarification.registry_ref:cleanup?.registry_ref);
+  assert.equal(transition.registryRef,transition.baselineRef===sourceFamily?.baseline_ref?sourceFamily.registry_ref:transition.baselineRef===closure?.baseline_ref?closure.registry_ref:transition.baselineRef===payoutInvoice?.baseline_ref?payoutInvoice.registry_ref:transition.baselineRef===payoutTerms?.baseline_ref?payoutTerms.registry_ref:transition.baselineRef===payload.payout_provider_transition?.baseline_ref?payload.payout_provider_transition.registry_ref:transition.baselineRef===scan.baseline_ref?scan.registry_ref:transition.baselineRef===jurisdiction?.baseline_ref?jurisdiction.registry_ref:transition.baselineRef===terms?.baseline_ref?terms.registry_ref:transition.baselineRef===clarification?.baseline_ref?clarification.registry_ref:cleanup?.registry_ref);
   for(const basis of transition.basis){assert.ok(payload.files[basis.artifactRef]);assert.ok(basis.support_rationale);if(basis.kind==='GOVERNING_SOURCE'){assert.ok(basis.excerpt);assert.match(basis.text_pointer,/^\//);}}
  }
  if(jurisdiction)for(const id of jurisdictionIds.keys())assert.ok(scan.transitions[id].auditHistory.length,`predecessor source history retained: ${id}`);
@@ -508,7 +568,7 @@ test('active authority scan retains per-claim predecessor and bounded source bin
    assert.deepEqual(transition.previous,phase45.get(id));
   }
  }
- assert.match(payload.current_result_ref,closure?/host-unvalidated-evidence-attempt-02\/result\.md$/:payload.payout_invoice_transition?/payout-invoice-correction-attempt-01\/result\.md$/:payload.payout_terms_transition?/payout-terms-correction-attempt-01\/result\.md$/:payload.payout_provider_transition?/payout-provider-correction-attempt-01\/result\.md$/:payload.cleanup_transition?/host-review-cleanup-attempt-01\/result\.md$/:jurisdiction?/host-jurisdiction-authority-attempt-01\/result\.md$/:terms?/host-terms-binding-attempt-01\/result\.md$/:/host-authority-scan-attempt-01\/result\.md$/);
+ assert.match(payload.current_result_ref,sourceFamily?/host-unvalidated-source-families-attempt-01\/result\.md$/:closure?/host-unvalidated-evidence-attempt-02\/result\.md$/:payload.payout_invoice_transition?/payout-invoice-correction-attempt-01\/result\.md$/:payload.payout_terms_transition?/payout-terms-correction-attempt-01\/result\.md$/:payload.payout_provider_transition?/payout-provider-correction-attempt-01\/result\.md$/:payload.cleanup_transition?/host-review-cleanup-attempt-01\/result\.md$/:jurisdiction?/host-jurisdiction-authority-attempt-01\/result\.md$/:terms?/host-terms-binding-attempt-01\/result\.md$/:/host-authority-scan-attempt-01\/result\.md$/);
  assert.match(app,/Source review adds no runtime execution/);
 });
 test('clarification metadata reports bounded changed claim and node context only',()=>{

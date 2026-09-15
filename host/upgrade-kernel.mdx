@@ -107,9 +107,9 @@ rather than assuming them, install the update, and confirm it took.
 
 ### 1. Find your kernel metapackage
 
-Find which kernel metapackages are installed. These are the names you will
-upgrade in step 3, and they differ between machines, so save them to a variable
-that the later commands read:
+Find the installed `linux-generic*` metapackages selected by this query. Save
+the names to a variable for the later commands; other kernel families and
+packages with a different dpkg selection state need separate review:
 
 ```bash
 KERNEL_METAPACKAGES=$(dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 'linux-generic*' 2>/dev/null | awk '$1 == "ii" { print $2 }' | sort -V); echo "$KERNEL_METAPACKAGES"
@@ -127,32 +127,31 @@ On a machine running the HWE kernel:
 linux-generic-hwe-22.04
 ```
 
-Every command from here on can be pasted as written. If `echo` printed nothing,
-stop: no `linux-generic*` metapackage is installed, and steps 2 and 3 have
-nothing to act on.
+If `echo` printed nothing, stop and inspect the package query before continuing.
+The later commands need a non-empty list of reviewed metapackage names. An empty
+result can mean no matching `ii` records were returned or the query failed.
 
-More than one line is a valid result, and every one of them is upgraded
-together:
+More than one line is a valid result. The later install command requests an
+upgrade for each returned name; review APT’s proposed changes before accepting:
 
 ```
 linux-generic-hwe-22.04
 linux-generic-hwe-22.04-edge
 ```
 
-Each metapackage pulls its own image and headers, so these are separate stacks
-rather than one being a newer form of the other. Upgrading a single name leaves
-the other stack on its old kernel, and GRUB can still boot that one.
+Different metapackage names do not by themselves establish separate kernel
+stacks. Check each package’s image and header dependencies, and review the
+actual package changes and boot entries.
 
 `KERNEL_METAPACKAGES` lives only in the shell session you set it in. If your
 connection drops, or you open a second terminal, set it again before
 continuing.
 
 <Note>
-Ubuntu ships two kernel stacks. GA is the kernel the release shipped with and is
-supported for the life of the LTS release. HWE, the hardware enablement stack,
-tracks the kernel from a later release to support newer hardware. Server
-installations default to GA and offer HWE as an option, so most machines report
-`linux-generic`.
+Ubuntu provides a general availability (GA) kernel and hardware enablement
+(HWE) kernels for LTS releases. HWE provides newer kernel support for newer
+hardware. Ubuntu Server 22.04 and 24.04 default to GA and offer HWE as an option;
+other kernel variants also exist, so inspect the packages on your machine.
 </Note>
 
 <Warning>
@@ -237,9 +236,9 @@ The following packages will be upgraded:
 3 upgraded, 5 newly installed, 0 to remove and 24 not upgraded.
 ```
 
-Everything named is part of the kernel. The `24 not upgraded` is the rest of the
-system being left alone, which is what keeps this from turning into a general
-package upgrade during a maintenance window.
+In this example, the named changes are kernel packages. Your proposed changes
+may differ, so inspect the full list, including dependencies, before accepting.
+The `not upgraded` count alone does not prove that all other packages stay unchanged.
 
 <Note>
 Upgrade the metapackage, not a bare `linux-image-...` package. The metapackage
@@ -250,8 +249,8 @@ an image on its own and the driver has nothing to rebuild against, so the GPUs
 disappear on the next boot.
 </Note>
 
-Your previous kernel is deliberately left installed. It stays in the boot menu
-and is what you fall back to if the new one does not work.
+Before rebooting, confirm that a known working previous kernel is still
+installed and available in the boot menu as a recovery option.
 
 ### 4. Reboot
 
@@ -275,7 +274,9 @@ Once the machine is back, check that the new kernel is the one running:
 uname -r; ls -1 /boot/vmlinuz-* | sed 's|.*/vmlinuz-||' | sort -V | tail -1
 ```
 
-The running kernel and the newest one installed must now be the same:
+Compare the running release with the kernel you intended to boot. For a
+single kernel stack, the two lines may match as in this example; multiple
+variants or a custom boot entry need separate interpretation:
 
 ```
 5.15.0-190-generic
@@ -326,9 +327,10 @@ wrong, and they apply whichever path you took.
 
 ### If the machine booted the old kernel
 
-Step 5 is what surfaces this: `uname -r` reports an older version than the
-newest kernel in `/boot`, while `Installed` and `Candidate` match. The upgrade
-worked and the new kernel is on disk. GRUB did not boot it.
+If `uname -r` differs from the kernel you intended to boot, inspect the
+installed kernel files and boot configuration. Matching `Installed` and
+`Candidate` values describe the selected metapackage state; they do not by
+themselves prove which kernel booted or that the upgrade completed correctly.
 
 The machine is up and reachable here, so unlike the section below, this is
 fixable over SSH.
@@ -349,9 +351,10 @@ GRUB_DEFAULT=0
 GRUB_SAVEDEFAULT=
 ```
 
-Entry `0` is the first entry in the generated menu, and Ubuntu builds that menu
-in reverse version order, so entry `0` is the newest installed kernel. That is
-what lets a new kernel boot without touching the bootloader.
+Entry `0` is the first entry in the generated menu. GRUB normally creates a
+top-level entry for the highest-version kernel it finds, but custom entries
+and boot-time overrides can change what starts. Inspect the generated menu
+before choosing an entry.
 
 Two values break it. `GRUB_DEFAULT=saved` boots whatever booted last, and
 paired with `GRUB_SAVEDEFAULT=true` every boot re-saves the old kernel as the
@@ -369,10 +372,11 @@ Find which file sets it, since that is the file to edit:
 grep -rE '^GRUB_DEFAULT=' /etc/default/grub /etc/default/grub.d/
 ```
 
-Set it back to `0`, keeping a copy of the file first:
+If the intended kernel is the first generated entry, set `GRUB_DEFAULT` to
+`0`, keeping a copy of the configuration first:
 
 ```bash
-[ -f /etc/default/grub.bak ] || sudo cp /etc/default/grub /etc/default/grub.bak; sudo sed -i 's/^GRUB_DEFAULT=.*/GRUB_DEFAULT=0/' /etc/default/grub && grep '^GRUB_DEFAULT=' /etc/default/grub
+([ -f /etc/default/grub.bak ] || sudo cp /etc/default/grub /etc/default/grub.bak) && sudo sed -i 's/^GRUB_DEFAULT=.*/GRUB_DEFAULT=0/' /etc/default/grub && grep '^GRUB_DEFAULT=' /etc/default/grub
 ```
 
 The backup is only taken when there is not one already, so running this a second
@@ -394,7 +398,8 @@ Editing the configuration changes nothing on its own. Regenerate the menu:
 sudo update-grub
 ```
 
-The new kernel must appear in the output:
+Check the output for the intended kernel and its matching initrd. Investigate
+errors or missing files before rebooting:
 
 ```
 Found linux image: /boot/vmlinuz-5.15.0-190-generic
@@ -420,17 +425,19 @@ instance. Confirm you are inside a maintenance window before you run it.
 sudo reboot
 ```
 
-Then repeat step 5. `uname -r` should now match the newest kernel in `/boot`.
+Then repeat step 5 and confirm that `uname -r` reports the kernel you intended
+to boot. Investigate a mismatch before returning the machine to service.
 
 ### If the machine does not come back
 
 You need access that does not go through SSH: the machine's IPMI, iDRAC, iLO, or
 other BMC console, or a monitor and keyboard attached to it.
 
-Ubuntu keeps the previous kernel installed, so the fix is to boot it. Hold the
-right **Shift** key during boot to bring up the GRUB menu; on some machines
-pressing **Esc** works instead. Choose **Advanced options for Ubuntu**, then the
-entry for your previous kernel, listed as **Ubuntu, with Linux 5.15.0-25-generic**.
+If a known working previous kernel is still installed and present in the
+GRUB menu, try booting it from the console. Holding **Shift** or pressing **Esc**
+may reveal the menu, depending on the firmware and GRUB settings. Under
+**Advanced options for Ubuntu**, choose the entry for that kernel; its exact
+title and version depend on your installation.
 
 That gets the machine running again on the old kernel. The new kernel is still
 installed, so work out why it failed before rebooting into it again.

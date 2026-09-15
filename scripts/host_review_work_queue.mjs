@@ -28,11 +28,11 @@ const typeGroups = {
   Calculation: ['REVIEWED_EXAMPLE_CALCULATION'],
   Editorial: ['EDITORIAL_NAVIGATION_PREAMBLE','EDITORIAL_SCOPE_OR_LEAD_IN','EDITORIAL_STATIC_API_ROUTING'],
   'Published source or rule': ['PRODUCT_DESCRIPTION','GOVERNING_REQUIREMENT','PUBLISHED_SOURCE_CLAUSE','REVIEWED_POLICY_RULE','PROGRAM_ELIGIBILITY_OR_BENEFIT','PUBLISHED_FINANCIAL_RULE','PUBLISHED_FINANCIAL_GUIDANCE_DESCRIPTION','PUBLICATION_DESCRIPTION','PUBLISHED_TERMS_SUMMARY','TAX_OR_REPORTING_ASSERTION','REVIEWED_POLICY_REFERENCE','HIGH_LEVEL_PRODUCT_DESCRIPTION'],
-  'Technical declaration': ['DECLARED_INTERFACE_OR_UNIT','REVIEWED_TECHNICAL_DECLARATION','IMPLEMENTATION_OR_CONCEPT','SUPPORT_SCOPE_WITH_TECHNICAL_CONTEXT'],
+  'Technical declaration': ['DECLARED_INTERFACE_OR_UNIT','REVIEWED_TECHNICAL_DECLARATION','IMPLEMENTATION_OR_CONCEPT','SUPPORT_SCOPE_WITH_TECHNICAL_CONTEXT','REVIEWED_DIAGNOSTIC_RECIPE'],
   'Technical behavior or workflow': ['ACCOUNT_CONFIGURATION_OR_PERMISSION','IMPLEMENTED_BEHAVIOR','CONTRACT_TERMS_AND_IMPLEMENTED_EFFECT','RUNTIME_BEHAVIOR','UI_SURFACE_OR_WORKFLOW','REVIEWED_UI_PROVIDER_OPTION','REVIEWED_SETUP_INSTRUCTION','INTERFACE_WITH_BACKEND_EFFECT','VOLUME_ATOMIC_CLAIM','VERIFICATION_ENFORCEMENT','REVIEWED_BEHAVIOR_DESCRIPTION','RUNTIME_DIAGNOSTIC_GUIDANCE'],
 };
 const reviewTypes = new Map(Object.entries(typeGroups).flatMap(([label, classes]) => classes.map(kind => [kind,label])));
-const lanes = new Set(['STATIC_CONTEXT_REVIEW','REPOSITORY_STATIC_CHECK','CANONICAL_IMPLEMENTATION_SOURCE','RUNTIME_OR_UI_OBSERVATION','AUTHORITATIVE_DOCUMENTATION_CITATION','ACCOUNTABLE_OWNER_CONFIRMATION','PRODUCT_PUBLICATION_SOURCE']);
+const lanes = new Set(['STATIC_CONTEXT_REVIEW','REPOSITORY_STATIC_CHECK','CANONICAL_IMPLEMENTATION_SOURCE','RUNTIME_OR_UI_OBSERVATION','AUTHORITATIVE_DOCUMENTATION_CITATION','ACCOUNTABLE_OWNER_CONFIRMATION','PRODUCT_PUBLICATION_SOURCE','PRIMARY_ENGINEERING_SOURCE','PUBLISHED_VENDOR_DOCUMENTATION']);
 const field = (claim, snake, camel) => claim[snake] ?? claim[camel];
 export function describeHostReview(claim) {
   const required = field(claim, 'required_evidence_types', 'requiredEvidenceTypes');
@@ -91,11 +91,24 @@ export function buildHostReviewQueue(claims) {
  * Page grouping is deliberately transparent: it asserts no shared root cause.
  * UNVALIDATED alone never creates a finding or workflow follow-up.
  */
-export function buildHostReviewIssues({pages, ownerQuestions, originalFindings = []}) {
-  if (!Array.isArray(pages) || !Array.isArray(ownerQuestions)) throw new Error('Issue view requires current pages and validated owner questions');
+export function buildHostReviewIssues({pages, ownerQuestions, originalFindings = [], sourceFamilyTransitions = []}) {
+  if (!Array.isArray(pages) || !Array.isArray(ownerQuestions) || !Array.isArray(sourceFamilyTransitions)) throw new Error('Issue view requires current pages, validated owner questions and explicit source-family transitions');
   const claims = pages.flatMap(page => page.claims);
   const ids = new Set(claims.map(claim => claim.id));
   if (ids.size !== claims.length) throw new Error('Issue view requires distinct passage IDs');
+  const currentClaims = new Map(pages.flatMap(page => page.claims.map(claim => [claim.id, {claim, page}])));
+  const sourceIds = new Set();
+  const sourceFollowUps = sourceFamilyTransitions.filter(entry => entry?.decision === 'residual' && entry.after?.status === 'UNVALIDATED').map(entry => {
+    const current = currentClaims.get(entry.claim_id);
+    if (!current || sourceIds.has(entry.claim_id) || current.claim.status !== 'UNVALIDATED' ||
+        entry.after.text !== current.claim.text || typeof entry.after.next_action !== 'string' || !entry.after.next_action.trim() ||
+        entry.after.next_action !== current.claim.next_action) throw new Error('Issue view source follow-up does not match a distinct current reviewed residual');
+    sourceIds.add(entry.claim_id);
+    const {claim, page} = current;
+    // Quick-lookup rows use their literal diagnostic name; prose uses its heading.
+    const title = /^\|\s*`([^`]+)`\s*\|/.exec(claim.text)?.[1] || claim.headings?.at(-1) || page.title;
+    return {id: `source:${claim.id}`, claimId: claim.id, route: page.route, title, nextAction: entry.after.next_action};
+  });
   const ownerIds = new Set();
   const questions = ownerQuestions.map(question => {
     if (!question.id || ownerIds.has(question.id) || !Array.isArray(question.relatedClaims) || question.relatedClaims.some(claim => !ids.has(claim.id))) throw new Error('Issue view owner mapping is invalid');
@@ -122,7 +135,7 @@ export function buildHostReviewIssues({pages, ownerQuestions, originalFindings =
       unassignedClaimIds: blocked.filter(claim => !questions.some(question => question.claimIds.includes(claim.id))).map(claim => claim.id),
     });
   }
-  return {corrections, questions, workflows,
+  return {corrections, questions, workflows, sourceFollowUps,
     counts: {correctionTopics: corrections.length, correctionPassages: corrections.reduce((sum,group) => sum + group.claimIds.length,0),
       ownerQuestions: questions.length, workflowPageGroups: workflows.length,
       recordedProcedures: workflows.reduce((sum,group) => sum + group.procedures.length,0),

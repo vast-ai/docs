@@ -1,0 +1,29 @@
+        if logfile is not None:
+            logfile.flush()
+            os.fsync(logfile.fileno())
+    except:
+        traceback.print_exc()
+    try:
+        if out_dir is None:
+            out_dir = orig_dir
+        if upload_filename is None:
+            upload_filename = out_dir + "/vastai_install_logs.tar.gz"
+    except:
+        upload_filename = "/tmp/vastai_install_logs_" + str(int(time.time())) + ".tar.gz"
+        traceback.print_exc()
+    try:
+        fallback_filename = args.logfile
+    except:
+        fallback_filename = None
+        traceback.print_exc()
+    try:
+        subprocess.call(["tar", "--ignore-failed-read", "-czf", upload_filename]
+            + glob.glob("/var/lib/vastai_kaalia/*.log")
+            + glob.glob("/var/lib/vastai_kaalia/*.sh")
+            + glob.glob("/var/lib/vastai_kaalia/*/*.log")
+            + glob.glob("/var/lib/vastai_kaalia/*update*")
+            + glob.glob("/var/lib/vastai_kaalia/launch*")
+            + glob.glob("/var/log/syslog")
+            + glob.glob("/var/log/apt")
+            + glob.glob("/etc/apt/sources.list*")
+            + glob.glob(args.logfile)

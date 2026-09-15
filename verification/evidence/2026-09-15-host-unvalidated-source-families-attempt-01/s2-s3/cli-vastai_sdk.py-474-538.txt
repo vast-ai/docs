@@ -1,0 +1,65 @@
+    def show_machines(self) -> list[dict]:
+        """Return all hosted machines."""
+        return machines.show_machines(self.client)
+
+    def show_machine(self, id: int) -> dict:
+        """Return details of a single machine.
+
+        The underlying ``GET /machines/{id}`` endpoint returns a one-element
+        list; this wrapper unwraps it so callers get a single machine dict.
+        Raises ``ValueError`` if the backend returns zero or multiple rows.
+        """
+        result = machines.show_machine(self.client, id)
+        if not isinstance(result, list):
+            return result
+        if not result:
+            raise ValueError(f"Machine {id} not found")
+        if len(result) > 1:
+            raise ValueError(f"Expected 1 machine for id={id}, got {len(result)}")
+        return result[0]
+
+    def show_maints(self, ids) -> list[dict]:
+        """Show maintenance information for machines."""
+        return machines.show_maints(self.client, ids)
+
+    def list_machine(self, id: int, **kwargs) -> dict:
+        """List a machine for rent with optional pricing parameters."""
+        return machines.list_machine(self.client, id, **kwargs)
+
+    def list_machines(self, ids, **kwargs) -> list[dict]:
+        """List multiple machines for rent."""
+        results = []
+        for mid in ids:
+            results.append(machines.list_machine(self.client, mid, **kwargs))
+        return results
+
+    def unlist_machine(self, id: int) -> dict:
+        """Unlist a machine from being available."""
+        return machines.unlist_machine(self.client, id)
+
+    def set_defjob(self, id: int, **kwargs) -> dict:
+        """Set the default job on a machine."""
+        return machines.set_defjob(self.client, id, **kwargs)
+
+    def remove_defjob(self, id: int) -> dict:
+        """Remove the default job from a machine."""
+        return machines.remove_defjob(self.client, id)
+
+    def set_min_bid(self, id: int, price: Optional[float] = None) -> dict:
+        """Set the minimum bid price for a machine."""
+        return machines.set_min_bid(self.client, id, price=price)
+
+    def schedule_maint(self, id: int, sdate, duration, category: str = "not provided") -> dict:
+        """Schedule maintenance for a machine."""
+        return machines.schedule_maint(self.client, id, sdate, duration, maintenance_category=category)
+
+    def cancel_maint(self, id: int) -> dict:
+        """Cancel scheduled maintenance for a machine."""
+        return machines.cancel_maint(self.client, id)
+
+    def cleanup_machine(self, id: int) -> dict:
+        """Clean up a machine's configuration and resources."""
+        return machines.cleanup_machine(self.client, id)
+
+    def defrag_machines(self, ids) -> dict:
+        """Defragment machines."""

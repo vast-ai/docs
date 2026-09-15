@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import {buildHostReviewQueue, describeHostReview, normalizeSharedWording} from './host_review_work_queue.mjs';
 import {buildReport} from './export_host_review_html.mjs';
+import {encodeHostReviewPayload, decodeHostReviewPayload} from './host_review_payload.mjs';
 
 const root = new URL('../', import.meta.url);
 const read = path => fs.readFileSync(new URL(path, root), 'utf8');
@@ -124,7 +125,7 @@ test('issues view uses only recorded findings and prerequisites, preserving ever
   const bytes=fs.readFileSync(new URL('verification/current-host-docs-review.json',root));
   const owner=loadHostReviewOwnerQuestions({read:ref=>fs.readFileSync(new URL(ref,root)),model,modelSha256:createHash('sha256').update(bytes).digest('hex')});
   const before=JSON.stringify(model), projection=buildHostReviewIssues({pages:model.pages,ownerQuestions:owner.questions});
-  assert.deepEqual(projection.counts,{correctionTopics:1,correctionPassages:2,ownerQuestions:8,workflowPageGroups:13,recordedProcedures:14,blockedPassages:21});
+  assert.deepEqual(projection.counts,{correctionTopics:2,correctionPassages:4,ownerQuestions:8,workflowPageGroups:13,recordedProcedures:14,blockedPassages:21});
   assert.deepEqual(projection.corrections.flatMap(group=>group.claimIds).sort(),claims.filter(c=>c.status==='FAIL').map(c=>c.id).sort());
   assert.deepEqual(projection.workflows.flatMap(group=>group.claimIds).sort(),claims.filter(c=>c.status==='BLOCKED').map(c=>c.id).sort());
   const parents=projection.workflows.flatMap(group=>group.procedures);
@@ -142,7 +143,7 @@ test('issues view uses only recorded findings and prerequisites, preserving ever
 
 // Execute the entire production script, not a hand-picked function slice. The
 // small DOM double exposes the APIs used here; root also checks a real browser.
-function runWholeTemplate(payload,hash='') {
+async function runWholeTemplate(payload,hash='') {
   const template=read('scripts/templates/host-docs-review.html');
   const elements=new Map();
   for(const match of template.matchAll(/<([a-z][\w-]*)\b([^>]*\bid="([^"]+)"[^>]*)>/gi)) {
@@ -151,23 +152,26 @@ function runWholeTemplate(payload,hash='') {
       add(option){this.options.push(option);},addEventListener(name,callback){this.listeners[name]=callback;},scrollIntoView(){this.scrolled=true;},showModal(){this.open=true;},close(){this.open=false;},
       querySelector(){return null;},get selectedOptions(){return [{text:this.options.find(option=>option.value===this.value)?.text||this.value||'All'}];}});
   }
-  elements.get('report-data').textContent=JSON.stringify(payload);
+  elements.get('report-data').textContent=JSON.stringify(encodeHostReviewPayload(payload));
   elements.get('status').value='OPEN';elements.get('queue-view').value='individual';
   const listeners={},windowListeners={};
   const document={getElementById:id=>elements.get(id)||null,querySelectorAll:selector=>{
     if(selector==='[data-coverage-view]'||selector==='[data-issues-view]')return [...elements.values()].filter(element=>element.attributes.includes(selector.slice(1,-1)));
     return [];
   },addEventListener:(name,callback)=>(listeners[name]??=[]).push(callback)};
-  const context=vm.createContext({document,window:{addEventListener:(name,callback)=>(windowListeners[name]??=[]).push(callback),print(){}},location:{hash},URL,
+  const context=vm.createContext({atob,Blob,Response,DecompressionStream,document,window:{addEventListener:(name,callback)=>(windowListeners[name]??=[]).push(callback),print(){}},location:{hash},URL,
     Option:function(text,value){this.text=text;this.value=value;},console});
-  const script=template.match(/<script>\s*([\s\S]*?)<\/script>/)[1];
+  const script=template.match(/<script>\s*([\s\S]*?)<\/script>/)[1]
+    .replace('/*__REPORT_DECODER__*/',()=>decodeHostReviewPayload.toString())
+    .replace('return report;','Object.assign(globalThis,{handleReviewHash,goToClaims,showWorkflow,showPassage});\nreturn report;');
   vm.runInContext(script,context,{timeout:20000});
+  assert.ok(await context.window.hostReviewReady,elements.get('report-init').textContent);
   return {context,elements,listeners,windowListeners};
 }
 
-test('whole offline script initializes with eight owner questions, defaults to issues and keeps all ledger navigation and evidence controls', () => {
+test('whole offline script initializes with eight owner questions, defaults to issues and keeps all ledger navigation and evidence controls', async () => {
   const before=JSON.stringify(model),{payload}=buildReport();
-  const {context,elements}=runWholeTemplate(payload);
+  const {context,elements}=await runWholeTemplate(payload);
   assert.equal(elements.get('issue-owner-count').textContent,8);
   assert.equal(elements.get('issue-workflow-count').textContent,13);
   assert.match(elements.get('priority-cards').innerHTML,/CUR-11f83626486ada1d/);
@@ -178,7 +182,7 @@ test('whole offline script initializes with eight owner questions, defaults to i
   assert.equal(elements.get('coverage').hidden,true);
   assert.equal(elements.get('claims').hidden,true);
   assert.equal(elements.get('overview').hidden,false);
-  assert.equal(elements.get('coverage-unvalidated').textContent,'1,506');
+  assert.equal(elements.get('coverage-unvalidated').textContent,model.counts.claim_statuses.UNVALIDATED.toLocaleString());
   vm.runInContext("location.hash='#claims';handleReviewHash();",context);
   assert.equal(elements.get('claims').hidden,false);
   assert.equal(elements.get('overview').hidden,true);

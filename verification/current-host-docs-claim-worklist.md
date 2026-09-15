@@ -2,7 +2,7 @@
 
 Current-source claims requiring proof or correction. Historical evidence is carried only where exact source identity is recorded.
 
-Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1529 requiring review or evidence). Most dispositions are automated or exact historical carry-forward; this package records no invented manual completion.
+Current dispositions: 2008 occurrences (744 PASS, 89 editorial NOT_APPLICABLE, 1175 requiring review or evidence). Most dispositions are automated or exact historical carry-forward; this package records no invented manual completion.
 
 ## [Hosting Overview](http://127.0.0.1:4000/host/hosting-overview)
 
@@ -1062,20 +1062,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-3b5573f171e1df39 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Compute-Only Monthly Model](http://127.0.0.1:4000/host/earning#compute-only-monthly-model) — `MCL-de45745b7371d2ea`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `utilization` | Share of time rented, such as `0.55` for 55%. |
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
 ### [30-Day Range](http://127.0.0.1:4000/host/earning#30-day-range) — `MCL-8a295536feb086ec`
 
 **Status:** UNVALIDATED
@@ -1160,20 +1146,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-f1e6d4aaab85f9d6 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Compute-Only Example](http://127.0.0.1:4000/host/earning#compute-only-example) — `MCL-54decf78374d871f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** If actual earnings are lower than the estimate, check utilization first, then compare storage, bandwidth, and volume settings. A higher price does not help if renters choose cheaper or healthier machines.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
 ### [What To Compare](http://127.0.0.1:4000/host/earning#what-to-compare) — `MCL-f2c28cfd1aa6c89a`
 
 **Status:** UNVALIDATED
@@ -1201,62 +1173,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
 
 **Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [What To Compare](http://127.0.0.1:4000/host/earning#what-to-compare) — `MCL-15fd976af9df9776`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Region, latency, and bandwidth.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [What To Compare](http://127.0.0.1:4000/host/earning#what-to-compare) — `MCL-5c510c7c9dae633d`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - System RAM, CPU, storage, and disk size.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [What To Compare](http://127.0.0.1:4000/host/earning#what-to-compare) — `MCL-102b942b37b8109a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Storage and bandwidth prices.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [What To Compare](http://127.0.0.1:4000/host/earning#what-to-compare) — `MCL-6ece27546cfec525`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Reliability and uptime.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
 
 ### [What To Compare](http://127.0.0.1:4000/host/earning#what-to-compare) — `MCL-526f6a348de7aaf2`
 
@@ -1314,62 +1230,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Reuse retained current console evidence for this exact label/action and account context; check source for hidden field computation or state semantics separately. An authored screenshot/caption is not automatically current UI proof.
 
-### [Pricing Strategy](http://127.0.0.1:4000/host/earning#pricing-strategy) — `MCL-d9f3e08cb17c901c`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Start near comparable market prices, then adjust from actual utilization.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [Pricing Strategy](http://127.0.0.1:4000/host/earning#pricing-strategy) — `MCL-20338cf437fdade2`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - New machines often need competitive pricing while they build reliability history.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [Pricing Strategy](http://127.0.0.1:4000/host/earning#pricing-strategy) — `MCL-92880d84640c3366`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Higher prices only work when renters value the machine's advantages.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [Pricing Strategy](http://127.0.0.1:4000/host/earning#pricing-strategy) — `MCL-88a0b370ce14c609`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Lower prices can improve utilization, but may reduce revenue if the machine was already rented.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
 ### [Pricing Strategy](http://127.0.0.1:4000/host/earning#pricing-strategy) — `MCL-f1acb1113f75a3fe`
 
 **Status:** UNVALIDATED
@@ -1383,76 +1243,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Documentation authoritative-source reviewer
 
 **Next:** Verify the residual scope using canonical implementation or a scoped read-only/runtime observation as appropriate: Actual backend/billing enforcement and independent offer/spec/end-date mechanics remain unvalidated. Do not use the agreement as evidence of actual compliance.
-
-### [Net Margin](http://127.0.0.1:4000/host/earning#net-margin) — `MCL-8bbe65d1247cdcdd`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Subtract operating costs before judging profit:
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [Net Margin](http://127.0.0.1:4000/host/earning#net-margin) — `MCL-a92a5f176cb1e129`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Power and cooling.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [Net Margin](http://127.0.0.1:4000/host/earning#net-margin) — `MCL-216077c3dab0d6a1`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Internet, rack, or colocation.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [Net Margin](http://127.0.0.1:4000/host/earning#net-margin) — `MCL-3a382c4118031f61`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Hardware depreciation or financing.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [Net Margin](http://127.0.0.1:4000/host/earning#net-margin) — `MCL-4a8ee9706710c271`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Repairs and maintenance time.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
 
 ## [Tax Guide for Hosts](http://127.0.0.1:4000/host/guide-to-taxes)
 
@@ -5902,1617 +5692,35 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 ## [Verification / Self-test Reference](http://127.0.0.1:4000/host/self-test-reference)
 
-### [Introduction](http://127.0.0.1:4000/host/self-test-reference) — `CUR-a1ed0f1e37e1a090`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** The host self-test is the quickest way to check whether a listed machine can pass Vast.ai's minimum verification gate and run the runtime workload used by the tester.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Introduction](http://127.0.0.1:4000/host/self-test-reference) — `CUR-b5bed1b7af1332ff`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** When you run `vastai self-test machine <machine>`, the CLI selects a rentable offer for that machine, checks minimum requirements, rents one temporary diagnostic instance, starts the self-test image, polls the runtime progress endpoint, reports the result, and destroys the temporary instance.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Introduction](http://127.0.0.1:4000/host/self-test-reference) — `CUR-84215388a9705850`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Passing this self-test makes a machine eligible for verification, but it does not guarantee that the machine will be verified immediately. Verification also depends on ongoing health, reliability, supply and demand, and platform policy.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Introduction](http://127.0.0.1:4000/host/self-test-reference) — `CUR-99e9df52092e76ce`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** `--ignore-requirements` is for advanced runtime diagnostics only. A pass with requirement checks ignored does not qualify the machine for verification.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [How To Read The Result](http://127.0.0.1:4000/host/self-test-reference#how-to-read-the-result) — `CUR-0171e6584774034c`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Self-test output has two distinct parts: preflight qualification checks and the runtime workload.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [How To Read The Result](http://127.0.0.1:4000/host/self-test-reference#how-to-read-the-result) — `CUR-640c7897465fb71e`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Normal pass | Minimum requirements passed and the runtime workload passed. The machine is eligible for verification, subject to the normal platform verification process. | Keep the host stable and listed. Verification is still automated and not guaranteed immediately. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [How To Read The Result](http://127.0.0.1:4000/host/self-test-reference#how-to-read-the-result) — `CUR-bfa0f979eb4ccc00`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Normal preflight failure | The CLI found one or more requirement failures before renting a temporary instance. | Fix the measured values shown in the CLI, then rerun without `--ignore-requirements`. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [How To Read The Result](http://127.0.0.1:4000/host/self-test-reference#how-to-read-the-result) — `CUR-c9068eb47a455a37`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Runtime failure | The CLI rented a temporary instance, started the self-test image, and a runtime stage failed or timed out. | Use the failure code, last runtime stage, and diagnostic bundle to identify the failing subsystem. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [How To Read The Result](http://127.0.0.1:4000/host/self-test-reference#how-to-read-the-result) — `CUR-f41d371721b28342`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Pass with `--ignore-requirements` | The runtime workload passed, but minimum requirement checks were skipped. This does not qualify the machine for verification. | Treat this as runtime validation only. Rerun without `--ignore-requirements` to see qualification status. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [How To Read The Result](http://127.0.0.1:4000/host/self-test-reference#how-to-read-the-result) — `CUR-ed2bc8125c7d3cfa`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** If you use `--ignore-requirements`, still review any requirement diagnostics from a normal run. A runtime pass proves the container workload can run; it does not prove the machine meets the verification gate.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Preflight Checks](http://127.0.0.1:4000/host/self-test-reference#preflight-checks) — `CUR-a2078c9bdc23d1cf`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** These checks run before the CLI rents the temporary self-test instance. Failed required checks stop the normal flow before billing starts.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Preflight Checks](http://127.0.0.1:4000/host/self-test-reference#preflight-checks) — `CUR-82c210b2222f3619`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `cuda.version`<br />CUDA version | Required: CUDA version &gt;= 11.8 | The self-test image needs a host driver stack compatible with CUDA 11.8 or newer. | Update the NVIDIA driver/CUDA stack, then confirm the machine is listed and healthy in the Console. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Preflight Checks](http://127.0.0.1:4000/host/self-test-reference#preflight-checks) — `CUR-2b95b85864a9e508`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `reliability`<br />Reliability | Required: Reliability &gt; 0.90 | Self-test uses reliability as a guardrail before launching a temporary instance. | Let the host stabilize and resolve recent failures before retrying the self-test. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Preflight Checks](http://127.0.0.1:4000/host/self-test-reference#preflight-checks) — `CUR-59744ec9b953e5f4`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `network.direct_ports`<br />Direct port count | Required: Direct ports &gt;= 3 * listed GPUs | The tester needs at least 3 directly mapped ports per listed GPU for remote progress, SSH checks, and runtime port allocation. | Open at least 3 direct ports for the listed GPU count, check firewall/NAT forwarding, and make TCP/UDP forwarding symmetric where required. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Preflight Checks](http://127.0.0.1:4000/host/self-test-reference#preflight-checks) — `CUR-97aacc25183dad8c`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `pcie.bandwidth`<br />PCIe bandwidth | Required: PCIe bandwidth &gt; 2.85 GB/s | Low PCIe bandwidth can make GPU stress and transfer checks fail or time out. | Check BIOS PCIe generation/lane settings and confirm GPUs are seated in full-speed slots. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Preflight Checks](http://127.0.0.1:4000/host/self-test-reference#preflight-checks) — `CUR-cbee4862b920ab9e`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `network.download`<br />Download speed | Required: Download &gt;= min(500, max(100, 500 * total_vram_gib / 192)) Mb/s | The bandwidth floor scales with total VRAM so large GPU hosts can complete data movement tests. | Improve host download bandwidth or reduce contention, then rerun the Vast host verification. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Preflight Checks](http://127.0.0.1:4000/host/self-test-reference#preflight-checks) — `CUR-db3fadf74bcb7542`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `network.upload`<br />Upload speed | Required: Upload &gt;= min(500, max(100, 500 * total_vram_gib / 192)) Mb/s | The tester needs enough upload bandwidth to report progress and complete network checks. | Improve host upload bandwidth or reduce contention, then rerun the Vast host verification. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Preflight Checks](http://127.0.0.1:4000/host/self-test-reference#preflight-checks) — `CUR-be7542a8d423db29`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `gpu.ram`<br />GPU RAM | Required: Per-GPU VRAM &gt; 7 GiB | The verification workload requires more than 7 GB of VRAM per GPU. | Use a GPU with more VRAM for this self-test. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Preflight Checks](http://127.0.0.1:4000/host/self-test-reference#preflight-checks) — `CUR-7de6e84bca382d95`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `system.ram`<br />System RAM | Required: System RAM &gt;= min(0.95 * total GPU VRAM, 2,000,000 MiB) | System RAM must be close to total VRAM so CPU-side staging does not starve the tests. For very large GPU hosts, this requirement is capped at about 2 TB. | Add system RAM or reduce the listed GPU set so system RAM is at least 95% of total VRAM, up to the 2 TB cap. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
 ### [Preflight Checks](http://127.0.0.1:4000/host/self-test-reference#preflight-checks) — `CUR-f992e392221fe492`
 
-**Status:** UNVALIDATED
+**Status:** FAIL
 
 **Literal source text:** | `cpu.cores`<br />CPU cores | Required: Physical CPU cores &gt;= listed GPUs | The tester expects at least one physical CPU core per listed GPU. Hyperthreads/logical CPUs do not count as physical cores. | Add physical CPU cores or reduce the listed GPU count for this offer. |
 
 **Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
 
-**Existing proof / limit:** No retained proof
+**Existing proof / limit:** [SOURCE-FAMILY-CUR-f992e392221fe492-1](evidence/2026-09-14-host-unvalidated-source-attempt-01/sources/vastai/cli/self_test/machine_diagnostics.py) — Exact retained selector; source/runtime boundary is stated in the passage review.; [SOURCE-FAMILY-CUR-f992e392221fe492-3](evidence/2026-09-15-host-unvalidated-source-families-attempt-01/s1/sources/selftest/systemreqtest.py) — Exact retained selector; source/runtime boundary is stated in the passage review.; [SOURCE-FAMILY-CUR-f992e392221fe492-4](evidence/2026-09-15-host-unvalidated-source-families-attempt-01/s1/sources/selftest/remote.py) — Exact retained selector; source/runtime boundary is stated in the passage review.; [SOURCE-FAMILY-CUR-f992e392221fe492-5](evidence/2026-09-15-host-unvalidated-source-families-attempt-01/cpu-owner-source.json) — Exact retained selector; source/runtime boundary is stated in the passage review.; [SOURCE-FAMILY-CUR-f992e392221fe492-6](evidence/2026-09-15-host-unvalidated-source-families-attempt-01/s1/sources/docs/generate_self_test_reference-before.py) — Exact retained selector; source/runtime boundary is stated in the passage review.
 
 **Responsible role:** Host implementation source owner
 
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Preflight Checks](http://127.0.0.1:4000/host/self-test-reference#preflight-checks) — `CUR-605904f389be6c48`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `network.direct_ports.recommended_max`<br />Direct port count advisory | Advisory: direct ports &lt;= 64 * listed GPUs | Vast instances can use at most 64 open ports each. Mapping more than 64 ports per listed GPU is usually wasted effort. | This is advisory only, not a self-test gate. Keep enough direct ports for self-test and normal workloads, but avoid mapping very large unused ranges. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Direct Ports And Port Mapping](http://127.0.0.1:4000/host/self-test-reference#direct-ports-and-port-mapping) — `CUR-cf7d3f00409a8f1c`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** The self-test needs direct public connectivity to the temporary instance. The progress service runs inside the self-test container on `5000/tcp`, but the CLI connects to the mapped external public IP and external port reported by the instance.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Direct Ports And Port Mapping](http://127.0.0.1:4000/host/self-test-reference#direct-ports-and-port-mapping) — `CUR-5f8a0b2845756bc8`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Minimum gate: at least 3 direct ports per listed GPU.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Direct Ports And Port Mapping](http://127.0.0.1:4000/host/self-test-reference#direct-ports-and-port-mapping) — `CUR-56ac540d0db0f13f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Useful cap: each instance can use up to 64 ports. Mapping more than 64 ports per listed GPU is usually unnecessary and is not a self-test requirement.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Direct Ports And Port Mapping](http://127.0.0.1:4000/host/self-test-reference#direct-ports-and-port-mapping) — `CUR-47996cd0776a435d`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Port forwarding should target the host's LAN address, not its public address.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Direct Ports And Port Mapping](http://127.0.0.1:4000/host/self-test-reference#direct-ports-and-port-mapping) — `CUR-2bab27515a10d58e`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Keep TCP and UDP forwarding symmetric where your network setup requires both protocols.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Direct Ports And Port Mapping](http://127.0.0.1:4000/host/self-test-reference#direct-ports-and-port-mapping) — `CUR-7acba46b17c76f66`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - If the CLI reports a tested external IP:port, troubleshoot that external mapping first.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Direct Ports And Port Mapping](http://127.0.0.1:4000/host/self-test-reference#direct-ports-and-port-mapping) — `CUR-e8a8f936ddfb708f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - If the host and CLI are on the same LAN, a local failure to reach the public IP can be NAT hairpinning. Retest from an outside network before assuming the port is closed globally.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Direct Ports And Port Mapping](http://127.0.0.1:4000/host/self-test-reference#direct-ports-and-port-mapping) — `CUR-c0d025fcac03f79f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** The CLI can report the external progress port it tested when that mapping is available. A full list of exactly which direct ports failed still requires backend or daemon-side exposure.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Bandwidth Formula](http://127.0.0.1:4000/host/self-test-reference#bandwidth-formula) — `CUR-5363908779de50ad`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Upload and download thresholds scale with total machine VRAM:
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Self-test Image Selection](http://127.0.0.1:4000/host/self-test-reference#self-test-image-selection) — `CUR-5777dfcca00aca8a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `vastai/test:self-test-v2-cuda-11.8` | 2.7.1 | Pre-sm_70 (Maxwell, Pascal); older R450+ drivers | linux/amd64 |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Self-test Image Selection](http://127.0.0.1:4000/host/self-test-reference#self-test-image-selection) — `CUR-4bc10988febf67c7`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `vastai/test:self-test-v2-cuda-12.8` | 2.10.0 | sm_70+ (Volta and newer); current default | linux/amd64, linux/arm64 |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Self-test Image Selection](http://127.0.0.1:4000/host/self-test-reference#self-test-image-selection) — `CUR-1c7dd73b2e6c86be`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `vastai/test:self-test-v2-cuda-13.0` | 2.11.0 | sm_75+ (Turing and newer); cu130 wheels never shipped sm_70 | linux/amd64, linux/arm64 |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Self-test Image Selection](http://127.0.0.1:4000/host/self-test-reference#self-test-image-selection) — `CUR-153160d136ba9443`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `vastai/test:self-test-v2-cuda-13.3` | 2.12.0 | sm_75+ (Turing and newer); CUDA 13.3 runtime with latest available CUDA-13 PyTorch wheels (`cu132`) | linux/amd64, linux/arm64 |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Self-test Image Selection](http://127.0.0.1:4000/host/self-test-reference#self-test-image-selection) — `CUR-f4a22e2e90238a8a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Selection rules:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Self-test Image Selection](http://127.0.0.1:4000/host/self-test-reference#self-test-image-selection) — `CUR-2eba2f4a77b58e35`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Volta GPUs (`compute_cap < 750`) are capped at CUDA 12.8 because newer PyTorch CUDA 13 wheels do not include sm_70 support.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Runtime Stages](http://127.0.0.1:4000/host/self-test-reference#runtime-stages) — `CUR-43532fc42128c653`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** After preflight passes, the CLI starts the self-test image and polls the runtime progress service on container port `5000/tcp`.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Runtime Stages](http://127.0.0.1:4000/host/self-test-reference#runtime-stages) — `CUR-7a97d1904e4156bd`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `image_started`<br />Self-test image started | The runtime container starts and writes the first progress event. | Confirm the self-test runtime started and can report progress. | If this is the last event, inspect container startup logs and Python import errors. |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
+**Next:** Source owner must identify or implement the CLI/image revisions that enforce the approved one-physical-core rule and define how the offer CPU counter maps to physical cores; then regenerate the CPU rows together against those exact revisions. Preserve the owner requirement meanwhile.
 
 ### [Runtime Stages](http://127.0.0.1:4000/host/self-test-reference#runtime-stages) — `CUR-1de91e8c48307d8b`
 
-**Status:** UNVALIDATED
+**Status:** FAIL
 
 **Literal source text:** | `system_requirements`<br />System requirements | Each GPU has at least 98% free VRAM; system RAM is at least 95% of total GPU VRAM capped at 2,000,000 MiB; there is at least 1 visible physical CPU core per visible GPU. Hyperthreads/logical CPUs do not count as physical cores. | Verify GPU visibility, available VRAM, host RAM, and CPU core capacity. | Check CUDA visibility, host memory, CPU allocation, and competing GPU workloads. |
 
 **Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
 
-**Existing proof / limit:** No retained proof
+**Existing proof / limit:** [SOURCE-FAMILY-CUR-1de91e8c48307d8b-1](evidence/2026-09-14-host-unvalidated-source-attempt-01/sources/vastai/cli/self_test/machine_diagnostics.py) — Exact retained selector; source/runtime boundary is stated in the passage review.; [SOURCE-FAMILY-CUR-1de91e8c48307d8b-3](evidence/2026-09-15-host-unvalidated-source-families-attempt-01/s1/sources/selftest/systemreqtest.py) — Exact retained selector; source/runtime boundary is stated in the passage review.; [SOURCE-FAMILY-CUR-1de91e8c48307d8b-4](evidence/2026-09-15-host-unvalidated-source-families-attempt-01/s1/sources/selftest/remote.py) — Exact retained selector; source/runtime boundary is stated in the passage review.; [SOURCE-FAMILY-CUR-1de91e8c48307d8b-5](evidence/2026-09-15-host-unvalidated-source-families-attempt-01/cpu-owner-source.json) — Exact retained selector; source/runtime boundary is stated in the passage review.; [SOURCE-FAMILY-CUR-1de91e8c48307d8b-6](evidence/2026-09-15-host-unvalidated-source-families-attempt-01/s1/sources/docs/generate_self_test_reference-before.py) — Exact retained selector; source/runtime boundary is stated in the passage review.
 
 **Responsible role:** Host implementation source owner
 
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Runtime Stages](http://127.0.0.1:4000/host/self-test-reference#runtime-stages) — `CUR-421cc786d4da61bf`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `resnet`<br />ResNet GPU execution | A CUDA ResNet18 workload completes on the visible GPU set at any tested batch size. | Run a CUDA ResNet18 workload across visible GPUs. | Check PyTorch CUDA compatibility, GPU memory pressure, and driver health. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Runtime Stages](http://127.0.0.1:4000/host/self-test-reference#runtime-stages) — `CUR-7326826496b3bcb4`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `ecc`<br />ECC memory allocation | The test allocates 95% of total memory on each visible GPU. | Allocate most GPU memory on each visible GPU to surface memory/ECC failures. | Check GPU ECC/Xid errors, available VRAM, and device health. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Runtime Stages](http://127.0.0.1:4000/host/self-test-reference#runtime-stages) — `CUR-a73ed5f2809699f7`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `nccl`<br />NCCL distributed communication | At least 1 GPU is visible and all NCCL ranks initialize and synchronize on one machine. | Initialize NCCL workers across all visible GPUs and synchronize them. | Check NCCL support, peer communication, CUDA driver/runtime compatibility, and process limits. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Runtime Stages](http://127.0.0.1:4000/host/self-test-reference#runtime-stages) — `CUR-6774b9523a920311`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `stress_gpu_burn`<br />CPU stress and GPU burn | stress-ng and gpu-burn run together for 60 seconds and both exit with code 0. | Run stress-ng and gpu-burn together to exercise sustained host and GPU load. | Check thermals, power limits, gpu-burn output, stress-ng output, and system stability. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Runtime Stages](http://127.0.0.1:4000/host/self-test-reference#runtime-stages) — `CUR-f34c17305c434ddb`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `final_summary`<br />Final summary | The runtime reports the overall pass/fail result and exit code. | Report the overall self-test result. | Review the failed stage event and raw output tails for the first actionable failure. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Offer Selection And Preflight Issues](http://127.0.0.1:4000/host/self-test-reference#offer-selection-and-preflight-issues) — `CUR-8b32c666d584a27e`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** The CLI reports stable preflight failure codes and, when possible, a likely root state for machines that are not currently rentable.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Not Found Or Not Rentable](http://127.0.0.1:4000/host/self-test-reference#not-found-or-not-rentable) — `CUR-27c87b33fcbacb5a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** The old `not found or not rentable` wording hid several different states. The newer CLI tries to disambiguate the state before giving guidance.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Not Found Or Not Rentable](http://127.0.0.1:4000/host/self-test-reference#not-found-or-not-rentable) — `CUR-09f6d47a6ece0641`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Typical root causes:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Not Found Or Not Rentable](http://127.0.0.1:4000/host/self-test-reference#not-found-or-not-rentable) — `CUR-71020a7d1c1629c7`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - The machine is currently rented.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Not Found Or Not Rentable](http://127.0.0.1:4000/host/self-test-reference#not-found-or-not-rentable) — `CUR-734f8708e5bd8324`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - The machine is visible but has zero active on-demand offers.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Not Found Or Not Rentable](http://127.0.0.1:4000/host/self-test-reference#not-found-or-not-rentable) — `CUR-672238c73984233a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - The machine is offline, unlisted, or not visible to the API account.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Not Found Or Not Rentable](http://127.0.0.1:4000/host/self-test-reference#not-found-or-not-rentable) — `CUR-5452d5bc17d98dca`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - The machine is deverified, below the reliability threshold, or has offer-side error metadata.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Not Found Or Not Rentable](http://127.0.0.1:4000/host/self-test-reference#not-found-or-not-rentable) — `CUR-e729ac5c2f2bcb57`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - The API key can authenticate but does not have permission to inspect the required host or offer state.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Not Found Or Not Rentable](http://127.0.0.1:4000/host/self-test-reference#not-found-or-not-rentable) — `CUR-5c6836f3790eafc7`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Start with the machine page in the Console. Check whether the host is online, listed, already rented, below the reliability gate, missing an active on-demand offer, or being viewed from an account that cannot see the host state.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Not Found Or Not Rentable](http://127.0.0.1:4000/host/self-test-reference#not-found-or-not-rentable) — `CUR-a70fac57ed54d5d4`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `no_offer` | No on-demand offer found for the machine. | Confirm the host is online, listed, and has a visible on-demand offer in the Console. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Not Found Or Not Rentable](http://127.0.0.1:4000/host/self-test-reference#not-found-or-not-rentable) — `CUR-d0c5ba8271491423`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `no_rentable_offer` | Offers were visible, but none were currently rentable. | Wait for rentals/state refreshes or inspect host offer state. |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Not Found Or Not Rentable](http://127.0.0.1:4000/host/self-test-reference#not-found-or-not-rentable) — `CUR-e30923b9c1d95f46`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `api_permission_failed` | The API key could not inspect the required machine/offer state. | Use an API key/account with host machine and offer visibility. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Not Found Or Not Rentable](http://127.0.0.1:4000/host/self-test-reference#not-found-or-not-rentable) — `CUR-2af0b5a4149adaec`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `preflight_requirements_failed` | One or more minimum requirement checks failed before renting. | Resolve the failed checks or rerun with `--ignore-requirements` for runtime diagnostics only. |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Not Found Or Not Rentable](http://127.0.0.1:4000/host/self-test-reference#not-found-or-not-rentable) — `CUR-863348ef7a6ee974`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `currently_rented` | Visible offers exist and one or more are already rented. | Review the machine page, listing state, active rentals, and offer visibility in the Console. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Not Found Or Not Rentable](http://127.0.0.1:4000/host/self-test-reference#not-found-or-not-rentable) — `CUR-2d660f1253aee996`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `deverified_or_below_threshold` | Visible offers exist but host reliability, verification state, vericode, or error metadata points to a host quality gate. | Review the machine page, listing state, active rentals, and offer visibility in the Console. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Not Found Or Not Rentable](http://127.0.0.1:4000/host/self-test-reference#not-found-or-not-rentable) — `CUR-113d18f3625cf37a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `zero_active_offers` | The machine is visible, but no active on-demand offers are listed for it. | Review the machine page, listing state, active rentals, and offer visibility in the Console. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Not Found Or Not Rentable](http://127.0.0.1:4000/host/self-test-reference#not-found-or-not-rentable) — `CUR-8b9b434e26bce9a3`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `offline_or_not_listed` | The machine is not visible to the account or appears offline/not listed. | Review the machine page, listing state, active rentals, and offer visibility in the Console. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Not Found Or Not Rentable](http://127.0.0.1:4000/host/self-test-reference#not-found-or-not-rentable) — `CUR-1d41792736cace0c`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `unknown_no_rentable_offer` | Visible offers exist, but the payload does not expose a specific non-rentable reason. | Review the machine page, listing state, active rentals, and offer visibility in the Console. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [vericode=8 And Port Networking Issues](http://127.0.0.1:4000/host/self-test-reference#vericode-8-and-port-networking-issues) — `CUR-ce0a70e94226448a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** `vericode=8` means the machine has a host-facing `error_msg` in platform state. If the visible message is `Port Networking Issues`, `Port issue`, or similar wording, treat it as a direct-port or connectivity problem. Other `vericode=8` cases can point to Docker/NVIDIA runtime, CDI, PCIe, daemon, or other machine errors, so use the exact Console message when choosing the next fix.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [vericode=8 And Port Networking Issues](http://127.0.0.1:4000/host/self-test-reference#vericode-8-and-port-networking-issues) — `CUR-f55f896567f2822a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** For port-networking cases, check closed external ports, forwarding to the wrong LAN IP, CGNAT or double NAT, missing inbound public IP, host firewall rules, TCP/UDP mismatch, asymmetric protocol handling, and stale port ranges. See [Network & Ports](/host/network-ports) and [Machine Error Reference](/host/machine-errors).
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Runtime Failure Codes](http://127.0.0.1:4000/host/self-test-reference#runtime-failure-codes) — `CUR-cf4ac8e4570315a7`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Runtime failure codes are stable identifiers intended for CLI output, support workflows, and host-facing guidance.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-b15ae54be8393f59`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** A `no response` or progress timeout means the CLI could not get usable progress from the temporary self-test instance after it was created. This is usually a connectivity or startup problem, not a generic verification decision.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-a4b7995ee0eeeaed`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Common causes:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-52cb598321fdc478`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Router or firewall forwards the external port to the wrong LAN IP.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-02df56d9f12eb7f3`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - The external TCP port is closed, blocked, or not hairpin-accessible from the CLI's network.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-43ad0da31d694402`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - The self-test container never started, crashed, or did not bind the progress service.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-20cc5fb37cad89d8`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Docker, NVIDIA runtime, or the host daemon stalled during startup.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-711563110213542a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - The GPU or system hung under load before progress could be reported.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-337cc4bb479953b8`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Upload/network instability prevented progress responses from reaching the CLI.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-01db2b4f0e967228`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** First checks:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-b44f265caf83d5ed`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Look at the failure code and the tested external IP:port in CLI output when present.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-6f644896de98418a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Confirm the router/firewall forwards that external port to the host machine.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-edf80939896f3e27`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Inspect the diagnostic bundle for `instance/container.log`, `instance/daemon.log`, and `instance/show-instance.json` when the instance existed.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-1b391ded1bd53a70`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - If you ran the CLI from the same LAN as the host, retry from a different network to rule out NAT loopback/hairpinning.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-391fe85741fc4ff5`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `instance_create_failed` | Launch, network, or cleanup | Failed to create the runtime test instance. | Check the offer, docker image, and instance creation response. | Retry with `--debugging` enabled.<br />Inspect the create-instance API error. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-a194c8269707342b`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `instance_create_missing_contract` | Launch, network, or cleanup | Instance creation did not return a new contract id. | Treat the create response as malformed or incomplete. | Inspect the raw create-instance response.<br />Retry after confirming the offer is still rentable. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-5c99f89b472f3ea9`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `instance_status_error` | Launch, network, or cleanup | The instance reported an error while starting. | Inspect the instance status message and host/container logs. | Run show instance for the contract.<br />Check docker logs on the host if available. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-c90a9e55df910d35`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `instance_status_poll_failed` | Launch, network, or cleanup | Failed to poll instance status. | Confirm API connectivity and retry the status check. | Retry the CLI command.<br />Check network/API errors from the status request. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-4300d7146a72d7ee`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `instance_start_timeout` | Launch, network, or cleanup | The instance did not reach running state before timeout. | Check host capacity, docker startup, and network configuration. | Inspect instance status_msg.<br />Try the test again after confirming the host is healthy. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-0330eaa7f44f9d3c`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `instance_offline_before_test` | Launch, network, or cleanup | The instance went offline before the runtime test could run. | Investigate host availability and instance lifecycle events. | Check machine status.<br />Review host daemon and container logs. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-8d04a433a5f429c0`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `missing_public_ip` | Launch, network, or cleanup | The running instance did not expose a public IP address. | Confirm the instance network configuration and public IP assignment. | Inspect show instance output.<br />Retry on a machine with public networking available. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-cb37f5d8aeeba6c4`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `progress_port_not_mapped` | Launch, network, or cleanup | The runtime progress port was not mapped. | Confirm port 5000/tcp is exposed and direct ports are available. | Check the available mapped ports in the diagnostic output.<br />Verify the machine has enough direct ports. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-a8fe40e6fd1b3e16`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `progress_endpoint_unreachable` | Launch, network, or cleanup | The runtime progress endpoint was never reachable. | Check TCP firewall/NAT forwarding, direct port mapping, container startup, and NAT hairpinning. | Confirm the mapped public TCP port forwards to the host LAN IP.<br />Inspect docker logs to confirm the progress server bound port 5000/tcp.<br />If testing from the same LAN as the host, retry from an outside network to rule out NAT loopback/hairpinning. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-853d37147df71947`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `progress_endpoint_lost` | Launch, network, or cleanup | The runtime progress endpoint became unreachable after connecting. | Look for container crashes, OOM, GPU errors, or host instability. | Inspect docker logs for a crash or missing progress server.<br />Check dmesg for Xid, GPU reset, OOM, or host stall messages.<br />Check for network loss between the CLI and host public endpoint. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-284f6de3d54ae537`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `progress_empty_timeout` | Launch, network, or cleanup | The progress endpoint returned no new output before timeout. | Check whether the runtime script stalled or stopped writing progress. | Inspect runtime logs.<br />Retry with debugging enabled. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-8915b07806233dd0`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `runtime_test_timeout` | Launch, network, or cleanup | The runtime test did not complete before timeout. | Investigate long-running or stalled test stages. | Check the last reported progress stage.<br />Run individual tests to isolate the stall. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-77b7741f42a9d2db`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `legacy_progress_error` | Runtime test | The legacy runtime progress stream reported an unclassified error. | Use the raw error text and active stage to decide the next action. | Inspect the original ERROR line.<br />Retry with debugging enabled if the cause is unclear. |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-c3a330681f0c3056`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `docker_pull_failed` | Image or container startup | The test image could not be pulled. | Check image name, tag availability, registry access, and credentials. | Verify the docker image tag exists.<br />Check for registry unauthorized or denied errors. |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-00a3ee85c9cfcb8a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `daemon_startup_failed` | Image or container startup | The container or daemon failed during startup. | Inspect docker daemon, OCI runtime, and container startup logs. | Check docker logs.<br />Verify NVIDIA container runtime and host daemon health. |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-40db88cbc9350fae`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `nvml_failed` | Runtime test | NVML or nvidia-smi failed during system checks. | Check NVIDIA driver, NVML, and GPU visibility on the host. | Run nvidia-smi on the host.<br />Check driver/library mismatch or GPU reset errors. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-e30ea37c6f444c22`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `resnet_failed` | Runtime test | The ResNet runtime test failed. | Check PyTorch/CUDA health, available VRAM, and GPU compute stability. | Look for CUDA OOM, cuDNN, or torch runtime errors.<br />Run a smaller isolated torch workload. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-88e951798ec92b63`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `ecc_failed` | Runtime test | The ECC runtime test failed. | Check GPU ECC counters and hardware health. | Inspect ECC error counters.<br />Review dmesg and nvidia-smi health output. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-e118d8553fa2400a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `nccl_failed` | Runtime test | The NCCL distributed runtime test failed. | Check multi-GPU connectivity, NCCL transport, and network fabric. | Inspect NCCL error output.<br />Verify peer-to-peer and multi-GPU communication. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-ab7fc026f29f17ce`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `stress_gpu_burn_failed` | Runtime test | The stress-ng or gpu-burn runtime test failed. | Check thermals, power stability, GPU Xid errors, and host stress logs. | Inspect dmesg for Xid errors.<br />Review gpu-burn and stress-ng output. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-fdae425bced45907`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `interrupted` | Launch, network, or cleanup | The runtime test was interrupted. | Ensure cleanup completed or destroy the test instance manually. | Check whether the test instance still exists.<br />Destroy leaked instances if needed. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [No Response Or Progress Timeout](http://127.0.0.1:4000/host/self-test-reference#no-response-or-progress-timeout) — `CUR-2af2bef5a7f10264`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `cleanup_failed` | Launch, network, or cleanup | Runtime test cleanup failed. | Destroy the temporary test instance manually to avoid continued billing. | Run destroy instance for the temporary contract.<br />Retry cleanup after checking API connectivity. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [`nccl_failed` Deep Dive](http://127.0.0.1:4000/host/self-test-reference#nccl-failed-deep-dive) — `CUR-2ef63a8e4fc59aba`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** `nccl_failed` means the temporary self-test instance could not initialize and synchronize NCCL workers across the visible GPUs. It is a multi-GPU communication failure, not proof of one specific root cause.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [`nccl_failed` Deep Dive](http://127.0.0.1:4000/host/self-test-reference#nccl-failed-deep-dive) — `CUR-0db96abe5f84632c`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Start with the support bundle, confirm every GPU is visible to `nvidia-smi` and Docker, then check driver/CUDA/PyTorch/NCCL compatibility, peer-to-peer communication, PCIe/NVLink topology, Xid errors, GPU resets, and bus errors.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [`nccl_failed` Deep Dive](http://127.0.0.1:4000/host/self-test-reference#nccl-failed-deep-dive) — `CUR-d7b0815e825f3eb2`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** On HGX, DGX, or other NVSwitch systems, also check Fabric Manager or NVLSM on the host. The self-test container can show NCCL symptoms, but it cannot confirm whether host services such as `nvidia-fabricmanager` are healthy.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [`nccl_failed` Deep Dive](http://127.0.0.1:4000/host/self-test-reference#nccl-failed-deep-dive) — `CUR-789c2d4841f37cb3`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash systemctl status nvidia-fabricmanager journalctl -u nvidia-fabricmanager --since "-24h" nvidia-smi -q | grep -i -A 2 Fabric nvidia-smi topo -m ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Diagnostic Bundles](http://127.0.0.1:4000/host/self-test-reference#diagnostic-bundles) — `CUR-6860e45d0311e2b8`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** When a self-test fails, the CLI builds a redacted diagnostic tarball unless bundle creation is disabled.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Diagnostic Bundles](http://127.0.0.1:4000/host/self-test-reference#diagnostic-bundles) — `CUR-abbdd33f4e5840c2`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Create a manual CLI-visible bundle with `vastai dump-logs <machine>`.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Diagnostic Bundles](http://127.0.0.1:4000/host/self-test-reference#diagnostic-bundles) — `CUR-ce744441e07ec1a6`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Include local host OS/kaalia artifacts only when running on the actual host with `vastai dump-logs <machine> --include-local-host-artifacts`.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Diagnostic Bundles](http://127.0.0.1:4000/host/self-test-reference#diagnostic-bundles) — `CUR-403a881f99407cda`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Default self-test bundles include `self-test-output.log`, `self-test-result.json`, `manifest.json`, and `collection-errors.json`. Runtime failures with a created instance can also include `instance/show-instance.json`, `instance/container.log`, and `instance/daemon.log` from the Vast instance logs API.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Diagnostic Bundles](http://127.0.0.1:4000/host/self-test-reference#diagnostic-bundles) — `CUR-8ba405e889787225`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** When the CLI is run from a laptop or other third-party machine, it cannot collect host-local files such as `/var/lib/vastai_kaalia/kaalia.log*`, `dmesg`, `journalctl`, `/etc/docker/daemon.json`, or `/proc/mounts` from the Vast host. Those artifacts require running the helper on the actual host or adding a future daemon/backend log-collection feature.
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Host implementation source owner
-
-**Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Diagnostic Bundles](http://127.0.0.1:4000/host/self-test-reference#diagnostic-bundles) — `CUR-a6b228bee1a74c99`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Text artifacts are capped at 262,144 bytes and log artifacts are capped at 262,144 bytes. Obvious API keys, tokens, passwords, and related secrets are redacted, but hosts should still review the tarball before sharing it with support.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
+**Next:** Source owner must identify or implement the CLI/image revisions that enforce the approved one-physical-core rule and define how the offer CPU counter maps to physical cores; then regenerate the CPU rows together against those exact revisions. Preserve the owner requirement meanwhile.
 
 ## [Pricing Your Listing](http://127.0.0.1:4000/host/pricing-your-listing)
-
-### [Introduction](http://127.0.0.1:4000/host/pricing-your-listing) — `MCL-07ca2eb2d76b7500`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Use this page when you are ready to list a machine or adjust an offer. Price for total revenue, not just the highest hourly rate.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [Before You Price](http://127.0.0.1:4000/host/pricing-your-listing#before-you-price) — `MCL-5e12c7bb993d838a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - No unresolved hardware, driver, Docker, storage, or network errors.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [Before You Price](http://127.0.0.1:4000/host/pricing-your-listing#before-you-price) — `MCL-3dfdfcfb9fc1b656`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Offer end date matches the commitment you can honor.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [Before You Price](http://127.0.0.1:4000/host/pricing-your-listing#before-you-price) — `MCL-7e0e72f2ec54e028`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Similar machines have been checked in [GPU Market Metrics](/host/market-metrics).
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [Before You Price](http://127.0.0.1:4000/host/pricing-your-listing#before-you-price) — `MCL-01a5ca2ed2a35c42`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Gross revenue has been estimated with the [Earnings Model](/host/earning).
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
 
 ### [Before You Price](http://127.0.0.1:4000/host/pricing-your-listing#before-you-price) — `MCL-8f00a3466a2c728d`
 
@@ -7640,20 +5848,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-45728db1cf0fbe35 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Starting Workflow](http://127.0.0.1:4000/host/pricing-your-listing#starting-workflow) — `MCL-f07cbcdea0b58547`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** 2. Check P10, median, P90, and `% Rented (30D Avg)` for the last 30 days.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
 ### [Starting Workflow](http://127.0.0.1:4000/host/pricing-your-listing#starting-workflow) — `MCL-54acbeb016f26cd7`
 
 **Status:** UNVALIDATED
@@ -7668,34 +5862,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
-### [Starting Workflow](http://127.0.0.1:4000/host/pricing-your-listing#starting-workflow) — `MCL-d0dea82ab92274a6`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** 5. Set an interruptible min bid only as a floor, not as your target price.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [Starting Workflow](http://127.0.0.1:4000/host/pricing-your-listing#starting-workflow) — `MCL-0ebbdb298d5bf37f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** 6. Use reserved discounts only if you can support longer rentals.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
 ### [Starting Workflow](http://127.0.0.1:4000/host/pricing-your-listing#starting-workflow) — `MCL-82655ae2a41381c9`
 
 **Status:** UNVALIDATED
@@ -7709,20 +5875,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
 
 **Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Starting Workflow](http://127.0.0.1:4000/host/pricing-your-listing#starting-workflow) — `MCL-2c8d7c4ef6e8449d`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Use [GPU Market Metrics](/host/market-metrics#gpu-overview-income-estimate) to estimate income from both utilization and median price. Price alone is not enough; a machine that rents at a slightly lower rate for more hours may earn more than a high-priced idle listing.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
 
 ### [Example](http://127.0.0.1:4000/host/pricing-your-listing#example) — `MCL-e45c878667d4446d`
 
@@ -7780,20 +5932,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Verify the residual scope using canonical implementation or a scoped read-only/runtime observation as appropriate: Actual backend/billing enforcement and independent offer/spec/end-date mechanics remain unvalidated. Do not use the agreement as evidence of actual compliance.
 
-### [When To Adjust](http://127.0.0.1:4000/host/pricing-your-listing#when-to-adjust) — `MCL-85c106837f6a39a8`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Always rented | Test a modest increase for future contracts. |
-
-**Required proof:** Repository Static Check
-
-**Existing proof / limit:** [EV-HOST-REVIEW-CLEANUP-EDITORIAL-04](evidence/2026-09-11-host-review-cleanup-attempt-01/editorial-local-projection-04.json) — Passage-level editorial/navigation/arithmetic inspection only; no product/runtime proof.
-
-**Responsible role:** Documentation reviewer
-
-**Next:** Obtain claim-suitable source for the named factual/rule/outcome component; do not close by advice review.
-
 ### [When To Adjust](http://127.0.0.1:4000/host/pricing-your-listing#when-to-adjust) — `MCL-89e5620ab439e169`
 
 **Status:** UNVALIDATED
@@ -7807,34 +5945,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-89e5620ab439e169 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [When To Adjust](http://127.0.0.1:4000/host/pricing-your-listing#when-to-adjust) — `MCL-c2c48ce89527e0ec`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Poor rentals despite fair price | Check verification, reliability, search visibility, network, storage, and errors. |
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [When To Adjust](http://127.0.0.1:4000/host/pricing-your-listing#when-to-adjust) — `MCL-0c50a629b1a27cea`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Strong long-running demand | Consider reserved discount and longer end date. |
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
 
 ## [Volume Offers](http://127.0.0.1:4000/host/volume-offers)
 
@@ -8260,20 +6370,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [Access](http://127.0.0.1:4000/host/market-metrics#access) — `CUR-81159e163bace8db`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Dashboard | [cloud.vast.ai/host/market](https://cloud.vast.ai/host/market/) |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [Access](http://127.0.0.1:4000/host/market-metrics#access) — `CUR-c746dbd4e826e32c`
 
 **Status:** UNVALIDATED
@@ -8329,20 +6425,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Host implementation source owner
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Dashboard Views](http://127.0.0.1:4000/host/market-metrics#dashboard-views) — `CUR-537c45cc5c041c21`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - **Availability & Pricing**: historical supply/demand and P10/median/P90 prices.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [Dashboard Views](http://127.0.0.1:4000/host/market-metrics#dashboard-views) — `CUR-f5cf7eb6c8835f8a`
 
@@ -8400,20 +6482,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [GPU Overview Income Estimate](http://127.0.0.1:4000/host/market-metrics#gpu-overview-income-estimate) — `CUR-6f4e9e6b2ac6e6bd`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** For a quick compute-only estimate, combine:
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
 ### [GPU Overview Income Estimate](http://127.0.0.1:4000/host/market-metrics#gpu-overview-income-estimate) — `CUR-64c946d72751f3b8`
 
 **Status:** UNVALIDATED
@@ -8455,20 +6523,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Host implementation source owner
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [GPU Overview Income Estimate](http://127.0.0.1:4000/host/market-metrics#gpu-overview-income-estimate) — `CUR-25b06b9e16051c3c`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Example: if `RTX 5090` shows `% Rented (30D Avg)` of `65.0%` and `$/HR MED` of `$0.361/hr`:
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
 
 ### [GPU Overview Income Estimate](http://127.0.0.1:4000/host/market-metrics#gpu-overview-income-estimate) — `CUR-a287c24888f28591`
 
@@ -8526,48 +6580,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [CLI](http://127.0.0.1:4000/host/market-metrics#cli) — `CUR-a79e559ca5aceabf`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Current snapshot:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [CLI](http://127.0.0.1:4000/host/market-metrics#cli) — `CUR-a3757b11890b02da`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Historical trends:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [CLI](http://127.0.0.1:4000/host/market-metrics#cli) — `CUR-8f415e72697f67a5`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Locations:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [CLI](http://127.0.0.1:4000/host/market-metrics#cli) — `CUR-116c95fba2351f5d`
 
 **Status:** UNVALIDATED
@@ -8581,20 +6593,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Host implementation source owner
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Market Comparison Sources](http://127.0.0.1:4000/host/market-metrics#market-comparison-sources) — `CUR-2f4cb77bf9345643`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** For planning and comparison, start with Vast-owned market sources:
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
 
 ### [Market Comparison Sources](http://127.0.0.1:4000/host/market-metrics#market-comparison-sources) — `CUR-cd7ed7ebc9cc0625`
 
@@ -8610,104 +6608,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [Market Comparison Sources](http://127.0.0.1:4000/host/market-metrics#market-comparison-sources) — `CUR-591de37ea1d33168`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - [Vast hosting earnings calculator](https://vast.ai/hosting/calculator)
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Market Comparison Sources](http://127.0.0.1:4000/host/market-metrics#market-comparison-sources) — `CUR-98fe1a3036cb8de0`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - [Host market dashboard](https://cloud.vast.ai/host/market/)
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Market Comparison Sources](http://127.0.0.1:4000/host/market-metrics#market-comparison-sources) — `CUR-d87b7e0c4ec551b4`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Use the Host market dashboard as the source of truth for current host market demand and pricing signals.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [API](http://127.0.0.1:4000/host/market-metrics#api) — `CUR-767c47b216acfb02`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Pass your host API key as a Bearer token.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [API](http://127.0.0.1:4000/host/market-metrics#api) — `CUR-9eb72db181f81086`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Common parameters:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [API](http://127.0.0.1:4000/host/market-metrics#api) — `CUR-13159c926782a164`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `verified` | `yes`, `no`, `all` |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [API](http://127.0.0.1:4000/host/market-metrics#api) — `CUR-c5970a3bcb839da9`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `hosting_type` | `secure_cloud`, `community`, `all` |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [API](http://127.0.0.1:4000/host/market-metrics#api) — `CUR-fcc30ead99e2c846`
 
 **Status:** UNVALIDATED
@@ -8722,34 +6622,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [API](http://127.0.0.1:4000/host/market-metrics#api) — `CUR-8bd3f260907a9130`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `start`, `end` | Unix timestamps |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [API](http://127.0.0.1:4000/host/market-metrics#api) — `CUR-6859da618cb3827f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `step` | Seconds between history points |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [API](http://127.0.0.1:4000/host/market-metrics#api) — `CUR-1f0bcff5445a9a7f`
 
 **Status:** UNVALIDATED
@@ -8763,20 +6635,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Host implementation source owner
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Freshness And Limits](http://127.0.0.1:4000/host/market-metrics#freshness-and-limits) — `CHC-MARKET-METRICS-FRESHNESS-01`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Read the [current snapshot API definition](https://github.com/vast-ai/docs/blob/bfa926c9421521767fa7411718bd31ea38b38528/api-reference/openapi/yaml/metrics_gpu.yaml), [historical trends API definition](https://github.com/vast-ai/docs/blob/bfa926c9421521767fa7411718bd31ea38b38528/api-reference/openapi/yaml/metrics_gpu_trends.yaml), and [locations API definition](https://github.com/vast-ai/docs/blob/bfa926c9421521767fa7411718bd31ea38b38528/api-reference/openapi/yaml/metrics_gpu_locations.yaml) for endpoint paths, request fields, and response shapes. These are the sources read for this page. They do not document a public update cadence, cache duration, or per-user request allowance, so this page makes no fixed promise about those behaviors.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** [CHC-MARKET-METRICS-FRESHNESS-01](current-host-claim-corrections.json) — Do not infer a three-requests-per-second allowance from x-rate-limit.per: request. No runtime, UI, cache, service-level, or account-access behavior is validated.
-
-**Responsible role:** Network or API source owner
-
-**Next:** If public freshness, caching, or quota behavior is required, obtain an accountable API/service-owner source that states the exact contract.
 
 ## [Optimize Your Earnings](http://127.0.0.1:4000/host/optimization-guide)
 
@@ -8793,20 +6651,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-ad97857bfa72cad9 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Core Rule](http://127.0.0.1:4000/host/optimization-guide#core-rule) — `MCL-37c5601dbd39cdce`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Revenue is price multiplied by utilization. A high price with low occupancy can earn less than a moderate price with steady rentals.
-
-**Required proof:** Repository Static Check
-
-**Existing proof / limit:** [EV-HOST-REVIEW-CLEANUP-EDITORIAL-04](evidence/2026-09-11-host-review-cleanup-attempt-01/editorial-local-projection-04.json) — Passage-level editorial/navigation/arithmetic inspection only; no product/runtime proof.
-
-**Responsible role:** Documentation calculation reviewer
-
-**Next:** Obtain claim-suitable source for the named factual/rule/outcome component; do not close by advice review.
 
 ### [Core Rule](http://127.0.0.1:4000/host/optimization-guide#core-rule) — `MCL-77a49245c082175e`
 
@@ -8836,20 +6680,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Locate the exact canonical implementation/schema/configuration for this behavior and reuse applicable retained source/execution/UI evidence. Client dispatch or documentation alone cannot prove backend effects.
 
-### [Duration](http://127.0.0.1:4000/host/optimization-guide#duration) — `MCL-7ed20e047d190019`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | More flexibility | Better fit for long jobs |
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
 ### [Duration](http://127.0.0.1:4000/host/optimization-guide#duration) — `MCL-6650bb14a6fdabea`
 
 **Status:** UNVALIDATED
@@ -8878,62 +6708,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Inspect the retained agreement Offer/Rental Contract/Operation and Maintenance clauses and any current published terms; bind only supported clauses. Inspect the corresponding offer/update/unlist/extension implementation and retained execution for actual system effects.
 
-### [Duration](http://127.0.0.1:4000/host/optimization-guide#duration) — `MCL-a443ddfff0691f6f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Different renters value different commitment windows:
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [Duration](http://127.0.0.1:4000/host/optimization-guide#duration) — `MCL-c6b33f097c787b0e`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Automated inference or burst work | Hours to days | Shorter offers preserve flexibility. |
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [Duration](http://127.0.0.1:4000/host/optimization-guide#duration) — `MCL-f42b42e963581b75`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Experiments and fine-tuning | Days to weeks | Medium durations can balance commitment and occupancy. |
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [Duration](http://127.0.0.1:4000/host/optimization-guide#duration) — `MCL-8990a3b72adf934d`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Training runs or reserved capacity | Weeks to months | Longer offers can attract higher-value, stability-sensitive renters. |
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
 ### [Duration](http://127.0.0.1:4000/host/optimization-guide#duration) — `MCL-3aa738746dc34785`
 
 **Status:** UNVALIDATED
@@ -8948,76 +6722,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Verify the residual scope using canonical implementation or a scoped read-only/runtime observation as appropriate: Automatic-extension/backend behavior not exercised; no churn benefit claimed. Do not use the agreement as evidence of actual compliance.
 
-### [Price](http://127.0.0.1:4000/host/optimization-guide#price) — `MCL-c346d2d59ffff473`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Use comparable listings and [market metrics](/host/market-metrics). Adjust from actual utilization, not from the highest visible price.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [Price](http://127.0.0.1:4000/host/optimization-guide#price) — `MCL-4b5c1e500979485f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Machine is healthy but idle | Lowering price or improving listing terms |
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [Price](http://127.0.0.1:4000/host/optimization-guide#price) — `MCL-8d69c2bb075e0c15`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Machine is always rented | Testing a modest price increase |
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [Price](http://127.0.0.1:4000/host/optimization-guide#price) — `MCL-6dfa085c35a11401`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Similar machines are cheaper | Matching the market until reliability/history improves |
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [Price](http://127.0.0.1:4000/host/optimization-guide#price) — `MCL-9bcd70097d2893da`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Demand spikes | Rechecking price after existing contracts end |
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
 ### [Price](http://127.0.0.1:4000/host/optimization-guide#price) — `MCL-df41831397bdadb8`
 
 **Status:** UNVALIDATED
@@ -9031,132 +6735,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Documentation authoritative-source reviewer
 
 **Next:** Verify the residual scope using canonical implementation or a scoped read-only/runtime observation as appropriate: Actual backend/billing enforcement and independent offer/spec/end-date mechanics remain unvalidated. Do not use the agreement as evidence of actual compliance.
-
-### [Interruptible Minimum Bid](http://127.0.0.1:4000/host/optimization-guide#interruptible-minimum-bid) — `MCL-a08770c33cd7d1af`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** The minimum bid is a floor, not your expected on-demand price. Set it near the lowest price you are willing to accept, often close to loaded power cost.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [Interruptible Minimum Bid](http://127.0.0.1:4000/host/optimization-guide#interruptible-minimum-bid) — `MCL-0c3c37d504b01f38`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** If the floor is too high, GPUs may sit idle. If it is too low, interruptible work may not cover operating cost. Do not set the floor close to the on-demand price just because that is the price you hope to receive.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [Disk And Bandwidth](http://127.0.0.1:4000/host/optimization-guide#disk-and-bandwidth) — `MCL-912f4fc01153430c`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Disk price | Price lower if storage is abundant; price higher if disk is scarce. |
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [Disk And Bandwidth](http://127.0.0.1:4000/host/optimization-guide#disk-and-bandwidth) — `MCL-307f5b9855a598f5`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Bandwidth price | Price lower for fast, unmetered links; price higher if bandwidth is metered or capacity-limited. |
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [Disk And Bandwidth](http://127.0.0.1:4000/host/optimization-guide#disk-and-bandwidth) — `MCL-3397592e4033c1b8`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Do not let stopped instances, cached images, or rented volumes consume the disk needed for active rentals.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [Disk And Bandwidth](http://127.0.0.1:4000/host/optimization-guide#disk-and-bandwidth) — `MCL-3f3cde2e5306852e`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Excess disk capacity | Pricing storage too high can make the listing less attractive without protecting a scarce resource. |
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [Disk And Bandwidth](http://127.0.0.1:4000/host/optimization-guide#disk-and-bandwidth) — `MCL-abfacd9d8b4c7585`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Disk-constrained host | Pricing storage too low can let stopped instances or volumes starve active GPU rentals. |
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [Disk And Bandwidth](http://127.0.0.1:4000/host/optimization-guide#disk-and-bandwidth) — `MCL-249c4808586a7ead`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Fast unmetered bandwidth | A lower bandwidth price can be a competitive advantage. |
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [Disk And Bandwidth](http://127.0.0.1:4000/host/optimization-guide#disk-and-bandwidth) — `MCL-1a3dedcbfa0bdc7d`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Metered or shared bandwidth | A low bandwidth price can let one renter saturate the connection or create unexpected cost. |
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
 
 ### [Min GPU](http://127.0.0.1:4000/host/optimization-guide#min-gpu) — `MCL-f166af02a80b03bc`
 
@@ -9312,20 +6890,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-b9a2234d232976cd and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Keep The Listing Competitive](http://127.0.0.1:4000/host/optimization-guide#keep-the-listing-competitive) — `MCL-3956d55db518eaa8`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Keep drivers current before listing.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
 ### [Keep The Listing Competitive](http://127.0.0.1:4000/host/optimization-guide#keep-the-listing-competitive) — `MCL-f09d755d9fc2c3a4`
 
 **Status:** UNVALIDATED
@@ -9353,62 +6917,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
 
 **Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Keep The Listing Competitive](http://127.0.0.1:4000/host/optimization-guide#keep-the-listing-competitive) — `MCL-c9004ebe62856857`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Avoid unplanned reboots, disconnects, and overheating.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [Keep The Listing Competitive](http://127.0.0.1:4000/host/optimization-guide#keep-the-listing-competitive) — `MCL-d9da265d026893c3`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Highlight datacenter status, facility certifications, or compliance claims only when they are real and approved.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation in this heading, including its assumptions and limits. Use primary technical guidance or the relevant Vast definition for any feature or factual input; do not use this draft as its own proof. Keep advice separate from a claim that an operation succeeded.
-
-### [Quick Reference](http://127.0.0.1:4000/host/optimization-guide#quick-reference) — `MCL-17f0db9b9773ff3f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Duration | How long can you reliably commit? |
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [Quick Reference](http://127.0.0.1:4000/host/optimization-guide#quick-reference) — `MCL-89ca18d38ed24003`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Min bid | What is your acceptable floor? |
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
 
 ### [Quick Reference](http://127.0.0.1:4000/host/optimization-guide#quick-reference) — `MCL-55fd057c3a148dd0`
 
@@ -12914,20 +10422,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [Introduction](http://127.0.0.1:4000/host/upgrade-kernel) — `CUR-d963fc54f393ad3f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** The steps are the same on Ubuntu Server 22.04 and 24.04.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [Introduction](http://127.0.0.1:4000/host/upgrade-kernel) — `CUR-b6f4f83fed353e73`
 
 **Status:** UNVALIDATED
@@ -12984,20 +10478,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [Full system upgrade (packages included)](http://127.0.0.1:4000/host/upgrade-kernel#full-system-upgrade-packages-included) — `CUR-7268bf180bdbfe17`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** This path also covers machines running a non-generic kernel, such as `linux-oem-22.04` on certified OEM hardware or `linux-nvidia`, where step 1 of the kernel-only path matches nothing.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [Full system upgrade (packages included)](http://127.0.0.1:4000/host/upgrade-kernel#full-system-upgrade-packages-included) — `CUR-e7f28f33e442598a`
 
 **Status:** UNVALIDATED
@@ -13040,20 +10520,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [Full system upgrade (packages included)](http://127.0.0.1:4000/host/upgrade-kernel#full-system-upgrade-packages-included) — `CUR-07797f3c49f3beb9`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ``` The following packages have been kept back:   linux-generic linux-headers-generic linux-image-generic ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [Full system upgrade (packages included)](http://127.0.0.1:4000/host/upgrade-kernel#full-system-upgrade-packages-included) — `CUR-b4d37e92f9ef1aa0`
 
 **Status:** UNVALIDATED
@@ -13081,20 +10547,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Host implementation source owner
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Full system upgrade (packages included)](http://127.0.0.1:4000/host/upgrade-kernel#full-system-upgrade-packages-included) — `CUR-3dfcbbd8b592bc98`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash uname -r; ls -1 /boot/vmlinuz-* | sed 's|.*/vmlinuz-||' | sort -V | tail -1 ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [Full system upgrade (packages included)](http://127.0.0.1:4000/host/upgrade-kernel#full-system-upgrade-packages-included) — `CUR-f96b0d1d73b1ba1e`
 
@@ -13138,34 +10590,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [1. Find your kernel metapackage](http://127.0.0.1:4000/host/upgrade-kernel#1-find-your-kernel-metapackage) — `CUR-b06d4fb8eb052e3d`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Find which kernel metapackages are installed. These are the names you will upgrade in step 3, and they differ between machines, so save them to a variable that the later commands read:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [1. Find your kernel metapackage](http://127.0.0.1:4000/host/upgrade-kernel#1-find-your-kernel-metapackage) — `CUR-dc15f757356d0e8e`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash KERNEL_METAPACKAGES=$(dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 'linux-generic*' 2>/dev/null | awk '$1 == "ii" { print $2 }' | sort -V); echo "$KERNEL_METAPACKAGES" ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [1. Find your kernel metapackage](http://127.0.0.1:4000/host/upgrade-kernel#1-find-your-kernel-metapackage) — `CUR-9fee2f8407618994`
 
 **Status:** UNVALIDATED
@@ -13179,20 +10603,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Host implementation source owner
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [1. Find your kernel metapackage](http://127.0.0.1:4000/host/upgrade-kernel#1-find-your-kernel-metapackage) — `CUR-f0dc315073c4db7e`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ``` linux-generic ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [1. Find your kernel metapackage](http://127.0.0.1:4000/host/upgrade-kernel#1-find-your-kernel-metapackage) — `CUR-f31418ad74893f64`
 
@@ -13208,104 +10618,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [1. Find your kernel metapackage](http://127.0.0.1:4000/host/upgrade-kernel#1-find-your-kernel-metapackage) — `CUR-9b96f1395c404b8a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ``` linux-generic-hwe-22.04 ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [1. Find your kernel metapackage](http://127.0.0.1:4000/host/upgrade-kernel#1-find-your-kernel-metapackage) — `CUR-54b525bbf018345d`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Every command from here on can be pasted as written. If `echo` printed nothing, stop: no `linux-generic*` metapackage is installed, and steps 2 and 3 have nothing to act on.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [1. Find your kernel metapackage](http://127.0.0.1:4000/host/upgrade-kernel#1-find-your-kernel-metapackage) — `CUR-7fa13addd6aee7b1`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** More than one line is a valid result, and every one of them is upgraded together:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [1. Find your kernel metapackage](http://127.0.0.1:4000/host/upgrade-kernel#1-find-your-kernel-metapackage) — `CUR-5303a0ee01742a47`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ``` linux-generic-hwe-22.04 linux-generic-hwe-22.04-edge ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [1. Find your kernel metapackage](http://127.0.0.1:4000/host/upgrade-kernel#1-find-your-kernel-metapackage) — `CUR-e0f6859af3fcef01`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Each metapackage pulls its own image and headers, so these are separate stacks rather than one being a newer form of the other. Upgrading a single name leaves the other stack on its old kernel, and GRUB can still boot that one.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [1. Find your kernel metapackage](http://127.0.0.1:4000/host/upgrade-kernel#1-find-your-kernel-metapackage) — `CUR-1d8527ed28f606bb`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** `KERNEL_METAPACKAGES` lives only in the shell session you set it in. If your connection drops, or you open a second terminal, set it again before continuing.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [1. Find your kernel metapackage](http://127.0.0.1:4000/host/upgrade-kernel#1-find-your-kernel-metapackage) — `CUR-6f8ae343d412611d`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Ubuntu ships two kernel stacks. GA is the kernel the release shipped with and is supported for the life of the LTS release. HWE, the hardware enablement stack, tracks the kernel from a later release to support newer hardware. Server installations default to GA and offer HWE as an option, so most machines report `linux-generic`.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [1. Find your kernel metapackage](http://127.0.0.1:4000/host/upgrade-kernel#1-find-your-kernel-metapackage) — `CUR-f1d055ce0b71dbde`
 
 **Status:** UNVALIDATED
@@ -13319,20 +10631,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Host implementation source owner
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [1. Find your kernel metapackage](http://127.0.0.1:4000/host/upgrade-kernel#1-find-your-kernel-metapackage) — `CUR-3efa5d455e840d88`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ``` Skipping linux-generic, it is not installed and only upgrades are requested. 0 upgraded, 0 newly installed, 0 to remove and 24 not upgraded. ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [1. Find your kernel metapackage](http://127.0.0.1:4000/host/upgrade-kernel#1-find-your-kernel-metapackage) — `CUR-47459b59696f0d3e`
 
@@ -13348,90 +10646,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [2. Check for updates](http://127.0.0.1:4000/host/upgrade-kernel#2-check-for-updates) — `CUR-90417e4b2b1f95a0`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Refresh the package lists first, or you will be comparing against stale data.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [2. Check for updates](http://127.0.0.1:4000/host/upgrade-kernel#2-check-for-updates) — `CUR-f764b55aaa08bd3e`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo apt update ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [2. Check for updates](http://127.0.0.1:4000/host/upgrade-kernel#2-check-for-updates) — `CUR-179635ff378fa441`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Then look at what you have against what the archive is offering:
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [2. Check for updates](http://127.0.0.1:4000/host/upgrade-kernel#2-check-for-updates) — `CUR-f21b9b6c7cfdee85`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash apt-cache policy $KERNEL_METAPACKAGES ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [2. Check for updates](http://127.0.0.1:4000/host/upgrade-kernel#2-check-for-updates) — `CUR-911fbf925b5a9836`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ``` linux-generic:   Installed: 5.15.0.25.27   Candidate: 5.15.0.190.169   Version table:      5.15.0.190.169 500         500 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 Packages         500 http://security.ubuntu.com/ubuntu jammy-security/main amd64 Packages  *** 5.15.0.25.27 500         500 http://archive.ubuntu.com/ubuntu jammy/main amd64 Packages         100 /var/lib/dpkg/status ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [2. Check for updates](http://127.0.0.1:4000/host/upgrade-kernel#2-check-for-updates) — `CUR-e95df0457694d116`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** This is the comparison that decides whether you go on. Step 1 printing more than one metapackage gives you one block per name here, and every block has to be considered, not just the first.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [2. Check for updates](http://127.0.0.1:4000/host/upgrade-kernel#2-check-for-updates) — `CUR-5930a774f5ffcb90`
 
 **Status:** UNVALIDATED
@@ -13445,20 +10659,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Host implementation source owner
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [2. Check for updates](http://127.0.0.1:4000/host/upgrade-kernel#2-check-for-updates) — `CUR-071ae27e331a26d8`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash uname -r; ls -1 /boot/vmlinuz-* | sed 's|.*/vmlinuz-||' | sort -V | tail -1 ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [2. Check for updates](http://127.0.0.1:4000/host/upgrade-kernel#2-check-for-updates) — `CUR-9c8b61d2083f5690`
 
@@ -13502,48 +10702,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [3. Install the kernel update](http://127.0.0.1:4000/host/upgrade-kernel#3-install-the-kernel-update) — `CUR-b0878c786928790f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** The summary line is the part worth reading:
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [3. Install the kernel update](http://127.0.0.1:4000/host/upgrade-kernel#3-install-the-kernel-update) — `CUR-fad269e41c4872ce`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ``` The following NEW packages will be installed:   linux-headers-5.15.0-190 linux-headers-5.15.0-190-generic   linux-image-5.15.0-190-generic linux-modules-5.15.0-190-generic   linux-modules-extra-5.15.0-190-generic The following packages will be upgraded:   linux-generic linux-headers-generic linux-image-generic 3 upgraded, 5 newly installed, 0 to remove and 24 not upgraded. ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [3. Install the kernel update](http://127.0.0.1:4000/host/upgrade-kernel#3-install-the-kernel-update) — `CUR-8d3cf5bdb16885c9`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Everything named is part of the kernel. The `24 not upgraded` is the rest of the system being left alone, which is what keeps this from turning into a general package upgrade during a maintenance window.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [3. Install the kernel update](http://127.0.0.1:4000/host/upgrade-kernel#3-install-the-kernel-update) — `CUR-587616f2592ba37b`
 
 **Status:** UNVALIDATED
@@ -13557,20 +10715,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Host implementation source owner
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [3. Install the kernel update](http://127.0.0.1:4000/host/upgrade-kernel#3-install-the-kernel-update) — `CUR-473592d77f21d692`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Your previous kernel is deliberately left installed. It stays in the boot menu and is what you fall back to if the new one does not work.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [4. Reboot](http://127.0.0.1:4000/host/upgrade-kernel#4-reboot) — `CUR-43757f1c859a6f73`
 
@@ -13628,48 +10772,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [5. Verify](http://127.0.0.1:4000/host/upgrade-kernel#5-verify) — `CUR-b23d7be1968df284`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash uname -r; ls -1 /boot/vmlinuz-* | sed 's|.*/vmlinuz-||' | sort -V | tail -1 ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [5. Verify](http://127.0.0.1:4000/host/upgrade-kernel#5-verify) — `CUR-ee242828500d3d5f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** The running kernel and the newest one installed must now be the same:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [5. Verify](http://127.0.0.1:4000/host/upgrade-kernel#5-verify) — `CUR-575aea631f47603a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ``` 5.15.0-190-generic 5.15.0-190-generic ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [5. Verify](http://127.0.0.1:4000/host/upgrade-kernel#5-verify) — `CUR-ac6c92df9a2d5e0c`
 
 **Status:** UNVALIDATED
@@ -13697,20 +10799,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Host implementation source owner
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [5. Verify](http://127.0.0.1:4000/host/upgrade-kernel#5-verify) — `CUR-a559945e17fa15d2`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash KERNEL_METAPACKAGES=$(dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 'linux-generic*' 2>/dev/null | awk '$1 == "ii" { print $2 }' | sort -V); apt-cache policy $KERNEL_METAPACKAGES ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [5. Verify](http://127.0.0.1:4000/host/upgrade-kernel#5-verify) — `CUR-da704a6283a96622`
 
@@ -13740,34 +10828,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [5. Verify](http://127.0.0.1:4000/host/upgrade-kernel#5-verify) — `CUR-6b4e95086ab62b5a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Finally, confirm the GPUs came back:
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [5. Verify](http://127.0.0.1:4000/host/upgrade-kernel#5-verify) — `CUR-1f9574850b947bee`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash nvidia-smi ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [5. Verify](http://127.0.0.1:4000/host/upgrade-kernel#5-verify) — `CUR-3fac4c5a66be7ad1`
 
 **Status:** UNVALIDATED
@@ -13796,20 +10856,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [If the machine booted the old kernel](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-booted-the-old-kernel) — `CUR-ca3078a7c825a5d0`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Step 5 is what surfaces this: `uname -r` reports an older version than the newest kernel in `/boot`, while `Installed` and `Candidate` match. The upgrade worked and the new kernel is on disk. GRUB did not boot it.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [If the machine booted the old kernel](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-booted-the-old-kernel) — `CUR-bd6ca25ecb7013f9`
 
 **Status:** UNVALIDATED
@@ -13823,34 +10869,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Host implementation source owner
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [If the machine booted the old kernel](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-booted-the-old-kernel) — `CUR-2ebd75c40a5c75bd`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Start with the entry GRUB is configured to boot. `grub-mkconfig` reads `/etc/default/grub` first and then every `/etc/default/grub.d/*.cfg`, so a drop-in overrides the main file and reading the main file alone can show you a value that is not the one in effect. Resolve it the way `grub-mkconfig` does:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [If the machine booted the old kernel](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-booted-the-old-kernel) — `CUR-b2181872a9ad2e1f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash bash -c '. /etc/default/grub; shopt -s nullglob; for f in /etc/default/grub.d/*.cfg; do . "$f"; done; echo "GRUB_DEFAULT=$GRUB_DEFAULT"; echo "GRUB_SAVEDEFAULT=$GRUB_SAVEDEFAULT"' ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [If the machine booted the old kernel](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-booted-the-old-kernel) — `CUR-541502a3028965d9`
 
@@ -13866,34 +10884,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [If the machine booted the old kernel](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-booted-the-old-kernel) — `CUR-6809a4c960eda2d5`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ``` GRUB_DEFAULT=0 GRUB_SAVEDEFAULT= ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [If the machine booted the old kernel](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-booted-the-old-kernel) — `CUR-7b73c6173802d7f6`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Entry `0` is the first entry in the generated menu, and Ubuntu builds that menu in reverse version order, so entry `0` is the newest installed kernel. That is what lets a new kernel boot without touching the bootloader.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [If the machine booted the old kernel](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-booted-the-old-kernel) — `CUR-ab17b10a0de12702`
 
 **Status:** UNVALIDATED
@@ -13907,174 +10897,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Host implementation source owner
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [If the machine booted the old kernel](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-booted-the-old-kernel) — `CUR-4e7986cff4ca2aba`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ``` GRUB_DEFAULT="Advanced options for Ubuntu>Ubuntu, with Linux 5.15.0-25-generic" ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [If the machine booted the old kernel](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-booted-the-old-kernel) — `CUR-813ddd58376f9ea4`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Find which file sets it, since that is the file to edit:
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [If the machine booted the old kernel](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-booted-the-old-kernel) — `CUR-529bcca689588850`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash grep -rE '^GRUB_DEFAULT=' /etc/default/grub /etc/default/grub.d/ ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [If the machine booted the old kernel](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-booted-the-old-kernel) — `CUR-4379d1862bb17e91`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Set it back to `0`, keeping a copy of the file first:
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [If the machine booted the old kernel](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-booted-the-old-kernel) — `CUR-b100a6b8811cf951`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash [ -f /etc/default/grub.bak ] || sudo cp /etc/default/grub /etc/default/grub.bak; sudo sed -i 's/^GRUB_DEFAULT=.*/GRUB_DEFAULT=0/' /etc/default/grub && grep '^GRUB_DEFAULT=' /etc/default/grub ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [If the machine booted the old kernel](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-booted-the-old-kernel) — `CUR-8d310ddf00fa297c`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** The backup is only taken when there is not one already, so running this a second time keeps the copy of the original rather than overwriting it with the edited file.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [If the machine booted the old kernel](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-booted-the-old-kernel) — `CUR-586f9b05d71806be`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** `GRUB_SAVEDEFAULT` only has an effect when `GRUB_DEFAULT=saved`, so once the default is `0` it can stay as it is.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [If the machine booted the old kernel](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-booted-the-old-kernel) — `CUR-2d1d81288e4175bd`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** If the grep listed a file under `/etc/default/grub.d/`, correct `GRUB_DEFAULT` there as well. That file is sourced after the main one, so leaving it alone means it overrides the edit you just made.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [If the machine booted the old kernel](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-booted-the-old-kernel) — `CUR-fcb16e03504f6ebf`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Editing the configuration changes nothing on its own. Regenerate the menu:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [If the machine booted the old kernel](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-booted-the-old-kernel) — `CUR-79a6df1e8bbad924`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo update-grub ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [If the machine booted the old kernel](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-booted-the-old-kernel) — `CUR-b04fd6fd8740f725`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** The new kernel must appear in the output:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [If the machine booted the old kernel](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-booted-the-old-kernel) — `CUR-49f721c7b1bd403d`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ``` Found linux image: /boot/vmlinuz-5.15.0-190-generic Found initrd image: /boot/initrd.img-5.15.0-190-generic Found linux image: /boot/vmlinuz-5.15.0-25-generic Found initrd image: /boot/initrd.img-5.15.0-25-generic ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [If the machine booted the old kernel](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-booted-the-old-kernel) — `CUR-c4050ea34912cf76`
 
@@ -14118,20 +10940,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [If the machine booted the old kernel](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-booted-the-old-kernel) — `CUR-1af98b0b15519b08`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Then repeat step 5. `uname -r` should now match the newest kernel in `/boot`.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [If the machine does not come back](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-does-not-come-back) — `CUR-04895d4ff3bd2cae`
 
 **Status:** UNVALIDATED
@@ -14145,20 +10953,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Host implementation source owner
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [If the machine does not come back](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-does-not-come-back) — `CUR-636734966b81d1e7`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Ubuntu keeps the previous kernel installed, so the fix is to boot it. Hold the right **Shift** key during boot to bring up the GRUB menu; on some machines pressing **Esc** works instead. Choose **Advanced options for Ubuntu**, then the entry for your previous kernel, listed as **Ubuntu, with Linux 5.15.0-25-generic**.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [If the machine does not come back](http://127.0.0.1:4000/host/upgrade-kernel#if-the-machine-does-not-come-back) — `CUR-266325b344f12751`
 
@@ -14204,90 +10998,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Inspect verification scheduler/gate/configuration and exact self-test versus backend checks. Reuse compatible observations and keep any unsupported timeline/guarantee statement unresolved.
 
-### [Introduction](http://127.0.0.1:4000/host/disable-ssh-password-login) — `CUR-9c17c66b613dcdf7`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** The steps are the same on Ubuntu Server 22.04 and 24.04.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Introduction](http://127.0.0.1:4000/host/disable-ssh-password-login) — `CUR-1925fb93343cf99c`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Do not turn off password login until you have confirmed your key works. Step 2 is what stops you locking yourself out. Keep your current session open until the end.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [1. Check the current setting](http://127.0.0.1:4000/host/disable-ssh-password-login#1-check-the-current-setting) — `CUR-491405aec946ed50`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** This asks sshd what it is actually using, with defaults and included files resolved.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [1. Check the current setting](http://127.0.0.1:4000/host/disable-ssh-password-login#1-check-the-current-setting) — `CUR-7e77074195015fd0`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo sshd -T | grep passwordauthentication ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [1. Check the current setting](http://127.0.0.1:4000/host/disable-ssh-password-login#1-check-the-current-setting) — `CUR-c103c9a09dd0aca0`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ``` passwordauthentication yes ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [1. Check the current setting](http://127.0.0.1:4000/host/disable-ssh-password-login#1-check-the-current-setting) — `CUR-cc56d7fed7a590cc`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** If it already says `no`, you are done. If it says `yes`, continue.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
 ### [1. Check the current setting](http://127.0.0.1:4000/host/disable-ssh-password-login#1-check-the-current-setting) — `CUR-56b269be0ac552e6`
 
 **Status:** UNVALIDATED
@@ -14316,34 +11026,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [2. Add your key and confirm it works](http://127.0.0.1:4000/host/disable-ssh-password-login#2-add-your-key-and-confirm-it-works) — `CUR-a5c155e49d0bbb7f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash ssh-copy-id youruser@1.2.3.4 ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [2. Add your key and confirm it works](http://127.0.0.1:4000/host/disable-ssh-password-login#2-add-your-key-and-confirm-it-works) — `CUR-08c0bd1c5797187f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ``` Number of key(s) added: 1 ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [2. Add your key and confirm it works](http://127.0.0.1:4000/host/disable-ssh-password-login#2-add-your-key-and-confirm-it-works) — `CUR-0384df43f8e6b914`
 
 **Status:** UNVALIDATED
@@ -14358,20 +11040,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Check the implementation and any retained result that covers this exact behavior. For an asserted timing, state change or completed outcome, identify the smallest authorized runtime/UI check and retain its result. Do not rent or mutate merely to establish a declared interface.
 
-### [2. Add your key and confirm it works](http://127.0.0.1:4000/host/disable-ssh-password-login#2-add-your-key-and-confirm-it-works) — `CUR-97f860901c54e022`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash ssh -o PreferredAuthentications=publickey youruser@1.2.3.4 ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [2. Add your key and confirm it works](http://127.0.0.1:4000/host/disable-ssh-password-login#2-add-your-key-and-confirm-it-works) — `CUR-fff81b607ab85103`
 
 **Status:** UNVALIDATED
@@ -14385,20 +11053,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Documentation technical-source reviewer; authorized operator for a required observed result
 
 **Next:** Check the implementation and any retained result that covers this exact behavior. For an asserted timing, state change or completed outcome, identify the smallest authorized runtime/UI check and retain its result. Do not rent or mutate merely to establish a declared interface.
-
-### [2. Add your key and confirm it works](http://127.0.0.1:4000/host/disable-ssh-password-login#2-add-your-key-and-confirm-it-works) — `CUR-cccaaf33c813b98a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** If you get `Permission denied (publickey)`, your key is not working. Stop here and fix it. Check that the key landed in `~/.ssh/authorized_keys` on the host, and that `~/.ssh` is mode `700` and `authorized_keys` is mode `600`.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [3. Turn off password login](http://127.0.0.1:4000/host/disable-ssh-password-login#3-turn-off-password-login) — `CUR-8644fba884bb187b`
 
@@ -14428,160 +11082,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [3. Turn off password login](http://127.0.0.1:4000/host/disable-ssh-password-login#3-turn-off-password-login) — `CUR-4c05c6454b7e6248`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo cp -n /etc/ssh/sshd_config /etc/ssh/sshd_config.orig sudo sh -c 'for f in /etc/ssh/sshd_config.d/*.conf; do cp -n "$f" "$f.orig"; done' ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [3. Turn off password login](http://127.0.0.1:4000/host/disable-ssh-password-login#3-turn-off-password-login) — `CUR-8a781b4b3ee17155`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Now set `PasswordAuthentication no` in the SSH config files that have it, including the extra files Ubuntu keeps in `/etc/ssh/sshd_config.d/`.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [3. Turn off password login](http://127.0.0.1:4000/host/disable-ssh-password-login#3-turn-off-password-login) — `CUR-994864e626e37c79`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo sed -i -E 's/^[[:space:]]*#?[[:space:]]*(PasswordAuthentication)[[:space:]]+.*/\1 no/I' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [3. Turn off password login](http://127.0.0.1:4000/host/disable-ssh-password-login#3-turn-off-password-login) — `CUR-798805fce5932096`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ``` (no output) ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [3. Turn off password login](http://127.0.0.1:4000/host/disable-ssh-password-login#3-turn-off-password-login) — `CUR-aab78d01230cadd7`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** This catches commented lines, indented lines, and any file a cloud image left behind.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Or edit the config yourself](http://127.0.0.1:4000/host/disable-ssh-password-login#or-edit-the-config-yourself) — `CUR-1d35238977984a80`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Open `/etc/ssh/sshd_config` and set:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Or edit the config yourself](http://127.0.0.1:4000/host/disable-ssh-password-login#or-edit-the-config-yourself) — `CUR-d55d8d105b5208a7`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ``` PasswordAuthentication no ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Or edit the config yourself](http://127.0.0.1:4000/host/disable-ssh-password-login#or-edit-the-config-yourself) — `CUR-8ddd4e60088f5136`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Then check that nothing else overrides it:
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [Or edit the config yourself](http://127.0.0.1:4000/host/disable-ssh-password-login#or-edit-the-config-yourself) — `CUR-af17cbe601f9bff5`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo grep -r -i passwordauthentication /etc/ssh/sshd_config.d/ 2>/dev/null ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Or edit the config yourself](http://127.0.0.1:4000/host/disable-ssh-password-login#or-edit-the-config-yourself) — `CUR-369807ee343ca7ec`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Change any line that says `yes` to `no`. Files in that folder are read first, so they win over the main config.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Or edit the config yourself](http://127.0.0.1:4000/host/disable-ssh-password-login#or-edit-the-config-yourself) — `CUR-d9859ac08ad2d5e2`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Removing the `#` is not enough. The value must be `no`. A line reading `PasswordAuthentication yes` still allows passwords.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [4. Apply and verify](http://127.0.0.1:4000/host/disable-ssh-password-login#4-apply-and-verify) — `CUR-722204a43ad1f31d`
 
 **Status:** UNVALIDATED
@@ -14609,76 +11109,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Host implementation source owner
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [4. Apply and verify](http://127.0.0.1:4000/host/disable-ssh-password-login#4-apply-and-verify) — `CUR-c45792c338dd5466`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** No output means both worked. Existing sessions stay connected.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [4. Apply and verify](http://127.0.0.1:4000/host/disable-ssh-password-login#4-apply-and-verify) — `CUR-dd6a893ee8bdc2d8`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Now confirm the running service is refusing passwords:
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [4. Apply and verify](http://127.0.0.1:4000/host/disable-ssh-password-login#4-apply-and-verify) — `CUR-87807c07b36119df`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo sshd -T | grep passwordauthentication ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [4. Apply and verify](http://127.0.0.1:4000/host/disable-ssh-password-login#4-apply-and-verify) — `CUR-eb3aafade07aecdb`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ``` passwordauthentication no ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [4. Apply and verify](http://127.0.0.1:4000/host/disable-ssh-password-login#4-apply-and-verify) — `CUR-7b9a0fdeb17059be`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Once it says `no`, log in once more from your own computer to confirm, then close your original session.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
 
 ### [4. Apply and verify](http://127.0.0.1:4000/host/disable-ssh-password-login#4-apply-and-verify) — `CUR-4f4370d23549cda8`
 
@@ -14749,20 +11179,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Host implementation source owner
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [If you are locked out](http://127.0.0.1:4000/host/disable-ssh-password-login#if-you-are-locked-out) — `CUR-e5b9bf976e579a57`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Restoring only `/etc/ssh/sshd_config` is not enough. The files in `/etc/ssh/sshd_config.d/` are read first, so they keep password login off until they are restored too.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [If you are locked out](http://127.0.0.1:4000/host/disable-ssh-password-login#if-you-are-locked-out) — `CUR-b235ee5806d25707`
 
@@ -16704,34 +13120,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-272177fff956fdf7 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-95d8c362e5ebc79f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Installer logs are written to `vast_host_install.log` in the directory where you launched the installer, not under `/var/lib/vastai_kaalia`.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-275ad9daca24ba6c`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** If the installer created a compressed log archive:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-be6f050aaddc289f`
 
 **Status:** UNVALIDATED
@@ -16745,20 +13133,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-be6f050aaddc289f and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-53625fe44180286a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** The host daemon log is:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-d825fab0e420cfa3`
 
@@ -16801,20 +13175,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Backend and Host-daemon source owner; Authorized Host/API operator
 
 **Next:** For the remaining official diagnostic workload, use a currently suitable authorized machine and bounded window; reconfirm occupancy and cleanup scope. Retain the exact diagnostic result, not only preflight.
-
-### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-7ffec0f9b23aaf16`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Bundles can include:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-6e90c304b231dd63`
 
@@ -16899,20 +13259,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Backend and Host-daemon source owner; Authorized Host/API operator
 
 **Next:** The Backend and Host-daemon source owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-ce761396fde491b7 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-ce761396fde491b7 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Logs And Support Bundles](http://127.0.0.1:4000/host/common-errors-diagnostics#logs-and-support-bundles) — `MCL-d3cae0fb3cb5c9d6`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** The flag is opt-in because a laptop or other remote CLI cannot safely collect files from the Vast host. Review the redacted archive before sharing it. See [Self-Test Reference: Diagnostic Bundles](/host/self-test-reference#diagnostic-bundles) for contents, size caps, and collection boundaries.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [Host Service Snapshot](http://127.0.0.1:4000/host/common-errors-diagnostics#host-service-snapshot) — `MCL-1113b3f4ae1a1eb8`
 
@@ -17362,20 +13708,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-1e28623cfe82e85b and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Before Asking For Help](http://127.0.0.1:4000/host/common-errors-diagnostics#before-asking-for-help) — `MCL-884394079ab58c34`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Exact error strings, screenshots, or CLI output.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [Before Asking For Help](http://127.0.0.1:4000/host/common-errors-diagnostics#before-asking-for-help) — `MCL-e49e10b3757c9960`
 
 **Status:** UNVALIDATED
@@ -17417,34 +13749,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-a546d436fb3462ce and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Before Asking For Help](http://127.0.0.1:4000/host/common-errors-diagnostics#before-asking-for-help) — `MCL-e36f08c1dedadcc9`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Self-test support bundle when available.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [Before Asking For Help](http://127.0.0.1:4000/host/common-errors-diagnostics#before-asking-for-help) — `MCL-9a47d3bb5fa94c59`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Installer log, daemon log, and relevant kernel log excerpts.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [Before Asking For Help](http://127.0.0.1:4000/host/common-errors-diagnostics#before-asking-for-help) — `MCL-54b10ee8437031af`
 
@@ -17616,20 +13920,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-3b35a3450b691d5d and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Quick Lookup](http://127.0.0.1:4000/host/machine-errors#quick-lookup) — `MCL-5ef562461a015aad`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `Port issue`, `port networking issues`, `Port Networking Issues` | Public port reachability | [Port Networking Issues](#port-networking-issues) |
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-5ef562461a015aad and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
 ### [Quick Lookup](http://127.0.0.1:4000/host/machine-errors#quick-lookup) — `MCL-f143922edf4037e0`
 
 **Status:** UNVALIDATED
@@ -17644,104 +13934,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-f143922edf4037e0 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Quick Lookup](http://127.0.0.1:4000/host/machine-errors#quick-lookup) — `MCL-43c8af4794b1f5a5`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | TCP works but UDP fails | Public port protocol mismatch | [TCP works but UDP fails](#tcp-works-but-udp-fails) |
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-43c8af4794b1f5a5 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Quick Lookup](http://127.0.0.1:4000/host/machine-errors#quick-lookup) — `MCL-22fbca1b73497073`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `nvidia-container-cli: device error:` | NVIDIA container runtime or GPU device state | [NVIDIA container runtime](#nvidia-container-runtime) |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Backend and Host-daemon source owner; Authorized Host/API operator
-
-**Next:** The Backend and Host-daemon source owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-22fbca1b73497073 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-22fbca1b73497073 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Quick Lookup](http://127.0.0.1:4000/host/machine-errors#quick-lookup) — `MCL-3f8842d8ae8384a4`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `failed to inject CDI devices: unresolvable CDI devices` | NVIDIA CDI / Docker GPU injection | [CDI device injection](#cdi-device-injection) |
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-3f8842d8ae8384a4 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Quick Lookup](http://127.0.0.1:4000/host/machine-errors#quick-lookup) — `MCL-b28fced4b1a6184b`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `unknown or invalid runtime nvidia` | NVIDIA container runtime not available to Docker | [Docker runtime configuration](#docker-runtime-configuration) |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Quick Lookup](http://127.0.0.1:4000/host/machine-errors#quick-lookup) — `MCL-694d449174e7d0f4`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `unknown flag: runtime` | Docker CLI/runtime invocation problem | [Docker runtime configuration](#docker-runtime-configuration) |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Quick Lookup](http://127.0.0.1:4000/host/machine-errors#quick-lookup) — `MCL-d63686b534cbf505`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `Cannot connect to the Docker daemon` | Docker daemon unavailable | [Docker daemon unavailable](#docker-daemon-unavailable) |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Quick Lookup](http://127.0.0.1:4000/host/machine-errors#quick-lookup) — `MCL-bfc6481ee67f3d04`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `GPU PCIE issue`, AER, PCIe, Xid 79, fallen off bus | Hardware path / PCIe / power / riser | [GPU PCIe issue](#gpu-pcie-issue) |
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-bfc6481ee67f3d04 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
 ### [Quick Lookup](http://127.0.0.1:4000/host/machine-errors#quick-lookup) — `MCL-1221941af8a7a4fe`
 
 **Status:** UNVALIDATED
@@ -17750,165 +13942,11 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Required proof:** Runtime Or Ui Observation
 
-**Existing proof / limit:** No retained proof
+**Existing proof / limit:** [SOURCE-FAMILY-MCL-1221941af8a7a4fe-1](evidence/2026-09-15-host-unvalidated-source-families-attempt-01/s2-s3/fleet_database_guide.md.excerpt.txt) — Exact retained selector; source/runtime boundary is stated in the passage review.; [SOURCE-FAMILY-MCL-1221941af8a7a4fe-2](evidence/2026-09-15-host-unvalidated-source-families-attempt-01/s2-s3/fleet_report.py.excerpt.txt) — Exact retained selector; source/runtime boundary is stated in the passage review.; [SOURCE-FAMILY-MCL-1221941af8a7a4fe-3](evidence/2026-09-15-host-unvalidated-source-families-attempt-01/s2-s3/context-review.json) — Exact retained selector; source/runtime boundary is stated in the passage review.
 
 **Responsible role:** Authorized Host/API operator
 
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-1221941af8a7a4fe and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Quick Lookup](http://127.0.0.1:4000/host/machine-errors#quick-lookup) — `MCL-ca213e23f60ba778`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `Unable to determine the device handle for` | GPU disappeared or cannot be enumerated | [GPU missing or unhealthy](#gpu-missing-or-unhealthy) |
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-ca213e23f60ba778 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Quick Lookup](http://127.0.0.1:4000/host/machine-errors#quick-lookup) — `MCL-f0787eb7f15682e3`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `CUDA error: uncorrectable ECC error encountered` | GPU memory / ECC fault | [ECC and GPU memory errors](#ecc-and-gpu-memory-errors) |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Backend and Host-daemon source owner; Authorized Host/API operator
-
-**Next:** The Backend and Host-daemon source owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-f0787eb7f15682e3 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-f0787eb7f15682e3 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Quick Lookup](http://127.0.0.1:4000/host/machine-errors#quick-lookup) — `MCL-8644eedd5436393a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `CUDA is not available` | Driver/runtime/container CUDA visibility | [CUDA unavailable](#cuda-unavailable) |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Quick Lookup](http://127.0.0.1:4000/host/machine-errors#quick-lookup) — `MCL-f0f80d6abe9fe6ca`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `nccl_failed`, NCCL initialization, sync, or communicator error | Multi-GPU communication | [NCCL failed](#nccl-failed) |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Backend and Host-daemon source owner; Authorized Host/API operator
-
-**Next:** The Backend and Host-daemon source owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-f0f80d6abe9fe6ca and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-f0f80d6abe9fe6ca and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Quick Lookup](http://127.0.0.1:4000/host/machine-errors#quick-lookup) — `MCL-7ccb5cafc341757b`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `--storage-opt is supported only for overlay over xfs` | Docker storage filesystem/quota | [XFS project quota error](#xfs-project-quota-error) |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Quick Lookup](http://127.0.0.1:4000/host/machine-errors#quick-lookup) — `MCL-f4b6d52c5154f056`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Full client storage, `no space left on device` | Docker storage capacity | [Full client storage](#full-client-storage) |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Quick Lookup](http://127.0.0.1:4000/host/machine-errors#quick-lookup) — `MCL-71aa729580ef41f6`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Machine not found or not rentable | Offer/listing/rentability state | [Machine not rentable](#machine-not-rentable) |
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-71aa729580ef41f6 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Quick Lookup](http://127.0.0.1:4000/host/machine-errors#quick-lookup) — `MCL-496140cb2d389f83`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Red machine error / unhealthy / deverified | Machine health or platform state | [Generic red machine error](#generic-red-machine-error) |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Backend and Host-daemon source owner; Authorized Host/API operator
-
-**Next:** The Backend and Host-daemon source owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-496140cb2d389f83 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-496140cb2d389f83 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Quick Lookup](http://127.0.0.1:4000/host/machine-errors#quick-lookup) — `MCL-84bd956810d5bdb4`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `<admin-set>` | Manual Vast admin review flag | [Admin-set machine error](#admin-set-machine-error) |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Backend and Host-daemon source owner; Authorized Host/API operator
-
-**Next:** The Backend and Host-daemon source owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-84bd956810d5bdb4 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-84bd956810d5bdb4 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Quick Lookup](http://127.0.0.1:4000/host/machine-errors#quick-lookup) — `MCL-d20593d74e807618`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | IOMMU, GDM, machine does not support VMs, VM memory preflight, or VM secrets HTTP 401 | VM host support | [VM offer errors](#vm-offer-errors) |
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-d20593d74e807618 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Quick Lookup](http://127.0.0.1:4000/host/machine-errors#quick-lookup) — `MCL-3958c0b2b3b026e1`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Container create, build, volume, template update, or secrets-service message | Single rental attempt | [Rental-attempt messages](#rental-attempt-messages) |
-
-**Required proof:** Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Authorized Host/API operator
-
-**Next:** An authorized Host/API operator runs only an approved representative check for MCL-3958c0b2b3b026e1 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
+**Next:** The retained support-tools guide contains the exact bad bandwidthtest2 label and its reporter groups bandwidthtest messages, but neither establishes the full GPU-transfer/PCIe diagnostic meaning. The fetched Hanran catalog does not define this legacy label. Inspect its daemon/test emitter or obtain a focused owner definition; no induced hardware fault is required.
 
 ### [Port Networking Issues](http://127.0.0.1:4000/host/machine-errors#port-networking-issues) — `MCL-175aab07d4c371cb`
 
@@ -18120,20 +14158,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-898d18582a016b61 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [CDI Device Injection](http://127.0.0.1:4000/host/machine-errors#cdi-device-injection) — `MCL-4880790be6ba445f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** If Docker reports that direct `--gpus` or CDI-hook invocation is unsupported, use the registered `nvidia` runtime form above.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [CDI Device Injection](http://127.0.0.1:4000/host/machine-errors#cdi-device-injection) — `MCL-fc67724b38d97c59`
 
 **Status:** UNVALIDATED
@@ -18148,48 +14172,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** The Backend and Host-daemon source owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-fc67724b38d97c59 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-fc67724b38d97c59 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Docker Runtime Configuration](http://127.0.0.1:4000/host/machine-errors#docker-runtime-configuration) — `MCL-54edb13fe8c0e5d0`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** `unknown or invalid runtime nvidia` usually means Docker cannot use the NVIDIA runtime.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Docker Runtime Configuration](http://127.0.0.1:4000/host/machine-errors#docker-runtime-configuration) — `MCL-a8d6bba43add3bdb`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** `unknown flag: runtime` means the Docker command rejected the `--runtime` option. This can happen if the command is being handled by a nonstandard wrapper or incompatible Docker path.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Docker Runtime Configuration](http://127.0.0.1:4000/host/machine-errors#docker-runtime-configuration) — `MCL-806f2d92f1fa26f2`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** The final command requires Docker-daemon access; use interactive `sudo` when the operator is not in the `docker` group. An exit status of `1` from `grep` means no matching runtime was found.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [Docker Runtime Configuration](http://127.0.0.1:4000/host/machine-errors#docker-runtime-configuration) — `MCL-2c23637ddcc30c0f`
 
 **Status:** UNVALIDATED
@@ -18203,20 +14185,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-2c23637ddcc30c0f and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Docker Daemon Unavailable](http://127.0.0.1:4000/host/machine-errors#docker-daemon-unavailable) — `MCL-756a4e6e0e2c7633`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** `Cannot connect to the Docker daemon` means the host software could not talk to Docker.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [Docker Daemon Unavailable](http://127.0.0.1:4000/host/machine-errors#docker-daemon-unavailable) — `MCL-714ae351589eca7c`
 
@@ -18442,20 +14410,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-ef226b48044d21cb and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [NCCL Failed](http://127.0.0.1:4000/host/machine-errors#nccl-failed) — `MCL-281a990a183c3268`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** On HGX, DGX, or other NVSwitch systems, also check Fabric Manager/NVLSM on the host. The self-test container can show NCCL symptoms, but it cannot prove host service state:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [NCCL Failed](http://127.0.0.1:4000/host/machine-errors#nccl-failed) — `MCL-c9ccf1cbdcadfa35`
 
 **Status:** UNVALIDATED
@@ -18469,20 +14423,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-c9ccf1cbdcadfa35 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [NCCL Failed](http://127.0.0.1:4000/host/machine-errors#nccl-failed) — `MCL-d35784fe85b17d51`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Canonical entry (including NVSwitch/Fabric Manager checks): [Self-Test Reference: nccl_failed](/host/self-test-reference#nccl-failed).
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [XFS Project Quota Error](http://127.0.0.1:4000/host/machine-errors#xfs-project-quota-error) — `MCL-7fe0bdcfe4fa3da6`
 
@@ -18511,20 +14451,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Backend and Host-daemon source owner; Authorized Host/API operator
 
 **Next:** The Backend and Host-daemon source owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-d5fcb8a06ce549a2 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-d5fcb8a06ce549a2 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Full Client Storage](http://127.0.0.1:4000/host/machine-errors#full-client-storage) — `MCL-f3e7dae0a707f1d0`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Full client storage, `no space left on device`, or missing expected disk space usually means Docker storage is full, mounted on the wrong disk, or still holding images, stopped containers, volumes, or expired rental data.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [Full Client Storage](http://127.0.0.1:4000/host/machine-errors#full-client-storage) — `MCL-75f7b6edfb04fc5b`
 
@@ -18722,20 +14648,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** The Backend and Host-daemon source owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-2dbb1d41349b8114 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-2dbb1d41349b8114 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [VM Offer Errors](http://127.0.0.1:4000/host/machine-errors#vm-offer-errors) — `MCL-165460e8dbaacce7`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `Error: unable to complete out-of-memory-check` | VM preflight could not confirm enough usable host memory. | Check host RAM pressure, reserved memory, and whether too many workloads are active. |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [VM Offer Errors](http://127.0.0.1:4000/host/machine-errors#vm-offer-errors) — `MCL-4511e3b198ae9a50`
 
 **Status:** UNVALIDATED
@@ -18778,20 +14690,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-ab31bf43a2b6cd2b and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Rental-Attempt Messages](http://127.0.0.1:4000/host/machine-errors#rental-attempt-messages) — `MCL-a559e069a733c192`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `Error: Internal error.` | Unexpected internal error while creating the container. |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [Rental-Attempt Messages](http://127.0.0.1:4000/host/machine-errors#rental-attempt-messages) — `MCL-7b3c8ca9f59a413c`
 
 **Status:** UNVALIDATED
@@ -18820,20 +14718,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** The Backend and Host-daemon source owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-73db49b7b2c4fc5e and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-73db49b7b2c4fc5e and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Rental-Attempt Messages](http://127.0.0.1:4000/host/machine-errors#rental-attempt-messages) — `MCL-da4576c44bad0b29`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `docker_build(): <inner error>` | Docker build failed and wrapped the build's own output. |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [Rental-Attempt Messages](http://127.0.0.1:4000/host/machine-errors#rental-attempt-messages) — `MCL-61dc6504bbafba73`
 
 **Status:** UNVALIDATED
@@ -18847,20 +14731,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-61dc6504bbafba73 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Rental-Attempt Messages](http://127.0.0.1:4000/host/machine-errors#rental-attempt-messages) — `MCL-961b88428e7ab8b0`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `unknown` | The failed operation did not provide a more specific message. |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [Rental-Attempt Messages](http://127.0.0.1:4000/host/machine-errors#rental-attempt-messages) — `MCL-b84456f5e7e04f49`
 
@@ -18876,20 +14746,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** The Backend and Host-daemon source owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-b84456f5e7e04f49 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-b84456f5e7e04f49 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Rental-Attempt Messages](http://127.0.0.1:4000/host/machine-errors#rental-attempt-messages) — `MCL-4f12ad8bf75543d3`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `Secrets fetch failed: empty response` | The secrets service returned an empty body. |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [Rental-Attempt Messages](http://127.0.0.1:4000/host/machine-errors#rental-attempt-messages) — `MCL-b62adcd1cd777086`
 
 **Status:** UNVALIDATED
@@ -18903,76 +14759,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-b62adcd1cd777086 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Rental-Attempt Messages](http://127.0.0.1:4000/host/machine-errors#rental-attempt-messages) — `MCL-fcfa473622135a42`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `Secrets fetch failed: bad request (HTTP 400)` | The secrets request was malformed. |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Rental-Attempt Messages](http://127.0.0.1:4000/host/machine-errors#rental-attempt-messages) — `MCL-cfbc1ebcaea8a51c`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `Secrets fetch rate limited (HTTP 429)` | The secrets service rate-limited the request. |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Rental-Attempt Messages](http://127.0.0.1:4000/host/machine-errors#rental-attempt-messages) — `MCL-a5c03528d88f45f6`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `Secrets fetch failed: server error (HTTP <code>)` | The secrets service returned a 5xx server error. |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Rental-Attempt Messages](http://127.0.0.1:4000/host/machine-errors#rental-attempt-messages) — `MCL-08717c2cb481b0ca`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `Secrets fetch failed: unexpected HTTP <code>` | The secrets service returned another non-success status. |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Rental-Attempt Messages](http://127.0.0.1:4000/host/machine-errors#rental-attempt-messages) — `MCL-decd53fd86502f29`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | `Secrets fetch JSON parse error` | The secrets response was not valid JSON. |
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [Rental-Attempt Messages](http://127.0.0.1:4000/host/machine-errors#rental-attempt-messages) — `MCL-3ee913b70e4ab694`
 
@@ -18988,20 +14774,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-3ee913b70e4ab694 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [What To Collect](http://127.0.0.1:4000/host/machine-errors#what-to-collect) — `MCL-e3dbeb7aa010c7e5`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Exact error string and screenshot.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [What To Collect](http://127.0.0.1:4000/host/machine-errors#what-to-collect) — `MCL-0bb4b4207417a122`
 
 **Status:** UNVALIDATED
@@ -19015,20 +14787,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-0bb4b4207417a122 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [What To Collect](http://127.0.0.1:4000/host/machine-errors#what-to-collect) — `MCL-0aeb0b73ffda8457`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Timestamp with timezone.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [What To Collect](http://127.0.0.1:4000/host/machine-errors#what-to-collect) — `MCL-c070a8fa137e5f89`
 
@@ -19071,20 +14829,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Backend and Host-daemon source owner; Authorized Host/API operator
 
 **Next:** The Backend and Host-daemon source owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-89246d7d44a43b34 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-89246d7d44a43b34 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [What To Collect](http://127.0.0.1:4000/host/machine-errors#what-to-collect) — `MCL-df0057a65286eb13`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Self-test support bundle if the error came from self-test.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [What To Collect](http://127.0.0.1:4000/host/machine-errors#what-to-collect) — `MCL-5b36a92449f328a5`
 
@@ -19158,34 +14902,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Obtain network-owner confirmation before publishing a stronger diagnosis.
 
-### [Check basic connectivity](http://127.0.0.1:4000/host/machine-offline#check-basic-connectivity) — `CUR-097897b950a25c64`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash ping -c 4 1.1.1.1 ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Check basic connectivity](http://127.0.0.1:4000/host/machine-offline#check-basic-connectivity) — `CUR-848fef3fdd4eee35`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ``` PING 1.1.1.1 (1.1.1.1) 56(84) bytes of data. 64 bytes from 1.1.1.1: icmp_seq=1 ttl=56 time=35.7 ms 64 bytes from 1.1.1.1: icmp_seq=2 ttl=56 time=36.0 ms 64 bytes from 1.1.1.1: icmp_seq=3 ttl=56 time=35.7 ms 64 bytes from 1.1.1.1: icmp_seq=4 ttl=56 time=35.9 ms  --- 1.1.1.1 ping statistics --- 4 packets transmitted, 4 received, 0% packet loss, time 3005ms rtt min/avg/max/mdev = 35.681/35.806/35.962/0.109 ms ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [Check basic connectivity](http://127.0.0.1:4000/host/machine-offline#check-basic-connectivity) — `CHC-MACHINE-OFFLINE-ICMP-OUTAGE-01`
 
 **Status:** UNVALIDATED
@@ -19213,34 +14929,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Host implementation source owner
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Check DNS resolution](http://127.0.0.1:4000/host/machine-offline#check-dns-resolution) — `CUR-a6fb4be482b49cc3`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash nslookup vast.ai ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Check DNS resolution](http://127.0.0.1:4000/host/machine-offline#check-dns-resolution) — `CUR-201737b41ce0ff38`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ``` Server:		127.0.0.53 Address:	127.0.0.53  Non-authoritative answer: Name:	vast.ai Address: 76.76.21.21 ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [Check DNS resolution](http://127.0.0.1:4000/host/machine-offline#check-dns-resolution) — `CHC-MACHINE-OFFLINE-DNS-SCOPE-01`
 
@@ -19270,34 +14958,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Obtain network-owner confirmation before publishing a stronger conclusion about protocol, inbound reachability, or NAT behavior.
 
-### [Check your public IPv4 address](http://127.0.0.1:4000/host/machine-offline#check-your-public-ipv4-address) — `CUR-bd934e556fa399f2`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash curl -4 ifconfig.me ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Check your public IPv4 address](http://127.0.0.1:4000/host/machine-offline#check-your-public-ipv4-address) — `CUR-8ab6037f36301981`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ``` 203.0.113.45 ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [Check your public IPv4 address](http://127.0.0.1:4000/host/machine-offline#check-your-public-ipv4-address) — `CHC-MACHINE-OFFLINE-EGRESS-SCOPE-01`
 
 **Status:** UNVALIDATED
@@ -19326,62 +14986,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Obtain network-owner confirmation before publishing a stronger gate or prescribing a configuration change.
 
-### [2. Confirm the Vastai Service Is Running](http://127.0.0.1:4000/host/machine-offline#2-confirm-the-vastai-service-is-running) — `CUR-b36aa1c240836460`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Check the current status:
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [2. Confirm the Vastai Service Is Running](http://127.0.0.1:4000/host/machine-offline#2-confirm-the-vastai-service-is-running) — `CUR-651294992dada22c`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo systemctl status vastai ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [2. Confirm the Vastai Service Is Running](http://127.0.0.1:4000/host/machine-offline#2-confirm-the-vastai-service-is-running) — `CUR-ebd77d25aa1975ef`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Example output when the service is running normally:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [2. Confirm the Vastai Service Is Running](http://127.0.0.1:4000/host/machine-offline#2-confirm-the-vastai-service-is-running) — `CUR-b4953b096644b00f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ``` ● vastai.service - Vast.ai Host Daemon      Loaded: loaded (/etc/systemd/system/vastai.service; enabled; preset: enabl>      Active: active (running) since Tue 2026-08-04 07:47:51 +07; 6h ago    Main PID: 2966 (launch_kaalia.s)       Tasks: 2 (limit: 143635)      Memory: 3.5G (peak: 6.5G)         CPU: 5min 41.404s      CGroup: /system.slice/vastai.service              ├─2966 /bin/bash /var/lib/vastai_kaalia/latest/launch_kaalia.sh              └─2975 /var/lib/vastai_kaalia/latest/kaalia backend=DKR installpat> ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [2. Confirm the Vastai Service Is Running](http://127.0.0.1:4000/host/machine-offline#2-confirm-the-vastai-service-is-running) — `CUR-3e9c3f0a0d28565c`
 
 **Status:** UNVALIDATED
@@ -19395,20 +14999,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Host implementation source owner
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [2. Confirm the Vastai Service Is Running](http://127.0.0.1:4000/host/machine-offline#2-confirm-the-vastai-service-is-running) — `CUR-e68bd48f2d0e208a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - **`since Tue 2026-08-04 07:47:51 +07; 6h ago`** shows when the service last started and how long it has been running continuously — here, 6 hours without interruption, which is a good sign of stability.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [2. Confirm the Vastai Service Is Running](http://127.0.0.1:4000/host/machine-offline#2-confirm-the-vastai-service-is-running) — `CUR-c0bec3766bdb0a10`
 
@@ -19437,20 +15027,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Host implementation source owner
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Verify GPUs are detected](http://127.0.0.1:4000/host/machine-offline#verify-gpus-are-detected) — `CUR-c2b72b6b624b25d7`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash nvidia-smi ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [Verify GPUs are detected](http://127.0.0.1:4000/host/machine-offline#verify-gpus-are-detected) — `CUR-0addbc76f63fb716`
 
@@ -19494,20 +15070,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [Verify GPUs are detected](http://127.0.0.1:4000/host/machine-offline#verify-gpus-are-detected) — `CUR-e89f14f59bbe9fdf`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - **`NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver`** — the driver is not loaded or is broken, often after a kernel/OS update. The GPUs are invisible to the system.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [Verify GPUs are detected](http://127.0.0.1:4000/host/machine-offline#verify-gpus-are-detected) — `CUR-4636f4d6c214e904`
 
 **Status:** UNVALIDATED
@@ -19550,20 +15112,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [Verify GPUs are detected](http://127.0.0.1:4000/host/machine-offline#verify-gpus-are-detected) — `CUR-c229d76db9f47b74`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** If the service is not running, or GPUs are not detected correctly, investigate the root cause with the commands below.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
 ### [Debugging commands](http://127.0.0.1:4000/host/machine-offline#debugging-commands) — `CUR-8b865255449728fc`
 
 **Status:** UNVALIDATED
@@ -19577,20 +15125,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Host implementation source owner
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Debugging commands](http://127.0.0.1:4000/host/machine-offline#debugging-commands) — `CUR-5b4120877294038d`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo systemctl start vastai ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [Debugging commands](http://127.0.0.1:4000/host/machine-offline#debugging-commands) — `CUR-4e4a5d713a085289`
 
@@ -19606,48 +15140,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [Debugging commands](http://127.0.0.1:4000/host/machine-offline#debugging-commands) — `CUR-546b560d7396ac07`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo systemctl status vastai ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Debugging commands](http://127.0.0.1:4000/host/machine-offline#debugging-commands) — `CUR-958cf6cbe25a6f9a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Show the last 100 lines of the Vastai daemon log. This is where the actual error text is written — look for messages logged right before the service exited or crashed:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Debugging commands](http://127.0.0.1:4000/host/machine-offline#debugging-commands) — `CUR-ee46b4e9a6417e1a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo tail -n 100 /var/lib/vastai_kaalia/kaalia.log ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [Debugging commands](http://127.0.0.1:4000/host/machine-offline#debugging-commands) — `CUR-5e261e22f3037d9f`
 
 **Status:** UNVALIDATED
@@ -19662,20 +15154,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [Debugging commands](http://127.0.0.1:4000/host/machine-offline#debugging-commands) — `CUR-008dd7b297cfe335`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash nvidia-smi -q ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [Debugging commands](http://127.0.0.1:4000/host/machine-offline#debugging-commands) — `CUR-34004fe300a0faf7`
 
 **Status:** UNVALIDATED
@@ -19689,48 +15167,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Host implementation source owner
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [Debugging commands](http://127.0.0.1:4000/host/machine-offline#debugging-commands) — `CUR-cbc7aaf13af05a1f`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo dmesg -T | grep -iE 'nvrm|nvidia|xid|pcie|aer' ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Debugging commands](http://127.0.0.1:4000/host/machine-offline#debugging-commands) — `CUR-9216e1cdd3e0869b`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Search the kernel logs for the current boot for the same NVIDIA/PCIe error patterns. Unlike `dmesg`, this survives ring-buffer overflow, so it catches errors that happened hours ago:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Debugging commands](http://127.0.0.1:4000/host/machine-offline#debugging-commands) — `CUR-8deeeeeae7529d2e`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo journalctl -k -b | grep -iE 'nvrm|nvidia|xid|pcie|aer' ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [Debugging commands](http://127.0.0.1:4000/host/machine-offline#debugging-commands) — `CUR-ca09b3f30eb6d5d6`
 
@@ -19816,34 +15252,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [3. Reset the Controller Connection and Restart Vastai](http://127.0.0.1:4000/host/machine-offline#3-reset-the-controller-connection-and-restart-vastai) — `CUR-8123840c36bb1246`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Confirm the service remains active:
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [3. Reset the Controller Connection and Restart Vastai](http://127.0.0.1:4000/host/machine-offline#3-reset-the-controller-connection-and-restart-vastai) — `CUR-86bd3f3370a7484d`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo systemctl status vastai ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [4. Contact Vast.ai Support](http://127.0.0.1:4000/host/machine-offline#4-contact-vast-ai-support) — `CUR-06afcf42bf6900b0`
 
 **Status:** UNVALIDATED
@@ -19886,20 +15294,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [4. Contact Vast.ai Support](http://127.0.0.1:4000/host/machine-offline#4-contact-vast-ai-support) — `CUR-5b27db1b2c1d625e`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - Whether the host has active Docker or VM rentals.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
 ### [4. Contact Vast.ai Support](http://127.0.0.1:4000/host/machine-offline#4-contact-vast-ai-support) — `CUR-f210173a9f4efb8e`
 
 **Status:** UNVALIDATED
@@ -19914,34 +15308,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
 
-### [4. Contact Vast.ai Support](http://127.0.0.1:4000/host/machine-offline#4-contact-vast-ai-support) — `CUR-289bb4892fc1ed78`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Current state of the Vastai service — tells Support whether the daemon is running, stopped, or crash-looping, and for how long:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [4. Contact Vast.ai Support](http://127.0.0.1:4000/host/machine-offline#4-contact-vast-ai-support) — `CUR-be15e303131a0f07`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash sudo systemctl status vastai ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [4. Contact Vast.ai Support](http://127.0.0.1:4000/host/machine-offline#4-contact-vast-ai-support) — `CUR-3783409b714de742`
 
 **Status:** UNVALIDATED
@@ -19955,48 +15321,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Host implementation source owner
 
 **Next:** Bind an exact canonical source, authorized runtime observation, or accountable-owner decision before changing status.
-
-### [4. Contact Vast.ai Support](http://127.0.0.1:4000/host/machine-offline#4-contact-vast-ai-support) — `CUR-3ab39720adfd3881`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** ```bash nvidia-smi ```
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [4. Contact Vast.ai Support](http://127.0.0.1:4000/host/machine-offline#4-contact-vast-ai-support) — `CUR-a8e9eacd3b6e388b`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - The full Vastai daemon log file: `/var/lib/vastai_kaalia/kaalia.logX`
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [4. Contact Vast.ai Support](http://127.0.0.1:4000/host/machine-offline#4-contact-vast-ai-support) — `CUR-7c0d43b9bed78244`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Please redact any passwords, private keys, API keys, tokens, customer information, or other sensitive data before sharing logs.
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
 
 ## [Datacenter Status](http://127.0.0.1:4000/host/datacenter-status)
 
@@ -20728,11 +16052,11 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Required proof:** Canonical Implementation Source
 
-**Existing proof / limit:** No retained proof
+**Existing proof / limit:** [SOURCE-FAMILY-MCL-b106578dbaccc269-1](evidence/2026-09-15-host-unvalidated-source-families-attempt-01/s2-s3/cli-vastai_cli_commands_offers.py-25-35.txt) — Exact retained selector; source/runtime boundary is stated in the passage review.; [SOURCE-FAMILY-MCL-b106578dbaccc269-2](evidence/2026-09-15-host-unvalidated-source-families-attempt-01/s2-s3/context-review.json) — Exact retained selector; source/runtime boundary is stated in the passage review.
 
 **Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
 
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
+**Next:** The checked CLI search ordering is not the console AutoSort algorithm. No retained owner definition or exact console implementation in this review establishes default selection, ranking inputs and randomness together. Obtain the AutoSort implementation/owner definition; a command search result is insufficient.
 
 ### [CGNAT](http://127.0.0.1:4000/host/glossary#cgnat) — `MCL-d992675b43bdcf7f`
 
@@ -20776,34 +16100,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-51df0d3231b1cd10 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [DLPerf](http://127.0.0.1:4000/host/glossary#dlperf) — `MCL-1cd1cc2855505c7e`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Vast's estimated deep-learning performance score for comparing machines. See [DLPerf scoring](/guides/reference/faq/rental-types#dlperf-scoring).
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [DPH](http://127.0.0.1:4000/host/glossary#dph) — `MCL-1bcb7e2c373afcd2`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Dollars per hour, usually the hourly GPU compute price. See [Pricing Your Listing](/host/pricing-your-listing).
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [Instance](http://127.0.0.1:4000/host/glossary#instance) — `MCL-77aaa70c71e8414a`
 
 **Status:** UNVALIDATED
@@ -20831,20 +16127,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-73ed4f2f89d6a3d6 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [kaalia](http://127.0.0.1:4000/host/glossary#kaalia) — `MCL-2fd86ac820a14d5d`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** The Vast host daemon that runs as a systemd service. See [Host Diagnostics](/host/common-errors-diagnostics#logs).
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ### [Machines tab](http://127.0.0.1:4000/host/glossary#machines-tab) — `MCL-38d3e256db801f2f`
 
@@ -21000,20 +16282,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-78770a59873b66e2 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [vericode](http://127.0.0.1:4000/host/glossary#vericode) — `MCL-4fbce74c8314d7c9`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** A numeric verification-status signal used on offers.
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ### [vericode](http://127.0.0.1:4000/host/glossary#vericode) — `MCL-6d3078c053d4ad1d`
 
 **Status:** UNVALIDATED
@@ -21056,20 +16324,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-9d2fe906a3395548 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [XFS prjquota](http://127.0.0.1:4000/host/glossary#xfs-prjquota) — `MCL-8f9043e6471f67c1`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** XFS project quotas used for per-container storage limits. See [Storage Setup](/host/storage-setup#xfs-prjquota).
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
 ## [Host CLI/API/SDK](http://127.0.0.1:4000/host/cli-api-sdk)
 
 ### [Introduction](http://127.0.0.1:4000/host/cli-api-sdk) — `MCL-d692c68e7a18cf61`
@@ -21100,202 +16354,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 
 **Next:** The Teams and account engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-eaa89f1e15e2195a and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-eaa89f1e15e2195a and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
 
-### [Start With Authentication](http://127.0.0.1:4000/host/cli-api-sdk#start-with-authentication) — `MCL-32d82f5e40edc067`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - [Install the Vast CLI](https://cloud.vast.ai/cli/)
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Teams and account engineering owner; Authorized Host/API operator
-
-**Next:** The Teams and account engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-32d82f5e40edc067 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-32d82f5e40edc067 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Start With Authentication](http://127.0.0.1:4000/host/cli-api-sdk#start-with-authentication) — `MCL-0eacd4728ea36c84`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Use an API key from the account or team that owns the hosted machines. For host-specific key guidance, see [Host Account Security](/host/account-security-for-hosts).
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Common Host Workflows](http://127.0.0.1:4000/host/cli-api-sdk#common-host-workflows) — `MCL-0b44a8d35cdf9e1a`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Check machine state | [show machines](/cli/reference/show-machines), [show machine](/cli/reference/show-machine) | [show_machines](/sdk/python/reference/show-machines), [show_machine](/sdk/python/reference/show-machine) |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Teams and account engineering owner; Authorized Host/API operator
-
-**Next:** The Teams and account engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-0b44a8d35cdf9e1a and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-0b44a8d35cdf9e1a and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Common Host Workflows](http://127.0.0.1:4000/host/cli-api-sdk#common-host-workflows) — `MCL-31780c80ae3cac80`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | List or unlist machines | [list machines](/cli/reference/list-machines), [unlist machine](/cli/reference/unlist-machine) | [list_machines](/sdk/python/reference/list-machines), [unlist_machine](/sdk/python/reference/unlist-machine) |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Teams and account engineering owner; Authorized Host/API operator
-
-**Next:** The Teams and account engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-31780c80ae3cac80 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-31780c80ae3cac80 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Common Host Workflows](http://127.0.0.1:4000/host/cli-api-sdk#common-host-workflows) — `MCL-39d956b828a766be`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Run self-test | [self-test machine](/cli/reference/self-test-machine) | [self_test_machine](/sdk/python/reference/self-test-machine) |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Teams and account engineering owner; Authorized Host/API operator
-
-**Next:** The Teams and account engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-39d956b828a766be and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-39d956b828a766be and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Common Host Workflows](http://127.0.0.1:4000/host/cli-api-sdk#common-host-workflows) — `MCL-d078ec43af5e7a28`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Repair or clean up | [cleanup machine](/cli/reference/cleanup-machine), [defrag machines](/cli/reference/defrag-machines) | [cleanup_machine](/sdk/python/reference/cleanup-machine), [defrag_machines](/sdk/python/reference/defrag-machines) |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Teams and account engineering owner; Authorized Host/API operator
-
-**Next:** The Teams and account engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-d078ec43af5e7a28 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-d078ec43af5e7a28 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Common Host Workflows](http://127.0.0.1:4000/host/cli-api-sdk#common-host-workflows) — `MCL-d09f027e5f9f7b07`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** | Market context | [metrics gpu](/cli/reference/metrics-gpu), [metrics gpu-trends](/cli/reference/metrics-gpu-trends), [metrics gpu-locations](/cli/reference/metrics-gpu-locations) | Use the general SDK/API reference where available. |
-
-**Required proof:** Canonical Implementation Source, Runtime Or Ui Observation
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Teams and account engineering owner; Authorized Host/API operator
-
-**Next:** The Teams and account engineering owner supplies the exact repository, revision, path, and symbol/operation locator; bind it to MCL-d09f027e5f9f7b07 and retain the focused source check. An authorized Host/API operator runs only an approved representative check for MCL-d09f027e5f9f7b07 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Day-To-Day Host Usage](http://127.0.0.1:4000/host/cli-api-sdk#day-to-day-host-usage) — `MCL-94bb4bab675fa0c6`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Most hosts use the CLI or SDK for:
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Day-To-Day Host Usage](http://127.0.0.1:4000/host/cli-api-sdk#day-to-day-host-usage) — `MCL-34aff665d1e50aaa`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - rerunning self-test after a fix
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
-
-### [Day-To-Day Host Usage](http://127.0.0.1:4000/host/cli-api-sdk#day-to-day-host-usage) — `MCL-119bcf4f43e4cb51`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - checking whether machines are listed, rented, or reporting errors
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [Day-To-Day Host Usage](http://127.0.0.1:4000/host/cli-api-sdk#day-to-day-host-usage) — `MCL-ea667318b74d816b`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - listing, unlisting, or repricing machines
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [Day-To-Day Host Usage](http://127.0.0.1:4000/host/cli-api-sdk#day-to-day-host-usage) — `MCL-403d274d53dcff55`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - scheduling and canceling maintenance
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [Day-To-Day Host Usage](http://127.0.0.1:4000/host/cli-api-sdk#day-to-day-host-usage) — `MCL-07e440c43f3b61fb`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - cleaning stale storage
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
-### [Day-To-Day Host Usage](http://127.0.0.1:4000/host/cli-api-sdk#day-to-day-host-usage) — `MCL-5ce91758cdd42a6d`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** - operating several machines from one workstation
-
-**Required proof:** Repository Static Check, Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation reviewer; technical-source reviewer for factual inputs
-
-**Next:** Review the recommendation and its safety limits. Check any named feature or factual input against a primary technical source. This does not prove a device is safe, a machine is eligible, or a support request will succeed.
-
 ### [Automation Notes](http://127.0.0.1:4000/host/cli-api-sdk#automation-notes) — `MCL-963235c71bdb0ca9`
 
 **Status:** UNVALIDATED
@@ -21309,20 +16367,6 @@ Current dispositions: 2008 occurrences (392 PASS, 87 editorial NOT_APPLICABLE, 1
 **Responsible role:** Authorized Host/API operator
 
 **Next:** An authorized Host/API operator runs only an approved representative check for MCL-963235c71bdb0ca9 and retains inputs, outputs/UI state, environment identity, timestamps, and cleanup evidence.
-
-### [Automation Notes](http://127.0.0.1:4000/host/cli-api-sdk#automation-notes) — `MCL-b3e9fdd5c4698cd3`
-
-**Status:** UNVALIDATED
-
-**Literal source text:** Do not paste API keys into shared scripts, tickets, screenshots, or public channels. If a key is exposed, rotate it from the [Keys page](/guides/reference/keys).
-
-**Required proof:** Canonical Implementation Source
-
-**Existing proof / limit:** No retained proof
-
-**Responsible role:** Documentation technical-source reviewer; implementation source owner only for an unavailable or unclear definition
-
-**Next:** Find the exact definition or instruction in canonical code, an API schema, configuration or primary tool documentation. Compare each option, unit, limit and safety condition with this passage. Use a separate retained result if claiming that the operation ran or succeeded.
 
 ## [Hosting Agreement](http://127.0.0.1:4000/host/hosting-agreement)
 

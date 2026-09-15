@@ -64,14 +64,19 @@ def selection(raw, pointer):
 
 def index(model): return {c['id']:c for p in model['pages'] for c in p['claims']}
 
-def project(root: Path):
-    root=root.resolve();registry=json.loads(pin(root,REGISTRY,REGISTRY_SHA256))
+def project(root: Path, frozen_source_overrides=None):
+    root=root.resolve()
+    def read(ref):
+        return (frozen_source_overrides or {})[ref] if ref in (frozen_source_overrides or {}) else safe(root,ref).read_bytes()
+    def bound(ref, wanted):
+        value=read(ref);req(sha(value)==wanted,'digest drift '+ref);return value
+    registry=json.loads(bound(REGISTRY,REGISTRY_SHA256))
     req(set(registry)=={'schema_version','record_type','generated_at','baseline','sources','artifacts','transitions','retirements','original_findings','limits'},'registry keys')
     req(registry['schema_version']=='1.0' and registry['record_type']=='HOST_CLOSURE_CORRECTION','registry type')
     req(registry['baseline']=={'path':BASELINE,'sha256':BASELINE_SHA256},'baseline substitution')
-    baseline=json.loads(pin(root,BASELINE,BASELINE_SHA256));old=index(baseline)
-    evidence_inventory=json.loads(pin(root,EVIDENCE_ATTEMPT+'/inventory.json',EVIDENCE_INVENTORY_SHA256))
-    evidence_scope=json.loads(pin(root,EVIDENCE_ATTEMPT+'/integration-scope.json',EVIDENCE_SCOPE_SHA256))
+    baseline=json.loads(bound(BASELINE,BASELINE_SHA256));old=index(baseline)
+    evidence_inventory=json.loads(bound(EVIDENCE_ATTEMPT+'/inventory.json',EVIDENCE_INVENTORY_SHA256))
+    evidence_scope=json.loads(bound(EVIDENCE_ATTEMPT+'/integration-scope.json',EVIDENCE_SCOPE_SHA256))
     req(set(evidence_scope['accepted_ids'])==EVIDENCE_REVIEW and set(evidence_scope['corrected_ids'])==EVIDENCE_CORRECTED and set(evidence_scope['decisions'])==EVIDENCE_REVIEW,'evidence review inventory')
     req(set(evidence_scope['candidate_ids'])==set(evidence_inventory['scope_claim_ids']) and len(evidence_inventory['claims'])==23,'frozen evidence inventory')
     evidence_prior={item['claim']['id']:item['claim'] for item in evidence_inventory['claims']}
@@ -80,16 +85,16 @@ def project(root: Path):
     for source in evidence_scope['before_sources']:
         ref=source['path'];req(ref in {'host/fleet-operations.mdx','host/self-test-reference.mdx'} and ref not in evidence_before,'evidence source scope')
         req(source['before_artifact']['path']==EVIDENCE_ATTEMPT+'/sources-before/'+ref,'evidence source snapshot path')
-        evidence_before[ref]=pin(root,source['before_artifact']['path'],source['before_artifact']['sha256'])
-        pin(root,ref,source['after_sha256'])
+        evidence_before[ref]=bound(source['before_artifact']['path'],source['before_artifact']['sha256'])
+        bound(ref,source['after_sha256'])
     req(set(evidence_before)=={'host/fleet-operations.mdx','host/self-test-reference.mdx'},'evidence source inventory')
     for ref,wanted in evidence_inventory['all_baseline_page_hashes'].items():
-        req(sha(evidence_before[ref])==wanted,'evidence frozen source drift') if ref in evidence_before else pin(root,ref,wanted)
-    inventory=json.loads(pin(root,UNCHANGED_INVENTORY,UNCHANGED_INVENTORY_SHA256))
+        req(sha(evidence_before[ref])==wanted,'evidence frozen source drift') if ref in evidence_before else bound(ref,wanted)
+    inventory=json.loads(bound(UNCHANGED_INVENTORY,UNCHANGED_INVENTORY_SHA256))
     req(set(inventory['accepted_ids'])==UNCHANGED_REVIEW and set(inventory['held_ids'])==UNCHANGED_HELD and len(inventory['candidates'])==26,'unchanged review inventory')
     req(all(item['original_claim']==old[item['claim_id']] and objhash(item['original_claim'])==item['original_claim_sha256'] for item in inventory['candidates']),'unchanged review predecessor')
     for ref,wanted in inventory['customer_mdx_sha256'].items():
-        req(sha(evidence_before[ref])==wanted,'unchanged review frozen source drift') if ref in evidence_before else pin(root,ref,wanted)
+        req(sha(evidence_before[ref])==wanted,'unchanged review frozen source drift') if ref in evidence_before else bound(ref,wanted)
     req(len(old)==2013 and len(registry['transitions'])==len(IDS) and {x['claim_id'] for x in registry['transitions']}==IDS,'transition inventory')
     req(len(registry['retirements'])==5 and {x['claim_id'] for x in registry['retirements']}==RETIRED,'retirement inventory')
     findings={x['claim_id']:x for x in registry['original_findings']}
@@ -99,7 +104,7 @@ def project(root: Path):
     for source in registry['sources']:
         ref=source['path'];req(ref.startswith('host/') and ref not in before,'source scope')
         req(source['before_artifact']['path']==(EVIDENCE_ATTEMPT if ref=='host/fleet-operations.mdx' else ATTEMPT_02 if ref in {'host/glossary.mdx','host/maintenance-windows.mdx','host/hosting-agreement.mdx'} else ATTEMPT)+'/sources-before/'+ref,'source snapshot path')
-        before[ref]=pin(root,source['before_artifact']['path'],source['before_artifact']['sha256']);current[ref]=pin(root,ref,source['after_sha256']);after_hashes[ref]=sha(current[ref])
+        before[ref]=bound(source['before_artifact']['path'],source['before_artifact']['sha256']);current[ref]=bound(ref,source['after_sha256']);after_hashes[ref]=sha(current[ref])
         oldlines,newlines=before[ref].decode().splitlines(),current[ref].decode().splitlines()
         maps[ref]=dict(source['line_map']);req(len(maps[ref])==len(source['line_map']) and len(set(maps[ref].values()))==len(maps[ref]),'duplicate line map')
         req(list(maps[ref])==sorted(maps[ref]) and list(maps[ref].values())==sorted(maps[ref].values()),'unordered line map')
@@ -108,8 +113,11 @@ def project(root: Path):
         req(set(maps[ref]).isdisjoint(oldchanged) and set(maps[ref])|oldchanged==set(range(1,len(oldlines)+1)),'before line partition')
         req(set(maps[ref].values()).isdisjoint(newchanged) and set(maps[ref].values())|newchanged==set(range(1,len(newlines)+1)),'after line partition')
     spec=importlib.util.spec_from_file_location('closure_invoice_predecessor',Path(__file__).with_name('current_host_payout_invoice_correction.py'));pre=importlib.util.module_from_spec(spec);spec.loader.exec_module(pre)
-    req(pre.project(root,frozen_source_overrides=before)==baseline,'complete sealed predecessor differs from frozen baseline')
-    artifacts={a['path']:pin(root,a['path'],a['sha256']) for a in registry['artifacts']};req(len(artifacts)==len(registry['artifacts']),'duplicate artifact')
+    # The owner registry is first bound by this closure layer; earlier source
+    # projectors accept only their complete customer-source manifest.
+    earlier_overrides={k:v for k,v in (frozen_source_overrides or {}).items() if k!='verification/current-host-owner-questions.json'}
+    req(pre.project(root,frozen_source_overrides={**earlier_overrides,**before})==baseline,'complete sealed predecessor differs from frozen baseline')
+    artifacts={a['path']:bound(a['path'],a['sha256']) for a in registry['artifacts']};req(len(artifacts)==len(registry['artifacts']),'duplicate artifact')
     def relocate(span):
         ref=span['source_file']
         if ref not in maps:return copy.deepcopy(span)
@@ -117,7 +125,7 @@ def project(root: Path):
         if None in values or values!=list(range(values[0],values[-1]+1)):return None
         return {**span,'start':values[0],'end':values[-1]}
     def verify_span(span):
-        ref=span['source_file'];raw=current.get(ref) or safe(root,ref).read_bytes();lines=raw.decode().splitlines()
+        ref=span['source_file'];raw=current.get(ref) or read(ref);lines=raw.decode().splitlines()
         req(0<span['start']<=span['end']<=len(lines),'claim span bounds')
         text='\n'.join(lines[span['start']-1:span['end']]);req(sha(text.encode())==span['text_sha256'],'claim span hash drift');return text
     out=copy.deepcopy(baseline);claims=index(out)
@@ -191,7 +199,7 @@ def project(root: Path):
     for item in expected_manifest:
         if item['path'] in evidence_before:item['sha256']=after_hashes[item['path']]
     req(out['source']['source_manifest']==expected_manifest,'evidence review source manifest drift')
-    owners=json.loads(safe(root,'verification/current-host-owner-questions.json').read_bytes());owners.pop('model_sha256')
+    owners=json.loads(read('verification/current-host-owner-questions.json'));owners.pop('model_sha256')
     req(objhash(owners)==inventory['owner_questions_without_model_hash_sha256'],'unchanged review owner question drift')
     out['counts']['claims']=len(remaining);out['counts']['claim_statuses']=dict(sorted(Counter(c['status'] for c in remaining.values()).items()));out['counts']['page_coverage_states']=dict(sorted(Counter(p['coverage_state'] for p in out['pages']).items()))
     out['generated_at']=registry['generated_at'];out['corrections'].append({'id':MARKER,'scope':'24 original findings handled: 19 narrowed corrections and 5 retired checklist clauses; 2 adjacent rental edits; 8 bounded evidence/status reconciliations; upstream PR948 and CON1531 routing; 24 unchanged source/declaration occurrences from a frozen 26-candidate inventory; bounded evidence attempt02 source corrections and retained observations','history':'Complete sealed predecessor replayed against exact frozen source bytes. Five historical FAIL objects remain in the application instruction history and frozen baseline.','current':'Two tax FAIL assertions remain open. Nine original rental FAIL assertions are retained in history after withdrawal from active prose; backend and maintenance owner questions remain open. Partial runtime observations do not promote compound workflows.','reason':registry['limits']})
