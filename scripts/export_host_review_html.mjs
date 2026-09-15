@@ -14,6 +14,7 @@ import { CLOSURE_PATH } from './current_host_closure_correction.mjs';
 import { SOURCE_FAMILY_PATH, SOURCE_FAMILY_ATTEMPT } from './current_host_source_family_review.mjs';
 import { SETUP_METRICS_PATH, SETUP_METRICS_ATTEMPT } from './current_host_setup_metrics_review.mjs';
 import { RECOVERY_EARNINGS_PATH, RECOVERY_EARNINGS_ATTEMPT } from './current_host_recovery_earnings_review.mjs';
+import { VERIFICATION_STORAGE_PATH, VERIFICATION_STORAGE_ATTEMPT } from './current_host_verification_storage_review.mjs';
 import { TEAMS_CONSOLE_PATH, TEAMS_CONSOLE_ATTEMPT } from './current_host_teams_console_review.mjs';
 import { DIAGNOSTICS_SSH_PATH, DIAGNOSTICS_SSH_ATTEMPT } from './current_host_diagnostics_ssh_review.mjs';
 import { CONTINUATION_PATH, CONTINUATION_ATTEMPT } from './current_host_continuation_review.mjs';
@@ -80,7 +81,7 @@ const earlierBaselineSummaryPath = 'verification/evidence/2026-09-07-host-curren
 const priorityPath = 'verification/HOST-DOCS-CLAIMS-TO-RESOLVE.md';
 const sha = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 const read = (ref) => {
-  if (!/^(verification|host|snippets|cli|sdk|python)\//.test(ref) || ref.split('/').includes('..')) throw new Error(`Unsafe export path: ${ref}`);
+  if ((!/^(verification|host|snippets|cli|sdk|python)\//.test(ref) && ref !== 'guides/reference/faq/rental-types.mdx') || ref.split('/').includes('..')) throw new Error(`Unsafe export path: ${ref}`);
   const resolved = fs.realpathSync(path.join(root, ref));
   if (!resolved.startsWith(root + path.sep)) throw new Error('Export symlink escapes repository');
   return fs.readFileSync(resolved);
@@ -354,7 +355,7 @@ export function buildReport() {
   const model = JSON.parse(bytes);
   const ownerQuestions = requireHostReviewOwnerQuestions({ read, model, modelSha256: sha(bytes) });
   const authorityScan = loadCurrentHostReviewTransition({ read, model });
-  const selectedResult = authorityScan?.recoveryEarnings?.resultRef || authorityScan?.setupMetrics?.resultRef || authorityScan?.teamsConsole?.resultRef || authorityScan?.diagnosticsSsh?.resultRef || authorityScan?.continuation?.resultRef || authorityScan?.evidenceReuse?.resultRef || authorityScan?.sourceFamily?.resultRef || authorityScan?.closure?.resultRef || (authorityScan?.payoutInvoice ? payoutInvoiceResultPath : (authorityScan?.payoutTerms ? payoutTermsResultPath : (authorityScan?.payoutProvider ? payoutProviderResultPath : (authorityScan?.cleanup?.resultRef || (authorityScan?.jurisdiction ? `${JURISDICTION_ATTEMPT}/result.md` : authorityScan?.terms ? `${TERMS_ATTEMPT}/result.md` : authorityScan ? `${AUTHORITY_SCAN_ATTEMPT}/result.md` : currentResultPath)))));
+  const selectedResult = authorityScan?.verificationStorage?.resultRef || authorityScan?.recoveryEarnings?.resultRef || authorityScan?.setupMetrics?.resultRef || authorityScan?.teamsConsole?.resultRef || authorityScan?.diagnosticsSsh?.resultRef || authorityScan?.continuation?.resultRef || authorityScan?.evidenceReuse?.resultRef || authorityScan?.sourceFamily?.resultRef || authorityScan?.closure?.resultRef || (authorityScan?.payoutInvoice ? payoutInvoiceResultPath : (authorityScan?.payoutTerms ? payoutTermsResultPath : (authorityScan?.payoutProvider ? payoutProviderResultPath : (authorityScan?.cleanup?.resultRef || (authorityScan?.jurisdiction ? `${JURISDICTION_ATTEMPT}/result.md` : authorityScan?.terms ? `${TERMS_ATTEMPT}/result.md` : authorityScan ? `${AUTHORITY_SCAN_ATTEMPT}/result.md` : currentResultPath)))));
   const claims = model.pages.flatMap(page => page.claims.map(claim => ({ ...claim, route: page.route, page_title: page.title })));
   const ids = new Set(claims.map(c => c.id));
   if (ids.size !== claims.length || claims.length !== model.counts.claims) throw new Error('Claim inventory mismatch');
@@ -576,6 +577,19 @@ export function buildReport() {
     for (const source of review.registry.sources) add(source.before_artifact.path, source.before_artifact.sha256);
     for (const artifact of review.registry.artifacts) add(artifact.path, artifact.sha256);
   }
+  if (authorityScan?.verificationStorage) {
+    const review = authorityScan.verificationStorage;
+    add(VERIFICATION_STORAGE_PATH, review.registrySha256);
+    add(`${VERIFICATION_STORAGE_ATTEMPT}/inventory.json`, authorityScan.artifactHashes.get(`${VERIFICATION_STORAGE_ATTEMPT}/inventory.json`));
+    add(review.registry.scope.path, review.registry.scope.sha256);
+    add(review.baseline, review.baselineSha256);
+    add(review.resultRef);
+    // The successor registry explicitly lists its approved, shareable records.
+    // Preserve earlier source-family/closure evidence above; never crawl raw
+    // captures or infer a new evidence scope from files present on disk.
+    for (const source of review.registry.sources) add(source.before_artifact.path, source.before_artifact.sha256);
+    for (const artifact of review.registry.artifacts) add(artifact.path, artifact.sha256);
+  }
   for (const ref of installationIntake.artifactRefs) add(ref);
   add(currentResultPath); add(currentAuthorityBaselinePath); add(claimCorrectionResultPath);
   for (const ref of currentAttemptArtifacts) add(ref);
@@ -611,7 +625,8 @@ export function buildReport() {
       diagnosticsSshTransitions: authorityScan?.diagnosticsSsh?.registry.transitions || [],
       teamsConsoleTransitions: authorityScan?.teamsConsole?.registry.transitions || [],
       setupMetricsTransitions: authorityScan?.setupMetrics?.registry.transitions || [],
-      recoveryEarningsTransitions: authorityScan?.recoveryEarnings?.registry.transitions || []}), (_, value) => typeof value === 'string' ? sanitize(value) : value)),
+      recoveryEarningsTransitions: authorityScan?.recoveryEarnings?.registry.transitions || [],
+      verificationStorageTransitions: authorityScan?.verificationStorage?.registry.transitions || []}), (_, value) => typeof value === 'string' ? sanitize(value) : value)),
     owner_questions: JSON.parse(JSON.stringify({ registry_ref: ownerQuestions.registryRef, registry_sha256: ownerQuestions.registrySha256,
       questions: ownerQuestions.questions }, (_, value) => typeof value === 'string' ? sanitize(value) : value)),
     cleanup_transition: authorityScan?.cleanup ? {registry_ref: 'verification/current-host-review-cleanup.json', registry_sha256: authorityScan.cleanup.registrySha256,
@@ -664,6 +679,12 @@ export function buildReport() {
       reviewed_claims:authorityScan.setupMetrics.registry.transitions.length,
       wording_corrections:authorityScan.setupMetrics.registry.transitions.filter(entry => entry.decision === 'correction').length,
       limit:authorityScan.setupMetrics.registry.limits} : null,
+    verification_storage_transition: authorityScan?.verificationStorage ? {registry_ref:VERIFICATION_STORAGE_PATH, attempt_ref:VERIFICATION_STORAGE_ATTEMPT,
+      registry_sha256:authorityScan.verificationStorage.registrySha256, baseline_ref:authorityScan.verificationStorage.baseline,
+      baseline_sha256:authorityScan.verificationStorage.baselineSha256, result_ref:authorityScan.verificationStorage.resultRef,
+      reviewed_claims:175, adjacent_pass_consistency_records:1, newly_resolved:174, transition_records:authorityScan.verificationStorage.registry.transitions.length,
+      wording_corrections:46, corrected_claim_literals:authorityScan.verificationStorage.registry.transitions.filter(entry => entry.decision === 'correction').length,
+      limit:authorityScan.verificationStorage.registry.limits} : null,
     recovery_earnings_transition: authorityScan?.recoveryEarnings ? {registry_ref:RECOVERY_EARNINGS_PATH, attempt_ref:RECOVERY_EARNINGS_ATTEMPT,
       registry_sha256:authorityScan.recoveryEarnings.registrySha256, baseline_ref:authorityScan.recoveryEarnings.baseline,
       baseline_sha256:authorityScan.recoveryEarnings.baselineSha256, result_ref:authorityScan.recoveryEarnings.resultRef,

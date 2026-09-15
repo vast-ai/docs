@@ -10,6 +10,7 @@ import { loadPayoutTermsCorrection } from './current_host_payout_terms_correctio
 import { loadClosureCorrection } from './current_host_closure_correction.mjs';
 import { loadPayoutInvoiceCorrection } from './current_host_payout_invoice_correction.mjs';
 import { loadSetupMetricsReview } from './current_host_setup_metrics_review.mjs';
+import { loadVerificationStorageReview } from './current_host_verification_storage_review.mjs';
 import { loadRecoveryEarningsReview } from './current_host_recovery_earnings_review.mjs';
 import { loadTeamsConsoleReview } from './current_host_teams_console_review.mjs';
 import { loadDiagnosticsSshReview } from './current_host_diagnostics_ssh_review.mjs';
@@ -18,6 +19,8 @@ import { loadEvidenceReuseReview } from './current_host_evidence_reuse_review.mj
 import { loadSourceFamilyReview } from './current_host_source_family_review.mjs';
 
 export function loadCurrentHostReviewTransition({read, model, exists}) {
+  const verificationStorage = loadVerificationStorageReview({read, model, exists});
+  if (verificationStorage) return verificationStorage;
   const recoveryEarnings = loadRecoveryEarningsReview({read, model, exists});
   if (recoveryEarnings) return recoveryEarnings;
   const setupMetrics = loadSetupMetricsReview({read, model, exists});

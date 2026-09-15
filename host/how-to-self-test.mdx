@@ -14,7 +14,7 @@ personas:
 Self-test checks a listed machine against the CLI’s preflight requirements and attempts a temporary diagnostic rental. It does not by itself establish platform verification or readiness for every renter workload.
 
 <Note>
-Passing self-test makes a machine eligible for verification. It does not guarantee verification, search placement, or rentals.
+Passing self-test is one part of preparing for verification; the machine must also meet the published [verification requirements](/host/verification-stages#additional-requirements-for-verification). A pass does not guarantee verification, search placement or rentals.
 </Note>
 
 ## Before You Run It
@@ -32,18 +32,18 @@ vastai set api-key <API_KEY>
 <span id="what-the-self-test-checks" aria-hidden="true" />
 ## What Self-Test Checks
 
-The CLI first checks listing requirements. If preflight passes, it rents a temporary diagnostic instance, starts the self-test image, polls progress, reports results, and destroys the instance.
+The CLI checks for a rentable offer and evaluates its reported requirements. If those checks allow the run, it attempts a temporary diagnostic rental, starts the selected image, polls progress and reports the result. It also attempts to destroy the temporary instance. If cleanup reports a failure, follow the displayed instructions to check and remove the remaining test instance.
 
-Before renting the temporary diagnostic instance, the CLI checks whether the machine can be tested at all:
+Before attempting the temporary diagnostic rental, the CLI looks for a rentable offer and checks its reported requirements:
 
 - The machine has a rentable offer.
-- The API key can inspect the machine and offer.
+- The API request can find a rentable offer. If no offer is found, diagnostics may query the machine and report access errors.
 - Reliability is greater than `0.90`.
 - CUDA compatibility is `>= 11.8`.
 - Direct ports are at least 3 ports per listed GPU.
 - PCIe bandwidth is greater than 2.85 GB/s.
 - Upload/download bandwidth meet the VRAM-scaled requirement.
-- GPU VRAM is greater than 7 GB per GPU.
+- GPU VRAM is greater than 7 GiB per GPU.
 - System RAM is close to total GPU VRAM, capped around 2 TB for very high-VRAM machines.
 
 These are diagnostic preflight checks implemented by the CLI. Compare the [Self-Test Reference](/host/self-test-reference) with the published [verification requirements](/host/verification-stages#additional-requirements-for-verification); a difference needs source/version clarification and does not change the check your installed tester executes.
@@ -51,13 +51,13 @@ These are diagnostic preflight checks implemented by the CLI. Compare the [Self-
 The CLI and temporary self-test image perform checks that include:
 
 - HTTPS progress endpoint reachability.
-- UDP echo on the mapped UDP port.
+- UDP forwarding needs a separate check; the pinned CLI and self-test image do not perform a UDP echo test.
 - PyTorch/CUDA import and GPU visibility.
 - For each visible GPU, PyTorch allocated plus reserved memory must be at most 2% of its reported VRAM.
 - Total system RAM meeting the image’s minimum requirement.
 - The image requires at least two physical CPU cores per visible GPU, using `psutil.cpu_count(logical=False)`.
 - CUDA ResNet workload across all visible GPUs.
-- GPU memory allocation, including ECC-capable memory allocation checks where applicable.
+- GPU memory allocation targeting about 95% of each visible GPU’s VRAM. The stage is named “ECC” in the output, but it does not test ECC error correction.
 - NCCL initialization and synchronization across visible GPUs; see [`nccl_failed`](/host/self-test-reference#nccl-failed) if this stage fails.
 - `stress-ng` and `gpu-burn` running together for 60 seconds.
 
@@ -115,7 +115,7 @@ On the host, watch only for the planned self-test window; press `Ctrl+C` when th
 sudo tail -f /var/lib/vastai_kaalia/self_test.log
 ```
 
-If reliability is still `<= 0.90`, the installer may run with `--ignore-requirements` as a diagnostic. That does not qualify the machine for verification.
+When the installer’s helper reaches its self-test command, it uses `--ignore-requirements` regardless of the current reliability value. Treat that result as diagnostic; it does not qualify the machine for verification.
 
 ## Ignore Requirements Mode
 

@@ -1,0 +1,124 @@
+---
+title: "Hosting Overview"
+sidebarTitle: "Hosting Overview"
+createdAt: "Tue Jan 14 2025 01:09:17 GMT+0000 (Coordinated Universal Time)"
+updatedAt: "Fri Jul 11 2025 22:44:42 GMT+0000 (Coordinated Universal Time)"
+"canonical": "/host/hosting-overview"
+personas:
+  - pro-operator
+  - headless-operator
+  - business-owner
+  - hobbyist
+---
+
+<div className="persona-chips"><span className="persona-chip">All host personas</span></div>
+
+Vast is a GPU marketplace. Hosts provide machines; renters run workloads on them.
+
+As a host, you are responsible for:
+
+- Installing and maintaining Ubuntu, NVIDIA drivers, storage, networking, and the Vast host software. The general responsibility for running and maintaining the hardware is set out in [Hosting Agreement — Performance of Services](https://cloud.vast.ai/host/agreement); the setup pages below cover the technical requirements.
+- Keeping rented machines online, stable, and dedicated to renter workloads. [Hosting Agreement — Operation and Maintenance](https://cloud.vast.ai/host/agreement) requires commercially best efforts for 24/7 availability, excluding scheduled preventative and remedial maintenance.
+- Setting prices, offer end dates, and maintenance windows. See the [Vast CLI listing options](https://github.com/vast-ai/vast-cli/blob/ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd/vastai/cli/commands/machines.py#L230-L241) for pricing and expiration controls, and [Hosting Agreement — Operation and Maintenance](https://cloud.vast.ai/host/agreement) for the maintenance duty.
+- Troubleshooting local hardware problems. [Hosting Agreement — Performance of Services](https://cloud.vast.ai/host/agreement) assigns the provider responsibility for running, troubleshooting, and maintaining the hardware.
+- Troubleshooting local driver, storage, and network problems. [Hosting Agreement — Intellectual Property and Data Security](https://cloud.vast.ai/host/agreement), under Access to Software, assigns responsibility for the supporting hardware, software, and telecommunications needed to use the service.
+
+Vast bears no responsibility for technical assistance for the hardware or software required to get the hardware to function properly. See [Hosting Agreement — Performance of Services](https://cloud.vast.ai/host/agreement).
+
+For community help, connect your host account to Discord and use the [host-only channels](https://discord.gg/hSuEbSQ4X8).
+
+## Start Here
+
+Create a dedicated host account from the [Vast host setup page](https://cloud.vast.ai/host/setup/). That flow links to the hosting agreement and starts host onboarding, including access to the Machines area after the agreement is accepted.
+
+After signup, use this docs path for hardware, storage, networking, install, and self-test details. For account conversion or Machines-tab troubleshooting, see [Host Account and Agreement](/host/account-hosting-agreement).
+
+Before using API keys, CLI commands, SDK automation, or team access for hosting, review [Host Account Security](/host/account-security-for-hosts).
+
+New to hosting? The [Hosting Quickstart](/host/quickstart) walks this same path as one numbered journey. Not sure hosting fits your hardware or expectations? Start with [Is Vast for Me?](/host/persona-decision-guide).
+
+For direct access to each setup topic:
+
+1. [Supported Hardware](/host/supported-hardware)
+2. [Hardware Prep](/host/hardware-prep)
+3. [Storage Setup](/host/storage-setup)
+4. [Network & Ports](/host/network-ports)
+5. [Installing Host Software](/host/installing-host-software)
+6. [How to Self-Test](/host/how-to-self-test)
+
+## Host Commitment
+
+Renters expect cloud-like availability. During an active rental, assume the GPUs may be used heavily and continuously. Power, cooling, internet, drivers, storage, and the host daemon must stay healthy for the full rental period.
+
+Avoid local gaming, mining, display workloads or GPU jobs that compete with renter work. The [Hosting Agreement — License and Responsibilities](https://cloud.vast.ai/host/agreement) prohibits interference with the software’s integrity or performance.
+
+## Offers And Rental Contracts
+
+An offer is the listing renters can accept. Key offer settings include:
+
+- GPU, storage, and bandwidth prices, exposed as `--price_gpu`, `--price_disk`, `--price_inetu`, and `--price_inetd` in the [Vast CLI listing options](https://github.com/vast-ai/vast-cli/blob/ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd/vastai/cli/commands/machines.py#L230-L241).
+- Minimum GPU count (`min_chunk`).
+- Interruptible minimum bid.
+- Maximum prepaid discount (`discount_rate`).
+- Offer end date.
+
+When a renter accepts an offer, Vast creates a rental contract with a price, hardware specs, and rental end date. For price increases, the [Vast CLI price-increase guidance](https://github.com/vast-ai/vast-cli/blob/ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd/vastai/cli/commands/price_increase.py#L123-L145) states that the remaining current term keeps its original price; a renter can accept a higher rate for an extension after that term ends.
+
+<Frame>
+  ![Offer, rental contract, and instance lifecycle diagram](/images/offer-contract-lifecycle.png)
+</Frame>
+
+## The Rental Contract
+
+Each rental contract is independent. A multi-GPU machine can have several active contracts with different renters, prices, and end dates.
+
+When editing an offer, distinguish the current rental term from a later extension. The [Vast CLI price-increase guidance](https://github.com/vast-ai/vast-cli/blob/ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd/vastai/cli/commands/price_increase.py#L123-L145) describes price protection through the current end date and client acceptance of a higher extension rate. Review each change separately:
+
+- An offer price change applies to new rentals. Existing renters retain the original rate for their current term; a higher rate for an extension requires their acceptance. See the [Vast CLI price-increase guidance](https://github.com/vast-ai/vast-cli/blob/ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd/vastai/cli/commands/price_increase.py#L123-L145).
+- Before changing the offer end date, review existing rental dates. Do not rely on an offer edit to end a rental.
+- Unlisting stops new rentals, but existing contracts continue.
+- Before planned downtime, review active rental and storage commitments and follow [Maintenance Windows](/host/maintenance-windows).
+
+For the Provider–Vast hardware and services agreement, see the [Hosting Agreement](https://cloud.vast.ai/host/agreement). Its Term & Termination section describes the agreement's own term; consult the rental's terms for the individual rental commitment.
+
+### Offer End Date
+
+The CLI describes `--end_date` as the offer’s expiration or available-until date. Review each rental’s recorded end date separately.
+
+Set an offer end date before listing. If you leave it open indefinitely, you may create a longer commitment than intended.
+
+### Changing An Offer
+
+To change an offer, update it or unlist and relist. Existing renters keep their current-term price; accepted price increases take effect after the current end date. See the [Vast CLI price-increase guidance](https://github.com/vast-ai/vast-cli/blob/ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd/vastai/cli/commands/price_increase.py#L123-L145).
+
+To offer more time, move the offer end date later or review the rolling-duration setting. If you raise a resource price, automatic extension at the higher rate waits for the renter to accept the increase; the new rate applies after the current term ends. See the [Vast CLI listing guidance](https://github.com/vast-ai/vast-cli/blob/ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd/vastai/cli/commands/machines.py#L249-L257) and [Vast CLI price-increase guidance](https://github.com/vast-ai/vast-cli/blob/ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd/vastai/cli/commands/price_increase.py#L123-L145).
+
+## Listing Controls
+
+For pricing and listing strategy, use the focused pages:
+
+| Setting | Read next |
+| --- | --- |
+| On-demand price | [Pricing Your Listing](/host/pricing-your-listing) |
+| Interruptible minimum bid | [Pricing Your Listing](/host/pricing-your-listing#listing-controls) |
+| Reserved discounts | [Pricing Your Listing](/host/pricing-your-listing#listing-controls) |
+| Minimum GPU size | [Pricing Your Listing](/host/pricing-your-listing#listing-controls) |
+| Earnings estimate | [Earnings & Pricing Model](/host/earning) |
+
+## Volume Offers
+
+Volume offers rent storage space separately from GPU offers. Rented volume space comes from the same disk pool used by GPU rentals, so it reduces storage available for GPU offers only when actually rented or occupied. See [Volume Offers](/host/volume-offers) for the host/renter lifecycle, identifiers, shared-capacity planning, limits, and the complete command map.
+
+CLI references:
+
+- [vastai list machine](/cli/reference/list-machine)
+- [vastai list volume](/cli/reference/list-volume)
+- [vastai unlist volume](/cli/reference/unlist-volume)
+
+## Maintenance
+
+Plan maintenance around active rentals and stored workloads. [Hosting Agreement — Operation and Maintenance](https://cloud.vast.ai/host/agreement) requires preventative and remedial maintenance when an Authorized User is not actively using the hardware; no running instances alone does not resolve every storage or rental commitment. For planned downtime, use [Maintenance Windows](/host/maintenance-windows). For unlisting, deleting, recreating, or uninstalling, see [Remove or Recreate](/host/removing-recreating-machines).
+
+## Common Questions
+
+Use [Common Host Questions](/host/common-host-questions) for quick links to setup, verification, search visibility, payouts, reliability, storage, and operations. For a displayed machine error, use the [Machine Error Reference](/host/machine-errors).

@@ -100,6 +100,11 @@ test('export carries the shared queue without changing any claim status, lanes, 
     assert.equal(payload.current_result_ref,payload.cleanup_transition.result_ref);
     for(const ref of [payload.cleanup_transition.registry_ref,payload.cleanup_transition.baseline_ref,...payload.cleanup_transition.context_refs])assert.ok(payload.files[ref],ref);
   }
+  if(payload.verification_storage_transition) {
+    const review=payload.verification_storage_transition;assert.equal(review.reviewed_claims,175);assert.equal(review.transition_records,176);assert.equal(review.newly_resolved,174);assert.equal(review.adjacent_pass_consistency_records,1);assert.equal(review.wording_corrections,46);assert.equal(review.corrected_claim_literals,47);
+    for(const ref of [review.registry_ref,review.baseline_ref,review.result_ref])assert.ok(payload.files[ref],ref);
+    for(const artifact of JSON.parse(payload.files[review.registry_ref].text).artifacts)assert.ok(payload.files[artifact.path],artifact.path);
+  }
   if(payload.recovery_earnings_transition) {
     const review=payload.recovery_earnings_transition;assert.equal(review.reviewed_claims,148);
     for(const ref of [review.registry_ref,review.baseline_ref,review.result_ref])assert.ok(payload.files[ref],ref);
@@ -127,7 +132,7 @@ test('export carries the shared queue without changing any claim status, lanes, 
     for(const artifact of registry.artifacts)assert.ok(payload.files[artifact.path],artifact.path);
   }
   if(payload.evidence_reuse_transition) {
-    assert.equal(payload.current_result_ref,(payload.recovery_earnings_transition||payload.setup_metrics_transition||payload.teams_console_transition||payload.diagnostics_ssh_transition||payload.continuation_transition||payload.evidence_reuse_transition).result_ref);
+    assert.equal(payload.current_result_ref,(payload.verification_storage_transition||payload.recovery_earnings_transition||payload.setup_metrics_transition||payload.teams_console_transition||payload.diagnostics_ssh_transition||payload.continuation_transition||payload.evidence_reuse_transition).result_ref);
     for(const ref of [payload.evidence_reuse_transition.registry_ref,payload.evidence_reuse_transition.baseline_ref,
       payload.evidence_reuse_transition.result_ref,payload.source_family_transition.result_ref,payload.closure_transition.result_ref])assert.ok(payload.files[ref],ref);
     const registry=JSON.parse(payload.files[payload.evidence_reuse_transition.registry_ref].text);
@@ -161,7 +166,8 @@ test('issues view uses only recorded findings and prerequisites, preserving ever
   const bytes=fs.readFileSync(new URL('verification/current-host-docs-review.json',root));
   const owner=loadHostReviewOwnerQuestions({read:ref=>fs.readFileSync(new URL(ref,root)),model,modelSha256:createHash('sha256').update(bytes).digest('hex')});
   const before=JSON.stringify(model), projection=buildHostReviewIssues({pages:model.pages,ownerQuestions:owner.questions});
-  assert.deepEqual(projection.counts,{correctionTopics:2,correctionPassages:3,ownerQuestions:8,workflowPageGroups:13,recordedProcedures:14,blockedPassages:21});
+  const sourceReviewed=model.corrections.some(x=>x.id==='HOST-VERIFICATION-STORAGE-REVIEW-01');
+  assert.deepEqual(projection.counts,{correctionTopics:2,correctionPassages:3,ownerQuestions:8,workflowPageGroups:sourceReviewed?12:13,recordedProcedures:14,blockedPassages:sourceReviewed?5:21});
   assert.deepEqual(projection.corrections.flatMap(group=>group.claimIds).sort(),claims.filter(c=>c.status==='FAIL').map(c=>c.id).sort());
   assert.deepEqual(projection.workflows.flatMap(group=>group.claimIds).sort(),claims.filter(c=>c.status==='BLOCKED').map(c=>c.id).sort());
   const parents=projection.workflows.flatMap(group=>group.procedures);
@@ -209,7 +215,7 @@ test('whole offline script initializes with eight owner questions, defaults to i
   const before=JSON.stringify(model),{payload}=buildReport();
   const {context,elements}=await runWholeTemplate(payload);
   assert.equal(elements.get('issue-owner-count').textContent,8);
-  assert.equal(elements.get('issue-workflow-count').textContent,13);
+  assert.equal(elements.get('issue-workflow-count').textContent,payload.verification_storage_transition?12:13);
   assert.match(elements.get('priority-cards').innerHTML,/CUR-11f83626486ada1d/);
   assert.match(elements.get('issue-owner-list').innerHTML,/HQ-RENTAL-AVAILABILITY/);
   assert.match(elements.get('issue-workflow-list').innerHTML,/page-based fallback/);

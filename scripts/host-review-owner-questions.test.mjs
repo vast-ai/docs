@@ -84,8 +84,10 @@ test('real Datacenter page retains one unresolved certification question and one
   const original = page.claims.map(claim => claim.id);
   const displayed = sortHostReviewDisplay(page.claims);
   assert.equal(page.claims.filter(claim => claim.status === 'FAIL').length, 0);
-  assert.equal(page.claims.filter(claim => claim.status === 'UNVALIDATED').length, 1);
-  assert.equal(displayed[0].id, 'MCL-1998fd97e70ac6c0');
+  const sourceReviewed=model.corrections.some(x=>x.id==='HOST-VERIFICATION-STORAGE-REVIEW-01');
+  assert.equal(page.claims.filter(claim => claim.status === 'UNVALIDATED').length, sourceReviewed?0:1);
+  if(sourceReviewed){assert.equal(page.claims.find(c=>c.id==='MCL-1998fd97e70ac6c0').status,'PASS');assert.ok(loadHostReviewOwnerQuestions({read,model,modelSha256}).questions.some(q=>q.id==='HQ-DATACENTER-CERTIFICATION'&&q.status==='UNVALIDATED'));}
+  else assert.equal(displayed[0].id, 'MCL-1998fd97e70ac6c0');
   assert.equal(page.claims.find(claim => claim.id === 'MCL-0ae9c2fd5ac2ef9a').history.superseded_claims.length, 5);
   assert.deepEqual(page.claims.map(claim => claim.id), original);
 });

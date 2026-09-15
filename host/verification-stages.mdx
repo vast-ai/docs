@@ -20,7 +20,9 @@ Vast’s [published verification guidance](https://github.com/vast-ai/docs/blob/
 Machines move between:
 
 ```text
-Unverified -> Verified -> Deverified -> Unverified
+Unverified -> Verified
+Verified -> Deverified (active machine error)
+Deverified -> Verified (error cleared)
 ```
 
 Automation evaluates reliability, performance, hardware, network, and current marketplace demand.
@@ -88,9 +90,7 @@ The public [Host Setup guide](https://cloud.vast.ai/host/setup) lists CUDA 12.6 
 | Forwarded ports | 5 ports per GPU, 100 ports per GPU recommended |
 
 <Warning>
-Renters connect directly to the machine over the WAN, so it needs a public
-IPv4 address with the port range forwarded to it. Machines behind CGNAT or a
-shared ISP IP cannot be used for hosting.
+Verification guidance requires a public IPv4 address with the port range forwarded to the machine. CGNAT and shared ISP IPs are not supported for this configuration.
 </Warning>
 
 ### Operating System
@@ -123,8 +123,7 @@ will fail verification. See
 </Warning>
 
 <Warning>
-Use a separate SSH key pair for each machine you operate. One key reused across
-your fleet means a single compromise exposes every machine you host.
+Use a separate SSH key pair for each machine you operate. If a reused private key is compromised, every machine that trusts that key may be exposed; separate keys limit that shared access.
 </Warning>
 
 ### Storage
@@ -148,13 +147,10 @@ stays online. A stable machine typically reaches 90% within a few days.
 
 ### Self-Test
 
-You can check whether your machine is ready for verification by running a
-Self-Test. See [How to Self-Test](/host/how-to-self-test).
+Use Self-Test to check the CLI’s preflight requirements and run its diagnostic workload. Review the published verification requirements separately. See [How to Self-Test](/host/how-to-self-test).
 
 <Warning>
-**Dedicated machines only.** Any personal workload, such as mining, gaming,
-running your own jobs, or using the machine as a desktop, will automatically
-fail verification.
+**Keep the machine dedicated to Vast workloads.** Avoid local mining, gaming, desktop use or other jobs that compete with renter work. Run permitted jobs through the Jobs tab or `create job`. See [Workload Policy](/host/workload-policy).
 </Warning>
 
 <Tip>
@@ -197,13 +193,13 @@ Vast’s [published verification guidance](https://github.com/vast-ai/docs/blob/
 
 Common causes:
 
-- Network instability, closed ports, or low bandwidth.
-- GPU, NVML, Xid, PCIe, power, thermal, or storage errors.
+- Network instability, closed ports or low bandwidth reported as an active machine error.
+- GPU, NVML, Xid, PCIe, power, thermal or storage problems reported as an active machine error.
 - Machine-level Docker or NVIDIA runtime errors, such as `unknown or invalid runtime nvidia`; some per-instance launch failures are logged without affecting verification.
 - Active machine errors, as described in Vast’s [published verification guidance](https://github.com/vast-ai/docs/blob/175a318c27750ea64da94f043dda39ec5cb26259/host/hosting-overview.mdx#L281-L285).
 - An administrator-set machine error, such as a machine flagged for investigation.
 
-Fix the underlying issue and wait for automation to refresh state. Most machine error states clear only after the platform sees sustained healthy behavior.
+Fix the underlying issue and monitor the machine’s error and status. Some errors clear automatically after the platform detects recovery; others may need a Vast.ai team member to inspect and clear them. Clearing an error is distinct from manually selecting a machine for verification.
 
 ## Read Next
 

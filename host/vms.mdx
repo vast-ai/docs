@@ -26,7 +26,7 @@ VM support can make a host visible to renters using VM templates and can help wi
 - Non-Linux OS images.
 - `ptrace` tooling such as NVIDIA Nsight.
 
-Single-GPU hosts usually have the lowest VM risk. Multi-GPU RTX 40-series hosts may also benefit. Multi-GPU datacenter hosts should be more cautious until VM P2P/NVLink behavior is a good fit for the workload.
+Consider VM support for single-GPU machines and suitable multi-GPU RTX 40-series hosts after reviewing disk, network and workload needs. For multi-GPU datacenter hosts, the published VM guide recommends waiting for better VM P2P/NVLink support.
 
 ## Tradeoffs
 
@@ -86,11 +86,10 @@ Some hosts may also need:
 rd.driver.blacklist=nouveau modprobe.blacklist=nouveau
 ```
 
-Apply and reboot:
+During maintenance, after confirming there are no active rentals or other workloads, regenerate the GRUB configuration. Reboot only if that command succeeds:
 
 ```bash
-sudo update-grub
-sudo reboot
+sudo update-grub && sudo reboot
 ```
 
 ## Display Managers And GPU Processes
@@ -119,4 +118,4 @@ nvidia-smi -L
 systemctl is-active vastai.service docker.service
 ```
 
-Treat only exact `on` status, visible expected GPUs, and active Host services as a successful enablement. Treat `pending`, `off`, error or abort text, an unexpected status, a missing GPU, or an inactive service as a failure. If IOMMU groups are not set up, correct the BIOS and kernel IOMMU configuration, reboot, and verify the grouping before retrying.
+Require exact `on` status, the expected GPUs and an `active` result for each listed service before proceeding. These are basic configuration and Host-health checks, not proof that a VM workload is healthy. Stop and investigate `pending`, `off`, error or abort text, an unexpected status, a missing GPU or an inactive service. If IOMMU groups are missing, correct the BIOS and kernel configuration, reboot during maintenance, and verify the grouping before retrying.
