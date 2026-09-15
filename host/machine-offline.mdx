@@ -17,7 +17,7 @@ If your host machine appears **Offline**, follow the steps below in order to ide
 
 ## 1. Verify Internet Connectivity
 
-Before checking any Vast.ai-specific services, confirm the host machine has a stable, working internet connection with outbound access. Run each check below and compare your output with the expected result.
+Before checking Vast.ai-specific services, use the checks below to gather point-in-time evidence of outbound connectivity and DNS resolution. Compare each result with the explanation; passing these checks does not establish stable access to every Vast.ai endpoint.
 
 ### Check basic connectivity
 
@@ -45,7 +45,7 @@ What to look for: **`4 packets transmitted, 4 received, 0% packet loss`** shows 
 
 ### Check DNS resolution
 
-This command asks your DNS server to translate the domain name `vast.ai` into an IP address. The host daemon connects to Vast.ai servers by domain name, so even with a working internet connection, the machine cannot reach Vast.ai if DNS resolution is broken.
+This command asks the configured DNS server for address information about `vast.ai`. It tests that lookup at that moment. A failure needs investigation, but it does not by itself show that every DNS lookup or connection is broken; also check the exact hostname reported in the daemon’s error log.
 
 ```bash
 nslookup vast.ai
@@ -107,19 +107,19 @@ Example output when the service is running normally:
 
 How to read the `Active:` line:
 
-- **`active (running)`** is the healthy state — the service started successfully and is currently running. Any other state (`inactive (dead)`, `failed`, `activating (auto-restart)`) means the service is not running normally.
+- **`active (running)`** means systemd currently considers the service running. It does not establish that the daemon can reach Vast.ai or use every GPU. If the state is `inactive (dead)`, `failed`, or `activating (auto-restart)`, inspect the status details and recent logs to determine what happened.
 - **`since Tue 2026-08-04 07:47:51 +07; 6h ago`** shows when the service last started and how long it has been running continuously — here, 6 hours without interruption, which is a good sign of stability.
-- **A very recent start time is a warning sign.** If you run `systemctl status vastai` repeatedly and the "ago" value keeps resetting to a few seconds or minutes (and the `Main PID` keeps changing), the service is crashing and being restarted over and over — a **restart loop**. The state `activating (auto-restart)` with a message like `Restart=on-failure` or `Scheduled restart job` also indicates a restart loop. In that case, inspect the logs (see the debugging commands below) to find the crash reason.
+- **Repeated recent starts deserve investigation.** If the "ago" value repeatedly resets and the `Main PID` changes, the service is restarting. A single `activating (auto-restart)` state or `Scheduled restart job` message is not enough to establish a loop. Check several observations and the recent logs for exits, timeouts, manual actions or other restart causes; do not assume every restart is a crash.
 
 ### Verify GPUs are detected
 
-This command shows the NVIDIA driver status and every GPU the operating system currently sees, including temperature, power, and memory usage. The Vastai service requires all GPUs to be visible at this level — if the driver cannot see them, the service will fail to start.
+This command shows NVIDIA driver information and status fields for GPUs available through that driver, including supported temperature, power and memory readings. Compare the listed GPUs with those you expect on the host. Missing GPUs or driver errors need investigation; this output alone does not establish whether the Vastai service can start.
 
 ```bash
 nvidia-smi
 ```
 
-Expected result (your GPU model, driver version, and values will differ):
+Illustrative output format, not a captured result for your host. Your GPU model, driver version, supported fields and values will differ:
 
 ```
 Mon Aug 10 15:18:38 2026
@@ -142,18 +142,18 @@ Mon Aug 10 15:18:38 2026
 |=========================================================================================|
 ```
 
-What to look for: a table listing **every GPU installed in the machine**, each with a valid name, temperature, and memory reading. Signs that something is wrong:
+What to look for: the GPUs you expect to be available through the NVIDIA driver, with their names and supported readings. `N/A` can be normal for an unsupported field. Investigate unexpected missing devices or errors using the checks below:
 
 - **`NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver`** — `nvidia-smi` cannot communicate with the driver. Check the driver and kernel state; this message alone does not show whether the GPUs remain visible on PCIe.
-- **Fewer GPUs listed than physically installed** — a GPU has dropped off the PCIe bus (power, riser, or slot issue) or has a hardware fault.
-- **`ERR!` or `Unknown Error` in any column** — the GPU is in a faulty state and may need further diagnosis.
-- **The command hangs for a long time** — usually indicates a GPU stuck on the bus or a driver-level problem.
+- **Fewer GPUs listed than expected** — investigate device visibility, driver/module configuration, power and PCIe connectivity. The count alone does not identify the cause or prove a hardware fault.
+- **`ERR!` or `Unknown Error` in a field** — record the exact message and inspect the driver and kernel logs. An error reading does not by itself establish a hardware fault.
+- **The command hangs or takes unusually long** — record when it happens and inspect the driver and kernel logs. The delay alone does not identify the underlying cause.
 
 If the service is not running, or GPUs are not detected correctly, investigate the root cause with the commands below.
 
 ### Debugging commands
 
-Start the service manually. If it was simply stopped, this brings it back up; if it fails immediately, the error message points you to the cause:
+Attempt to start the service, then check the command result and service status. If it does not start or stops again, inspect the recent logs for the reason:
 
 ```bash
 sudo systemctl start vastai
@@ -171,13 +171,13 @@ Show up to the last 100 lines of the Vastai daemon log. Look for relevant messag
 sudo tail -n 100 /var/lib/vastai_kaalia/kaalia.log
 ```
 
-Show a detailed per-GPU report from the driver (much more detail than plain `nvidia-smi`), including ECC error counters, throttle reasons, and PCIe link status — useful for spotting a GPU that is detected but unhealthy:
+Show a detailed per-GPU report from the driver, including supported ECC, clock-event or throttle, and PCIe fields. Unsupported fields may show `N/A`. Use the readings with the logs when investigating a detected GPU; the report alone does not establish overall health:
 
 ```bash
 nvidia-smi -q
 ```
 
-Search the kernel ring buffer for NVIDIA driver errors (`NVRM`, `Xid`) and PCIe/AER bus errors with human-readable timestamps. `Xid` messages are NVIDIA's hardware/driver error codes and often reveal why a GPU fell off the bus:
+Search the kernel ring buffer for NVIDIA (`NVRM`, `Xid`) and PCIe/AER messages. `dmesg -T` shows human-readable timestamps, which can be inaccurate after suspend/resume. Xid messages are NVIDIA driver error reports and provide starting points for investigation; they do not always identify a single root cause:
 
 ```bash
 sudo dmesg -T | grep -iE 'nvrm|nvidia|xid|pcie|aer'
@@ -189,7 +189,7 @@ Search retained kernel journal entries for the current boot for the same NVIDIA/
 sudo journalctl -k -b | grep -iE 'nvrm|nvidia|xid|pcie|aer'
 ```
 
-Common root causes include NVIDIA driver errors, GPU power/PCIe issues, BIOS configuration changes, or a recent kernel/OS update.
+Possible areas to investigate include NVIDIA driver state, GPU power and PCIe connectivity, BIOS configuration, and recent kernel or OS changes.
 
 > **Note:** Do not restart or modify NVIDIA drivers while active customer instances are running unless instructed by Support.
 
@@ -197,7 +197,7 @@ Continue debugging until the service is active and all GPUs are detected. Once V
 
 ## 3. Reset the Controller Connection and Restart Vastai
 
-If the Vastai service is running and GPUs are detected correctly, but the machine remains Offline, reset the controller connection state and resend machine information.
+If the service is running and the expected GPUs are detected but the machine remains Offline, the recovery sequence below stops the service, clears the named controller-connection state paths, restarts it, and runs `send_mach_info.py`. Review existing rental and storage commitments and use a suitable maintenance window. Check the installed script before running it: the current public version can change managed packages or settings, download components, and run disk/network checks as well as submit machine information. This is not a read-only status check or a guarantee that the machine will return Online.
 
 ```bash
 sudo systemctl stop vastai.service && \
@@ -205,7 +205,7 @@ sudo rm -rf /var/lib/vastai_kaalia/data/last_try_get_controller && \
 sudo rm -rf /var/lib/vastai_kaalia/data/get_controller_delay && \
 sudo rm -rf /var/lib/vastai_kaalia/controller_connection && \
 sudo systemctl restart vastai.service && \
-sudo python3 /var/lib/vastai_kaalia/send_mach_info.py
+(cd /var/lib/vastai_kaalia && sudo python3 ./send_mach_info.py)
 ```
 
 Wait a few minutes, then check whether the machine returns Online in the Vast.ai Console.
@@ -232,7 +232,7 @@ Current state of the Vastai service, including its activation time and recent lo
 sudo systemctl status vastai
 ```
 
-Current GPU and driver status — tells Support whether all GPUs are visible and healthy at the driver level:
+Current GPU and driver information — shows Support which GPUs the NVIDIA driver reports and their available status readings; this is not a complete GPU health test:
 
 ```bash
 nvidia-smi

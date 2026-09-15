@@ -1,0 +1,451 @@
+---
+title: "Upgrade the Kernel"
+description: "Check whether your host machine's kernel is up to date, install the update, and confirm the machine came back online."
+personas:
+  - pro-operator
+  - headless-operator
+  - business-owner
+  - hobbyist
+---
+
+<div className="persona-chips"><span className="persona-chip">All host personas</span></div>
+
+Ubuntu releases kernel updates regularly. Installing them is part of normal
+upkeep on a host machine, and it is one of the
+[verification requirements](/host/verification-stages).
+
+This page has two paths. **Full system upgrade** is the shorter route for a
+machine you already keep current, and it patches the kernel along with
+everything else. **Kernel-only upgrade** moves the kernel and leaves the rest of
+the system where it is. Neither moves Ubuntu to a newer version, for example
+22.04 to 24.04.
+
+The steps are the same on Ubuntu Server 22.04 and 24.04.
+
+<Note>
+An up-to-date kernel is one requirement out of several. On its own it does not
+mean the machine will pass verification. Ubuntu also releases updates for the
+rest of the system. The full system upgrade installs those as well; the
+kernel-only path leaves them alone.
+</Note>
+
+<Warning>
+A kernel upgrade only takes effect after a reboot, and a reboot stops every
+running instance on the machine. Instances are not destroyed, but the workloads
+inside them are interrupted. Do not start until you have a maintenance
+window. Wait until all active rental contracts have ended, or schedule the
+window with
+[`vastai schedule maint`](/cli/reference/schedule-maint) so renters are
+notified and can save their work.
+</Warning>
+
+---
+
+## Full system upgrade (packages included)
+
+For a machine whose packages you already keep current. The kernel moves with
+everything else, and the whole upgrade is three commands:
+
+```bash
+sudo apt-get update
+sudo apt-get upgrade --with-new-pkgs
+sudo reboot
+```
+
+This path also covers machines running a non-generic kernel, such as
+`linux-oem-22.04` on certified OEM hardware or `linux-nvidia`, where step 1 of
+the kernel-only path matches nothing.
+
+<Warning>
+This is a full system upgrade, not a kernel upgrade. Every package with an
+update available moves inside the same maintenance window, services are
+restarted as part of it, and a machine that misbehaves afterwards leaves you the
+whole upgrade to work back through rather than a single change.
+
+Take this path only if you know what it will change on your machine and can put
+it right yourself if something breaks. To move the kernel on its own, use the
+kernel-only path below.
+</Warning>
+
+`--with-new-pkgs` is not optional here. A kernel upgrade pulls in new versioned
+packages such as `linux-image-5.15.0-190-generic`, and plain `apt-get upgrade`
+will not install packages that are not already present, so it holds the kernel
+back:
+
+```
+The following packages have been kept back:
+  linux-generic linux-headers-generic linux-image-generic
+```
+
+The machine then reboots onto the kernel it was already running.
+`--with-new-pkgs` allows those additions, and it never removes a package.
+
+Confirm the new kernel is the one running, because the reboot on its own proves
+nothing:
+
+```bash
+uname -r; ls -1 /boot/vmlinuz-* | sed 's|.*/vmlinuz-||' | sort -V | tail -1
+```
+
+Differing values mean GRUB booted the old kernel. See
+[If the machine booted the old kernel](#if-the-machine-booted-the-old-kernel).
+
+<Warning>
+`nvidia-smi` does not substitute for that check. When GRUB boots the old kernel,
+the DKMS module built against that kernel is still in place, so `nvidia-smi`
+lists every GPU on a machine that never took the patch. Comparing the running
+kernel against the newest one in `/boot` is what catches it.
+</Warning>
+
+---
+
+## Kernel-only upgrade
+
+For a machine where you want the kernel to move on its own and the rest of the
+system to stay where it is. The five steps below query the metapackage names
+rather than assuming them, install the update, and confirm it took.
+
+### 1. Find your kernel metapackage
+
+Find the installed `linux-generic*` metapackages selected by this query. Save
+the names to a variable for the later commands; other kernel families and
+packages with a different dpkg selection state need separate review:
+
+```bash
+KERNEL_METAPACKAGES=$(dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 'linux-generic*' 2>/dev/null | awk '$1 == "ii" { print $2 }' | sort -V); echo "$KERNEL_METAPACKAGES"
+```
+
+On a machine running the GA kernel:
+
+```
+linux-generic
+```
+
+On a machine running the HWE kernel:
+
+```
+linux-generic-hwe-22.04
+```
+
+If `echo` printed nothing, stop and inspect the package query before continuing.
+The later commands need a non-empty list of reviewed metapackage names. An empty
+result can mean no matching `ii` records were returned or the query failed.
+
+More than one line is a valid result. The later install command requests an
+upgrade for each returned name; review APT’s proposed changes before accepting:
+
+```
+linux-generic-hwe-22.04
+linux-generic-hwe-22.04-edge
+```
+
+Different metapackage names do not by themselves establish separate kernel
+stacks. Check each package’s image and header dependencies, and review the
+actual package changes and boot entries.
+
+`KERNEL_METAPACKAGES` lives only in the shell session you set it in. If your
+connection drops, or you open a second terminal, set it again before
+continuing.
+
+<Note>
+Ubuntu provides a general availability (GA) kernel and hardware enablement
+(HWE) kernels for LTS releases. HWE provides newer kernel support for newer
+hardware. Ubuntu Server 22.04 and 24.04 default to GA and offer HWE as an option;
+other kernel variants also exist, so inspect the packages on your machine.
+</Note>
+
+<Warning>
+This is why the names are queried rather than hardcoded. On an HWE machine
+`linux-generic` is not installed, and passing it to the upgrade command in step
+3 reports success while patching nothing:
+
+```
+Skipping linux-generic, it is not installed and only upgrades are requested.
+0 upgraded, 0 newly installed, 0 to remove and 24 not upgraded.
+```
+
+The command exits `0`, so nothing looks wrong. This is the one step that can
+leave you with an inaccurate record: the machine is still on its old kernel, but
+the run looks like it succeeded. Step 5 is what catches it.
+</Warning>
+
+### 2. Check for updates
+
+Refresh the package lists first, or you will be comparing against stale data.
+
+```bash
+sudo apt update
+```
+
+Then look at what you have against what the archive is offering:
+
+```bash
+apt-cache policy $KERNEL_METAPACKAGES
+```
+
+```
+linux-generic:
+  Installed: 5.15.0.25.27
+  Candidate: 5.15.0.190.169
+  Version table:
+     5.15.0.190.169 500
+        500 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 Packages
+        500 http://security.ubuntu.com/ubuntu jammy-security/main amd64 Packages
+ *** 5.15.0.25.27 500
+        500 http://archive.ubuntu.com/ubuntu jammy/main amd64 Packages
+        100 /var/lib/dpkg/status
+```
+
+This is the comparison that decides whether you go on. Step 1 printing more
+than one metapackage gives you one block per name here, and every block has to
+be considered, not just the first.
+
+If `Installed` and `Candidate` are the same, the machine is already at the
+current patch level and step 3 has nothing to do. That is the normal result of a
+routine check. Before calling it done, confirm the kernel you are running is the
+newest one installed, since an earlier upgrade may be installed but never
+rebooted into:
+
+```bash
+uname -r; ls -1 /boot/vmlinuz-* | sed 's|.*/vmlinuz-||' | sort -V | tail -1
+```
+
+Matching values mean the machine is up to date and running what it should. Note
+the version and the date and you are done. Differing values mean the newer
+kernel is installed but not booted, so the machine needs the reboot in step 4
+but not the install in step 3.
+
+If they differ, `Candidate` is the version you are about to install, and the
+remaining steps need a maintenance window.
+
+### 3. Install the kernel update
+
+```bash
+sudo apt install --only-upgrade $KERNEL_METAPACKAGES
+```
+
+The summary line is the part worth reading:
+
+```
+The following NEW packages will be installed:
+  linux-headers-5.15.0-190 linux-headers-5.15.0-190-generic
+  linux-image-5.15.0-190-generic linux-modules-5.15.0-190-generic
+  linux-modules-extra-5.15.0-190-generic
+The following packages will be upgraded:
+  linux-generic linux-headers-generic linux-image-generic
+3 upgraded, 5 newly installed, 0 to remove and 24 not upgraded.
+```
+
+In this example, the named changes are kernel packages. Your proposed changes
+may differ, so inspect the full list, including dependencies, before accepting.
+The `not upgraded` count alone does not prove that all other packages stay unchanged.
+
+<Note>
+Upgrade the metapackage, not a bare `linux-image-...` package. The metapackage
+depends on both the image and the matching headers, which is why
+`linux-headers-5.15.0-190-generic` appears above. DKMS needs headers matching
+the kernel it is building for, and the NVIDIA driver is built by DKMS. Install
+an image on its own and the driver has nothing to rebuild against, so the GPUs
+disappear on the next boot.
+</Note>
+
+Before rebooting, confirm that a known working previous kernel is still
+installed and available in the boot menu as a recovery option.
+
+### 4. Reboot
+
+The kernel you installed in step 3 does not become the running kernel until the
+machine restarts.
+
+<Warning>
+This stops every running instance on the machine. Before you run it, confirm
+you are inside your maintenance window and that there are no active rentals.
+</Warning>
+
+```bash
+sudo reboot
+```
+
+### 5. Verify
+
+Once the machine is back, check that the new kernel is the one running:
+
+```bash
+uname -r; ls -1 /boot/vmlinuz-* | sed 's|.*/vmlinuz-||' | sort -V | tail -1
+```
+
+Compare the running release with the kernel you intended to boot. For a
+single kernel stack, the two lines may match as in this example; multiple
+variants or a custom boot entry need separate interpretation:
+
+```
+5.15.0-190-generic
+5.15.0-190-generic
+```
+
+If the first line is older, the machine booted the previous kernel and the
+upgrade has not taken effect. See
+[If the machine booted the old kernel](#if-the-machine-booted-the-old-kernel).
+
+That confirms the right kernel booted. Confirm the patch actually landed as
+well, which is the direct comparison from step 2 run again:
+
+```bash
+KERNEL_METAPACKAGES=$(dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 'linux-generic*' 2>/dev/null | awk '$1 == "ii" { print $2 }' | sort -V); apt-cache policy $KERNEL_METAPACKAGES
+```
+
+`Installed` and `Candidate` must now be the same value. If `Installed` is still
+what step 2 reported, nothing was patched, whatever the install output said.
+
+<Note>
+The metapackage assignment is repeated here because the reboot ended the shell
+session that held it. Note also that the metapackage version and the kernel
+release are written differently: metapackage `5.15.0.190.169` installs kernel
+`5.15.0-190-generic`. The `190` is the part that carries over.
+</Note>
+
+Finally, confirm the GPUs came back:
+
+```bash
+nvidia-smi
+```
+
+<Check>
+When `uname -r` matches the newest kernel in `/boot`, `Installed` matches
+`Candidate`, and `nvidia-smi` lists every GPU, the machine is up to date for its
+release and back in service. Record the new kernel version and the date against
+the machine for your own maintenance log; the next check reads the current state
+from `apt-cache policy` rather than from that record.
+</Check>
+
+---
+
+## Recovery
+
+Both paths end in a reboot. These two sections cover the ways that reboot goes
+wrong, and they apply whichever path you took.
+
+### If the machine booted the old kernel
+
+If `uname -r` differs from the kernel you intended to boot, inspect the
+installed kernel files and boot configuration. Matching `Installed` and
+`Candidate` values describe the selected metapackage state; they do not by
+themselves prove which kernel booted or that the upgrade completed correctly.
+
+The machine is up and reachable here, so unlike the section below, this is
+fixable over SSH.
+
+Start with the entry GRUB is configured to boot. `grub-mkconfig` reads
+`/etc/default/grub` first and then every `/etc/default/grub.d/*.cfg`, so a
+drop-in overrides the main file and reading the main file alone can show you a
+value that is not the one in effect. Resolve it the way `grub-mkconfig` does:
+
+```bash
+bash -c '. /etc/default/grub; shopt -s nullglob; for f in /etc/default/grub.d/*.cfg; do . "$f"; done; echo "GRUB_DEFAULT=$GRUB_DEFAULT"; echo "GRUB_SAVEDEFAULT=$GRUB_SAVEDEFAULT"'
+```
+
+A machine that picks up new kernels on its own reports:
+
+```
+GRUB_DEFAULT=0
+GRUB_SAVEDEFAULT=
+```
+
+Entry `0` is the first entry in the generated menu. GRUB normally creates a
+top-level entry for the highest-version kernel it finds, but custom entries
+and boot-time overrides can change what starts. Inspect the generated menu
+before choosing an entry.
+
+Two values break it. `GRUB_DEFAULT=saved` boots whatever booted last, and
+paired with `GRUB_SAVEDEFAULT=true` every boot re-saves the old kernel as the
+default, so the machine stays on it through any number of upgrades. A
+`GRUB_DEFAULT` pinned to one entry, by index or by title, boots that kernel and
+ignores newer ones:
+
+```
+GRUB_DEFAULT="Advanced options for Ubuntu>Ubuntu, with Linux 5.15.0-25-generic"
+```
+
+Find which file sets it, since that is the file to edit:
+
+```bash
+grep -rE '^GRUB_DEFAULT=' /etc/default/grub /etc/default/grub.d/
+```
+
+If the intended kernel is the first generated entry, set `GRUB_DEFAULT` to
+`0`, keeping a copy of the configuration first:
+
+```bash
+([ -f /etc/default/grub.bak ] || sudo cp /etc/default/grub /etc/default/grub.bak) && sudo sed -i 's/^GRUB_DEFAULT=.*/GRUB_DEFAULT=0/' /etc/default/grub && grep '^GRUB_DEFAULT=' /etc/default/grub
+```
+
+The backup is only taken when there is not one already, so running this a second
+time keeps the copy of the original rather than overwriting it with the edited
+file.
+
+<Note>
+`GRUB_SAVEDEFAULT` only has an effect when `GRUB_DEFAULT=saved`, so once the
+default is `0` it can stay as it is.
+</Note>
+
+If the grep listed a file under `/etc/default/grub.d/`, correct `GRUB_DEFAULT`
+there as well. That file is sourced after the main one, so leaving it alone
+means it overrides the edit you just made.
+
+Editing the configuration changes nothing on its own. Regenerate the menu:
+
+```bash
+sudo update-grub
+```
+
+Check the output for the intended kernel and its matching initrd. Investigate
+errors or missing files before rebooting:
+
+```
+Found linux image: /boot/vmlinuz-5.15.0-190-generic
+Found initrd image: /boot/initrd.img-5.15.0-190-generic
+Found linux image: /boot/vmlinuz-5.15.0-25-generic
+Found initrd image: /boot/initrd.img-5.15.0-25-generic
+```
+
+If the new kernel is absent, stop here and do not reboot. This output is the
+menu that was just generated, so a menu still missing the kernel is not
+something re-running `update-grub` will change, and rebooting only lands you on
+the old kernel again. Absence means `grub-mkconfig` did not find the kernel to
+begin with: check that `/boot` is mounted and that
+`/boot/vmlinuz-<version>` and the matching `/boot/initrd.img-<version>` both
+exist for the version you installed.
+
+<Warning>
+Booting the corrected default takes another reboot, which stops every running
+instance. Confirm you are inside a maintenance window before you run it.
+</Warning>
+
+```bash
+sudo reboot
+```
+
+Then repeat step 5 and confirm that `uname -r` reports the kernel you intended
+to boot. Investigate a mismatch before returning the machine to service.
+
+### If the machine does not come back
+
+You need access that does not go through SSH: the machine's IPMI, iDRAC, iLO, or
+other BMC console, or a monitor and keyboard attached to it.
+
+If a known working previous kernel is still installed and present in the
+GRUB menu, try booting it from the console. Holding **Shift** or pressing **Esc**
+may reveal the menu, depending on the firmware and GRUB settings. Under
+**Advanced options for Ubuntu**, choose the entry for that kernel; its exact
+title and version depend on your installation.
+
+That gets the machine running again on the old kernel. The new kernel is still
+installed, so work out why it failed before rebooting into it again.
+
+<Warning>
+If the machine boots but `nvidia-smi` reports
+`NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver`,
+the GPU driver did not rebuild for the new kernel. The machine will show as
+offline and cannot take rentals. See
+[Offline Machine](/host/machine-offline), which covers that symptom.
+</Warning>

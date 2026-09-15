@@ -971,6 +971,9 @@ def build() -> dict[str, Any]:
     The transition projection is an internal output-only snapshot: it must not
     change this established builder API or leak into the public JSON package.
     """
+    recovery_earnings = recovery_earnings_module()
+    if (REPO / recovery_earnings.REGISTRY).exists():
+        return recovery_earnings.project(REPO)
     setup_metrics = setup_metrics_module()
     if (REPO / setup_metrics.REGISTRY).exists():
         return setup_metrics.project(REPO)
@@ -1079,6 +1082,13 @@ def payout_terms_module() -> Any:
     spec.loader.exec_module(module)
     return module
 
+def recovery_earnings_module() -> Any:
+    spec = importlib.util.spec_from_file_location('current_host_recovery_earnings_review',
+        Path(__file__).with_name('current_host_recovery_earnings_review.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
 def setup_metrics_module() -> Any:
     spec = importlib.util.spec_from_file_location('current_host_setup_metrics_review',
         Path(__file__).with_name('current_host_setup_metrics_review.py'))
@@ -1140,6 +1150,14 @@ def payout_invoice_module() -> Any:
 
 def classify_literal_source_first(source_file: str, text: str) -> tuple[str, list[str], bool]:
     """Exact reviewed current classifier shared with repository reconciliation."""
+    recovery_earnings = recovery_earnings_module()
+    if (REPO / recovery_earnings.REGISTRY).exists():
+        model = recovery_earnings.project(REPO)
+        matches = [claim for page in model['pages'] for claim in page['claims'] if claim['text'] == text and any(span['source_file'] == source_file for span in claim['spans'])]
+        if not matches: raise ValueError('recovery_earnings classification has no exact reviewed occurrence')
+        values = {(claim['classification'], tuple(claim['required_evidence_types'])) for claim in matches}
+        if len(values) != 1: raise ValueError('same literal has differing recovery_earnings classifications; select exact claim ID')
+        classification, lanes = next(iter(values)); return classification, list(lanes), 'AUTHORITATIVE_DOCUMENTATION_CITATION' in lanes
     setup_metrics = setup_metrics_module()
     if (REPO / setup_metrics.REGISTRY).exists():
         model = setup_metrics.project(REPO)
@@ -1260,6 +1278,10 @@ def classify_literal_source_first(source_file: str, text: str) -> tuple[str, lis
 
 
 def outputs() -> dict[Path, bytes]:
+    recovery_earnings = recovery_earnings_module()
+    if (REPO / recovery_earnings.REGISTRY).exists():
+        package=recovery_earnings.project(REPO); worklist_md,runtime_md,owner_md=worklist(package)
+        return {OUT:(json.dumps(package,indent=2,ensure_ascii=False)+'\n').encode(),WORKLIST:worklist_md.encode(),RUNTIME_REGISTER:runtime_md.encode(),OWNER_REGISTER:owner_md.encode()}
     setup_metrics = setup_metrics_module()
     if (REPO / setup_metrics.REGISTRY).exists():
         package=setup_metrics.project(REPO); worklist_md,runtime_md,owner_md=worklist(package)
