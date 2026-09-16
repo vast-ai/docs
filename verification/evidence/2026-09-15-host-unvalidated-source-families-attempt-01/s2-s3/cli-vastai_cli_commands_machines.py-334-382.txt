@@ -1,0 +1,49 @@
+@parser.command(
+    argument("id", help="id of machine to cleanup", type=int),
+    usage="vastai cleanup machine ID [options]",
+    help="[Host] Remove all expired storage instances from the machine, freeing up space",
+    epilog=deindent("""
+        Instances expire on their end date. Expired instances still pay storage fees, but can not start.
+        Since hosts are still paid storage fees for expired instances, we do not auto delete them.
+        Instead you can use this CLI/API function to delete all expired storage instances for a machine.
+        This is useful if you are running low on storage, want to do maintenance, or are subsidizing storage, etc.
+    """)
+)
+def cleanup__machine(args):
+    """Remove expired storage instances from a machine."""
+    client = get_client(args)
+    rj = machines_api.cleanup_machine(client, id=args.id)
+
+    if args.raw:
+        return rj
+    if rj.get("success"):
+        print(json.dumps(rj, indent=1))
+    else:
+        print(rj.get("msg", rj))
+
+
+# ---------------------------------------------------------------------------
+# defrag machines
+# ---------------------------------------------------------------------------
+
+@parser.command(
+    argument("IDs", help="ids of machines", type=int, nargs='+'),
+    usage="vastai defragment machines IDs ",
+    help="[Host] Defragment machines",
+    epilog=deindent("""
+        Defragment some of your machines. This will rearrange GPU assignments to try and make more multi-gpu offers available.
+    """),
+)
+def defrag__machines(args):
+    """Defragment machines to make more multi-gpu offers available."""
+    if args.explain:
+        print("request json: ")
+        print({"machine_ids": args.IDs})
+
+    client = get_client(args)
+    try:
+        result = machines_api.defrag_machines(client, machine_ids=args.IDs)
+        print(f"defragment result: {result}")
+    except Exception as e:
+        print(f"Error: {e}")
+

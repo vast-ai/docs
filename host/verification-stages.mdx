@@ -1,24 +1,31 @@
 ---
-title: Verification Stages
+title: "Verification Stages"
+sidebarTitle: "Verification Stages"
 createdAt: Mon Jan 13 2025 21:20:40 GMT+0000 (Coordinated Universal Time)
 updatedAt: Mon Nov 03 2025 12:50:03 GMT+0000 (Coordinated Universal Time)
 "canonical": "/host/verification-stages"
+personas:
+  - pro-operator
+  - headless-operator
+  - business-owner
+  - hobbyist
 ---
 
+<div className="persona-chips"><span className="persona-chip">All host personas</span></div>
 
-## States & Lifecycle
+Vast’s [published verification guidance](https://github.com/vast-ai/docs/blob/175a318c27750ea64da94f043dda39ec5cb26259/host/hosting-overview.mdx#L257-L259) describes ordinary host verification as fully automated, with no manual intervention.
 
-**States:** Unverified → Verified → (potentially) Deverified → Unverified  → ...
+## Lifecycle
 
-**Lifecycle:** Machines automatically move between these states based on performance and reliability factors. Once verified, a machine will remain verified unless issues arise, such as failing health checks or reliability standards, which could lead to deverification.
+Machines move between:
 
----
+```text
+Unverified -> Verified
+Verified -> Deverified (active machine error)
+Deverified -> Verified (error cleared)
+```
 
-## How It Works
-
-Verification is **entirely automated by proprietary algorithms** that assess each machine’s operational health and performance, incorporating [supply-and-demand](https://docs.vast.ai/host/understanding-verification#4-supply-&-demand-analysis) dynamics.
-
-Only machines that meet the platform’s reliability and [performance thresholds](https://docs.vast.ai/host/how-to-self-test) are eligible for verification. There is **no manual intervention**, ensuring consistency, scalability, and objectivity.
+Automation evaluates reliability, performance, hardware, network, and current marketplace demand.
 
 <Note>
 Top-tier AI GPUs are prioritized for verification because demand for them is
@@ -27,40 +34,17 @@ and dense premium builds such as RTX PRO 6000 (Server/WS/Max-Q),
 8x RTX 5090, and 8x RTX 4090.
 </Note>
 
----
+## Listing Minimums
 
-## Host Responsibilities (Always)
+Start with [Supported Hardware](/host/supported-hardware) when planning a machine. Listing a machine and passing Self-Test do not guarantee verification; review the verification requirements below before preparing hardware.
 
-- Keep systems stable, well-cooled, and correctly configured.
-- Maintain compatible drivers/CUDA and dependable, symmetric networking.
-- Run jobs only through the Jobs tab or the `create job` CLI command.
-- When issues arise, fix them promptly-the automation will update status.
-
----
-
-## State Details & Guidance
-
-### Unverified
-
-**What it means:** Newly added machines or machines under evaluation. The system hasn't yet completed enough testing to confirm platform standards. This is not a judgment of quality-only that no platform guarantee exists yet.
-
-**Do**
-- [Pass the Self-Test](https://docs.vast.ai/host/how-to-self-test)
-- Maintain steady uptime during evaluation.
-- Ensure drivers/CUDA and networking are correctly installed and reachable.
-- Keep the environment clean; schedule work via Create Job only.
-
-**Avoid**
-- Unnecessary reboots or configuration changes.
-- Unrelated background workloads that consume GPU/CPU/IO.
-
----
-
-### Minimum Requirements for Verification
+<span id="additional-requirements-for-verification" aria-hidden="true" />
+<span id="minimum-requirements-for-verification" aria-hidden="true" />
+## Verification Requirements
 
 Your machine must meet all of the following.
 
-#### GPU
+### GPU
 
 | Requirement | Minimum |
 | --- | --- |
@@ -70,21 +54,19 @@ Your machine must meet all of the following.
 | GPU models | All identical, do not mix models in one machine |
 | PCIe bandwidth | More than 2.85 GiB/s per GPU |
 
-#### CPU
+### CPU
 
 | Requirement | Minimum |
 | --- | --- |
 | CPU architecture | x86_64 or ARM64 |
-| Instruction set | AVX |
+| Instruction set | Use an AVX-capable x86_64 CPU. For ARM64, clarify the published AVX requirement with Vast before choosing the hardware. |
 | Physical CPU cores | 2 per GPU |
 
 <Note>
-**On ARM64 (aarch64), CUDA 12.6 or newer is required.** The CUDA 11.8
-Self-Test image is built for x86_64 only, so Maxwell and Pascal GPUs cannot
-be verified on ARM64.
+The public [Host Setup guide](https://cloud.vast.ai/host/setup) lists CUDA 12.6 or newer for ARM64. The pinned Self-Test image build supports CUDA 11.8 on `linux/amd64`; its CUDA 12.8 and newer variants also target `linux/arm64`. These image build targets do not establish which ARM64 hosts or GPUs are eligible for platform verification.
 </Note>
 
-#### Memory
+### Memory
 
 | Requirement | Minimum |
 | --- | --- |
@@ -97,7 +79,7 @@ be verified on ARM64.
 96 GB x 8 = 730 GB
 </Note>
 
-#### Network
+### Network
 
 | Requirement | Minimum |
 | --- | --- |
@@ -108,12 +90,10 @@ be verified on ARM64.
 | Forwarded ports | 5 ports per GPU, 100 ports per GPU recommended |
 
 <Warning>
-Renters connect directly to the machine over the WAN, so it needs a public
-IPv4 address with the port range forwarded to it. Machines behind CGNAT or a
-shared ISP IP cannot be used for hosting.
+Verification guidance requires a public IPv4 address with the port range forwarded to the machine. CGNAT and shared ISP IPs are not supported for this configuration.
 </Warning>
 
-#### Operating system
+### Operating System
 
 | Requirement | Minimum |
 | --- | --- |
@@ -122,7 +102,7 @@ shared ISP IP cannot be used for hosting.
 | NVIDIA driver | A currently supported release for your GPU |
 | SSH login | SSH keys only, password authentication disabled |
 | SSH access keys | A unique key pair per machine, never shared or reused |
-| Secure Boot | Disabled |
+| Secure Boot | Recommended: disable before installing the NVIDIA driver |
 
 <Note>
 Use a server edition. Desktop editions are not supported.
@@ -143,19 +123,18 @@ will fail verification. See
 </Warning>
 
 <Warning>
-Use a separate SSH key pair for each machine you operate. One key reused across
-your fleet means a single compromise exposes every machine you host.
+Use a separate SSH key pair for each machine you operate. If a reused private key is compromised, every machine that trusts that key may be exposed; separate keys limit that shared access.
 </Warning>
 
-#### Storage
+### Storage
 
 | Requirement | Minimum |
 | --- | --- |
 | Storage type | SSD |
-| Dedicated drive for Docker container storage | 200 GB |
+| Dedicated partition for Docker container storage | 200 GB |
 | Root partition free space | 20 GB |
 
-#### Reliability
+### Reliability
 
 | Requirement | Minimum |
 | --- | --- |
@@ -166,67 +145,67 @@ Reliability starts low on a new machine and grows the longer the machine
 stays online. A stable machine typically reaches 90% within a few days.
 </Note>
 
-#### Self-Test
+### Self-Test
 
-You can check whether your machine is ready for verification by running a
-Self-Test. See [How to Self-Test](/host/how-to-self-test).
+Use Self-Test to check the CLI’s preflight requirements and run its diagnostic workload. Review the published verification requirements separately. See [How to Self-Test](/host/how-to-self-test).
 
 <Warning>
-**Dedicated machines only.** Any personal workload, such as mining, gaming,
-running your own jobs, or using the machine as a desktop, will automatically
-fail verification.
+**Keep the machine dedicated to Vast workloads.** Avoid local mining, gaming, desktop use or other jobs that compete with renter work. Run permitted jobs through the Jobs tab or `create job`. See [Workload Policy](/host/workload-policy).
 </Warning>
 
 <Tip>
-Meeting these minimum requirements makes your machine eligible for verification, but does not automatically guarantee verification. [Read More about Verification](https://docs.vast.ai/host/understanding-verification)
+Meeting these minimum requirements makes your machine eligible for verification, but does not automatically guarantee verification. [Read more about verification](/host/understanding-verification).
 </Tip>
----
 
+The [generated Self-Test Reference](/host/self-test-reference) describes the checks in its pinned CLI and test-image revisions. Those checks are not a substitute for the platform requirements on this page.
 
-### Verified
+<Note>
+Meeting requirements makes the machine eligible. It does not guarantee immediate verification, search placement, or rentals.
+</Note>
 
-**What it means:** The machine passed automated checks for reliability, network stability, operational health, and performance. A Verified machine consistently delivers server services to platform standards.
+## Unverified
 
-**Do**
-- Monitor health (uptime, thermals, power) and respond to alerts.
-- Keep drivers/CUDA on compatible, **latest** stable versions.
-- Maintain stable, symmetric bandwidth.
+Unverified means the machine is new, under evaluation, or not currently meeting verification conditions.
 
-**Avoid**
-- Downgrading hardware capacity (e.g., reducing GPU count, disk or RAM).
-- Allowing thermal, power, or bandwidth instability under load.
+Do:
 
----
+- Pass [self-test](/host/how-to-self-test).
+- Keep uptime stable.
+- Fix driver, network, storage, and daemon errors.
+- Avoid background workloads outside the Jobs tab or `create job`.
 
-### Deverified
+Avoid unnecessary reboots or hardware/config changes during evaluation.
 
-**What it means:**
-A previously Verified machine no longer meets requirements. System continuous monitoring detects sustained degradation.
+## Verified
 
-**When will deverification happen?**
-- When the hosting software detects an error, your machine is automatically, but **temporarily**, deverified. It will appear as *Unverified* in search results until the underlying issue is resolved.
+Verified means the machine passed automated checks and currently meets platform standards.
 
-**How should I begin fixing it?**
-- A **red error indicator** will appear on your machine in the Machines tab. Use this message to identify and investigate the issue in your logs or metrics.
+Keep it verified by:
 
-**Recovery:**
-Fix the issue and restore stability; the system will **automatically** transition back to Verified once system confirms healthy operation.
-This process may take some time, as the system ensures that the issue is fully resolved before restoring verification. Most error messages are cleared within 1-2 hours of resolution.
+- Monitoring thermals, power, drivers, Docker, and daemon health.
+- Keeping networking stable and reachable.
+- Avoiding hardware reductions after the machine is created.
+- Responding quickly to red machine errors.
 
-**Common causes**
-- Network instability, closed ports, or low bandwidth.
-- Hardware/system errors (e.g., failing storage, insufficient PCIe bandwidth).
-- GPU issues (e.g., nvidia-smi/NVML failures, container device init errors).
-- Container launch failures or repeated runtime exceptions.
-- Detected abuse or policy violations.
+## Deverified
 
-**Do**
-- Investigate red error indicators quickly; review logs and metrics.
-- Validate thermal/power headroom and bandwidth under load.
-- Re-check health after changes to confirm resolution.
+Vast’s [published verification guidance](https://github.com/vast-ai/docs/blob/175a318c27750ea64da94f043dda39ec5cb26259/host/hosting-overview.mdx#L281-L285) says an active error causes deverification; the machine is verified again once that error clears. A reliability drop alone does not remove verification.
 
-**Avoid**
-- Ignoring warnings or allowing instability to persist.
-- Reducing hardware below the created specification.
+Common causes:
 
-> **Note:** If you’ve fixed the issue but the system doesn’t automatically detect the resolution, a Vast.ai team member may need to manually check that your machine is functioning correctly and clear the error.
+- Network instability, closed ports or low bandwidth reported as an active machine error.
+- GPU, NVML, Xid, PCIe, power, thermal or storage problems reported as an active machine error.
+- Machine-level Docker or NVIDIA runtime errors, such as `unknown or invalid runtime nvidia`; some per-instance launch failures are logged without affecting verification.
+- Active machine errors, as described in Vast’s [published verification guidance](https://github.com/vast-ai/docs/blob/175a318c27750ea64da94f043dda39ec5cb26259/host/hosting-overview.mdx#L281-L285).
+- An administrator-set machine error, such as a machine flagged for investigation.
+
+Fix the underlying issue and monitor the machine’s error and status. Some errors clear automatically after the platform detects recovery; others may need a Vast.ai team member to inspect and clear them. Clearing an error is distinct from manually selecting a machine for verification.
+
+## Read Next
+
+| Topic | Page |
+| --- | --- |
+| What verification means | [Understanding Verification](/host/understanding-verification) |
+| Running self-test | [How to Self-Test](/host/how-to-self-test) |
+| Generated self-test checks | [Self-Test Reference](/host/self-test-reference) |
+| Direct ports | [Network & Ports](/host/network-ports) |

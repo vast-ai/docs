@@ -1,0 +1,81 @@
+{
+  "schema_version": "1.0",
+  "evidence_id": "HIST-04-source-inspection-01",
+  "date": "2026-09-08",
+  "scope": "Static inspection of two public download artifacts and source-only local TUI context; no execution, host/API/SSH access, credentials, or service changes.",
+  "artifacts": [
+    {
+      "role": "public_installer_script",
+      "source_url": "https://console.vast.ai/install",
+      "stored_path": ".orchestra/h100x4-install-history/source-inspection-01-restricted/public-install",
+      "sha256": "6b00488ccf837ed6b7b5375270b75db284c3906f6aec832ad9c8573f44eaac6c",
+      "bytes": 89020,
+      "mode": "0600",
+      "identification": "UTF-8 Python script",
+      "executed": false
+    },
+    {
+      "role": "public_tui_binary",
+      "source_url": "https://s3.amazonaws.com/public.vast.ai/host-installer-wizard-linux-x86_64",
+      "stored_path": ".orchestra/h100x4-install-history/source-inspection-01-restricted/host-installer-wizard-linux-x86_64",
+      "sha256": "0d078186004a37f8d2518fced156d39caf0ae36834797f008ce79d53459c268e",
+      "bytes": 32295864,
+      "mode": "0600",
+      "identification": "stripped x86-64 ELF; Build ID 85c0774f6116b4a98dbb3ea5f31cd2a68d4b21ba",
+      "executed": false
+    }
+  ],
+  "local_tui_source": {
+    "path": "<RESTRICTED_LOCAL_CHECKOUT>/host-installer-wizard",
+    "revision": "2d33c362bd0293f73730b258e77c9bcd1945ee14",
+    "provenance_limit": "Source-only context; no source-to-downloaded-binary correspondence was established."
+  },
+  "findings": [
+    {
+      "id": "HIST-04-A",
+      "status": "PASS_STATIC_ONLY",
+      "claim": "The inspected installer automatically attempts machine registration.",
+      "evidence": ["public-install:97-121", "public-install:1586-1607"]
+    },
+    {
+      "id": "HIST-04-B",
+      "status": "PASS_STATIC_ONLY",
+      "claim": "The inspected installer conditionally launches a self-test after a machine ID and successful speed-test output; its parser contains no self-test-disable or public-rental/listing-prevention flag.",
+      "evidence": ["public-install:1387-1411", "public-install:1658-1927", "public-install:1943-1969"]
+    },
+    {
+      "id": "HIST-04-C",
+      "status": "UNVALIDATED",
+      "claim": "Automatic public listing is not established by this static inspection.",
+      "evidence": ["public-install:1971-1974", "host-installer-wizard/docs/support_guide.md:9-10"],
+      "limit": "Dynamically obtained update/self-test components were not inspected."
+    },
+    {
+      "id": "HIST-04-D",
+      "status": "UNVALIDATED",
+      "claim": "No documented safe real-install no-public-rental mode was found; TUI source cannot pass such a control.",
+      "evidence": ["host-installer-wizard/docs/installer_interface.md:33-53", "host-installer-wizard/src/host_installer_wizard/workers/installer_runner.py:1123-1138", "host-installer-wizard/src/host_installer_wizard/app.py:431-459", "host-installer-wizard/README.md:51-65"]
+    },
+    {
+      "id": "HIST-04-E",
+      "status": "UNVALIDATED",
+      "claim": "The local TUI source is not proven to correspond to the downloaded binary.",
+      "evidence": ["downloaded TUI SHA-256 and static file metadata only"]
+    },
+    {
+      "id": "HIST-04-F",
+      "status": "FAIL_CLOSED",
+      "claim": "The stock installer/TUI cannot guarantee the authorized initial-publication prices, expiry bound, or no-reboot constraint.",
+      "evidence": ["public-install:1387-1411", "public-install:1486-1491", "public-install:1963-1967", "public-install:1667-1682", "public-install:1207-1212", "host-installer-wizard/src/host_installer_wizard/workers/installer_runner.py:1123-1138"],
+      "limits": ["Self-test positional value units and semantics are not defined by the inspected script.", "Dynamic downstream components were not inspected."]
+    }
+  ],
+  "residual_risks": [
+    "Unpinned dynamically retrieved update, machine-information, and self-test components.",
+    "Uninspected server-side and daemon behavior.",
+    "Unknown semantics of self-test positional arguments.",
+    "No source-to-downloaded-binary provenance proof.",
+    "No stock-path guarantee of authorized prices, offer end time, or no reboot."
+  ],
+  "authorization": "No installation, registration, self-test, listing, public rental, workload, or readiness claim is authorized by this evidence."
+}

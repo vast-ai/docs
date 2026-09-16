@@ -1,0 +1,49 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+const dir='verification/evidence/2026-09-14-host-review-handoff-attempt-01';
+const name=process.argv[2];
+if(!/^[a-z0-9-]+$/.test(name||''))throw Error('Supply unique record name');
+const output=dir+'/'+name+'.json';
+if(fs.existsSync(output))throw Error('Refuse overwrite');
+const commands=[],checks=[],started_at=new Date().toISOString();
+const browser=(...args)=>{const out=execFileSync('agent-browser',['--session','host-handoff-after',...args],{encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});commands.push({args,output:out});return out;};
+const evaluate=s=>JSON.parse(browser('eval',s));
+const record=(name,details)=>checks.push({name,result:'PASS',details});
+const live=()=>evaluate(`(()=>{const s=document.querySelector('#__vast_review_host__').shadowRoot;return {url:location.href,badge:s.querySelector('#pill').textContent,summary:s.querySelector('.vv-review-summary')?.textContent,questions:s.querySelector('.vv-owner-questions')?.textContent,questionCount:s.querySelectorAll('.vv-owner-questions article').length,filters:[...s.querySelectorAll('select[id^="current-"]')].map(x=>({id:x.id,value:x.value})),visible:[...s.querySelectorAll('[data-current-claim]')].filter(x=>!x.hidden).map(x=>({id:x.getAttribute('data-current-claim'),status:x.getAttribute('data-current-status')})),notice:s.querySelector('#current-location-notice')?.textContent}})()`);
+const offline=()=>evaluate(`({url:location.href,page:document.querySelector('#page').value,status:document.querySelector('#status').value,summary:document.querySelector('#page-claim-summary').textContent,questionCount:document.querySelectorAll('#owner-question-list article').length,questions:document.querySelector('#owner-question-list').textContent,cards:[...document.querySelectorAll('#claim-list > article')].map(x=>({id:x.id,text:x.textContent.slice(0,240)})),dialog:{open:document.querySelector('#viewer').open,text:document.querySelector('#viewer-body').textContent.slice(0,5000)}})`);
+const shot=tag=>browser('screenshot',path.resolve(dir+'/'+name+'-'+tag+'.png'));
+let error=null;
+try{
+ browser('open','http://127.0.0.1:4000/host/datacenter-status#requirements');
+ browser('click','#pill');browser('wait','#current-section-filter');
+ let state=live();assert.match(state.summary,/5 Correction needed/);assert.equal(state.questionCount,2);assert.match(state.badge,/V&V open checks: 7/);record('Live page-wide summary and separate badge',state);
+ browser('select','#current-work-filter','completed');browser('select','#current-status-filter','PASS');
+ state=live();assert.equal(state.questionCount,2);assert.match(state.summary,/5 Correction needed/);record('Live questions and total survive conflicting filters',state);
+ browser('click','[data-current-show-all-corrections]');state=live();assert.equal(state.visible.length,5);assert.ok(state.visible.every(x=>x.status==='FAIL'));assert.equal(state.filters.find(x=>x.id==='current-section-filter').value,'');record('Live show all corrections clears heading and category',state);shot('datacenter');
+ browser('click','[data-current-owner-question-claim="MCL-d5001953fbd7df0b"]');state=live();assert.match(state.notice,/located|highlight|exact/i);record('Live owner question locates customer passage',state);
+ browser('open','http://127.0.0.1:4000/host/payment#payout-methods');browser('wait','#pill');
+ if(!evaluate(`document.querySelector('#__vast_review_host__').shadowRoot.querySelector('#panel').classList.contains('open')`))browser('click','#pill');
+ browser('wait','#current-section-filter');state=live();assert.equal(state.questionCount,1);assert.match(state.questions,/\$20/);record('Live payout question visible outside its heading',state);
+ browser('click','[data-current-owner-question-claim="MCL-e2b956d14494e470"]');
+ const payout=evaluate(`(()=>{const s=document.querySelector('#__vast_review_host__').shadowRoot;const c=s.querySelector('[data-current-claim="MCL-e2b956d14494e470"]');return {text:c.textContent,sourceLinks:[...c.querySelectorAll('a')].map(a=>a.href).filter(h=>h.includes('basis='))}})()`);
+ assert.match(payout.text,/Published guidance checked/);assert.match(payout.text,/does not test invoice generation or payment processing/);assert.ok(payout.sourceLinks.length);record('Live publication scope and bound source retained',payout);
+ const response=await fetch(payout.sourceLinks[0]);const source=await response.text();assert.equal(response.status,200);assert.match(source,/Published Host Payouts guidance/);record('Live bound source destination',{url:payout.sourceLinks[0],http_status:response.status,source_sha256:crypto.createHash('sha256').update(source).digest('hex')});
+ browser('open','file://'+path.resolve('verification/host-docs-review.html')+'#claims');browser('wait','#owner-question-list article');
+ state=offline();assert.equal(state.questionCount,6);record('Offline separate six-question list',state);
+ browser('select','#page','/host/datacenter-status');browser('select','#status','PASS');browser('select','#work-category','completed');browser('fill','#search','no-matching-claim-test');
+ state=offline();assert.equal(state.questionCount,2);assert.match(state.summary,/17 passages/);assert.match(state.summary,/5 Correction needed/);assert.equal(state.cards.length,0);record('Offline page summary and questions survive claim filters',state);
+ browser('click','#show-all-corrections');state=offline();assert.equal(state.page,'/host/datacenter-status');assert.equal(state.status,'FAIL');assert.equal(state.cards.length,5);record('Offline corrections stay on selected page',state);
+ browser('click','[data-owner-question-claim="MCL-d5001953fbd7df0b"]');state=offline();assert.ok(state.dialog.open);assert.match(state.dialog.text,/Government-issued ID/);record('Offline owner question opens exact passage',state);browser('click','#close-viewer');
+ browser('select','#page','/host/payment');browser('select','#status','PASS');browser('fill','#search','MCL-e2b956d14494e470');
+ state=offline();assert.equal(state.questionCount,1);assert.match(state.questions,/\$20/);assert.equal(state.cards.length,1);assert.match(state.cards[0].text,/Published guidance checked/);record('Offline source-only PASS coexists with owner question',state);
+ browser('click','.claim summary');
+ browser('click','[data-basis="0"][data-context="MCL-e2b956d14494e470"]');state=offline();assert.ok(state.dialog.open);assert.match(state.dialog.text,/Published Host Payouts guidance/);assert.match(state.dialog.text,/SHA-256/);record('Offline retained source opens with native control',state);shot('payout-source');browser('click','#close-viewer');
+ for(const [route,word] of [['/host/volume-offers','secure-erasure'],['/host/workload-policy','personal'],['/host/guide-to-taxes','tax']]){
+  browser('select','#page',route);state=offline();assert.equal(state.questionCount,1);assert.ok(state.questions.toLowerCase().includes(word));record('Offline question retained for '+route,state);
+ }
+}catch(e){error=e.stack||String(e);}
+const result={started_at,finished_at:new Date().toISOString(),result:error?'FAIL':'PASS',error,checks,commands,html_sha256:crypto.createHash('sha256').update(fs.readFileSync('verification/host-docs-review.html')).digest('hex'),server_sha256:crypto.createHash('sha256').update(fs.readFileSync('review-server.mjs')).digest('hex'),limits:'Local browser UI checks only. Native agent-browser clicks/selects/fills activate controls; DOM reads inspect results. Bound live source destination is fetched from the actual href. No Host/API, account, payment, policy confirmation, publication or human acceptance.'};
+fs.writeFileSync(output,JSON.stringify(result,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({artifact:output,result:result.result,checks:checks.length,error}));process.exitCode=error?1:0;

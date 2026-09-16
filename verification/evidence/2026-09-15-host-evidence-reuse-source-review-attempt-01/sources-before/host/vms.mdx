@@ -1,0 +1,122 @@
+---
+title: "VMs & IOMMU"
+sidebarTitle: "VMs & IOMMU"
+createdAt: Mon Jan 13 2025 21:20:40 GMT+0000 (Coordinated Universal Time)
+updatedAt: Wed Jan 15 2025 00:37:08 GMT+0000 (Coordinated Universal Time)
+personas:
+  - pro-operator
+  - headless-operator
+---
+
+<div className="persona-chips"><span className="persona-chip">Pro Operator</span><span className="persona-chip">Headless / DC</span></div>
+
+Vast can run KVM virtual machines in addition to Docker containers. VM support is optional and depends heavily on hardware, BIOS, kernel, and GPU configuration.
+
+<Warning>
+VMs interact more directly with hardware than containers. Enable them only when the machine supports IOMMU and remains stable.
+</Warning>
+
+Default host onboarding should still start from the official [Vast host setup page](https://cloud.vast.ai/host/setup/). Use this page only for optional VM/IOMMU planning or troubleshooting after the normal host setup path is understood.
+
+## When VM Support Helps
+
+VM support can make a host visible to renters using VM templates and can help with workloads that need:
+
+- Systemd, Docker Compose, Kubernetes, or Docker build workflows.
+- Non-Linux OS images.
+- `ptrace` tooling such as NVIDIA Nsight.
+
+Single-GPU hosts usually have the lowest VM risk. Multi-GPU RTX 40-series hosts may also benefit. Multi-GPU datacenter hosts should be more cautious until VM P2P/NVLink behavior is a good fit for the workload.
+
+## Tradeoffs
+
+- IOMMU settings can reduce PCIe peer-to-peer performance on some multi-GPU systems.
+- VMs can use more disk than containers.
+- Hosts with VM support may need higher disk and bandwidth prices.
+
+## Check VM Status
+
+```bash
+python3 /var/lib/vastai_kaalia/enable_vms.py check
+```
+
+Results:
+
+| Status | Meaning |
+| --- | --- |
+| `on` | VM support is enabled. |
+| `off` | VM support is disabled, a previous test failed, or the status helper could not read its configuration. |
+| `pending` | No enablement attempt has completed; the host may be evaluated when idle. |
+
+These values describe VM configuration state only. They do not confirm that the Host is idle or that a VM workload is healthy.
+
+## Disable VM Support
+
+<Warning>
+Disabling VM support changes Host configuration and can disrupt running work. Prevent new rentals during the approved maintenance window, then confirm the machine has no active rentals or other workloads.
+</Warning>
+
+```bash
+sudo python3 /var/lib/vastai_kaalia/enable_vms.py off
+```
+
+The command marks VM enablement disabled and removes the VM configuration entry when present. It does not stop workloads, end rentals, or verify that the Host is safe to change.
+
+Run [Check VM Status](#check-vm-status) afterwards and confirm it reports `off`. Most hosts do not need to disable anything; unsupported machines are detected automatically.
+
+## Hardware Requirements
+
+VM support requires CPU/chipset support for Intel VT-d or AMD-Vi, plus BIOS virtualization support.
+
+In BIOS, enable virtualization and IOMMU/VT-d/AMD-Vi options.
+
+## Kernel Options
+
+Edit `/etc/default/grub` and add the appropriate IOMMU option plus NVIDIA modeset disablement:
+
+```text
+GRUB_CMDLINE_LINUX="intel_iommu=on nvidia_drm.modeset=0"
+```
+
+Use `amd_iommu=on` instead of `intel_iommu=on` on AMD platforms.
+
+Some hosts may also need:
+
+```text
+rd.driver.blacklist=nouveau modprobe.blacklist=nouveau
+```
+
+Apply and reboot:
+
+```bash
+sudo update-grub
+sudo reboot
+```
+
+## Display Managers And GPU Processes
+
+Disable display managers, XOrg/Wayland sessions, and background GPU processes. `nvidia-persistenced` is okay because it is managed by the host stack.
+
+## Retry Enablement
+
+If VM support is off and you want to retry after fixing the host:
+
+<Warning>
+This is a forced, state-changing setup retry—not a simple toggle. It can install VM packages, pull a test image, restart Host services, and run a GPU-passthrough test. Prevent new rentals during the approved maintenance window, then confirm there are no active rentals, containers, or GPU workloads.
+</Warning>
+
+```bash
+sudo python3 /var/lib/vastai_kaalia/enable_vms.py on -f
+```
+
+Do not use process exit status alone as evidence of success. The helper can print an error such as `IOMMU groups not set up for VMs, aborting.` while exiting with status `0`.
+
+After the command finishes, check the resulting state and basic Host health:
+
+```bash
+python3 /var/lib/vastai_kaalia/enable_vms.py check
+nvidia-smi -L
+systemctl is-active vastai.service docker.service
+```
+
+Treat only exact `on` status, visible expected GPUs, and active Host services as a successful enablement. Treat `pending`, `off`, error or abort text, an unexpected status, a missing GPU, or an inactive service as a failure. If IOMMU groups are not set up, correct the BIOS and kernel IOMMU configuration, reboot, and verify the grouping before retrying.

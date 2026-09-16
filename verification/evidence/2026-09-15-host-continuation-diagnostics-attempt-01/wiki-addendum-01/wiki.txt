@@ -1,0 +1,1664 @@
+☰ Menu
+On this page
+‹
+☰
+Common Error Messages and Possible Answers
+Comprehensive error reference for Vast.ai GPU hosting.
+Each error includes a researched
+Expert Answer
+with vendor documentation references,
+followed by
+Community Answers
+ranked 1–5 stars (showing rank 3+).
+Use the
+sidebar
+to navigate between errors.
+Last updated: 2026-04-08
+Top 20 Most Reported Errors
+1. bad bandwidthtest2: {'ERROR_CONDITION': 'not r_H2D or not r_D2H or not r_D2D', 'gpu_idx: N}
+Frequency:
+71 occurrences
+First seen:
+2024-02-05T01:34
+Error message:
+bad bandwidthtest2: {'ERROR_CONDITION': 'not r_H2D or not r_D2H or not r_D2D', 'gpu_idx': 0}
+Expert Answer
+This is best read as a failed GPU copy-path sanity check: host-to-device, device-to-host, and/or device-to-device transfer validation did not return acceptable results. NVIDIA's current tooling for this area is DCGM's PCIe/GPU bandwidth diagnostics and NVBandwidth, and NCCL explicitly warns that VT-d/IOMMU/ACS can interfere with GPU-direct traffic or even hang it. On a Vast host, repeated hits usually mean an unhealthy GPU, PCIe/topology problem, or driver/runtime/container exposure problem, not just an application bug.
+Diagnostic commands:
+nvidia-smi -q
+dcgmi diag -r 3
+journalctl -k | grep -i 'NVRM: Xid|AER|fallen off'
+lspci -vvv | grep ACSCtl
+References:
+NVIDIA CUDA Samples – Bandwidth Test
+,
+Vast.ai Host Docs
+Community Answers
+Community Answer 1 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 3.0)
+This error indicates that one or more of your GPUs may have fallen off the bus or is not communicating properly. First, use nvidia-smi to verify all GPUs are being detected properly by the system. If a GPU is not listed, this is often a power supply issue such as a molten cable or faulty PSU. As a temporary fix, you can relist the machine, but this requires manual intervention and is not a permanent solution. On fresh installations, the error may sometimes resolve itself after waiting a few hours.
+Community Answer 2 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 3.0)
+This error is related to CUDA driver issues. The bandwidth test error indicates the system is not properly detecting host-to-device (H2D), device-to-host (D2H), or device-to-device (D2D) transfers. To get verified as a GPU host, you need to meet the following requirements: CUDA version greater than or equal to 12.0, Reliability of 90%, At least 3 open ports per GPU (100 recommended), Internet download speed of 500 Mb/s, Internet upload speed of 500 Mb/s, and GPU RAM of 7 GB. The bandwidth test error can potentially be fixed by running the Vast install command, especially after Ubuntu updates.
+Community Answer 3 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This bandwidth test error indicates a GPU failure or communication problem between the host and GPU memory. The error means the GPU failed one or more bandwidth tests: Host to Device (H2D), Device to Host (D2H), or Device to Device (D2D) transfers. This typically indicates the GPU has a hardware problem, is missing, or is not functioning properly for data transfers. If this is a one-time occurrence, it may be a temporary glitch that disappears on the next bandwidth test run. If the error persists, investigate the following: First, check system logs using sudo dmesg -T | grep -E "NVRM|AER|fallen" or journalctl -o short-precise -k -b -1 | grep -E "NVRM|AER|fallen" to diagnose the issue. Second, verify that nvidia-persistenced mode is enabled by running nvidia-smi -pm 1. Third, check that the GPU is properly seated in its PCIe slot. Fourth, verify the GPU power connector (especially the 12-pin connector) is fully seated and secure, as a loose or disconnected power connector is a common cause. Fifth, ensure adequate power delivery to the GPU. The gpu_idx number in the error message indicates which specific GPU is affected (gpu_idx 0 means the first GPU, gpu_idx 3 means the fourth GPU, etc.).
+Community Answer 4 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error indicates a GPU bandwidth test failure where the GPU is not properly communicating with the system. The error occurs when one or more bandwidth tests (Host-to-Device, Device-to-Host, or Device-to-Device) fail. There are several potential causes and solutions:
+Hardware Issues (most serious): GPU falling off the bus, power supply issues (unplugged or loose 12-pin power connector), or riser problems. Check dmesg -t output and verify nvidia-smi is working properly to diagnose.
+Platform Issue: This may be a Vast.ai platform issue affecting multiple machines. Try restarting the Vast.ai daemon: sudo systemctl restart vastai
+nvidia-container-toolkit Version Issue: The problem may be caused by nvidia-container-toolkit version causing GPU UUID problems. Downgrade nvidia-container-toolkit-base and nvidia-container-toolkit to version 1.15.0-1, then place a hold on these packages using apt to prevent automatic updates. Check vast kaalia logs at /var/lib/vastai_kaalia/kaalia.logX for errors around docker run commands.
+Broken Self-Test Script: Download an updated vast.py script using these commands:
+sudo rm vast
+sudo wget
+https://github.com/jjziets/vast-python/raw/refs/heads/self-test/vast.py
+-O vast
+sudo chmod +x vast
+Community Answer 5 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+The bandwidth test error indicates that the GPU failed one or more data transfer tests (Host to Device, Device to Host, or Device to Device). This error points to problems with GPU communication or driver configuration. While it could be caused by server issues or a temporary glitch, this error is commonly related to compatibility issues with Ubuntu 24. The recommended solution is to use Ubuntu 22 instead, as Ubuntu 24 may have compatibility problems with Vast, nvidia-docker, or other system requirements. Switching to Ubuntu 22 typically provides better stability.
+2. No such file or directory
+Frequency:
+42 occurrences
+First seen:
+2024-03-02T17:53
+Error message:
+No such file or directory
+Expert Answer
+This is generic Linux
+ENOENT
+, but on Ubuntu it is often more subtle than "the file is missing." For executed programs,
+execve
+also returns
+ENOENT
+when the script interpreter or ELF interpreter does not exist, so a file can be present and still fail with this message if its shebang or loader path is wrong. On Vast hosts this commonly comes from stale script paths, moved binaries, broken symlinks, or mounts that exist on the host but not inside the container.
+Diagnostic commands:
+ls -la /path/to/file
+file /path/to/binary
+ldd /path/to/binary
+References:
+errno(3) man page
+Community Answers
+Community Answer 1 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+The issue is with the path syntax. Instead of trying to execute "./var/lib/vastai_kaalia/send_mach_info.py" from root, you need to first change to the correct directory using "cd /var/lib/vastai_kaalia/" and then execute the script with "./send_mach_info.py --speedtest". The error occurred because the user was trying to execute the file with an incorrect relative path.
+Community Answer 2 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 5.0)
+The error occurs because the download and install should be done as two separate commands, not combined into one. The correct installation process is:
+wget
+https://s3.amazonaws.com/vast.ai/install.py
+sudo python3 install.py
+First download the installer script using wget, then run it with python3. Make sure you are in the same directory where you downloaded install.py when you run the second command, or the file will not be found.
+If you continue to have issues after installation, you can check the vast daemon logs with:
+tail /var/lib/vastai_kaalia/kaalia.log -f
+Community Answer 3 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+Navigate to /var/lib/vastai_kaalia/data/ and run sudo rm nvidia_smi.json to remove the file (note the underscore in the filename, not a hyphen), then restart the vast daemon. If the file doesn't exist, you'll get a no such file or directory error. If this doesn't resolve the issue, run the Vast.ai install command again, as reinstalling Vast.ai can resolve nvidia-smi related problems. Using sudo apt remove --purge nvidia* won't take care of this specific file, so it must be removed manually.
+Community Answer 4 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+The log file path is incorrect. Use "cat /var/lib/vastai_kaalia/kaalia.log | grep download" instead of "/var/lib/docker/kaalia.log". The instance is likely still downloading the Docker image and won't start until the download is complete.
+Community Answer 5 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+You need to download and install the vast CLI tool first from
+https://cloud.vast.ai/cli/
+. The CLI tool is a management tool that can be used to manage rigs and check machine status, including whether machines are rentable or not. The error occurs because the vast executable hasn't been downloaded or isn't in the current directory.
+3. error: Bind to port NNNNN on 0.0.0.0 failed: Address already in use.
+Frequency:
+32 occurrences
+First seen:
+2024-02-07T01:25
+Error message:
+error: Bind to port 50200 on 0.0.0.0 failed: Address already in use.
+Expert Answer
+This is plain Linux
+EADDRINUSE
+: something is already bound to that port, or in rarer cases the ephemeral port range is exhausted. On Docker dual-stack hosts, one published port can occupy both IPv4 and IPv6, so stale listeners or parallel tests can collide across both families.
+Diagnostic commands:
+ss -ltnp
+lsof -i :PORT
+Look for reused fixed test ports in your automation.
+References:
+bind(2) man page
+Community Answers
+Community Answer 1 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error occurs when trying to bind SSH to a port that is already in use by another process. However, the port bind message itself is often not the actual root cause of the problem. First, check if another process is already using the port, which would prevent the SSH daemon from binding to that address. More importantly, check the kaalia logs (not the service logs) located in /var/lib/vastai_kaalia folder for the real underlying cause of the problem. Also verify you are looking at the correct logs - sometimes users mistakenly look at their own vastai instance logs rather than the relevant client connection attempt logs.
+Community Answer 2 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+The port bind error message in vastai.service logs is often not the actual underlying problem. First, check the kaalia logs located in /var/lib/vastai_kaalia folder instead of the service logs, as the real issue will be shown there. If the problem persists, try restarting both the vastai and docker services using these commands: sudo systemctl restart vastai and sudo systemctl restart docker. This can resolve port binding conflicts where the SSH daemon cannot bind because the port is already in use by another process. Additionally, verify that you have explicitly configured which ports your server should use in the Vast.ai host settings, as not specifying ports causes Vast.ai to default to using 0 ports, which can cause SSH binding failures. If none of these solutions work, contact Vast.ai web chat support through the website.
+Community Answer 3 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error occurs when the vastai service cannot bind to port 20000 because another process is already using it. Here are the steps to resolve this issue.
+First, identify what is using port 20000 by running:
+sudo lsof -i :20000
+or
+sudo netstat -tlnp | grep 20000
+If you find an sshd process or another service using the port, stop it. For lingering sshd processes:
+sudo pkill -f "sshd.*20000"
+Next, ensure the host port range file is configured correctly. Create or edit the file:
+sudo nano /var/lib/vastai_kaalia/host_port_range
+Add the following content specifying your desired port range:
+18000-20000
+Make sure no other services on your system are configured to use ports in this range.
+After making these changes, restart the vastai service:
+sudo systemctl restart vastai
+Then check the service status:
+sudo systemctl status vastai
+If the service still fails, check the logs for more details:
+sudo journalctl -u vastai -f
+For 8xRTX 5090 setups specifically, ensure your NVIDIA drivers are properly installed and all GPUs are detected by running nvidia-smi before starting the vastai service.
+If the issue persists after these steps, try rebooting the machine to clear any stuck processes, then restart the vastai service. You can also try using a different port range in the host_port_range file, such as 15000-17000, to avoid conflicts with other services.
+For additional troubleshooting scripts and host management tools, refer to the JJZiets VastTools repository at
+https://github.com/jjziets/vasttools
+. The official Vast.ai Host Guide at
+https://docs.vast.ai/documentation/reference/host
+also provides detailed configuration guidance.
+Community Answer 4 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+This appears to be an error that can be resolved by restarting the vastai and docker services using the commands: sudo systemctl restart vastai and sudo systemctl restart docker. The error indicates a port conflict issue that requires service restart to clear.
+Community Answer 5 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+This error occurs when Vast.ai launches a duplicate service that tries to bind to the same port (commonly port 16484 or 32768). According to users, this is generally harmless and does not prevent the service from working - clients can still rent, payments still process, and rigs remain verified. The duplicate service fails to bind but the main service continues to function normally. The error happens because the vastai.service is already running with an sshd process bound to that port, and when the service tries to restart or spawn another instance, it fails because the port is already occupied. One user reports that adding a single character 'r' as a patch to Vast.ai scripts fixes the issue and has worked for them for half a year without problems. If you need to resolve it manually, you can kill the existing sshd process occupying the port.
+4. error: Bind to port NNNNN on :: failed: Address already in use.
+Frequency:
+28 occurrences
+First seen:
+2024-03-04T19:42
+Error message:
+error: Bind to port 3150 on :: failed: Address already in use.
+Expert Answer
+This is plain Linux
+EADDRINUSE
+: something is already bound to that port, or in rarer cases the ephemeral port range is exhausted. On Docker dual-stack hosts, one published port can occupy both IPv4 and IPv6, so stale listeners or parallel tests can collide across both families.
+Diagnostic commands:
+ss -ltnp
+lsof -i :PORT
+Look for reused fixed test ports in your automation.
+References:
+bind(2) man page
+Community Answers
+Community Answer 1 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error typically appears when the SSH daemon is already running and bound to a port, so when the service tries to bind again it sees the address is in use. In most cases, this is normal and can be ignored. Vast.ai launches a duplicate service which fails to bind to the port, but this is harmless. If your main vastai.service shows as green/running and active, the error from the duplicate service does not affect functionality and clients can still rent your machine. However, if the service is actually failing and stuck in a restart loop, you should diagnose what process is using the port. To check what process is using a specific port, run: sudo lsof -i :PORT_NUMBER or sudo netstat -tulpn | grep PORT_NUMBER. Once you identify the conflicting process, you can decide whether to stop it or reconfigure the port assignment.
+Community Answer 2 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error indicates there are multiple instances of the service running on the same port. The solution is to stop the vastai service, kill the kaalia process, and restart vastai using these commands: systemctl stop vastai; pkill -9 kaalia; systemctl start vastai. Then check the status with systemctl status vastai to confirm the service is running properly.
+⚠️ Important:
+If you need vastai to stay stopped (for maintenance, disk replacement, etc.), you must also run
+sudo systemctl mask vastai
+because the service has
+Restart=always
+configured. To re-enable:
+sudo systemctl unmask vastai && sudo systemctl start vastai
+Community Answer 3 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+This error occurs when Vast.ai launches a duplicate service that tries to bind to the same port (commonly port 16484 or 32768). According to users, this is generally harmless and does not prevent the service from working - clients can still rent, payments still process, and rigs remain verified. The duplicate service fails to bind but the main service continues to function normally. The error happens because the vastai.service is already running with an sshd process bound to that port, and when the service tries to restart or spawn another instance, it fails because the port is already occupied. One user reports that adding a single character 'r' as a patch to Vast.ai scripts fixes the issue and has worked for them for half a year without problems. If you need to resolve it manually, you can kill the existing sshd process occupying the port.
+Community Answer 4 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+This appears to be an error that can be resolved by restarting the vastai and docker services using the commands: sudo systemctl restart vastai and sudo systemctl restart docker. The error indicates a port conflict issue that requires service restart to clear.
+Community Answer 5 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+There are multiple instances of SSH running on that port. You need to check if another service is using port 32768 or if there are duplicate SSH daemon processes running.
+5. error: Broken pipe
+Frequency:
+16 occurrences
+First seen:
+2024-05-13T15:34
+Error message:
+error: Broken pipe
+Expert Answer
+This is Linux
+EPIPE
+: your process wrote to a pipe or socket after the read side had already closed, and the writer may also receive
+SIGPIPE
+. Treat it as a downstream disconnect symptom, not the primary cause; the important question is what exited or crashed first on the other side of the pipe or socket.
+Diagnostic approach:
+Check what process was on the other end of the pipe/socket
+Look at logs for the receiving process to find the real crash or exit reason
+On Vast hosts, this commonly appears in SSH/sshd logs when a client disconnects unexpectedly
+References:
+errno(3) man page
+Community Answers
+Community Answer 1 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+These errors during Vast.ai host software installation can have two main causes. First, the broken pipe error with send_mach_info.py on Ubuntu 22.04.5 is caused by using a minimized installation that is missing required packages. Solutions include downgrading to Ubuntu 22.04.4 (regular or minimal install both work), using a regular non-minimized installation of Ubuntu 22.04.5 instead of the minimal install, or restoring with an existing installation. Second, the ModuleNotFoundError for pipes occurs because the pipes module was deprecated in Python 3.11 and completely removed in Python 3.13. To resolve this, downgrade to Python 3.12 which still supports the pipes module.
+Community Answer 2 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+A broken pipe error indicates that the connection attempt failed due to network connectivity issues. This means the system wasn't able to establish or maintain a connection to the remote host. Common causes include: internet connection problems, network interruptions, faulty ethernet cables, dirty ports, issues with network switches, or problems with the physical cable itself (especially long cables like 20m CAT8 that may have twists or damage). The port itself is unlikely to be faulty unless physically damaged. To troubleshoot: check cable connections, test with different cables, and verify all network equipment in the connection path.
+Community Answer 3 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+A broken pipe error during host registration means the wrong install key was used. This typically happens when manually selecting and copying the key instead of using the copy icon. To fix this: 1) Go to the setup page on Vast.ai, 2) Click the copy icon (not manual select/copy) to get the correct install key, 3) Run the installation command with the properly copied key. Make sure you are using the machine ID from the setup page, not your API key.
+Community Answer 4 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+Broken pipe errors in send_mach_info.py typically indicate a network communication issue between your machine and the vast.ai servers, not necessarily a fundamental system problem. Before considering anything drastic, work through these troubleshooting steps in order.
+First, check if the vast.ai API servers are reachable from your machine by running:
+curl -I
+https://vast.ai
+If that fails, you likely have a network configuration issue, firewall blocking outbound connections, or DNS problems. Check your firewall rules and ensure outbound HTTPS traffic on port 443 is allowed.
+Next, restart the vastai service to clear any stale connections:
+sudo systemctl restart vastai
+Check the service status and logs for more specific error messages:
+sudo systemctl status vastai
+sudo journalctl -u vastai -n 50
+If the broken pipe errors persist, verify your vastai host software is up to date. An outdated version may have compatibility issues with current API endpoints.
+Also examine whether the errors correlate with specific events like high network load, other services competing for bandwidth, or intermittent connectivity issues with your ISP.
+If none of these steps resolve the issue and you have confirmed stable network connectivity to other services, reach out to vast.ai support through community with your specific error logs. They can check server-side if there are issues with your machine registration.
+A full system reinstall should only be considered as a last resort after exhausting all other options and confirming with vast.ai support that no simpler fix exists.
+Community Answer 5 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+The 'Instance takes too long to load' error and 'socket write error: Broken pipe' messages typically indicate that Docker is in the process of downloading the docker image. These issues are often related to insufficient system memory. The solution is to add more RAM to the system. Docker can use up to 100% of system RAM during image downloads and operations, which can cause client processes to be killed when memory runs out.
+6. No devices were found
+Frequency:
+12 occurrences
+First seen:
+2025-02-05T06:46
+Error message:
+No devices were found
+Expert Answer
+nvidia-smi
+uses NVML underneath, so this means NVML currently sees zero usable GPUs. NVIDIA's troubleshooting guidance treats this as the driver not loading correctly or the GPU not being accessible; NVIDIA also documents container cases where a running container suddenly loses GPU access after
+systemctl daemon-reload
+on
+runc
+/
+systemd
+-cgroup setups.
+Diagnostic commands:
+lsmod | grep nvidia
+sudo modprobe nvidia
+dmesg | grep -i nvrm
+nvidia-smi -L
+lspci | grep -i nvidia
+Check on the host first, then in the container, and inspect
+dmesg | grep -i nvrm
+plus Xid logs before blaming the application layer.
+References:
+NVIDIA NVML API Reference
+Community Answers
+Community Answer 1 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+The machine is running under virtualization with GPU passthrough, so nvidia-smi on the host won't show any devices — that's expected. The GPUs are passed through to the renter, which is why the host reports no devices. Vast should not be querying nvidia-smi when all cards are in VMs. The error will go away once one of them is free from the VM. If all of your cards are in VMs then they're all being used properly.
+Community Answer 2 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+These nvidia-smi errors on Vast.ai can have multiple causes depending on your setup. For GPU passthrough virtualization: When all GPUs are passed through to VMs and rented out, nvidia-smi on the host will not detect any devices because the GPUs are assigned to the renter's VM. This is expected behavior and Vast.ai should not be querying nvidia-smi when all cards are in VMs. The error will go away once one of the GPUs is freed from the VM and available for the host system to query directly. Since the machine works normally for renters, no urgent fix is needed. For non-virtualized setups: The error may be related to a kaalia binary update (such as the one on Oct 15, 2024). The error appears on the Vast machine page only, not in dmesg, and machines continue to work perfectly fine despite the error. A reboot typically clears the error. For machines that genuinely cannot detect GPUs: This typically requires reinstalling NVIDIA drivers after purging them completely.
+Community Answer 3 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+There are several possible causes for nvidia-smi not detecting GPUs:
+Missing GPU power connection: If you just installed a new GPU card (especially a second card), verify that power cables are properly connected to the GPU. The system may boot and be accessible via SSH even without GPU power connected, but nvidia-smi will not detect any devices.
+Driver installation requires reboot: After installing NVIDIA drivers, you must reboot the system before nvidia-smi will detect devices.
+GPU passthrough to virtual machines: When running virtualization with GPU passthrough, nvidia-smi on the host will show no devices because the GPUs are assigned to VMs. This is expected behavior - the host system cannot see GPUs while they are in use by VMs. The error will go away once one of the GPUs is no longer passed through.
+Driver version or installation method issues: Some driver versions may have compatibility issues. If apt install does not work properly, try using the .run installation method instead. To install driver version 570.124.04 using the .run method: First uninstall the old version with sudo apt-get remove --purge '^nvidia-.*' -y, then reboot. Download the driver with wget
+https://us.download.nvidia.com/XFree86/Linux-x86_64/570.124.04/NVIDIA-Linux-x86_64-570.124.04.run
+then install with sudo bash NVIDIA-Linux-x86_64-570.124.04.run.
+Community Answer 4 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+The Ubuntu repository driver version 570.86.15 (nvidia-driver-570-server package from apt) is too old for the RTX 5090. You need driver version 570.124.04 or newer, which is currently only available via NVIDIA's .run installer. To fix: 1) Uninstall existing NVIDIA drivers with sudo apt-get remove --purge '^nvidia-.*' -y, 2) Reboot the system, 3) Blacklist the nouveau driver, 4) Download the .run installer using wget
+https://us.download.nvidia.com/XFree86/Linux-x86_64/570.124.04/NVIDIA-Linux-x86_64-570.124.04.run
+, 5) Run the installer to complete the driver installation.
+Community Answer 5 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+The RTX 5090 requires the NVIDIA open kernel modules instead of proprietary drivers. The system shows the error message "The NVIDIA GPU 0000:c7:00.0 (PCI ID: 10de:2b85) installed in this system requires use of the NVIDIA open kernel modules." The solution is to switch from proprietary drivers to open drivers, which work fine under GPL/MIT license.
+7. no such file or directory
+Frequency:
+11 occurrences
+First seen:
+2024-03-10T00:04
+Error message:
+no such file or directory
+Expert Answer
+This is generic Linux
+ENOENT
+, but on Ubuntu it is often more subtle than "the file is missing." For executed programs,
+execve
+also returns
+ENOENT
+when the script interpreter or ELF interpreter does not exist, so a file can be present and still fail with this message if its shebang or loader path is wrong. On Vast hosts this commonly comes from stale script paths, moved binaries, broken symlinks, or mounts that exist on the host but not inside the container.
+Diagnostic commands:
+ls -la /path/to/file
+file /path/to/binary
+ldd /path/to/binary
+References:
+errno(3) man page
+Community Answers
+Community Answer 1 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+The issue is with the path syntax. Instead of trying to execute "./var/lib/vastai_kaalia/send_mach_info.py" from root, you need to first change to the correct directory using "cd /var/lib/vastai_kaalia/" and then execute the script with "./send_mach_info.py --speedtest". The error occurred because the user was trying to execute the file with an incorrect relative path.
+Community Answer 2 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 5.0)
+The error occurs because the download and install should be done as two separate commands, not combined into one. The correct installation process is:
+wget
+https://s3.amazonaws.com/vast.ai/install.py
+sudo python3 install.py
+First download the installer script using wget, then run it with python3. Make sure you are in the same directory where you downloaded install.py when you run the second command, or the file will not be found.
+If you continue to have issues after installation, you can check the vast daemon logs with:
+tail /var/lib/vastai_kaalia/kaalia.log -f
+Community Answer 3 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error typically occurs when the vastai_kaalia directory was manually deleted before reinstalling. To fix it, create the missing directory with proper permissions using these commands: sudo mkdir -p /var/lib/vastai_kaalia/ and sudo chmod 755 /var/lib/vastai_kaalia/. After creating the directory, retry the installation. If issues persist or the machine does not appear in the machines list, reinstall again using the --reset-machine flag to properly handle the reinstallation and get a new machine ID. Alternatively, you can do a remote reinstall of Ubuntu through IPMI access for a completely fresh start.
+Community Answer 4 — ★★★★☆ (4/5)
+Source: Community — woodygbw
+No joy... Same error.
+Error response from daemon: open /var/lib/docker/volumes/dcmonitoring_prometheus-data/_data: no such file or directory
+Community Answer 5 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+The log file path is incorrect. Use "cat /var/lib/vastai_kaalia/kaalia.log | grep download" instead of "/var/lib/docker/kaalia.log". The instance is likely still downloading the Docker image and won't start until the download is complete.
+Community Answer 6 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+You need to download and install the vast CLI tool first from
+https://cloud.vast.ai/cli/
+. The CLI tool is a management tool that can be used to manage rigs and check machine status, including whether machines are rentable or not. The error occurs because the vast executable hasn't been downloaded or isn't in the current directory.
+8. Error: Command 'docker run --shm-size 4G --rm --runtime=nvidia --gpus all pytorch/pytorch bash -c 'apt update; apt-get i
+Frequency:
+10 occurrences
+First seen:
+2024-03-19T11:11
+Error message:
+Error: Command 'docker run --shm-size 4G --rm --runtime=nvidia --gpus all pytorch/pytorch bash -c 'apt update; apt-get install -y wget; wget https://s3.amazo
+Expert Answer
+This is a wrapper message, not a diagnosis. It only tells you that the subprocess invoking
+docker run
+failed; the real cause is in Docker/NVIDIA stderr and is often the same family as nvidia-container-cli errors, OCI runtime failures, or CUDA unavailability.
+Recovery path on Ubuntu:
+# Confirm NVIDIA driver is installed
+nvidia-smi
+# Configure Docker with NVIDIA runtime
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+# Enable debug logging if needed
+sudo nano /etc/nvidia-container-runtime/config.toml
+# Set debug = "/var/log/nvidia-container-runtime.log"
+References:
+NVIDIA Container Toolkit Install Guide
+Community Answers
+Community Answer 1 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+When Docker cannot install wget inside a container, this typically indicates either network connectivity issues or apt configuration problems within the container.
+First, verify that Docker itself is properly installed and running on the host by checking the service status:
+sudo systemctl status docker
+To diagnose the issue, start a basic container and test network connectivity manually:
+docker run -it ubuntu:latest /bin/bash
+Once inside the container, test basic network connectivity:
+ping -c 4 8.8.8.8
+If ping works, test DNS resolution:
+ping -c 4 archive.ubuntu.com
+Then attempt to update apt and install wget:
+apt update
+apt install wget
+If apt update fails, the container may not have proper DNS configuration. Check the DNS settings inside the container:
+cat /etc/resolv.conf
+For hosts using VLAN configurations, ensure that the Docker network bridge has proper access to the internet and that no firewall rules are blocking outbound connections from containers. You may need to configure Docker to use specific DNS servers by editing the Docker daemon configuration at /etc/docker/daemon.json and adding DNS entries, then restarting Docker:
+sudo systemctl restart docker
+If you experience persistent overlay storage issues that might affect container operations, stop Docker, remove the overlay2 directory, and restart:
+sudo systemctl stop docker
+sudo rm -rf /var/lib/docker/overlay2
+sudo systemctl start docker
+Note that removing overlay2 deletes all containers and images, so only use this as a last resort after backing up important data.
+Community Answer 2 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+When a PyTorch container with CUDA 12.1 fails to start on Vast.ai, there are several common causes and solutions to check.
+First verify your NVIDIA driver version supports CUDA 12.1. Run nvidia-smi to check your driver version. CUDA 12.1 requires driver version 530 or higher. If your driver is older, update it with:
+sudo apt update
+sudo apt install nvidia-driver-535
+Next ensure the NVIDIA Container Toolkit is properly installed and configured. Reinstall it if needed:
+sudo apt-get install -y nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+Test that Docker can access the GPU by running:
+docker run --rm --gpus all nvidia/cuda:12.1.0-base-ubuntu22.04 nvidia-smi
+If this fails, check that the nvidia-container-runtime is set as the default runtime in your Docker daemon configuration at /etc/docker/daemon.json. It should contain:
+{"default-runtime": "nvidia", "runtimes": {"nvidia": {"path": "nvidia-container-runtime", "runtimeArgs": []}}}
+After editing, restart Docker with sudo systemctl restart docker.
+If the pytorch/pytorch image specifically fails while other CUDA images work, try pulling a fresh copy with docker pull pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime and check your available disk space with df -h since large images can fail to extract if space is low.
+Also verify your machine passes the Vast.ai verification tests, as CUDA compatibility issues will cause test failures. You can monitor container startup issues by checking docker logs for the specific container ID.
+For additional host setup scripts and monitoring tools, see the JJZiets VastTools repository at
+https://github.com/jjziets/vasttools
+which includes utilities for managing Docker configurations on Vast.ai host machines.
+Community Answer 3 — ★★★★☆ (4/5)
+Source: Community — jopdorp
+getting a different error now:
+[2024-03-19 11:21:49.157866 UTC] process_check_output():182: subprocess.check_output("docker run --shm-size 4G --rm --runtime=nvidia --gpus all pytorch/pytorch bash -c 'apt update; apt-get install -y wget; wget https://s3.amazonaws.com/vast.ai/test_NCCL.py; python3 test_NCCL.py --num-gpus 8 --backend NCCL;'", shell=True)
+...
+W: Failed to fetch http://security.ubuntu.com/ubuntu/dists/jammy-security/InRelease  Temporary failure resolving 'security.ubuntu.com'
+W: Some index files failed to download. They have been ignored, or old ones used instead.
+E: Unable to locate package wget
+bash: line 1: wget: command not found
+python3: can't open file '/workspace/test_NCCL.py': [Errno 2] No such file or directory
+[2024-03-19 11:31:06.989983 UTC] <module>():1050: Traceback (most recent call last):
+File "install", line 967, in <module>
+output = process_check_output(f"docker run --shm-size 4G --rm --runtime=nvidia --gpus all pytorch/pytorch bash -c 'apt update; apt-get install -y wget; wget https://s3.amazonaws.com/vast.ai/test_NCCL.py; python3 test_NCCL.py --num-gpus {num_gpus} --backend NCCL;'", shell=True)
+File "install", line 184, in process_check_output
+result = subprocess.check_output(*a, **kw)
+File "/usr/lib/python3.8/subprocess.py", line 415, in check_output
+return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+File "/usr/lib/python3.8/subprocess.py", line 516, in run
+raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command 'docker run --shm-size 4G --rm --runtime=nvidia --gpus all pytorch/pytorch bash -c 'apt update; apt-get install -y wget; wget https://s3.amazonaws.com/vast.ai/test_NCCL.py; python3 test_NCCL.py --num-gpus 8 --backend NCCL;'' returned non-zero exit status 2.
+Community Answer 4 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+You don't need to run this manually. The command provided (sudo docker run --shm-size 4G --rm --runtime=nvidia --gpus all pytorch/pytorch bash -c 'apt update; apt-get install -y wget; wget
+https://s3.amazonaws.com/vast.ai/test_NCCL.py
+; python3 test_NCCL.py --num-gpus 6 --backend NCCL;') is for checking server performance. The test is used to verify that GPUs pass testing so they can run tasks from the Vast.ai site. When working correctly, you should see output showing processing percentages, Gflop/s performance metrics, error counts, and GPU temperatures for each GPU being tested.
+Community Answer 5 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+The DNS resolution failure is occurring inside the Docker container, not on the host system. The error shows that the Docker container cannot resolve archive.ubuntu.com or security.ubuntu.com. This is a network configuration issue with the Docker container's DNS settings. The problem is happening during the vast.ai installer's NCCL test which runs a Docker container with the command 'docker run --shm-size 4G --rm --runtime=nvidia --gpus all pytorch/pytorch bash -c apt update...'. The container needs proper DNS configuration to resolve external domains. This is separate from the host system's network configuration.
+Community Answer 6 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+The issue appears to be system-level corruption. The recommended solution is to do a complete reinstall of the OS. When creating instances, make sure to set the bid price slightly above minimum and use commands like "./vast create instance YOUROFFERID --price BIDPRICE --image oguzpastirmaci/gpu-burn" to test. For NCCL testing, use "sudo docker run --shm-size 4G --rm --runtime=nvidia --gpus all pytorch/pytorch bash -c 'apt update; apt-get install -y wget; wget
+https://s3.amazonaws.com/vast.ai/test_NCCL.py
+; python3 test_NCCL.py'". If wget fails and NCCL tests continue to error despite passing other tests, the underlying system is likely corrupted and needs a fresh OS installation.
+9. nvidia-container-cli: device error: 1: unknown device: unknown
+Frequency:
+9 occurrences
+First seen:
+2024-02-28T02:37
+Error message:
+nvidia-container-cli: device error: 1: unknown device: unknown
+Expert Answer
+This usually means the NVIDIA container runtime was asked for a GPU identifier it does not recognize in its current device mapping. Docker's GPU docs say
+device_ids
+must match IDs visible from
+nvidia-smi
+, and NVIDIA's own toolkit issue tracker reproduces the exact
+unknown device: unknown
+string when a nonexistent GPU ID is requested. On multi-GPU or MIG-capable systems, also verify that the container still has valid NVIDIA device nodes and
+/dev/char
+symlinks.
+Diagnostic commands:
+nvidia-smi -L
+ls -la /dev/nvidia*
+cat /etc/docker/daemon.json
+Compare with the exact
+--gpus device=...
+or Compose
+device_ids
+you are passing.
+References:
+NVIDIA Container Toolkit Issue #1197
+Community Answers
+Community Answer 1 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error indicates that nvidia-container-cli cannot detect or access the GPU device. The NVIDIA container runtime component is unable to communicate with your GPU. Common causes include driver issues, improper GPU passthrough configuration, problems with the NVIDIA container runtime setup, or the GPU being temporarily in use by another process. When the vast daemon tries to run bandwidth tests while the GPU is occupied, this error can appear and should clear up once the GPU becomes available. To troubleshoot, first run nvidia-smi to check GPU status and verify the GPU is detected. Then run journalctl -o short-precise -k -b -0|grep -Ei 'aer | fall' to check for hardware errors in the system logs. Also verify that NVIDIA drivers are properly installed and the container runtime is correctly configured.
+Community Answer 2 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error typically occurs when there is a mismatch between the GPUs detected by the system and what the NVIDIA Container Toolkit can access. Here are actionable steps to resolve it.
+First, verify your GPU is properly detected by the system by running
+nvidia-smi
+If this shows your GPU correctly, check that the NVIDIA Container Toolkit is properly configured by running
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+Next, update the NVIDIA Container Toolkit to the latest version, as version 1.13.5 has known issues. Run these commands to update
+sudo apt-get update
+sudo apt-get install -y nvidia-container-toolkit
+After updating, restart the Docker daemon
+sudo systemctl restart docker
+If the error persists and mentions detecting more GPUs than physically present, check your Vast.ai machine configuration to ensure the GPU count matches your actual hardware. You can verify the devices visible to containers by running
+sudo nvidia-ctk cdi list
+If there is a mismatch, regenerate the CDI specification with
+sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+Then restart Docker again. If you continue experiencing issues where Vast.ai detects incorrect GPU counts, contact Vast.ai support as this may require adjustment on the platform side to match your actual hardware configuration.
+For additional host management tools and troubleshooting scripts, see the JJZiets VastTools repository at
+https://github.com/jjziets/vasttools
+which includes utilities for monitoring and managing GPU hosts.
+Community Answer 3 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error has several potential causes and solutions depending on your situation. First, verify GPU status by running nvidia-smi to check if the driver is working properly. If GPUs appear to be working normally and tests pass, this may be a false positive timing/initialization issue that can resolve itself within 24-36 hours without any action needed. If the driver is not running properly, a system reboot will reload the driver and often fixes the issue. If you recently changed GPUs or hardware configuration, you need to uninstall and reinstall NVIDIA drivers. Run sudo nvidia-uninstall, then clean up with sudo apt autoremove and sudo apt autoclean, reboot the system, and reinstall the NVIDIA drivers. For additional diagnostics, run sudo dmesg -T | grep -E 'NVRM|AER|fallen' to check for system errors indicating the GPU may have fallen off the bus. Also verify you are using the correct GPU device number in your Docker command - the syntax --gpus '"device=x"' requires replacing x with the actual GPU number (0, 1, 2, etc.).
+Community Answer 4 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error indicates that the NVIDIA container runtime cannot recognize or communicate with the specified GPU. The "unknown device" message typically points to one of several issues.
+First, verify that the GPU is properly detected by the host system by running
+nvidia-smi
+If nvidia-smi fails or does not show the expected GPU, check the system logs for hardware errors
+sudo dmesg | grep -i nvidia
+The most common causes for this error are a faulty GPU, an improperly seated GPU in the PCIe slot, or a driver crash. Even with new hardware, GPUs can occasionally have issues out of the box or may not be fully seated in their slots.
+If nvidia-smi works on the host but Docker cannot access the GPU, test Docker GPU access directly
+docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi
+If this test fails while the host nvidia-smi succeeds, the nvidia-container-toolkit may need to be reinstalled or reconfigured.
+If the problem persists after verifying physical connections, try rebooting the system
+sudo reboot
+After reboot, if the GPU still shows as unknown, consider reinstalling the NVIDIA drivers. Persistent issues after driver reinstallation typically indicate a hardware problem with the GPU itself, even if the card is new.
+The nvml fix script from the jjziets vasttools repository at
+https://github.com/jjziets/vasttools
+is designed to address certain NVML library issues, but it cannot resolve underlying hardware problems or driver crashes. If running the script did not help, focus on the hardware and driver troubleshooting steps above.
+Community Answer 5 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+This error typically occurs when you swap a GPU or when there is a mismatch between the expected and actual GPU configuration. The nvidia-container-cli is looking for a GPU with a specific UUID that no longer exists in the system. To resolve this issue: First, try rebooting the system and letting it run for a while, as the error may clear itself. You may also need to list the devices to clear those errors. If the issue persists, reconfigure the container runtime to recognize the new GPU configuration. For Ubuntu 22, there is an nvml-fix available that might help resolve this issue.
+10. error: 1: unknown device: unknown
+Frequency:
+9 occurrences
+First seen:
+2024-02-28T02:37
+Error message:
+error: 1: unknown device: unknown
+Expert Answer
+This usually means the NVIDIA container runtime was asked for a GPU identifier it does not recognize in its current device mapping. Docker's GPU docs say
+device_ids
+must match IDs visible from
+nvidia-smi
+, and NVIDIA's own toolkit issue tracker reproduces the exact
+unknown device: unknown
+string when a nonexistent GPU ID is requested. On multi-GPU or MIG-capable systems, also verify that the container still has valid NVIDIA device nodes and
+/dev/char
+symlinks.
+Diagnostic commands:
+nvidia-smi -L
+ls -la /dev/nvidia*
+cat /etc/docker/daemon.json
+Compare with the exact
+--gpus device=...
+or Compose
+device_ids
+you are passing.
+References:
+NVIDIA Container Toolkit Issue #1197
+Community Answers
+Community Answer 1 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error typically occurs when there is a mismatch between the GPUs detected by the system and what the NVIDIA Container Toolkit can access. Here are actionable steps to resolve it.
+First, verify your GPU is properly detected by the system by running
+nvidia-smi
+If this shows your GPU correctly, check that the NVIDIA Container Toolkit is properly configured by running
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+Next, update the NVIDIA Container Toolkit to the latest version, as version 1.13.5 has known issues. Run these commands to update
+sudo apt-get update
+sudo apt-get install -y nvidia-container-toolkit
+After updating, restart the Docker daemon
+sudo systemctl restart docker
+If the error persists and mentions detecting more GPUs than physically present, check your Vast.ai machine configuration to ensure the GPU count matches your actual hardware. You can verify the devices visible to containers by running
+sudo nvidia-ctk cdi list
+If there is a mismatch, regenerate the CDI specification with
+sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+Then restart Docker again. If you continue experiencing issues where Vast.ai detects incorrect GPU counts, contact Vast.ai support as this may require adjustment on the platform side to match your actual hardware configuration.
+For additional host management tools and troubleshooting scripts, see the JJZiets VastTools repository at
+https://github.com/jjziets/vasttools
+which includes utilities for monitoring and managing GPU hosts.
+Community Answer 2 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error indicates that nvidia-container-cli cannot detect or access the GPU device. The NVIDIA container runtime component is unable to communicate with your GPU. Common causes include driver issues, improper GPU passthrough configuration, problems with the NVIDIA container runtime setup, or the GPU being temporarily in use by another process. When the vast daemon tries to run bandwidth tests while the GPU is occupied, this error can appear and should clear up once the GPU becomes available. To troubleshoot, first run nvidia-smi to check GPU status and verify the GPU is detected. Then run journalctl -o short-precise -k -b -0|grep -Ei 'aer | fall' to check for hardware errors in the system logs. Also verify that NVIDIA drivers are properly installed and the container runtime is correctly configured.
+Community Answer 3 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error has several potential causes and solutions depending on your situation. First, verify GPU status by running nvidia-smi to check if the driver is working properly. If GPUs appear to be working normally and tests pass, this may be a false positive timing/initialization issue that can resolve itself within 24-36 hours without any action needed. If the driver is not running properly, a system reboot will reload the driver and often fixes the issue. If you recently changed GPUs or hardware configuration, you need to uninstall and reinstall NVIDIA drivers. Run sudo nvidia-uninstall, then clean up with sudo apt autoremove and sudo apt autoclean, reboot the system, and reinstall the NVIDIA drivers. For additional diagnostics, run sudo dmesg -T | grep -E 'NVRM|AER|fallen' to check for system errors indicating the GPU may have fallen off the bus. Also verify you are using the correct GPU device number in your Docker command - the syntax --gpus '"device=x"' requires replacing x with the actual GPU number (0, 1, 2, etc.).
+Community Answer 4 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error indicates that the NVIDIA container runtime cannot recognize or communicate with the specified GPU. The "unknown device" message typically points to one of several issues.
+First, verify that the GPU is properly detected by the host system by running
+nvidia-smi
+If nvidia-smi fails or does not show the expected GPU, check the system logs for hardware errors
+sudo dmesg | grep -i nvidia
+The most common causes for this error are a faulty GPU, an improperly seated GPU in the PCIe slot, or a driver crash. Even with new hardware, GPUs can occasionally have issues out of the box or may not be fully seated in their slots.
+If nvidia-smi works on the host but Docker cannot access the GPU, test Docker GPU access directly
+docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi
+If this test fails while the host nvidia-smi succeeds, the nvidia-container-toolkit may need to be reinstalled or reconfigured.
+If the problem persists after verifying physical connections, try rebooting the system
+sudo reboot
+After reboot, if the GPU still shows as unknown, consider reinstalling the NVIDIA drivers. Persistent issues after driver reinstallation typically indicate a hardware problem with the GPU itself, even if the card is new.
+The nvml fix script from the jjziets vasttools repository at
+https://github.com/jjziets/vasttools
+is designed to address certain NVML library issues, but it cannot resolve underlying hardware problems or driver crashes. If running the script did not help, focus on the hardware and driver troubleshooting steps above.
+Community Answer 5 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+This error often occurs when the machine is rented on demand (showing status D). When the instance is actively rented, error messages may persist until the client leaves. To resolve: Wait for the client to leave the instance, then give the system some time to clear the error automatically or reboot the machine. Sometimes a reboot clears the error immediately, while other times it can take up to 36 hours to resolve. Additionally, try reseating the GPU and ensuring nvidia-container configuration is properly set up. If an instance is running when it should not be, contact Vast support for assistance.
+11. error: Traceback (most recent call last):
+Frequency:
+9 occurrences
+First seen:
+2024-03-19T11:11
+Error message:
+error:
+Traceback (most recent call last):
+Expert Answer
+This is a generic Python exception trace. The actual error is on the
+last line
+of the traceback. On Vast hosts, the most common underlying exceptions are:
+ModuleNotFoundError
+-- missing Python package in the container
+FileNotFoundError
+-- script or config file not at expected path
+RuntimeError: CUDA error
+-- GPU/driver issue surfacing through Python
+InstallFailed
+-- Vast installer abort (check
+/var/lib/vastai_kaalia/*.log
+)
+Diagnostic approach:
+Read the
+last line
+of the traceback for the actual exception
+Check the file path and line number in the trace
+If it's in Vast's install script, check
+/var/lib/vastai_kaalia/*.log
+for the preceding error
+The traceback itself is just the call stack -- the root cause is always in the final exception line.
+Community Answers
+Community Answer 1 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+Use dmesg for general system logs. For boot-specific logs, use journalctl with the -b flag. To view the current boot logs, use journalctl -b. To view previous boot logs, use journalctl -r -b -1 for the last reboot, -b -2 for two boots ago, -b -3 for three boots ago, and so on. The -r flag shows the most recent logs first.
+Community Answer 2 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+Vast.ai always uses the last port in your specified range for SSHD (SSH daemon). This is expected behavior and the 'bind already in use' error for the last port is normal. Vast.ai retries starting sshd on that port which generates this message. While not an elegant implementation, this error does not prevent the self-test or verification from working. The last port must always be open for connections to succeed. If self-tests are timing out with 'no response after 120 seconds' despite ports testing as open individually, the issue is likely with the port forwarding configuration itself rather than this error message. Check that your port forwarding rules are correctly configured to forward traffic to the machine running Vast.ai.
+Community Answer 3 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 4.0)
+When a machine shows "last seen" it means either the vast.ai service isn't running or your machine can't communicate with vast.ai servers. To diagnose the issue, SSH into the machine and check the service status:
+sudo systemctl status vastai
+Then test connectivity to vast.ai:
+ping vast.ai -c 5
+The problem likely occurred when you edited the vastai_kaalia configuration file. You may have introduced a syntax error or misconfiguration that caused the vast.ai service to stop or fail to connect properly. Check the service status first to see if it's running, and review any error messages. If the service is down, restart it. If connectivity fails, verify your network configuration and firewall rules aren't blocking outbound connections to vast.ai.
+Community Answer 4 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 4.0)
+Not anymore in the way it used to. The newest daemon calls send_mach_info.py script frequently, which calls speedtest by rolling a dice (random number 0-8, only runs if it equals 3). Additionally, it won't call speedtest from send_mach_info if it ran less than 6 hours ago, and send_mach_info itself is run randomly on the next run.
+Community Answer 5 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error indicates the vast.ai daemon cannot communicate with the platform. Follow these troubleshooting steps: 1. Verify local connectivity: Check if you can reach the machine locally on your network. 2. Check daemon status: Run 'systemctl status vastai' to verify the vast daemon is running and active. 3. Check disk space: Run 'df -h' to ensure the root partition is not full, as a full disk can crash the vast daemon. 4. Check the logs: Tail the logs to see if the vast daemon is running properly or stuck on an update. The update process can sometimes hang but may recover on its own, so waiting is recommended. 5. If the issue persists, you may need to reinstall the vast daemon. Before reinstalling, backup your machine ID which is located in /var/lib/vastai_kaalia/.
+12. Error: Command '/var/lib/vastai_kaalia/test_nvml_error.sh' returned non-zero exit status 1.
+Frequency:
+9 occurrences
+First seen:
+2024-05-17T10:38
+Error message:
+Error: Command '/var/lib/vastai_kaalia/test_nvml_error.sh' returned non-zero exit status 1.
+Expert Answer
+Vast's installer downloads
+/var/lib/vastai_kaalia/test_nvml_error.sh
+, executes it, and checks whether its output contains
+Error
+, so this is best interpreted as an installer-side NVML/GPU sanity-check failure. Operationally, it usually collapses back to the same underlying families: no visible GPU, driver/NVML mismatch, or NVIDIA runtime/device exposure drift.
+Diagnostic commands:
+# Check the actual test output
+bash /var/lib/vastai_kaalia/test_nvml_error.sh
+# Check installer logs
+cat /var/lib/vastai_kaalia/*.log | tail -50
+# Verify GPU visibility
+nvidia-smi
+Pull the earliest failure from
+/var/lib/vastai_kaalia/*.log
+before retrying, because the later wrapper message is not the root cause.
+References:
+Vast.ai Install Script
+Community Answers
+Community Answer 1 — ★★★★★ (5/5)
+Source: Community Knowledge Base (quality score: 5.0)
+The RX 570 is an AMD GPU, and vast.ai only supports NVIDIA GPUs. This is the fundamental issue causing your error. The kaalia_nv_use_check script is specifically checking for NVIDIA GPU compatibility, which is why it fails on your AMD hardware.
+Vast.ai's platform is built around NVIDIA CUDA technology for GPU compute workloads. All client templates such as PyTorch, TensorFlow, vLLM, and Stable Diffusion require CUDA support, which is exclusive to NVIDIA GPUs. AMD GPUs use ROCm instead of CUDA and are not compatible with the vast.ai hosting infrastructure.
+To host on vast.ai, you would need to replace the RX 570 with an NVIDIA GPU. Popular options for hosting include consumer cards like the RTX 3090, RTX 4090, or datacenter cards like the A100 or H100, depending on your budget and power capacity.
+Community Answer 2 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+The kaalia_nv_use_check error with exit status 1 typically indicates that the Vast.ai verification tool cannot properly access or validate the GPU for VM hosting. This check specifically tests whether the GPU can be passed through to a KVM virtual machine.
+First, verify that IOMMU is properly enabled in your BIOS and kernel boot parameters. Check your current boot parameters with cat /proc/cmdline and ensure you see intel_iommu=on or amd_iommu=on depending on your CPU. If missing, add the appropriate parameter to your GRUB configuration in /etc/default/grub on the GRUB_CMDLINE_LINUX_DEFAULT line, then run update-grub and reboot.
+Next, confirm the GPU is not bound to the nvidia driver when attempting VM mode. For VM passthrough, the GPU needs to be available for VFIO binding. Check current driver binding with lspci -nnk | grep -A3 NVIDIA and look at the "Kernel driver in use" line.
+Ensure vfio-pci modules are loaded. Run lsmod | grep vfio to verify vfio_pci, vfio_iommu_type1, and vfio are present. If not, add them to /etc/modules and reboot.
+Check that your IOMMU groups are clean, meaning the GPU and its audio device are isolated or grouped together without other devices that cannot be passed through. You can inspect groups by examining /sys/kernel/iommu_groups/ directories.
+If you recently updated drivers or the Vast.ai software, try restarting the vastai service with sudo systemctl restart vastai and check logs with journalctl -u vastai -f for more detailed error messages about what specifically failed during the GPU check.
+The host setup documentation at
+https://github.com/jjziets/vasttools
+covers VM-specific configuration requirements that differ from standard Docker rentals, particularly around IOMMU and VFIO setup.
+Community Answer 3 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+Create the directory and set permissions with: sudo mkdir -p /var/lib/vastai_kaalia/ and sudo chmod 755 /var/lib/vastai_kaalia/
+This error occurs when the Vast.ai daemon cannot find the required directory. The -p flag ensures parent directories are created if needed, and chmod 755 sets appropriate read/execute permissions for the daemon to access the directory.
+Community Answer 4 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+This is an NVML (NVIDIA Management Library) error that occurs during Vast.ai setup. The fix is to run a patch script: wget -O fix-nvml-error.py
+https://raw.githubusercontent.com/Bo26fhmC5M/vast-tools/main/fix-nvml-error.py
+followed by sudo python3 fix-nvml-error.py. You can also search community for "fix nvml" to find the script. Additionally, verify that nvidia-container-toolkit or nvidia-docker is properly installed by checking with apt list --installed | grep -E "nvidia-container-toolkit|nvidia-docker" and review your Docker daemon configuration at /etc/docker/daemon.json.
+Community Answer 5 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+Try removing the nvidia_smi.json file located in /var/lib/vastai_kaalia/data/ directory using the command: sudo rm nvidia_smi.json. After removing it, restart the vast daemon. Note that the file will recreate itself automatically. This may help resolve the container runtime issue, though it's not guaranteed to fix the problem in all cases.
+13. GPU has fallen off the bus.
+Frequency:
+6 occurrences
+First seen:
+2024-05-03T16:58
+Error message:
+GPU has fallen off the bus.
+Expert Answer
+This is a serious hardware-path failure. NVIDIA maps "GPU has fallen off the bus" to Xid 79 and says it is logged when the driver tries to access the GPU over PCIe and finds the GPU inaccessible; the Xid catalog's immediate action is
+RESTART_BM
+, with follow-up investigation/support. On bare metal, that usually points to PCIe connectivity, riser/slot, power delivery, board, firmware, or the GPU itself rather than a normal container issue.
+Diagnostic commands:
+dmesg | grep -i 'xid\|nvrm\|fallen'
+nvidia-smi -q
+lspci -vvv | grep -A 20 -i nvidia | grep LnkSta
+nvidia-bug-report.sh
+If the same host repeats Xid 79, drain it from Vast and inspect power, PCIe slot/riser, board firmware, and the GPU before returning it to service.
+References:
+NVIDIA Xid Error Catalog
+Community Answers
+Community Answer 1 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+A GPU falling off the bus means it disappears from the nvidia-smi output. The only way to restore a GPU that has fallen off the bus is by restarting the system. Common causes to investigate and prevent this issue include: high temperatures when the GPU crashed, bad cables, bad risers, or the GPU not being properly seated in the PCIe slot or riser.
+Community Answer 2 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+A GPU 'fallen off the bus' error occurs when the GPU stops communicating with the PCIe bus. This is most commonly caused by power issues or hardware connection problems. Common causes include faulty risers, an inadequate or weak power supply, or brief power flickers. Solutions in order of priority: 1. Power Supply: Upgrade to a better PSU that can provide adequate and stable power to the GPU. Insufficient or unstable power is the primary cause of this error. Verify your PSU has sufficient capacity for all connected GPUs. 2. PCIe Risers and Cables: Check and replace any suspect risers. Use quality risers and cables to ensure reliable connections. 3. Power Stability: Ensure stable power delivery to the entire system to prevent power flickers from causing disconnections.
+Community Answer 3 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+The 'GPU fallen off the bus' error corresponds to NVIDIA XID79, which occurs when communication is halted between the drivers and the GPU. This typically indicates a hardware issue where the GPU is not capable of handling the workload being run. To diagnose the issue, check your listing for the PCIe bus width - if it shows something less than x16 (such as x1, x4, or x8), this indicates the GPU is not properly connected or seated. The problem often surfaces when clients run high-intensity workloads, even if the system has been stable with idle or low-usage clients for months. In some cases, the error may disappear after a reboot, which could indicate a temporary condition.
+Community Answer 4 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+There are several reasons why GPUs fall off the bus that should be investigated. Common causes include high temperatures when the cards crash, bad cables, bad risers (the board that the PCIe slot is part of), or GPUs not properly seated in the riser. For 4090 cards specifically, a known issue involves the 12pin to 4x8 PCI power nvidia adapter cables where one of the sense pins may have bad contact. To troubleshoot, try swapping PSUs and cables to isolate which component the issue follows. If the problem follows a particular adapter cable, replace it with a new one. If temps are normal with no throttling flags and the issue persists after reseating the GPU into different risers, the GPU hardware itself may need to be replaced. There is no way to restore a GPU that has fallen off the bus other than restarting the system.
+Community Answer 5 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+There is no way to restore a GPU that has fallen off the bus without restarting the system. If you have active clients, you either have to wait until they leave or accept the reliability penalty of restarting. The issue should be investigated by checking: temperatures of cards when they crashed, bad cables, bad risers, or whether the GPU is properly seated in the riser/PCIe slot. Try reseating the GPU and check all connections.
+14. docker: Error response from daemon: failed to create task for container: failed to create shim task: OCI runtime create
+Frequency:
+6 occurrences
+First seen:
+2025-06-11T14:23
+Error message:
+docker: Error response from daemon: failed to create task for container: failed to create shim task: OCI runtime create failed: runc create failed: unable to start container process: error during container init: error running prestart h
+Expert Answer
+This is another wrapper-level container-start failure. The useful information is whatever comes after it in the chain; NVIDIA has real-world cases where the suffix is
+nvidia-container-cli: initialization error ...
+, while other common suffixes are missing executables, bad mounts, permission denials, or entrypoint failures.
+Diagnostic commands:
+# Check full Docker daemon logs
+journalctl -u docker | tail -50
+# Enable NVIDIA toolkit debug logging
+sudo nano /etc/nvidia-container-runtime/config.toml
+# Set debug = "/var/log/nvidia-container-runtime.log"
+# Check container entrypoint
+docker inspect IMAGE | jq '.[0].Config.Entrypoint'
+Always capture the full daemon error; if NVIDIA is involved, turn on the toolkit debug log.
+References:
+NVIDIA Docker Issue #1648
+Community Answers
+Community Answer 1 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error can have multiple causes. First, try removing --gpus all from your docker command and use the nvidia runtime instead. Run the command like this: sudo docker run --runtime=nvidia --rm oguzpastirmaci/gpu-burn 10. The issue may be related to CDI (Container Device Interface) configuration. If this does not resolve the issue, the error may indicate that the GPU has fallen off the bus, which is a hardware-level issue where the system has lost communication with the GPU. In this case, try rebooting the system or physically reseating the GPU.
+Community Answer 2 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error typically indicates a problem with the NVIDIA Container Toolkit or Docker runtime configuration that prevents containers from starting after the initial setup.
+First, verify that the NVIDIA driver and container runtime are properly installed by running nvidia-smi to confirm the driver is loaded, then run docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi to test if Docker can access the GPUs.
+If the container test fails, reinstall the NVIDIA Container Toolkit by running these commands in order:
+sudo apt-get purge nvidia-container-toolkit
+sudo apt-get install nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+If the issue persists, check for conflicting container runtime configurations by examining the Docker daemon configuration file at /etc/docker/daemon.json and ensure it properly references the nvidia runtime.
+You should also verify that the NVIDIA persistence daemon is running with systemctl status nvidia-persistenced since this service helps maintain GPU state between container launches.
+If you recently updated the kernel or NVIDIA drivers, a reboot may be required to ensure all components are properly loaded. After rebooting, run dmesg | grep -i nvidia to check for any driver loading errors.
+For clean Ubuntu 22.04 installations, also confirm that secure boot is either disabled or that the NVIDIA drivers are properly signed, as unsigned drivers can cause intermittent failures after the initial installation succeeds.
+Community Answer 3 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+Remove --gpus all from your Docker command. The error message is caused by the --gpus all flag conflicting with the Container Device Interface configuration. Instead, use the --runtime=nvidia flag format. For example: sudo docker run --runtime=nvidia --rm oguzpastirmaci/gpu-burn 10
+Community Answer 4 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error on RTX 5090 machines typically occurs when the NVIDIA container runtime cannot properly communicate with the GPU driver after a reboot. The RTX 5090 requires the latest drivers and container toolkit versions to function correctly.
+First, verify your NVIDIA driver is loaded and working by running nvidia-smi. If this command fails or shows errors, the driver needs to be reloaded or reinstalled.
+If nvidia-smi works but containers still fail, the issue is likely with the NVIDIA container toolkit. Reinstall or update it with these commands:
+sudo apt-get update
+sudo apt-get install --reinstall nvidia-container-toolkit
+sudo systemctl restart docker
+For NVML communication issues where nvidia-smi works but applications report errors, download and run the NVML fix script:
+wget
+https://github.com/jjziets/vasttools/raw/main/nvml_fix.py
+python3 nvml_fix.py
+Also verify your Docker daemon configuration includes the NVIDIA runtime. Check the file at /etc/docker/daemon.json and ensure it contains the nvidia runtime configuration with the path set to nvidia-container-runtime.
+If problems persist after these steps, check that you are running driver version 550 or newer, as RTX 5090 cards require recent driver branches. You can check your driver version with nvidia-smi and update through the NVIDIA driver PPA or by downloading directly from NVIDIA if needed.
+After making any changes, restart the Docker service with sudo systemctl restart docker and then test by running a simple container such as docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi to confirm GPU access is working inside containers.
+Community Answer 5 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+This is typically caused by version mismatches between components (NVIDIA driver, Docker, NVIDIA Container Toolkit). The user should check if their daemon.json configuration is correct and verify all components are up to date. With NVIDIA driver version 575.64.03, something in the stack (docker, nvidia toolkit, or daemon.json configuration) is likely out of date or misconfigured causing the shim to break. For a comprehensive setup guide, refer to
+https://vastwiki.gno.red/en/opinionated-vast-setup
+which is a maintained alternative to outdated official guides.
+15. RuntimeError: CUDA is not available. Please check your installation.
+Frequency:
+5 occurrences
+First seen:
+2024-03-19T11:11
+Error message:
+RuntimeError: CUDA is not available. Please check your installation.
+Expert Answer
+This is an application/framework symptom, not proof that the host install is wrong. In PyTorch it simply means
+torch.cuda.is_available()
+evaluated to false. Typical causes are a CPU-only framework build, a container that has no GPU access, empty/incorrect visible-device settings, or a host-side driver/NVML problem that already shows up in
+nvidia-smi
+.
+Diagnostic commands:
+# Check host GPU status first
+nvidia-smi
+# Check inside container
+docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi
+# Check PyTorch CUDA detection
+python3 -c "import torch; print(torch.cuda.is_available()); print(torch.version.cuda)"
+References:
+PyTorch torch.cuda.is_available()
+Community Answers
+Community Answer 1 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+The CUDA initialization error 802 "system not yet initialized" in a Docker container while nvidia-smi works on the host typically indicates a mismatch between the NVIDIA driver components inside the container and on the host, or an issue with how the container runtime is configured.
+First verify the NVIDIA container runtime is properly installed and configured by running
+nvidia-container-cli info
+If this command fails or shows errors, reinstall the NVIDIA Container Toolkit with
+sudo apt-get update
+sudo apt-get install -y nvidia-container-toolkit
+sudo systemctl restart docker
+Next ensure your Docker container is launched with proper GPU access. When running containers you need the --gpus all flag or equivalent runtime configuration.
+Check that the CUDA version in your PyTorch container is compatible with your host driver 550.90.07. Driver 550 supports CUDA 12.4 and below. If your container has a newer CUDA toolkit than your driver supports, you will see initialization failures even though nvidia-smi works since nvidia-smi only queries the driver, not the full CUDA runtime.
+Try running a simple CUDA test inside the container
+python -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0))"
+If you did perform an in-place upgrade from Ubuntu 20.04 to 22.04, this can leave residual driver conflicts. A clean reinstall is recommended for hosting on vast.ai. Before reinstalling, backup your machine_id from /var/lib/vastai_kaalia/machine_id to preserve your host identity.
+You can also try completely removing and reinstalling NVIDIA drivers with
+sudo apt-get purge nvidia-*
+sudo apt-get autoremove
+sudo reboot
+Then reinstall the driver and container toolkit fresh. For additional troubleshooting scripts and host setup guidance, see the JJZiets VastTools repository at
+https://github.com/jjziets/vasttools
+and the official Vast.ai Host Guide at
+https://docs.vast.ai/documentation/reference/host
+Community Answer 2 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+As of the current knowledge cutoff, CUDA 13 and nvidia-driver-580 do not exist. The latest stable CUDA version is in the 12.x series, and NVIDIA driver versions are in the 500-560 range depending on the branch.
+If you are asking about upgrading to a new major CUDA version in general, the advice is to be cautious. Major CUDA updates can introduce breaking changes, and client workloads may not yet be compatible with the newest versions. Many machine learning frameworks and libraries take time to add support for new CUDA releases.
+For Vast.ai hosting, it is best to stick with well-tested driver and CUDA combinations that are known to work with common client templates. You can check the Vast.ai Templates documentation at
+https://docs.vast.ai/documentation/templates/introduction
+to see which CUDA versions are commonly used. Before upgrading, verify that your target driver and CUDA version are compatible with the workloads your clients typically run.
+If you meant a different driver or CUDA version, please clarify and I can provide more specific guidance.
+Community Answer 3 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+CUDA 13.0.0 does not exist. As of current releases, CUDA versions go up to 12.x, with versions like 12.4, 12.5, and 12.6 being recent. If you are seeing references to CUDA 13.0.0, this indicates either a typo, a misconfigured template, or incorrect documentation.
+To resolve Docker container issues related to CUDA versions, first verify what CUDA version your driver actually supports by running nvidia-smi and checking the CUDA Version shown in the top right corner. Then ensure your Docker images use a compatible CUDA version from NVIDIA's official container registry at nvcr.io.
+For vast.ai hosting, you should use templates with CUDA versions that match your driver capabilities. Check the Vast.ai Templates documentation at
+https://docs.vast.ai/documentation/templates/introduction
+for guidance on CUDA version requirements and compatible Docker images.
+If you meant a different CUDA version like 12.3 or 12.0, please clarify and I can provide specific guidance for that version. You can also reference the JJZiets VastTools repository at
+https://github.com/jjziets/vasttools
+for Docker setup scripts that handle CUDA compatibility properly.
+Community Answer 4 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+CUDA being unavailable while nvidia-smi shows GPUs typically has nothing to do with IOMMU settings. IOMMU is primarily needed for GPU passthrough in virtual machines, not for basic CUDA functionality on the host.
+Common causes for CUDA unavailability despite nvidia-smi working include driver and toolkit version mismatches, incorrect environment variables, or library path issues. First verify your CUDA toolkit version matches what your application expects by running nvcc --version and comparing it to your driver's supported CUDA version shown in nvidia-smi.
+Check that your environment variables are set correctly. Run echo $PATH and verify it includes /usr/local/cuda/bin or your CUDA installation path. Similarly run echo $LD_LIBRARY_PATH and confirm it includes /usr/local/cuda/lib64.
+If using Docker containers, ensure the NVIDIA Container Toolkit is properly installed and configured. Test with docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi to verify GPU access works inside containers.
+For Python applications, the issue is often a mismatch between the installed PyTorch or TensorFlow version and your CUDA version. Check with python -c "import torch; print(torch.cuda.is_available())" for PyTorch or python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))" for TensorFlow.
+Also verify no other process is holding exclusive access to the GPUs and that the nvidia-persistenced service is running with systemctl status nvidia-persistenced.
+For additional troubleshooting scripts and host management tools, see JJZiets VastTools at
+https://github.com/jjziets/vasttools
+and the official Vast.ai FAQ at
+https://docs.vast.ai/documentation/reference/faq/index
+for common issues.
+Community Answer 5 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+This question combines two separate issues that should be addressed individually.
+For the CUDA not available error with PyTorch multiprocessing using torch.multiprocessing.spawn, this typically occurs when child processes cannot properly initialize CUDA contexts. First verify CUDA is working in a basic single-process test by running python -c "import torch; print(torch.cuda.is_available())" in your container. If that works but multiprocessing fails, ensure you are using the spawn start method correctly and that your code initializes CUDA within each spawned process rather than in the parent process before spawning. The parent process should not call any CUDA operations before spawn, as CUDA contexts do not fork cleanly.
+For installation failures on newly added machines, there are a few things to check. When copying the Kaalia installation code from the Vast setup page, use the copy icon button rather than manually selecting and copying the text, as manual selection can miss hidden characters or formatting that causes the script to fail. Additionally, verify your driver version is compatible with the CUDA version required by your workloads. Driver version 580 or newer is recommended for current CUDA toolkit versions.
+If you are running Ubuntu 24.04, confirm that your Vast software and drivers are fully compatible with this distribution, as some edge cases may exist with newer OS versions. Check the host dashboard for any error messages and review your system logs at /var/log/vastai/ for specific failure details.
+For ongoing issues, the JJZiets VastTools repository at
+https://github.com/jjziets/vasttools
+provides diagnostic scripts that can help identify configuration problems on host machines.
+16. Error: CUDA is not available. Please check your installation.
+Frequency:
+5 occurrences
+First seen:
+2024-03-19T11:11
+Error message:
+Error: CUDA is not available. Please check your installation.
+Expert Answer
+This is an application/framework symptom, not proof that the host install is wrong. In PyTorch it simply means
+torch.cuda.is_available()
+evaluated to false. Typical causes are a CPU-only framework build, a container that has no GPU access, empty/incorrect visible-device settings, or a host-side driver/NVML problem that already shows up in
+nvidia-smi
+.
+Diagnostic commands:
+# Check host GPU status first
+nvidia-smi
+# Check inside container
+docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi
+# Check PyTorch CUDA detection
+python3 -c "import torch; print(torch.cuda.is_available()); print(torch.version.cuda)"
+References:
+PyTorch torch.cuda.is_available()
+Community Answers
+Community Answer 1 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+CUDA 13.0.0 does not exist. As of current releases, CUDA versions go up to 12.x, with versions like 12.4, 12.5, and 12.6 being recent. If you are seeing references to CUDA 13.0.0, this indicates either a typo, a misconfigured template, or incorrect documentation.
+To resolve Docker container issues related to CUDA versions, first verify what CUDA version your driver actually supports by running nvidia-smi and checking the CUDA Version shown in the top right corner. Then ensure your Docker images use a compatible CUDA version from NVIDIA's official container registry at nvcr.io.
+For vast.ai hosting, you should use templates with CUDA versions that match your driver capabilities. Check the Vast.ai Templates documentation at
+https://docs.vast.ai/documentation/templates/introduction
+for guidance on CUDA version requirements and compatible Docker images.
+If you meant a different CUDA version like 12.3 or 12.0, please clarify and I can provide specific guidance for that version. You can also reference the JJZiets VastTools repository at
+https://github.com/jjziets/vasttools
+for Docker setup scripts that handle CUDA compatibility properly.
+Community Answer 2 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+As of the current knowledge cutoff, CUDA 13 and nvidia-driver-580 do not exist. The latest stable CUDA version is in the 12.x series, and NVIDIA driver versions are in the 500-560 range depending on the branch.
+If you are asking about upgrading to a new major CUDA version in general, the advice is to be cautious. Major CUDA updates can introduce breaking changes, and client workloads may not yet be compatible with the newest versions. Many machine learning frameworks and libraries take time to add support for new CUDA releases.
+For Vast.ai hosting, it is best to stick with well-tested driver and CUDA combinations that are known to work with common client templates. You can check the Vast.ai Templates documentation at
+https://docs.vast.ai/documentation/templates/introduction
+to see which CUDA versions are commonly used. Before upgrading, verify that your target driver and CUDA version are compatible with the workloads your clients typically run.
+If you meant a different driver or CUDA version, please clarify and I can provide more specific guidance.
+Community Answer 3 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+The "manifest for nvidia/cuda:latest not found" error occurs because the nvidia/cuda:latest tag doesn't exist in the Docker registry. You need to specify an exact CUDA version tag that matches your installation instead of using :latest. For example, if you're running CUDA 12.4 with driver version 550 (such as on a 4070S Ti), use this command: sudo docker run --rm --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all vastai/base-image:cuda-12.4.1-auto nvidia-smi. Alternatively, you can use other nvidia/cuda images with explicit version tags like cuda-12.4.1. Always match the CUDA version tag to your installed CUDA version.
+Community Answer 4 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+This question combines two separate issues that should be addressed individually.
+For the CUDA not available error with PyTorch multiprocessing using torch.multiprocessing.spawn, this typically occurs when child processes cannot properly initialize CUDA contexts. First verify CUDA is working in a basic single-process test by running python -c "import torch; print(torch.cuda.is_available())" in your container. If that works but multiprocessing fails, ensure you are using the spawn start method correctly and that your code initializes CUDA within each spawned process rather than in the parent process before spawning. The parent process should not call any CUDA operations before spawn, as CUDA contexts do not fork cleanly.
+For installation failures on newly added machines, there are a few things to check. When copying the Kaalia installation code from the Vast setup page, use the copy icon button rather than manually selecting and copying the text, as manual selection can miss hidden characters or formatting that causes the script to fail. Additionally, verify your driver version is compatible with the CUDA version required by your workloads. Driver version 580 or newer is recommended for current CUDA toolkit versions.
+If you are running Ubuntu 24.04, confirm that your Vast software and drivers are fully compatible with this distribution, as some edge cases may exist with newer OS versions. Check the host dashboard for any error messages and review your system logs at /var/log/vastai/ for specific failure details.
+For ongoing issues, the JJZiets VastTools repository at
+https://github.com/jjziets/vasttools
+provides diagnostic scripts that can help identify configuration problems on host machines.
+Community Answer 5 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+The error indicates a client tried to run something that requires CUDA 12.4 or higher, but your machine has an older version (likely CUDA 12.2 based on context). You need to update your CUDA installation to version 12.4 or higher. After updating, the machine page should eventually refresh to show the new CUDA version. You can run a self-test to verify the update:
+./vast self-test machine <id>
+The self-test will show these errors if your machine is tested with an outdated CUDA version. Some hosts report being deverified if they don't update CUDA when newer versions are required by clients.
+17. nvidia-container-cli: device error: 3: unknown device: unknown
+Frequency:
+5 occurrences
+First seen:
+2024-03-21T05:22
+Error message:
+nvidia-container-cli: device error: 3: unknown device: unknown
+Expert Answer
+This usually means the NVIDIA container runtime was asked for a GPU identifier it does not recognize in its current device mapping. Docker's GPU docs say
+device_ids
+must match IDs visible from
+nvidia-smi
+, and NVIDIA's own toolkit issue tracker reproduces the exact
+unknown device: unknown
+string when a nonexistent GPU ID is requested. On multi-GPU or MIG-capable systems, also verify that the container still has valid NVIDIA device nodes and
+/dev/char
+symlinks.
+Diagnostic commands:
+nvidia-smi -L
+ls -la /dev/nvidia*
+cat /etc/docker/daemon.json
+Compare with the exact
+--gpus device=...
+or Compose
+device_ids
+you are passing.
+References:
+NVIDIA Container Toolkit Issue #1197
+Community Answers
+Community Answer 1 — ★★★★★ (5/5)
+Source: Community Knowledge Base (quality score: 5.0)
+This error indicates that GPU device 3 is not being detected by the NVIDIA container runtime, which typically means the GPU has fallen off the PCIe bus or has a hardware communication problem. GPUs do not spontaneously recover from this state on their own, so waiting without action is not an effective troubleshooting approach.
+First, check if the system can see the GPU at all by running
+nvidia-smi
+If nvidia-smi shows an error or the GPU is missing, try reloading the NVIDIA kernel modules
+sudo rmmod nvidia_uvm nvidia_drm nvidia_modeset nvidia
+sudo modprobe nvidia
+If the modules fail to reload or the GPU still does not appear, a full system reboot is required
+sudo reboot
+After reboot, if the GPU remains undetected, check the PCIe bus directly
+lspci | grep -i nvidia
+If the GPU does not appear in lspci output, this points to a hardware-level issue. Power down the system completely, reseat the GPU in its PCIe slot, and check all power connections to the card. Also inspect for any visible damage, dust buildup, or thermal issues.
+Persistent detection failures after reseating suggest potential hardware failure of the GPU, a failing PCIe slot, insufficient power delivery, or motherboard issues. Check system logs for additional clues
+dmesg | grep -i nvidia
+dmesg | grep -i pci
+If you experienced a power interruption before this error appeared, also verify your PSU is delivering stable power and consider testing the GPU in a different PCIe slot if available.
+Community Answer 2 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error indicates that nvidia-container-cli cannot detect or access the GPU device. The NVIDIA container runtime component is unable to communicate with your GPU. Common causes include driver issues, improper GPU passthrough configuration, problems with the NVIDIA container runtime setup, or the GPU being temporarily in use by another process. When the vast daemon tries to run bandwidth tests while the GPU is occupied, this error can appear and should clear up once the GPU becomes available. To troubleshoot, first run nvidia-smi to check GPU status and verify the GPU is detected. Then run journalctl -o short-precise -k -b -0|grep -Ei 'aer | fall' to check for hardware errors in the system logs. Also verify that NVIDIA drivers are properly installed and the container runtime is correctly configured.
+Community Answer 3 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error typically occurs when there is a mismatch between the GPUs detected by the system and what the NVIDIA Container Toolkit can access. Here are actionable steps to resolve it.
+First, verify your GPU is properly detected by the system by running
+nvidia-smi
+If this shows your GPU correctly, check that the NVIDIA Container Toolkit is properly configured by running
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+Next, update the NVIDIA Container Toolkit to the latest version, as version 1.13.5 has known issues. Run these commands to update
+sudo apt-get update
+sudo apt-get install -y nvidia-container-toolkit
+After updating, restart the Docker daemon
+sudo systemctl restart docker
+If the error persists and mentions detecting more GPUs than physically present, check your Vast.ai machine configuration to ensure the GPU count matches your actual hardware. You can verify the devices visible to containers by running
+sudo nvidia-ctk cdi list
+If there is a mismatch, regenerate the CDI specification with
+sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+Then restart Docker again. If you continue experiencing issues where Vast.ai detects incorrect GPU counts, contact Vast.ai support as this may require adjustment on the platform side to match your actual hardware configuration.
+For additional host management tools and troubleshooting scripts, see the JJZiets VastTools repository at
+https://github.com/jjziets/vasttools
+which includes utilities for monitoring and managing GPU hosts.
+Community Answer 4 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error indicates that the NVIDIA container runtime cannot recognize or communicate with the specified GPU. The "unknown device" message typically points to one of several issues.
+First, verify that the GPU is properly detected by the host system by running
+nvidia-smi
+If nvidia-smi fails or does not show the expected GPU, check the system logs for hardware errors
+sudo dmesg | grep -i nvidia
+The most common causes for this error are a faulty GPU, an improperly seated GPU in the PCIe slot, or a driver crash. Even with new hardware, GPUs can occasionally have issues out of the box or may not be fully seated in their slots.
+If nvidia-smi works on the host but Docker cannot access the GPU, test Docker GPU access directly
+docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi
+If this test fails while the host nvidia-smi succeeds, the nvidia-container-toolkit may need to be reinstalled or reconfigured.
+If the problem persists after verifying physical connections, try rebooting the system
+sudo reboot
+After reboot, if the GPU still shows as unknown, consider reinstalling the NVIDIA drivers. Persistent issues after driver reinstallation typically indicate a hardware problem with the GPU itself, even if the card is new.
+The nvml fix script from the jjziets vasttools repository at
+https://github.com/jjziets/vasttools
+is designed to address certain NVML library issues, but it cannot resolve underlying hardware problems or driver crashes. If running the script did not help, focus on the hardware and driver troubleshooting steps above.
+Community Answer 5 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error has several potential causes and solutions depending on your situation. First, verify GPU status by running nvidia-smi to check if the driver is working properly. If GPUs appear to be working normally and tests pass, this may be a false positive timing/initialization issue that can resolve itself within 24-36 hours without any action needed. If the driver is not running properly, a system reboot will reload the driver and often fixes the issue. If you recently changed GPUs or hardware configuration, you need to uninstall and reinstall NVIDIA drivers. Run sudo nvidia-uninstall, then clean up with sudo apt autoremove and sudo apt autoclean, reboot the system, and reinstall the NVIDIA drivers. For additional diagnostics, run sudo dmesg -T | grep -E 'NVRM|AER|fallen' to check for system errors indicating the GPU may have fallen off the bus. Also verify you are using the correct GPU device number in your Docker command - the syntax --gpus '"device=x"' requires replacing x with the actual GPU number (0, 1, 2, etc.).
+18. error: 3: unknown device: unknown
+Frequency:
+5 occurrences
+First seen:
+2024-03-21T05:22
+Error message:
+error: 3: unknown device: unknown
+Expert Answer
+This usually means the NVIDIA container runtime was asked for a GPU identifier it does not recognize in its current device mapping. Docker's GPU docs say
+device_ids
+must match IDs visible from
+nvidia-smi
+, and NVIDIA's own toolkit issue tracker reproduces the exact
+unknown device: unknown
+string when a nonexistent GPU ID is requested. On multi-GPU or MIG-capable systems, also verify that the container still has valid NVIDIA device nodes and
+/dev/char
+symlinks.
+Diagnostic commands:
+nvidia-smi -L
+ls -la /dev/nvidia*
+cat /etc/docker/daemon.json
+Compare with the exact
+--gpus device=...
+or Compose
+device_ids
+you are passing.
+References:
+NVIDIA Container Toolkit Issue #1197
+Community Answers
+Community Answer 1 — ★★★★★ (5/5)
+Source: Community Knowledge Base (quality score: 5.0)
+This error indicates that GPU device 3 is not being detected by the NVIDIA container runtime, which typically means the GPU has fallen off the PCIe bus or has a hardware communication problem. GPUs do not spontaneously recover from this state on their own, so waiting without action is not an effective troubleshooting approach.
+First, check if the system can see the GPU at all by running
+nvidia-smi
+If nvidia-smi shows an error or the GPU is missing, try reloading the NVIDIA kernel modules
+sudo rmmod nvidia_uvm nvidia_drm nvidia_modeset nvidia
+sudo modprobe nvidia
+If the modules fail to reload or the GPU still does not appear, a full system reboot is required
+sudo reboot
+After reboot, if the GPU remains undetected, check the PCIe bus directly
+lspci | grep -i nvidia
+If the GPU does not appear in lspci output, this points to a hardware-level issue. Power down the system completely, reseat the GPU in its PCIe slot, and check all power connections to the card. Also inspect for any visible damage, dust buildup, or thermal issues.
+Persistent detection failures after reseating suggest potential hardware failure of the GPU, a failing PCIe slot, insufficient power delivery, or motherboard issues. Check system logs for additional clues
+dmesg | grep -i nvidia
+dmesg | grep -i pci
+If you experienced a power interruption before this error appeared, also verify your PSU is delivering stable power and consider testing the GPU in a different PCIe slot if available.
+Community Answer 2 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error typically occurs when there is a mismatch between the GPUs detected by the system and what the NVIDIA Container Toolkit can access. Here are actionable steps to resolve it.
+First, verify your GPU is properly detected by the system by running
+nvidia-smi
+If this shows your GPU correctly, check that the NVIDIA Container Toolkit is properly configured by running
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+Next, update the NVIDIA Container Toolkit to the latest version, as version 1.13.5 has known issues. Run these commands to update
+sudo apt-get update
+sudo apt-get install -y nvidia-container-toolkit
+After updating, restart the Docker daemon
+sudo systemctl restart docker
+If the error persists and mentions detecting more GPUs than physically present, check your Vast.ai machine configuration to ensure the GPU count matches your actual hardware. You can verify the devices visible to containers by running
+sudo nvidia-ctk cdi list
+If there is a mismatch, regenerate the CDI specification with
+sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+Then restart Docker again. If you continue experiencing issues where Vast.ai detects incorrect GPU counts, contact Vast.ai support as this may require adjustment on the platform side to match your actual hardware configuration.
+For additional host management tools and troubleshooting scripts, see the JJZiets VastTools repository at
+https://github.com/jjziets/vasttools
+which includes utilities for monitoring and managing GPU hosts.
+Community Answer 3 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error indicates that nvidia-container-cli cannot detect or access the GPU device. The NVIDIA container runtime component is unable to communicate with your GPU. Common causes include driver issues, improper GPU passthrough configuration, problems with the NVIDIA container runtime setup, or the GPU being temporarily in use by another process. When the vast daemon tries to run bandwidth tests while the GPU is occupied, this error can appear and should clear up once the GPU becomes available. To troubleshoot, first run nvidia-smi to check GPU status and verify the GPU is detected. Then run journalctl -o short-precise -k -b -0|grep -Ei 'aer | fall' to check for hardware errors in the system logs. Also verify that NVIDIA drivers are properly installed and the container runtime is correctly configured.
+Community Answer 4 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error indicates that the NVIDIA container runtime cannot recognize or communicate with the specified GPU. The "unknown device" message typically points to one of several issues.
+First, verify that the GPU is properly detected by the host system by running
+nvidia-smi
+If nvidia-smi fails or does not show the expected GPU, check the system logs for hardware errors
+sudo dmesg | grep -i nvidia
+The most common causes for this error are a faulty GPU, an improperly seated GPU in the PCIe slot, or a driver crash. Even with new hardware, GPUs can occasionally have issues out of the box or may not be fully seated in their slots.
+If nvidia-smi works on the host but Docker cannot access the GPU, test Docker GPU access directly
+docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi
+If this test fails while the host nvidia-smi succeeds, the nvidia-container-toolkit may need to be reinstalled or reconfigured.
+If the problem persists after verifying physical connections, try rebooting the system
+sudo reboot
+After reboot, if the GPU still shows as unknown, consider reinstalling the NVIDIA drivers. Persistent issues after driver reinstallation typically indicate a hardware problem with the GPU itself, even if the card is new.
+The nvml fix script from the jjziets vasttools repository at
+https://github.com/jjziets/vasttools
+is designed to address certain NVML library issues, but it cannot resolve underlying hardware problems or driver crashes. If running the script did not help, focus on the hardware and driver troubleshooting steps above.
+Community Answer 5 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+This error has several potential causes and solutions depending on your situation. First, verify GPU status by running nvidia-smi to check if the driver is working properly. If GPUs appear to be working normally and tests pass, this may be a false positive timing/initialization issue that can resolve itself within 24-36 hours without any action needed. If the driver is not running properly, a system reboot will reload the driver and often fixes the issue. If you recently changed GPUs or hardware configuration, you need to uninstall and reinstall NVIDIA drivers. Run sudo nvidia-uninstall, then clean up with sudo apt autoremove and sudo apt autoclean, reboot the system, and reinstall the NVIDIA drivers. For additional diagnostics, run sudo dmesg -T | grep -E 'NVRM|AER|fallen' to check for system errors indicating the GPU may have fallen off the bus. Also verify you are using the correct GPU device number in your Docker command - the syntax --gpus '"device=x"' requires replacing x with the actual GPU number (0, 1, 2, etc.).
+19. permission denied
+Frequency:
+5 occurrences
+First seen:
+2024-04-24T12:40
+Error message:
+permission denied
+Expert Answer
+This is Linux
+EACCES
+or
+EPERM
+. On Vast hosts it commonly appears in three contexts: (1) file permission issues on mounted volumes or Docker socket, (2) SSH key authentication failures, and (3) container processes running as non-root trying to access host devices.
+Diagnostic commands:
+# Check file permissions
+ls -la /path/to/file
+namei -l /path/to/file
+# Check Docker socket permissions
+ls -la /var/run/docker.sock
+# Check SSH permissions
+ls -la ~/.ssh/
+Common fixes:
+Docker socket:
+sudo usermod -aG docker $USER
+SSH keys:
+chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys
+Device access: ensure container runs with
+--privileged
+or correct device mounts
+Community Answers
+Community Answer 1 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+Permission requirements depend on whether you are operating as a host or as a client renting a machine.
+As a host configuring your own Ubuntu system, most system-level operations require root access. This includes installing packages, modifying system configurations, managing Docker and KVM services, and running maintenance scripts. For example, disabling auto-updates to protect your NVIDIA drivers requires root:
+sudo apt remove unattended-upgrades -y
+As a client renting a machine through vast.ai, your access level depends on how the instance was configured. Docker instances typically run as root inside the container by default, so you should have full permissions within that container environment. However, you cannot access the underlying host system. If you are getting permission denied errors in a rented Docker instance, try prefixing your command with sudo, or check if the container was launched with restricted permissions.
+For KVM virtual machines, you typically have root access within the VM itself but again no access to the host.
+If you are a host and receiving permission denied errors while running system maintenance or monitoring scripts from tools like vasttools, prefix your commands with sudo or switch to root using sudo su. Most host-level operations for GPU management, driver maintenance, and system configuration require elevated privileges.
+Community Answer 2 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+The troubleshooting steps for permission denied errors are: 1) Check the service log with journalctl -u vastai.service, 2) Check service status with systemctl status vastai, 3) If permission denied errors appear during installation, use sudo before wget. The correct installation format is: wget
+https://console.vast.ai/install
+-O install; sudo python3 install [YourKey]; history -d $((HISTCMD-1)), 4) If permission denied errors persist after installation, try running the install script again as root using sudo, 5) Check for driver issues or docker directory mount issues by running df -h and cat /etc/fstab to verify mount points, 6) Look for duplicate UUID entries in /etc/fstab which can cause conflicts. If the issue is caused by duplicate UUID entries from manually editing fstab while Ubuntu already used that disk for the /var directory, a full reinstall of the operating system may be required.
+Community Answer 3 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+Use sudo before the docker command. When getting the error 'permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock', run the command with sudo. For example, instead of running 'docker run hello-world', run 'sudo docker run hello-world'.
+Community Answer 4 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+The file is missing the executable flag (+x bit). Some machines don't have it set by default. The issue can be resolved by adding the execute permission to the file.
+Community Answer 5 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+The error indicates a permission problem with the script execution. The script file needs to have execute permissions set. This can typically be fixed by running chmod +x on the script file to make it executable.
+20. Permission denied
+Frequency:
+5 occurrences
+First seen:
+2024-07-09T21:38
+Error message:
+Permission denied
+Expert Answer
+This is Linux
+EACCES
+or
+EPERM
+. On Vast hosts it commonly appears in three contexts: (1) file permission issues on mounted volumes or Docker socket, (2) SSH key authentication failures, and (3) container processes running as non-root trying to access host devices.
+Diagnostic commands:
+# Check file permissions
+ls -la /path/to/file
+namei -l /path/to/file
+# Check Docker socket permissions
+ls -la /var/run/docker.sock
+# Check SSH permissions
+ls -la ~/.ssh/
+Common fixes:
+Docker socket:
+sudo usermod -aG docker $USER
+SSH keys:
+chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys
+Device access: ensure container runs with
+--privileged
+or correct device mounts
+Community Answers
+Community Answer 1 — ★★★★☆ (4/5)
+Source: Community Knowledge Base (quality score: 4.0)
+Permission requirements depend on whether you are operating as a host or as a client renting a machine.
+As a host configuring your own Ubuntu system, most system-level operations require root access. This includes installing packages, modifying system configurations, managing Docker and KVM services, and running maintenance scripts. For example, disabling auto-updates to protect your NVIDIA drivers requires root:
+sudo apt remove unattended-upgrades -y
+As a client renting a machine through vast.ai, your access level depends on how the instance was configured. Docker instances typically run as root inside the container by default, so you should have full permissions within that container environment. However, you cannot access the underlying host system. If you are getting permission denied errors in a rented Docker instance, try prefixing your command with sudo, or check if the container was launched with restricted permissions.
+For KVM virtual machines, you typically have root access within the VM itself but again no access to the host.
+If you are a host and receiving permission denied errors while running system maintenance or monitoring scripts from tools like vasttools, prefix your commands with sudo or switch to root using sudo su. Most host-level operations for GPU management, driver maintenance, and system configuration require elevated privileges.
+Community Answer 2 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+The file is missing the executable flag (+x bit). Some machines don't have it set by default. The issue can be resolved by adding the execute permission to the file.
+Community Answer 3 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+Use sudo before the docker command. When getting the error 'permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock', run the command with sudo. For example, instead of running 'docker run hello-world', run 'sudo docker run hello-world'.
+Community Answer 4 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+The error indicates a permission problem with the script execution. The script file needs to have execute permissions set. This can typically be fixed by running chmod +x on the script file to make it executable.
+Community Answer 5 — ★★★☆☆ (3/5)
+Source: Community Knowledge Base (quality score: 3.0)
+The troubleshooting steps suggested are: 1) Try manually enabling docker with "sudo systemctl enable docker", 2) Delete the install file if there are permission denied messages, 3) Check if it's a minimal Ubuntu install which might be missing required modules (indicated by "no module named 'send_mach_info'" error), and 4) If none of these work, consider re-installing Ubuntu from scratch as the system may have underlying issues preventing Docker from functioning properly.
+21. failed to inject CDI devices: unresolvable CDI devices
+Frequency:
+— (documented from host investigations; also appears in community reports)
+First seen:
+field notes 2026-04-08
+Error message (representative variants):
+failed to inject CDI devices: unresolvable CDI devices
+OCI runtime create failed: could not apply required modification to OCI specification: error modifying OCI spec: failed to inject CDI devices: unresolvable CDI devices D.<uuid-fragment>
+docker: Error response from daemon: failed to create task for container: failed to create shim task: OCI runtime create failed: … failed to inject CDI …
+Expert Answer
+This is a
+CDI (Container Device Interface)
+failure: Docker/runc asked the NVIDIA CDI layer to inject devices from the generated spec, and
+one or more entries could not be resolved
+at container start.
+For SRE agents and operators — hardware is a first-class cause
+Before closing an incident as “stale CDI files” or “run
+nvidia-ctk cdi generate
+”,
+rule in or out a PCIe GPU that is on the bus but unhealthy
+:
+Fewer GPUs in
+nvidia-smi -L
+than the machine is supposed to have
+, or
+non-contiguous GPU indices
+(e.g. 0, 1, 3 with no 2) without a documented MIG/passthrough reason →
+assume hardware / link / power / riser
+until disproven. CDI regeneration
+does not repair
+a device the driver cannot use.
+lspci
+still lists NVIDIA functions, but one BDF shows
+rev ff
+,
+Unknown header type
+, or
+AER / PCIe Bus Error
+noise →
+PCI device in bad state
+(config space or link garbage); the driver may
+skip
+or
+partially initialize
+that adapter while CDI still references it or conflicts with reality.
+This is the
+“zombie GPU”
+pattern:
+enumerated on PCI
+,
+not reliably usable with the NVIDIA driver
+— the dashboard CDI error is a
+downstream symptom
+, not proof the GPU is fine.
+Software causes (often coexist with hardware investigations)
+These are real and should be fixed, but they
+do not eliminate
+the hardware path above:
+Stale or broken
+/etc/cdi/
+specs
+(including Vast-specific files): regenerate after verifying GPU set; see
+Troubleshooting Guide
+(CDI section, software-only steps).
+vast_metrics.service
+crash-looping on
+launch_metrics_pusher.sh
+Permission denied
+(
+chmod +x
+, restart service) — see
+SRE Self-Test Debugging
+.
+If CDI errors persist after chmod, CDI regen, and daemon restart:
+treat as
+confirmation
+to escalate
+hardware
+(BDF,
+nvidia-bug-report.sh
+, provider ticket)—not as “unknown software”.
+Diagnostic commands (hardware + CDI):
+nvidia-smi -L
+# Compare count and indices to expected machine GPU count
+lspci -nn | grep -i nvidia
+sudo nvidia-ctk cdi list
+journalctl -k -b | grep -iE 'NVRM|Xid|nvidia-modeset|AER|PCIe Bus Error' | tail -80
+journalctl -u vast_metrics.service -b --no-pager | tail -40
+Soft fixes (only when PCI/NVML are healthy: full GPU count, contiguous indices, clean kernel log):
+sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+sudo systemctl restart docker
+docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi
+Hardware / ops path:
+Escalate with
+PCI BDF
+,
+nvidia-smi -L
+, and
+journalctl -k
+excerpts; request
+full power cycle
+or physical check. Collect
+nvidia-bug-report.sh
+for NVIDIA or the host vendor.
+That pattern (partial enumeration, sick BDF, modeset/Xid spam) fits
+link, power, riser, or wedged GPU
+, and is
+not
+the usual picture of a GPU cleanly passed to another VM (those are normally
+vfio-pci
+, not a sick
+nvidia
+-bound function).
+References:
+NVIDIA Container Toolkit — CDI
+. Full triage table:
+Troubleshooting Guide
+section
+CDI injection: "failed to inject CDI devices" / "unresolvable CDI devices"
+.
+Community Answers
+Community Answer 1 — ★★★★★ (5/5)
+Source: Field investigation on a multi-GPU Vast host (2026)
+Four physical NVIDIA functions were still bound to
+nvidia
+, but one BDF showed
+rev ff
+and
+!!! Unknown header type 7f
+—invalid PCI config space—while others showed normal revision.
+nvidia-smi
+exposed three usable GPUs (indices not contiguous).
+journalctl
+showed repeated
+nvidia-modeset: ERROR: … Error while waiting for GPU progress
+, consistent with a sick adapter. Resolution path: provider ticket with that BDF, full power cycle, and hardware check—not CDI regenerate alone.
+Community Answer 2 — ★★★★☆ (4/5)
+Source: SRE investigation notes (combined software + hardware pattern)
+The same host can show
+both
+:
+vast_metrics.service
+stuck in a restart loop because
+launch_metrics_pusher.sh
+lacks
+execute
+permission,
+and
+dashboard
+CDI unresolvable
+errors from
+stale
+/etc/cdi/
+files. Fix
+chmod +x
+,
+regenerate CDI
+, and
+restart
+vastai
+as required—but if
+nvidia-smi -L
+still does not show every expected GPU
+(or indices skip), treat that as
+ongoing PCIe/GPU hardware fault
+and escalate;
+do not
+mark the incident resolved on software steps alone.
+Additional Error Reference
+The following errors are less frequently reported but still important for host operators.
+Error:
+--storage-opt is supported only for overlay over xfs with "pquota" mount option
+Problem:
+Docker is configured to use storage quotas, but the filesystem doesn't support it.
+Solution:
+Check your Docker storage filesystem:
+df -T /var/lib/docker
+If XFS, ensure it's mounted with pquota:
+mount | grep $(df /var/lib/docker | tail -1 | awk '{print $1}')
+# If pquota missing, edit /etc/fstab and add pquota option
+sudo mount -o remount /var/lib/docker
+If not XFS or can't use pquota, remove storage-opts from
+/etc/docker/daemon.json
+:
+{
+"runtimes": {
+"nvidia": {
+"path": "nvidia-container-runtime",
+"runtimeArgs": []
+}
+}
+}
+Restart Docker:
+sudo systemctl restart docker
+Why this works:
+Docker's overlay2 storage driver requires XFS with project quotas (pquota) to enforce per-container disk limits.
+Reference:
+Vast.ai FAQ
+Error:
+NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver
+Problem:
+NVIDIA driver not loaded or broken after system update.
+Solution:
+Check if driver module is loaded:
+lsmod | grep nvidia
+If not loaded, try loading manually:
+sudo modprobe nvidia
+If that fails, reinstall the driver:
+sudo apt install --reinstall nvidia-driver-535
+sudo reboot
+Why this works:
+System updates (especially kernel updates) can break NVIDIA driver compatibility. Reinstalling the driver rebuilds the kernel module.
+Reference:
+VastTools
+Error:
+Failed to initialize NVML: Driver/library version mismatch
+Problem:
+NVIDIA driver was updated but system wasn't rebooted.
+Solution:
+Reboot the system:
+sudo reboot
+After reboot, verify:
+nvidia-smi
+Why this works:
+After driver update, the kernel module and userspace library versions must match. Reboot loads the new kernel module.
+Prevention:
+Disable automatic updates to prevent unexpected driver changes:
+sudo apt remove unattended-upgrades -y
+Reference:
+VastTools
+Error:
+Xid 48
+/
+Xid 94
+/
+Xid 95
+- GPU Memory Errors
+Problem:
+GPU memory (VRAM) errors detected.
+Solution:
+Check error count:
+nvidia-smi --query-gpu=ecc.errors.corrected.volatile.total --format=csv
+If correctable errors are increasing rapidly, monitor closely
+For uncorrectable errors, the GPU may need replacement
+Why this happens:
+Memory errors can indicate failing VRAM or thermal issues.
+Error: Machine shows "unhealthy" or fails verification
+Problem:
+Vast.ai health checks failing.
+Solution:
+Check vast daemon status:
+sudo systemctl status vastai
+tail -f /var/lib/vastai_kaalia/kaalia.log
+Verify nvidia-smi works:
+nvidia-smi
+Verify Docker GPU access:
+docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi
+Restart vast service:
+sudo systemctl restart vastai
+Reference:
+Vast.ai FAQ
+Error:
+bad nvidia_smi: {'ERROR': ''}
+Problem:
+Driver crash detected by Vast.ai.
+Solution:
+This indicates a hardware problem or driver crash
+Check dmesg for GPU errors:
+sudo dmesg | grep -i nvidia
+Restart the system:
+sudo reboot
+If persistent, reinstall drivers or investigate hardware
+Reference:
+VastTools
+Error: Can't connect to instance SSH/Jupyter
+Problem:
+Port mapping or firewall issues.
+Solution:
+Verify the correct external port from Vast.ai console
+Test port connectivity:
+nc -vz <host_ip> <external_port>
+Check host firewall:
+sudo ufw status
+Verify router port forwarding (ports 10000-10099)
+Reference:
+Vast.ai FAQ
+Error: Low DLPerf / benchmark scores
+Problem:
+Machine showing lower performance than expected in Vast.ai benchmarks.
+Solution:
+Check for thermal throttling:
+nvidia-smi -q -d PERFORMANCE
+Check GPU power limits:
+nvidia-smi -q -d POWER
+Ensure persistence mode is enabled:
+sudo nvidia-smi -pm 1
+Check for background processes:
+nvidia-smi pmon -s um
+Why this matters:
+Low benchmark scores reduce visibility on Vast.ai marketplace.
+Error: Machine not appearing on Vast.ai marketplace
+Problem:
+Host registered but not visible to renters.
+Solution:
+Check machine status in host console
+Verify verification tests passed
+Check for billing/account issues
+Ensure competitive pricing
+Restart Vast service:
+sudo systemctl restart vastai
+Error:
+no space left on device
+Problem:
+Docker data directory full.
+Solution:
+Check disk usage:
+df -h /var/lib/docker
+docker system df
+Clean up unused images/containers:
+docker system prune -a -f
+Remove stopped containers:
+docker container prune -f
+Check for large overlay directories:
+sudo du -sh /var/lib/docker/overlay2/* | sort -h | tail -20
+Prevention:
+Set up dedicated storage with adequate space (100GB+ recommended per GPU).
+Error: Container won't start - overlay storage issues
+Problem:
+Docker overlay2 filesystem corruption.
+Solution:
+Stop Docker:
+sudo systemctl stop docker
+Remove overlay2 directory (WARNING: deletes all containers/images):
+sudo rm -rf /var/lib/docker/overlay2
+Restart Docker:
+sudo systemctl start docker
+Error:
+Permission denied (publickey)
+Problem:
+SSH key not properly configured.
+Solution:
+Check SSH service status:
+sudo systemctl status sshd
+Verify sshd_config allows password or key auth:
+sudo cat /etc/ssh/sshd_config | grep -E "PasswordAuthentication|PubkeyAuthentication"
+Check file permissions:
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/authorized_keys
+Error:
+Connection refused
+on SSH
+Problem:
+SSH service not running or port blocked.
+Solution:
+Check if sshd is running:
+sudo systemctl status sshd
+Check if port 22 is listening:
+sudo netstat -tlnp | grep :22
+Check firewall:
+sudo ufw allow 22/tcp
+Error: GPU only showing x4 lanes instead of x16
+Problem:
+PCIe not negotiating full bandwidth.
+Solution:
+Check current link status:
+sudo lspci -vvv | grep -E "LnkCap|LnkSta" | head -20
+Check BIOS for PCIe settings
+Try different PCIe slot
+Check riser cables if using risers
+Clean PCIe contacts
+Impact:
+Reduced bandwidth affects ML workloads with high data transfer.
+Error: PCIe AER errors in dmesg
+Problem:
+PCIe bus errors indicating connectivity issues.
+Solution:
+Check dmesg:
+sudo dmesg | grep -i aer
+Reseat GPU and power cables
+Check for thermal issues
+Try disabling ASPM:
+# Add to kernel parameters: pcie_aspm=off
+Quick Diagnostic Commands
+# System overview
+nvidia-smi
+# Check driver version mismatch
+cat /proc/driver/nvidia/version
+nvidia-smi --query-gpu=driver_version --format=csv
+# Check Docker GPU runtime
+docker info | grep -i runtime
+# Test GPU in container
+docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi
+# Check vast logs
+tail -f /var/lib/vastai_kaalia/kaalia.log
+# Check system logs for GPU errors
+sudo dmesg | grep -i "nvidia\|gpu\|xid\|nvrm"
+# Check PCIe link status
+sudo lspci -vvv | grep -E "LnkCap|LnkSta"
+# Check disk space
+df -h && docker system df
+# Check temperature
+nvidia-smi --query-gpu=temperature.gpu --format=csv
+# Check power usage
+nvidia-smi --query-gpu=power.draw --format=csv
+Prevention Best Practices
+Disable automatic updates:
+sudo apt remove unattended-upgrades -y
+Enable persistence mode:
+sudo nvidia-smi -pm 1
+Standardize NVIDIA setup:
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+Use Ubuntu 22.04 LTS
+-- proven compatibility with Vast.ai infrastructure
+Set up monitoring:
+Use
+IPMI Monitor
+for hardware alerts
+Monitor temperature, power, and errors
+Regular maintenance:
+Clean dust from GPUs monthly
+Check cable connections quarterly
+Monitor disk space weekly
+Use stable driver versions:
+Driver 535 is widely tested
+Avoid bleeding-edge drivers for production
+Auto-drain nodes
+that show Xid 79 or repeated bandwidth-copy failures
+Only relist hosts
+after DCGM diagnostics and Vast self-test pass cleanly
+References:
+Vast.ai Host Docs
+,
+NVIDIA Container Toolkit
+,
+VastTools

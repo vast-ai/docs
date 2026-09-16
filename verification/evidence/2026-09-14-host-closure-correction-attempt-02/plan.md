@@ -1,0 +1,13 @@
+# Bounded rental wording reconciliation — attempt 02
+
+Authorization: active user closure goal Step 3 permits narrowing unsupported guidance. Root delegated the nine prepared rental/availability replacements and two directly related workflow edits. This authorizes editorial correction, not owner acceptance or approval of backend rules.
+
+Baseline: clean signed docs revision `4ab40830cf38057e4eaeeeec36cd12c16794915b`; current model 335 PASS / 11 FAIL / 21 BLOCKED / 87 NOT_APPLICABLE / 1,554 UNVALIDATED, 2,008 active claims. The sealed attempt-01 predecessor and every existing attempt-01 artifact remain unchanged. The same closure registry/projectors are revised under Git history; no new projection layer.
+
+Scope: nine original FAIL occurrences across Hosting Overview, Pricing Your Listing, Maintenance Windows, Glossary and Hosting Agreement. Preserve shared price/agreement introductions. Change the example date label and unlisting introduction for coherence; account for their existing IDs separately. Do not edit tax, screenshots, runtime records or unrelated claims.
+
+Authority: pinned canonical Vast CLI `ecf32efa1d8d2f110f7de4118c30698bb7ae2fbd` option/help declarations; retained September 9 Hosting Agreement Operation and Maintenance, Hardware as a Service and Performance clauses; existing price-extension source for unchanged introduction. These support attributed declarations, clause referrals and conservative review advice only. They do not establish initial rental dates, shortening behavior, constant-duration roll-forward, an exact safe-stop boundary, current agreement acceptance or maintenance-policy approval.
+
+Checks: inspect exact literal/source selectors and surrounding workflow; Python/JavaScript full projection parity; exact nine FAIL histories and unchanged tax/runtime records; adjacent label remains NOT_APPLICABLE; shared introductions and retained commands unchanged; pinned artifact/source tamper checks; owner-question bindings; generated model/register check and diff whitespace. Inspect affected procedure invalidation without promoting procedure results. Retain failures and retests. Wait for independent review before the large HTML export; then check export and its exact source bindings. No live Host, account, rental, paid, commit, push or external-message action.
+
+Success: all nine unsupported assertions are absent from active prose and retained in history; replacement PASS means only the specified source/context review. Backend and maintenance owner questions remain UNVALIDATED. Two tax FAILs and human acceptance stay open. Report exact counts, changed IDs, checks and limits.

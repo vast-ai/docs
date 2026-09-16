@@ -1,0 +1,170 @@
+---
+title: "Storage Setup"
+sidebarTitle: "Storage Setup"
+description: "Disk, filesystem, Docker storage, XFS, RAID, and NVMe guidance for hosts."
+"canonical": "/host/storage-setup"
+personas:
+  - pro-operator
+  - headless-operator
+---
+
+<div className="persona-chips"><span className="persona-chip">Pro Operator</span><span className="persona-chip">Headless / DC</span></div>
+
+Vast uses Docker storage for renter data. Put `/var/lib/docker` on fast SSD/NVMe storage with XFS project quotas.
+
+<Warning>
+Formatting a disk or LVM volume destroys data. Identify the OS disk and any provider data mount before running `mkfs`.
+</Warning>
+
+<span id="docker-storage-layout" aria-hidden="true" />
+## Docker Storage Layout
+
+Current Setup guidance calls for SSD storage with at least a 200 GB dedicated partition for Docker. Plan additional capacity for the GPUs and workloads you intend to offer. Docker storage should:
+
+- Be on the intended data disk, not accidentally on the OS disk.
+- Be mounted and ready before Docker and the host daemon start. If you use `nofail`, configure and verify the service dependencies separately; `nofail` alone does not ensure this ordering.
+- Use XFS with `pquota` or `prjquota`.
+- Have enough capacity for active rentals, stopped instances, cached images, and any volume offers.
+
+Inspect first:
+
+```bash
+lsblk -f
+findmnt /
+findmnt /data0 || true
+findmnt /var/lib/docker || true
+df -h /
+```
+
+Back up `/etc/fstab` before editing mounts:
+
+```bash
+sudo cp /etc/fstab /etc/fstab.pre-vast-docker.$(date -u +%Y%m%d%H%M%S)
+```
+
+<span id="xfs-prjquota" aria-hidden="true" />
+## XFS Project Quotas
+
+XFS project quotas are required. Vast uses them for per-container storage quotas.
+
+Add `pquota` or `prjquota` to the mount-options column for the `/var/lib/docker` XFS mount in `/etc/fstab`. In the example below, the mount-options column is `rw,auto,pquota,nofail`:
+
+```text
+UUID=a1b2c3d4-e5f6-7890-abcd-ef1234567890  /var/lib/docker  xfs  rw,auto,pquota,nofail  0  0
+```
+
+After editing `/etc/fstab`, mount any filesystem that is not already mounted and verify it below. `mount -a` does not apply new quota options to an existing mount. If project quota accounting is off, first arrange maintenance with no active rentals or storage users, stop the services using that filesystem, and perform a full unmount/mount or a planned reboot. Then check the resulting mount and quota state; a remount alone does not activate quota accounting.
+
+```bash
+sudo mount -a
+findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS
+sudo xfs_quota -x -c "state" /var/lib/docker
+```
+
+Verify that the mount is XFS, includes `pquota` or `prjquota`, and reports project quota accounting and enforcement as ON. If accounting is off, do not proceed with hosting: activate it through a full unmount/mount or planned reboot during maintenance, then repeat these checks.
+
+Do not work around quota errors by removing Docker quota settings. Fix the filesystem and mount instead.
+
+<span id="disposable-device-example" aria-hidden="true" />
+## Disposable Device Example
+
+**Simple**
+
+Inspect the partition, RAID device, or LVM volume you intend to dedicate to Docker. Replace the example path with your device:
+
+```bash
+lsblk -f /dev/mapper/vg1-lv--1
+findmnt -S /dev/mapper/vg1-lv--1
+```
+
+`findmnt` shows any mount it finds for that device. Confirm that the device contains no OS or renter data before preparing it. If you need to format it manually, use the Advanced procedure below.
+
+<Warning>
+The Advanced formatting command erases the selected device. Confirm the exact device path and arrange maintenance with no active rentals or other storage users before running it.
+</Warning>
+
+<Accordion title="Advanced">
+
+Use this only after confirming that the target device is safe to erase. Replace the example path below; the command checks the device and asks you to type its path again. If the device is mounted, unmounting must succeed before formatting.
+
+```bash
+(
+  VAST_DOCKER_DEVICE=/dev/mapper/vg1-lv--1
+  [ -b "$VAST_DOCKER_DEVICE" ] || exit 1
+  lsblk -f "$VAST_DOCKER_DEVICE" || exit 1
+  findmnt -S "$VAST_DOCKER_DEVICE" || true
+  printf 'Type the disposable device path to confirm formatting: '
+  IFS= read -r VAST_FORMAT_CONFIRM || exit 1
+  [ "$VAST_FORMAT_CONFIRM" = "$VAST_DOCKER_DEVICE" ] || exit 1
+  if findmnt -S "$VAST_DOCKER_DEVICE" >/dev/null; then
+    sudo umount "$VAST_DOCKER_DEVICE" || exit 1
+  fi
+  sudo mkfs.xfs -f "$VAST_DOCKER_DEVICE" &&
+    sudo mkdir -p /var/lib/docker &&
+    sudo blkid "$VAST_DOCKER_DEVICE"
+)
+```
+
+Replace the old `/data0` fstab entry for this same disposable device with a `/var/lib/docker` entry using its new filesystem UUID. Confirm that `/var/lib/docker` is not already mounted from another device before mounting and checking it below.
+
+```bash
+sudo mount -a
+findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS
+sudo xfs_quota -x -c "state" /var/lib/docker
+```
+
+If you are starting from a raw disk, create a partition first. The [Headless Install Path](/host/headless-install) includes a `cfdisk` example.
+
+</Accordion>
+
+<span id="fstab-example" aria-hidden="true" />
+## Example fstab Line
+
+Use the filesystem UUID, not a device name like `/dev/nvme0n1p1`:
+
+```text
+UUID=a1b2c3d4-e5f6-7890-abcd-ef1234567890  /var/lib/docker  xfs  rw,auto,pquota,nofail  0  0
+```
+
+After editing:
+
+```bash
+sudo mount -a
+findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS
+sudo xfs_quota -x -c "state" /var/lib/docker
+```
+
+Verify that the mount is XFS, includes `pquota` or `prjquota`, and reports project quota accounting and enforcement as ON. If accounting is off, do not proceed with hosting: activate it through a full unmount/mount or planned reboot during maintenance, then repeat these checks.
+
+<span id="nvme-raid" aria-hidden="true" />
+## Single NVMe vs RAID
+
+One NVMe is simplest. Multiple NVMes in RAID0 can improve capacity and throughput, but RAID0 has no redundancy: one failed drive can break the array.
+
+Monitor redundant RAID arrays so you notice a failed device and can restore redundancy. Configure health checks and failure notifications for the RAID layer, NVMe/SMART health, and any storage controller or software you use. An unnoticed degraded array can suffer downtime or data loss if further failures exceed its remaining redundancy.
+
+Pick the layout that matches your reliability goals, then monitor it like production storage.
+
+<span id="pquota-error" aria-hidden="true" />
+## Docker pquota Error
+
+`--storage-opt is supported only for overlay over xfs with pquota` means Docker could not use the required XFS project-quota backing storage. Check the actual Docker mount, filesystem type, and quota options:
+
+Plan the storage migration for maintenance with no active rentals or other storage users. Stop Docker and the host software, preserve the existing Docker data, move it to the intended XFS filesystem, and verify the mount and quotas before restarting the services. Do not format or replace a device that holds renter data.
+
+## Installer Connection
+
+Review the prepared Docker storage in the Host Installer Wizard’s Storage step. For command-line installation, follow the [headless fallback installer instructions](/host/installing-host-software#headless-fallback) and add `--docker-partition` with the verified block device behind your Docker mount. For example, add `--docker-partition /dev/mapper/vg1-lv--1`, replacing the path with your prepared device.
+
+Fix ext4, missing quotas, or wrong-device mounts before installing.
+
+## Volume Offers And Cached Images
+
+Rented volume space reduces storage available to GPU offers. Cached images can be reused when possible instead of redownloaded.
+
+[Volume lifecycle and command map](/host/volume-offers)
+
+<span id="cached-images" aria-hidden="true" />
+## Does Vast redownload images that were already used?
+
+Prior images are cached when possible. If a renter uses an image already present on the machine, the system can reuse it.

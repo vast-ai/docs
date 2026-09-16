@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0",
+  "evidence_id": "HIST-04-source-inspection-02",
+  "date": "2026-09-08",
+  "scope": "Static download and inspection of public updater and self-test helper scripts; no execution or Host/API/SSH/credential use.",
+  "raw_artifacts": [
+    {
+      "source_url": "https://s3.amazonaws.com/public.vast.ai/kaalia/scripts/update_scripts.sh",
+      "stored_path": ".orchestra/h100x4-install-history/source-inspection-02-restricted/update_scripts.sh",
+      "sha256": "8b7f973b2f4b62d293c3078ce0d2c108c6e1556149877680ca7c723183c61714",
+      "mode": "0600",
+      "executed": false
+    },
+    {
+      "source_url": "https://s3.amazonaws.com/public.vast.ai/kaalia/scripts/start_self_test.sh",
+      "stored_path": ".orchestra/h100x4-install-history/source-inspection-02-restricted/start_self_test.sh",
+      "sha256": "b44cfb52802f0fe44535cba8b6d78365a6672418e89574c87d34f05aa197151f",
+      "mode": "0600",
+      "executed": false
+    }
+  ],
+  "static_findings": [
+    {
+      "id": "HIST-04-02-A",
+      "status": "PASS",
+      "claim": "The public updater retrieves start_self_test.sh by name.",
+      "evidence": ["update_scripts.sh:17-19", "update_scripts.sh:27-35"]
+    },
+    {
+      "id": "HIST-04-02-B",
+      "status": "PASS",
+      "claim": "For an unlisted machine, the public helper invokes a temporary listing before self-test and then attempts unlisting.",
+      "evidence": ["start_self_test.sh:33-45", "start_self_test.sh:61-62"],
+      "boundary": "Static control flow only; no runtime completion, cleanup, or marketplace observation."
+    },
+    {
+      "id": "HIST-04-02-C",
+      "status": "UNVALIDATED",
+      "claim": "The existing-listed early exit is safe to rely on for a new-host action.",
+      "evidence": ["start_self_test.sh:25-31"],
+      "boundary": "It proves only an early exit on a literal listed field, not target ownership, pricing, expiry, self-test success, or authorization."
+    },
+    {
+      "id": "HIST-04-02-D",
+      "status": "BLOCKED",
+      "claim": "Stock installer/TUI can publish with the exact authorized price, minimum-bid, storage-price, end-date, and no-reboot constraints.",
+      "evidence": ["public-install:1397-1411", "public-install:1963-1967", "start_self_test.sh:33-45", "host-installer-wizard/src/host_installer_wizard/workers/installer_runner.py:1123-1138"],
+      "blockers": ["No source-exposed controls for all required values.", "Helper omits -b and -s and fixes end time as now plus 10800 seconds.", "On-host vast executable identity and flag semantics are not proven.", "No safe fresh target/lifecycle/runtime evidence exists."]
+    },
+    {
+      "id": "HIST-04-02-E",
+      "status": "UNVALIDATED",
+      "claim": "The stock path cannot reboot the host.",
+      "evidence": ["public-install:1482-1483", "public-install:1667-1682", "public-install:1686-1736"],
+      "boundary": "The inspected installer has no direct reboot invocation and its default driver-install condition is favorable, but it invokes an external driver installer and does not prove no reboot on a future artifact or host."
+    }
+  ],
+  "local_reference_only": {
+    "source": "vast-ai/vast-cli",
+    "revision": "18c4f2ccd6da587d5352f8741c71805a9a18e1ae",
+    "line_references": ["vast.py:8099-8111", "vast.py:8150-8172"],
+    "purpose": "Explains the local source meaning of list-machine flags only.",
+    "provenance_limit": "Not proven identical to /var/lib/vastai_kaalia/vast used by the public helper."
+  },
+  "decision": "BLOCKED",
+  "authorization": "No installation, registration, listing, self-test, workload, reboot, or readiness claim is authorized by this source inspection."
+}

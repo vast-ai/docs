@@ -1,0 +1,184 @@
+{
+  "target_alias": "HOST-RTX4090-01",
+  "mode": "PLAN_AND_EXECUTE",
+  "authorization": "User-authorized read-only Host V&V; strict SSH, no sudo, no renters or mutations",
+  "commands": [
+    {
+      "id": "B01",
+      "command": "lsb_release -a",
+      "claims": [
+        "MCL-85a76ecace53a7e2",
+        "MCL-544ab3d874a4af8b"
+      ],
+      "expected": "OS inventory; no compatibility or clean-install inference"
+    },
+    {
+      "id": "B02",
+      "command": "uname -a",
+      "claims": [
+        "MCL-85a76ecace53a7e2"
+      ],
+      "expected": "Kernel/platform inventory; hostname redacted"
+    },
+    {
+      "id": "B03",
+      "command": "lscpu | sed -n '1,25p'",
+      "claims": [
+        "MCL-71aa2b81147538fb",
+        "MCL-85a76ecace53a7e2"
+      ],
+      "expected": "CPU topology fields; compare physical versus logical cores, not load performance"
+    },
+    {
+      "id": "B04",
+      "command": "lspci | grep -i nvidia",
+      "claims": [
+        "MCL-85a76ecace53a7e2"
+      ],
+      "expected": "NVIDIA PCI functions visible; not runtime injection"
+    },
+    {
+      "id": "B05",
+      "command": "lsblk -f",
+      "claims": [
+        "MCL-85a76ecace53a7e2",
+        "MCL-7928ad4ab732dd5e"
+      ],
+      "expected": "Filesystem layout only; UUID/labels and tenant mount paths redacted"
+    },
+    {
+      "id": "B06",
+      "command": "findmnt /",
+      "claims": [
+        "MCL-8b99412cf40c3153"
+      ],
+      "expected": "Root mount visible"
+    },
+    {
+      "id": "B07",
+      "command": "findmnt /data0",
+      "claims": [
+        "MCL-8b99412cf40c3153"
+      ],
+      "expected": "Optional mount if present; exit1 with empty output may be expected"
+    },
+    {
+      "id": "B08",
+      "command": "findmnt /var/lib/docker",
+      "claims": [
+        "MCL-8b99412cf40c3153",
+        "MCL-f0ea07f814b68cb6"
+      ],
+      "expected": "Observe Docker mount if present, not quota enforcement"
+    },
+    {
+      "id": "B09",
+      "command": "df -h /",
+      "claims": [
+        "MCL-85a76ecace53a7e2"
+      ],
+      "expected": "Root capacity snapshot, not workload storage guarantee"
+    },
+    {
+      "id": "B10",
+      "command": "findmnt /var/lib/docker -no SOURCE,FSTYPE,OPTIONS",
+      "claims": [
+        "MCL-f3e7dae0a707f1d0",
+        "MCL-5f07229056d10052"
+      ],
+      "expected": "Observe mount options, not XFS enforcement"
+    },
+    {
+      "id": "B11",
+      "command": "df -h /var/lib/docker",
+      "claims": [
+        "MCL-f3e7dae0a707f1d0",
+        "MCL-5f07229056d10052"
+      ],
+      "expected": "Docker storage capacity snapshot"
+    },
+    {
+      "id": "B12",
+      "command": "nvidia-smi -L",
+      "claims": [
+        "MCL-9183e3d8766d660a",
+        "MCL-60ec9280a68ab6d7"
+      ],
+      "expected": "GPU enumeration; UUIDs redacted; no process list"
+    },
+    {
+      "id": "B13",
+      "command": "nvidia-smi -q -d ECC",
+      "claims": [
+        "MCL-783a23e5cbc3d28a",
+        "MCL-2713359efabc2462"
+      ],
+      "expected": "ECC fields/N/A observed, no healthy-under-load conclusion"
+    },
+    {
+      "id": "B14",
+      "command": "type docker",
+      "claims": [
+        "MCL-a8d6bba43add3bdb"
+      ],
+      "expected": "Executable availability only"
+    },
+    {
+      "id": "B15",
+      "command": "docker --version",
+      "claims": [
+        "MCL-a8d6bba43add3bdb"
+      ],
+      "expected": "Installed client version only"
+    },
+    {
+      "id": "B16",
+      "command": "docker create --help | grep -- --runtime",
+      "claims": [
+        "MCL-a8d6bba43add3bdb"
+      ],
+      "expected": "CLI help flag existence, not container creation"
+    },
+    {
+      "id": "B17",
+      "command": "systemctl is-active docker",
+      "claims": [
+        "MCL-ded74f5fc92fbc85"
+      ],
+      "expected": "Active-state value; inactive exit3 is observation not automatic docsFAIL"
+    },
+    {
+      "id": "B18",
+      "command": "systemctl is-active vastai.service vast_metrics.service docker nvidia-persistenced.service",
+      "claims": [
+        "MCL-f0a3f4f3f551bac6"
+      ],
+      "expected": "Per-unit active-state only; no logs/restart"
+    },
+    {
+      "id": "B19",
+      "command": "systemctl is-active vastai.service docker.service",
+      "claims": [
+        "MCL-60ec9280a68ab6d7"
+      ],
+      "expected": "Partial composite command coverage only"
+    },
+    {
+      "id": "B20",
+      "command": "uname -r",
+      "claims": [
+        "CUR-f62113f77a2ac0c9"
+      ],
+      "expected": "Running kernel version; no upgrade/reboot"
+    }
+  ],
+  "exclusions": [
+    "Full nvidia-smi process display",
+    "VM helper until implementation safety inspected",
+    "logs",
+    "renter contents",
+    "WAN probes",
+    "any workload or host mutation"
+  ],
+  "status_policy": "Each item is a bounded subcommand observation; never a composite claim PASS. Nonzero absence/state outputs may be expected. Missing permission/tool blocks that check, not every claim."
+}

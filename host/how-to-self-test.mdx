@@ -1,120 +1,149 @@
 ---
 title: "How to Self-Test"
+sidebarTitle: "How to Self-Test"
 createdAt: "Mon Nov 25 2025 00:00:00 GMT+0000 (Coordinated Universal Time)"
 updatedAt: "Mon Nov 25 2025 00:00:00 GMT+0000 (Coordinated Universal Time)"
 "canonical": "/host/how-to-self-test"
+personas:
+  - pro-operator
+  - headless-operator
 ---
 
+<div className="persona-chips"><span className="persona-chip">Pro Operator</span><span className="persona-chip">Headless / DC</span></div>
 
-## Minimal Requirements for Verification
+You can start a self-test from the **Web UI** or run one with the **Vast CLI**:
 
-Before your machine can be verified on Vast.ai, it must meet all minimum quality and reliability benchmarks.
-Verification confirms that your machine is stable, performant, and properly configured to run client workloads.
+| Method | Where to start |
+| --- | --- |
+| [Web UI](#web-ui-self-test) | Choose **Test machine** from the machine’s menu on the Machines page. |
+| [Vast CLI](#vast-cli-self-test) | Run `vastai self-test machine <machine_id>` in a terminal on a computer outside the host’s network. |
+
+The CLI’s checks and diagnostic options are described below. A self-test result does not by itself establish platform verification or readiness for every renter workload.
 
 <Note>
-**Note:** Meeting these minimum requirements makes your machine eligible for verification, but does not automatically guarantee verification.
+Passing self-test is one part of preparing for verification; the machine must also meet the published [verification requirements](/host/verification-stages#additional-requirements-for-verification). A pass does not guarantee verification, search placement or rentals.
 </Note>
 
-## About the Self-Test
+## Before You Run It
 
-The self-test helps confirm that your machine satisfies Vast.ai’s minimum performance and configuration standards.
-It automatically evaluates key system aspects and simulates real workloads to validate both hardware and network readiness.
+- Use the host-enabled account that owns the machine.
+- List the machine.
+- Make sure no client is actively renting it.
 
-## What the Self-Test Checks
+<span id="what-the-self-test-checks" aria-hidden="true" />
+## What Self-Test Checks
 
-During the self-test, the following components and conditions are verified:
+The checks in this section describe the **CLI self-test**. The CLI checks for a rentable offer and evaluates its reported requirements. If those checks allow the run, it attempts a temporary diagnostic rental, starts the selected image, polls progress and reports the result. It also attempts to destroy the temporary instance. If cleanup reports a failure, follow the displayed instructions to check and remove the remaining test instance.
 
-* Driver setup (including CUDA configuration)
-* Network speed and stability
-* Open ports and connectivity
-* PCIe bandwidth
-* GPU VRAM capacity and reliability
-* System RAM and CPU performance
-* Overall machine reliability under simulated workloads
+Before attempting the temporary diagnostic rental, the CLI looks for a rentable offer and checks its reported requirements:
 
-A short test workload will be executed to assess actual runtime performance.
+- The machine has a rentable offer.
+- The API request can find a rentable offer. If no offer is found, diagnostics may query the machine and report access errors.
+- Reliability is greater than `0.90`.
+- CUDA compatibility is `>= 11.8`.
+- Direct ports are at least 3 ports per listed GPU.
+- PCIe bandwidth is greater than 2.85 GB/s.
+- Upload/download bandwidth meet the VRAM-scaled requirement.
+- GPU VRAM is greater than 7 GiB per GPU.
+- System RAM is close to total GPU VRAM, capped around 2 TB for very high-VRAM machines.
 
-<Tip>
-**Tip:** Ensure no other jobs or instances are running during the self-test for the most accurate results.
-</Tip>
+These are diagnostic preflight checks implemented by the CLI. Compare the [Self-Test Reference](/host/self-test-reference) with the published [verification requirements](/host/verification-stages#additional-requirements-for-verification); a difference needs source/version clarification and does not change the check your installed tester executes.
 
-## Step-by-Step Guide
+The CLI and temporary self-test image perform checks that include:
 
-### Step 0: Install the Vast CLI
+- HTTPS progress endpoint reachability.
+- UDP forwarding needs a separate check; the pinned CLI and self-test image do not perform a UDP echo test.
+- PyTorch/CUDA import and GPU visibility.
+- For each visible GPU, PyTorch allocated plus reserved memory must be at most 2% of its reported VRAM.
+- Total system RAM meeting the image’s minimum requirement.
+- The image requires at least two physical CPU cores per visible GPU, using `psutil.cpu_count(logical=False)`.
+- CUDA ResNet workload across all visible GPUs.
+- GPU memory allocation targeting about 95% of each visible GPU’s VRAM. The stage is named “ECC” in the output, but it does not test ECC error correction.
+- NCCL initialization and synchronization across visible GPUs; see [`nccl_failed`](/host/self-test-reference#nccl-failed) if this stage fails.
+- `stress-ng` and `gpu-burn` running together for 60 seconds.
 
-Follow the official setup guide to install the Vast CLI:
-[Vast CLI: Get Started](/cli/hello-world)
+Hyperthreads and logical CPUs do not count as physical cores.
 
-### Step 1: Set Your API Key
+## Run The Test
 
-1.1 Get your API key: [API Keys Documentation](https://docs.vast.ai/guides/reference/keys#api-keys)
+### Web UI Self-Test
 
-1.2 Authenticate your CLI with your Vast.ai account:
+1. Open the **Machines** page in the Vast Web UI and find your machine.
+2. Open its three-dot menu and select **Test machine**.
+3. In the **Self Test** dialog, leave **Ignore system requirements** unchecked for a normal run, then select **Run Test**. The Web UI opens a new tab to run the test.
 
-```
-vastai set api-key <API_KEY>
-```
+<Frame caption="The Machines list exposes the Test machine action for a listed host.">
+  ![Test machine action in the Machines list](/images/host-self-test-machine-menu.webp)
+</Frame>
 
-Example:
+<Frame caption="Self-Test confirmation dialog before starting the diagnostic run.">
+  ![Self-Test confirmation dialog](/images/host-self-test-status.webp)
+</Frame>
 
-```
-vastai set api-key 123123123123123
-```
+### Vast CLI Self-Test
 
-### Step 2: Run the Self-Test
+Follow [CLI Hello World](/cli/hello-world) to install the CLI and authenticate with an API key for the host account that owns the machine. See [Host Account Security](/host/account-security-for-hosts) for key guidance.
 
-Before running the test, make sure:
+Run the CLI on a computer **outside the host’s LAN**, such as a cloud VM or a laptop using mobile data with Wi-Fi disconnected. The CLI connects to the temporary instance’s public IP and mapped port. An SSH session on the host still runs the CLI inside the host’s network, even if you connect from elsewhere.
 
-* Your machine has been listed.
-* There are no active clients currently renting it.
+<Note>
+NAT hairpinning lets a local device reach another local device through its public address. A same-LAN test can fail when hairpinning is unavailable, or pass without testing the full Internet path when it is enabled. That pass can miss double-NAT forwarding problems or ISP firewall restrictions. Enabling hairpinning is not a substitute for testing from an external network. See [Network & Ports](/host/network-ports#test-ports-outside-lan).
+</Note>
 
-Run the self-test command:
+**Simple**
 
-```
+From that external computer, run:
+
+```bash
 vastai self-test machine <machine_id>
 ```
 
-Example:
+<Accordion title="Advanced">
 
-```
-vastai self-test machine 12345
-```
+To choose where failure bundles are saved:
 
-### Step 3: Review the Results
-
-If the test passes, you’ll see:
-
-* Test completed successfully.
-
-If the test fails:
-
-* The CLI will display detailed reasons for failure.
-* Apply the suggested fixes and rerun the test.
-
-If the test says the machine is "not found or not rentable":
-
-* Try un-listing your machine, then listing it again.
-* Ensure your machine has no missing data in your machines page, such as upload and download speed, RAM, or ports.
-
-### Optional: Ignore Requirements Mode
-
-If your machine is rejected for not meeting requirements, but you still want to check its rentability or run the pressure tests, you can rerun the test with the `--ignore-requirements` flag:
-
-```
-vastai self-test machine <machine_id> --ignore-requirements
+```bash
+vastai self-test machine <machine_id> \
+  --support-bundle-dir /path/to/output
 ```
 
-Example:
+See the [CLI command reference](/cli/reference/self-test-machine) for debugging and other options.
 
+</Accordion>
+
+If the test passes, the CLI reports success.
+
+If it fails, look up the exact error in the [Self-Test Reference](/host/self-test-reference), fix the cause, and rerun.
+
+## Machine Not Found Or Not Rentable
+
+Check:
+
+- The machine is listed.
+- There are active offers.
+- The account owns the machine.
+- Reliability is above the gate unless using diagnostic mode.
+- The Machines page has no red errors.
+- Upload speed, download speed, RAM, and ports are populated.
+
+See [Self-Test Reference: machine not rentable](/host/self-test-reference#machine-not-rentable).
+
+## Fresh Install Self-Test
+
+The installer can start self-test automatically after the daemon comes online. On a fresh host, it may wait about 10 minutes before listing the machine and starting the temporary diagnostic instance.
+
+On the host, watch only for the planned self-test window; press `Ctrl+C` when the self-test ends and confirm that `tail` exits:
+
+```bash
+sudo tail -f /var/lib/vastai_kaalia/self_test.log
 ```
-vastai self-test machine 12345 --ignore-requirements
-```
+
+When the installer’s helper reaches its self-test command, it uses `--ignore-requirements` regardless of the current reliability value. Treat that result as diagnostic; it does not qualify the machine for verification.
+
+## Ignore Requirements Mode
+
+Use `--ignore-requirements` only to diagnose rentability or runtime behavior. A pass in this mode does not mean the machine meets verification requirements.
 
 <Warning>
-**Note:** The `--ignore-requirements` flag runs the test in a relaxed mode, bypassing some checks.
-Even if the test passes in this mode, your machine does not meet the minimum verification requirements.
-</Warning>
-
-<Warning>
-**Important:** Even with `--ignore-requirements`, your machine must have at least three direct open ports, otherwise, the self-test will fail.
+Even with `--ignore-requirements`, the machine still needs at least three direct open ports or self-test can fail.
 </Warning>

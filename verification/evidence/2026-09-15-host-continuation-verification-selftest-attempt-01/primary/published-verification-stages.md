@@ -1,0 +1,239 @@
+> ## Documentation Index
+> Fetch the complete documentation index at: https://docs.vast.ai/llms.txt
+> Use this file to discover all available pages before exploring further.
+
+# Verification Stages
+
+## States & Lifecycle
+
+**States:** Unverified → Verified → (potentially) Deverified → Unverified  → ...
+
+**Lifecycle:** Machines automatically move between these states based on performance and reliability factors. Once verified, a machine will remain verified unless issues arise, such as failing health checks or reliability standards, which could lead to deverification.
+
+***
+
+## How It Works
+
+Verification is **entirely automated by proprietary algorithms** that assess each machine’s operational health and performance, incorporating [supply-and-demand](https://docs.vast.ai/host/understanding-verification#4-supply-&-demand-analysis) dynamics.
+
+Only machines that meet the platform’s reliability and [performance thresholds](https://docs.vast.ai/host/how-to-self-test) are eligible for verification. There is **no manual intervention**, ensuring consistency, scalability, and objectivity.
+
+<Note>
+  Top-tier AI GPUs are prioritized for verification because demand for them is
+  highest. This includes datacenter GPUs such as B300, B200, H200, and H100,
+  and dense premium builds such as RTX PRO 6000 (Server/WS/Max-Q),
+  8x RTX 5090, and 8x RTX 4090.
+</Note>
+
+***
+
+## Host Responsibilities (Always)
+
+* Keep systems stable, well-cooled, and correctly configured.
+* Maintain compatible drivers/CUDA and dependable, symmetric networking.
+* Run jobs only through the Jobs tab or the `create job` CLI command.
+* When issues arise, fix them promptly-the automation will update status.
+
+***
+
+## State Details & Guidance
+
+### Unverified
+
+**What it means:** Newly added machines or machines under evaluation. The system hasn't yet completed enough testing to confirm platform standards. This is not a judgment of quality-only that no platform guarantee exists yet.
+
+**Do**
+
+* [Pass the Self-Test](https://docs.vast.ai/host/how-to-self-test)
+* Maintain steady uptime during evaluation.
+* Ensure drivers/CUDA and networking are correctly installed and reachable.
+* Keep the environment clean; schedule work via Create Job only.
+
+**Avoid**
+
+* Unnecessary reboots or configuration changes.
+* Unrelated background workloads that consume GPU/CPU/IO.
+
+***
+
+### Minimum Requirements for Verification
+
+Your machine must meet all of the following.
+
+#### GPU
+
+| Requirement    | Minimum                                         |
+| -------------- | ----------------------------------------------- |
+| GPU            | NVIDIA, Maxwell or newer                        |
+| VRAM per GPU   | More than 7 GB                                  |
+| CUDA version   | 11.8 or newer                                   |
+| GPU models     | All identical, do not mix models in one machine |
+| PCIe bandwidth | More than 2.85 GiB/s per GPU                    |
+
+#### CPU
+
+| Requirement        | Minimum          |
+| ------------------ | ---------------- |
+| CPU architecture   | x86\_64 or ARM64 |
+| Instruction set    | AVX              |
+| Physical CPU cores | 2 per GPU        |
+
+<Note>
+  **On ARM64 (aarch64), CUDA 12.6 or newer is required.** The CUDA 11.8
+  Self-Test image is built for x86\_64 only, so Maxwell and Pascal GPUs cannot
+  be verified on ARM64.
+</Note>
+
+#### Memory
+
+| Requirement | Minimum                        |
+| ----------- | ------------------------------ |
+| System RAM  | At least 95% of total GPU VRAM |
+
+<Note>
+  **Formula:** system RAM >= 0.95 x VRAM per GPU x number of GPUs
+
+  **Example:** 8 x RTX PRO 6000 (96 GB) means the min system RAM >= 0.95 x
+  96 GB x 8 = 730 GB
+</Note>
+
+#### Network
+
+| Requirement     | Minimum                                        |
+| --------------- | ---------------------------------------------- |
+| Download speed  | 500 Mbps                                       |
+| Upload speed    | 500 Mbps                                       |
+| Connection type | Wired Ethernet, fiber recommended              |
+| Public IP       | Public IPv4 address                            |
+| Forwarded ports | 5 ports per GPU, 100 ports per GPU recommended |
+
+<Warning>
+  Renters connect directly to the machine over the WAN, so it needs a public
+  IPv4 address with the port range forwarded to it. Machines behind CGNAT or a
+  shared ISP IP cannot be used for hosting.
+</Warning>
+
+#### Operating system
+
+| Requirement      | Minimum                                               |
+| ---------------- | ----------------------------------------------------- |
+| Operating system | Ubuntu Server 22.04 LTS, 24.04 LTS recommended        |
+| Kernel           | Latest security patch level for your Ubuntu release   |
+| NVIDIA driver    | A currently supported release for your GPU            |
+| SSH login        | SSH keys only, password authentication disabled       |
+| SSH access keys  | A unique key pair per machine, never shared or reused |
+| Secure Boot      | Disabled                                              |
+
+<Note>
+  Use a server edition. Desktop editions are not supported.
+</Note>
+
+<Note>
+  Keeping the kernel patched is the host's responsibility. "Latest security patch
+  level" means the newest patch for the LTS release you are on, not a release
+  upgrade. Machines running a kernel with a known exploited vulnerability are
+  restricted on the marketplace and can lose verification. See
+  [Upgrade the Kernel](/host/upgrade-kernel).
+</Note>
+
+<Warning>
+  SSH password login must be disabled for security. SSH password login enabled
+  will fail verification. See
+  [Disable SSH Password Login](/host/disable-ssh-password-login).
+</Warning>
+
+<Warning>
+  Use a separate SSH key pair for each machine you operate. One key reused across
+  your fleet means a single compromise exposes every machine you host.
+</Warning>
+
+#### Storage
+
+| Requirement                                  | Minimum |
+| -------------------------------------------- | ------- |
+| Storage type                                 | SSD     |
+| Dedicated drive for Docker container storage | 200 GB  |
+| Root partition free space                    | 20 GB   |
+
+#### Reliability
+
+| Requirement       | Minimum  |
+| ----------------- | -------- |
+| Reliability score | Over 90% |
+
+<Note>
+  Reliability starts low on a new machine and grows the longer the machine
+  stays online. A stable machine typically reaches 90% within a few days.
+</Note>
+
+#### Self-Test
+
+You can check whether your machine is ready for verification by running a
+Self-Test. See [How to Self-Test](/host/how-to-self-test).
+
+<Warning>
+  **Dedicated machines only.** Any personal workload, such as mining, gaming,
+  running your own jobs, or using the machine as a desktop, will automatically
+  fail verification.
+</Warning>
+
+<Tip>
+  Meeting these minimum requirements makes your machine eligible for verification, but does not automatically guarantee verification. [Read More about Verification](https://docs.vast.ai/host/understanding-verification)
+</Tip>
+
+***
+
+### Verified
+
+**What it means:** The machine passed automated checks for reliability, network stability, operational health, and performance. A Verified machine consistently delivers server services to platform standards.
+
+**Do**
+
+* Monitor health (uptime, thermals, power) and respond to alerts.
+* Keep drivers/CUDA on compatible, **latest** stable versions.
+* Maintain stable, symmetric bandwidth.
+
+**Avoid**
+
+* Downgrading hardware capacity (e.g., reducing GPU count, disk or RAM).
+* Allowing thermal, power, or bandwidth instability under load.
+
+***
+
+### Deverified
+
+**What it means:**
+A previously Verified machine no longer meets requirements. System continuous monitoring detects sustained degradation.
+
+**When will deverification happen?**
+
+* When the hosting software detects an error, your machine is automatically, but **temporarily**, deverified. It will appear as *Unverified* in search results until the underlying issue is resolved.
+
+**How should I begin fixing it?**
+
+* A **red error indicator** will appear on your machine in the Machines tab. Use this message to identify and investigate the issue in your logs or metrics.
+
+**Recovery:**
+Fix the issue and restore stability; the system will **automatically** transition back to Verified once system confirms healthy operation.
+This process may take some time, as the system ensures that the issue is fully resolved before restoring verification. Most error messages are cleared within 1-2 hours of resolution.
+
+**Common causes**
+
+* Network instability, closed ports, or low bandwidth.
+* Hardware/system errors (e.g., failing storage, insufficient PCIe bandwidth).
+* GPU issues (e.g., nvidia-smi/NVML failures, container device init errors).
+* Container launch failures or repeated runtime exceptions.
+* Detected abuse or policy violations.
+
+**Do**
+
+* Investigate red error indicators quickly; review logs and metrics.
+* Validate thermal/power headroom and bandwidth under load.
+* Re-check health after changes to confirm resolution.
+
+**Avoid**
+
+* Ignoring warnings or allowing instability to persist.
+* Reducing hardware below the created specification.
+
+> **Note:** If you’ve fixed the issue but the system doesn’t automatically detect the resolution, a Vast.ai team member may need to manually check that your machine is functioning correctly and clear the error.

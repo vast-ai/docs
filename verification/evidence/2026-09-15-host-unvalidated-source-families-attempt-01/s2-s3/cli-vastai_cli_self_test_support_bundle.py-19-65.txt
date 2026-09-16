@@ -1,0 +1,47 @@
+DEFAULT_BUNDLE_DIR = "/tmp"
+MAX_TEXT_BYTES = 256 * 1024
+MAX_LOG_BYTES = 256 * 1024
+MAX_COMMAND_SECONDS = 10
+JSON_ARTIFACT_RE = re.compile(r"(^|/)[^/]+\.json$")
+SENSITIVE_KEY_RE = re.compile(
+    r"(api[_-]?key|token|secret|password|passwd|authorization|jupyter_token|instance_api_key|host_port_range)",
+    re.IGNORECASE,
+)
+SENSITIVE_ASSIGNMENT_RE = re.compile(
+    r"(?i)\b(api[_-]?key|token|secret|password|passwd|authorization|jupyter_token|instance_api_key|host_port_range)"
+    r"\b\s*[:=]\s*([^\s,;]+)"
+)
+DMESG_KEYWORDS_RE = re.compile(r"\b(warn|warning|err|error|fail|fault|crit|panic|oops|bug)\b", re.IGNORECASE)
+
+
+def utc_timestamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def support_bundles_enabled() -> bool:
+    value = os.environ.get("VAST_SELF_TEST_SUPPORT_BUNDLE", "")
+    return value.strip().lower() not in ("0", "false", "no", "off")
+
+
+def _safe_machine_id(machine_id: object) -> str:
+    return re.sub(r"[^A-Za-z0-9_.-]+", "_", str(machine_id or "unknown"))[:80]
+
+
+def _redact_text(text: object, secrets: list[str] | None = None) -> str:
+    redacted = redact_secret_text("" if text is None else str(text)) or ""
+    for secret in secrets or []:
+        if secret:
+            redacted = redacted.replace(str(secret), "REDACTED")
+    return SENSITIVE_ASSIGNMENT_RE.sub(lambda match: f"{match.group(1)}=REDACTED", redacted)
+
+
+def _redact_json(value: Any, secrets: list[str] | None = None) -> Any:
+    if isinstance(value, dict):
+        return {
+            str(key): "REDACTED" if SENSITIVE_KEY_RE.search(str(key)) else _redact_json(item, secrets)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact_json(item, secrets) for item in value]
+    if isinstance(value, str):
+        return _redact_text(value, secrets)

@@ -1,0 +1,739 @@
+### vastai/cli/commands/machines.py::dump_logs (original lines 612-692)
+@parser.command(
+    argument("machine_id", help="Machine ID", type=str),
+    argument("--instance-id", help="Instance ID to pull Vast instance logs from", type=int),
+    argument("--output-dir", help="Directory for the diagnostic bundle (default: /tmp)", type=str),
+    argument(
+        "--include-local-host-artifacts",
+        action="store_true",
+        help="Include local OS/kaalia artifacts; only use when running on the actual Vast host",
+    ),
+    usage=(
+        "vastai dump-logs <machine_id> [--instance-id INSTANCE_ID] "
+        "[--output-dir DIR] [--include-local-host-artifacts]"
+    ),
+    help="[Host] Bundle self-test diagnostics for support",
+    epilog=deindent("""
+        Creates a redacted diagnostic tarball containing CLI-visible self-test
+        evidence. If --instance-id is provided, the command also pulls container
+        and daemon logs from the Vast instance logs API.
+
+        Local OS/kaalia artifacts are only collected with
+        --include-local-host-artifacts. Use that option only when running this
+        command on the actual host machine; from a laptop, it would collect the
+        laptop's logs instead.
+
+        Example:
+         vastai dump-logs 12345 --instance-id 67890
+    """),
+)
+def dump_logs(args):
+    run_started_at = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    cli_output = [f"Manual diagnostic bundle requested for machine {args.machine_id}."]
+    extra_files = {}
+    extra_errors = []
+    if args.instance_id:
+        client = get_client(args)
+        cli_output.append(f"Requested Vast instance logs for instance {args.instance_id}.")
+        instance_files, instance_errors = collect_instance_log_artifacts(client, args.instance_id)
+        extra_files.update(instance_files)
+        extra_errors.extend(instance_errors)
+    else:
+        cli_output.append("No --instance-id provided; Vast instance logs were not requested.")
+
+    if not args.include_local_host_artifacts:
+        cli_output.append(
+            "Local host OS/kaalia artifacts were not collected. Use "
+            "--include-local-host-artifacts only when running on the actual host."
+        )
+
+    try:
+        bundle = create_support_bundle(
+            machine_id=args.machine_id,
+            output_dir=args.output_dir,
+            result={
+                "machine_id": args.machine_id,
+                "stage": "manual_dump_logs",
+                "reason": "Manual diagnostic bundle requested with vastai dump-logs.",
+                "instance_id": args.instance_id,
+                "includes_local_host_artifacts": args.include_local_host_artifacts,
+            },
+            cli_output=cli_output,
+            extra_files=extra_files,
+            extra_errors=extra_errors,
+            run_started_at=run_started_at,
+            command=sys.argv,
+            secrets=[getattr(args, "api_key", None), os.environ.get("VAST_API_KEY")],
+            include_local_host_artifacts=args.include_local_host_artifacts,
+        )
+    except Exception as e:
+        error = _diagnostic_error(e)
+        if getattr(args, "raw", False):
+            return {
+                "success": False,
+                "machine_id": args.machine_id,
+                "error": f"Failed to create diagnostic bundle: {error}",
+            }
+        print(f"WARNING: failed to create diagnostic bundle: {error}")
+        sys.exit(1)
+    if getattr(args, "raw", False):
+        return bundle
+    for line in format_bundle_summary(bundle):
+        print(line)
+
+### vastai/cli/commands/machines.py::_diagnostic_error (original lines 568-569)
+def _diagnostic_error(error):
+    return redact_secret_text(error) or ""
+
+### vastai/cli/commands/machines.py::_artifact_text (original lines 572-575)
+def _artifact_text(value):
+    if isinstance(value, str):
+        return value
+    return json.dumps(value, indent=2, sort_keys=True, default=str)
+
+### vastai/cli/commands/machines.py::collect_instance_log_artifacts (original lines 578-609)
+def collect_instance_log_artifacts(client, instance_id):
+    files = {}
+    errors = []
+
+    try:
+        instance_info = instances_api.show_instance(client, id=instance_id)
+        files["instance/show-instance.json"] = _artifact_text(instance_info)
+    except Exception as e:
+        errors.append({
+            "artifact": "instance/show-instance.json",
+            "error": _diagnostic_error(e),
+        })
+
+    for archive_name, daemon_logs in (
+        ("instance/container.log", False),
+        ("instance/daemon.log", True),
+    ):
+        try:
+            logs = instances_api.logs(
+                client,
+                instance_id=instance_id,
+                tail=INSTANCE_LOG_TAIL_LINES,
+                daemon_logs=daemon_logs,
+            )
+            files[archive_name] = _artifact_text(logs)
+        except Exception as e:
+            errors.append({
+                "artifact": archive_name,
+                "error": _diagnostic_error(e),
+            })
+
+    return files, errors
+
+### vastai/cli/commands/offers.py::search__offers (original lines 22-200)
+@parser.command(
+    argument("-t", "--type", default="on-demand", help="Show 'on-demand', 'reserved', or 'bid'(interruptible) pricing. default: on-demand"),
+    argument("-i", "--interruptible", dest="type", const="bid", action="store_const", help="Alias for --type=bid"),
+    argument("-b", "--bid", dest="type", const="bid", action="store_const", help="Alias for --type=bid"),
+    argument("-r", "--reserved", dest="type", const="reserved", action="store_const", help="Alias for --type=reserved"),
+    argument("-d", "--on-demand", dest="type", const="on-demand", action="store_const", help="Alias for --type=on-demand"),
+    argument("-n", "--no-default", action="store_true", help="Disable default query"),
+    argument("--new", action="store_true", help="New search exp"),
+    argument("--limit", type=int, help=""),
+    argument("--storage", type=float, default=5.0, help="Amount of storage to use for pricing, in GiB. default=5.0GiB"),
+    argument("-o", "--order", type=str, help="Comma-separated list of fields to sort on. postfix field with - to sort desc. ex: -o 'num_gpus,total_flops-'.  default='score-'", default='score-'),
+    argument("query", help="Query to search for. default: 'external=false rentable=true verified=true', pass -n to ignore default", nargs="*", default=None),
+    usage="vastai search offers [--help] [--api-key API_KEY] [--raw] <query>",
+    help="Search for instance types using custom query",
+    epilog=deindent("""
+        Query syntax:
+
+            query = comparison comparison...
+            comparison = field op value
+            field = <name of a field>
+            op = one of: <, <=, ==, !=, >=, >, in, notin
+            value = <bool, int, float, string> | 'any' | [value0, value1, ...]
+            bool: True, False
+
+        note: to pass '>' and '<' on the command line, make sure to use quotes
+        note: to encode a string query value (ie for gpu_name), replace any spaces ' ' with underscore '_'
+
+        Examples:
+
+            # search for somewhat reliable single RTX 3090 instances
+            vastai search offers 'reliability > 0.98 num_gpus=1 gpu_name=RTX_3090'
+
+            # search for datacenter gpus with minimal compute_cap and total_flops
+            vastai search offers 'compute_cap > 610 total_flops > 5 datacenter=True'
+
+            # search for reliable 4 gpu offers in Taiwan or Sweden
+            vastai search offers 'reliability>0.99 num_gpus=4 geolocation in [TW,SE]'
+
+            # search for reliable RTX 3090 or 4090 gpus NOT in China or Vietnam
+            vastai search offers 'reliability>0.99 gpu_name in ["RTX 4090", "RTX 3090"] geolocation notin [CN,VN]'
+
+            # search for machines with nvidia drivers 535.86.05 or greater (and various other options)
+            vastai search offers 'disk_space>146 duration>24 gpu_ram>10 cuda_vers>=12.1 direct_port_count>=2 driver_version >= 535.86.05'
+
+            # search for reliable machines with at least 4 gpus, unverified, order by num_gpus
+            vastai search offers 'reliability > 0.99  num_gpus>=4 verified=False' -o 'num_gpus-'
+
+            # search for arm64 cpu architecture
+            vastai search offers 'cpu_arch=arm64'
+
+        Available fields:
+
+              Name                  Type       Description
+
+            bw_nvlink               float     bandwidth NVLink
+            compute_cap:            int       cuda compute capability*100  (ie:  650 for 6.5, 700 for 7.0)
+            cpu_arch                string    host machine cpu architecture (e.g. amd64, arm64)
+            cpu_cores:              int       # virtual cpus
+            cpu_ghz:                Float     # cpu clock speed GHZ
+            cpu_cores_effective:    float     # virtual cpus you get
+            cpu_ram:                float     system RAM in gigabytes
+            cuda_vers:              float     machine max supported cuda version (based on driver version)
+            datacenter:             bool      show only datacenter offers
+            direct_port_count       int       open ports on host's router
+            disk_bw:                float     disk read bandwidth, in MB/s
+            disk_space:             float     disk storage space, in GB
+            dlperf:                 float     DL-perf score  (see FAQ for explanation)
+            dlperf_usd:             float     DL-perf/$
+            dph:                    float     $/hour rental cost
+            driver_version:         string    machine's nvidia/amd driver version as 3 digit string ex. "535.86.05,"
+            duration:               float     max rental duration in days
+            external:               bool      show external offers in addition to datacenter offers
+            flops_usd:              float     TFLOPs/$
+            geolocation:            string    Two letter country code. Works with operators =, !=, in, notin (e.g. geolocation not in ['XV','XZ'])
+            gpu_arch                string    host machine gpu architecture (e.g. nvidia, amd)
+            gpu_max_power           float     GPU power limit (watts)
+            gpu_max_temp            float     GPU temp limit (C)
+            gpu_mem_bw:             float     GPU memory bandwidth in GB/s
+            gpu_name:               string    GPU model name (no quotes, replace spaces with underscores, ie: RTX_3090 rather than 'RTX 3090')
+            gpu_ram:                float     per GPU RAM in GB
+            gpu_total_ram:          float     total GPU RAM in GB
+            gpu_frac:               float     Ratio of GPUs in the offer to gpus in the system
+            gpu_display_active:     bool      True if the GPU has a display attached
+            has_avx:                bool      CPU supports AVX instruction set.
+            id:                     int       instance unique ID
+            inet_down:              float     internet download speed in Mb/s
+            inet_down_cost:         float     internet download bandwidth cost in $/GB
+            inet_up:                float     internet upload speed in Mb/s
+            inet_up_cost:           float     internet upload bandwidth cost in $/GB
+            machine_id              int       machine id of instance
+            min_bid:                float     current minimum bid price in $/hr for interruptible
+            num_gpus:               int       # of GPUs
+            pci_gen:                float     PCIE generation
+            pcie_bw:                float     PCIE bandwidth (CPU to GPU)
+            reliability:            float     machine reliability score (see FAQ for explanation)
+            rentable:               bool      is the instance currently rentable
+            storage_cost:           float     storage cost in $/GB/month
+            static_ip:              bool      is the IP addr static/stable
+            total_flops:            float     total TFLOPs from all GPUs
+            ubuntu_version          string    host machine ubuntu OS version
+            verified:               bool      is the machine verified
+            vms_enabled:            bool      is the machine a VM instance
+    """),
+    aliases=hidden_aliases(["search instances"]),
+)
+def search__offers(args):
+    """Creates a query based on search parameters as in the examples above.
+
+    :param argparse.Namespace args: should supply all the command-line options
+    """
+    from vastai.api.query import parse_query, offers_fields, offers_alias, offers_mult
+
+    try:
+        if args.no_default:
+            query = {}
+        else:
+            query = {"verified": {"eq": True}, "external": {"eq": False}, "rentable": {"eq": True}}
+
+        if args.query is not None:
+            query = parse_query(args.query, query, offers_fields, offers_alias, offers_mult)
+
+        order = []
+        for name in args.order.split(","):
+            name = name.strip()
+            if not name:
+                continue
+            direction = "asc"
+            field = name
+            if name.strip("-") != name:
+                direction = "desc"
+                field = name.strip("-")
+            if name.strip("+") != name:
+                direction = "asc"
+                field = name.strip("+")
+            if field in offers_alias:
+                field = offers_alias[field]
+            order.append([field, direction])
+
+        query["order"] = order
+        query["type"] = args.type
+        if args.limit:
+            query["limit"] = int(args.limit)
+        query["allocated_storage"] = args.storage
+        if query["type"] == 'interruptible':
+            query["type"] = 'bid'
+    except ValueError as e:
+        print("Error: ", e)
+        return 1
+
+    json_blob = query
+    client = get_client(args)
+
+    if args.new:
+        json_blob = {"select_cols": ['*'], "q": query}
+        if args.explain:
+            print("request json: ")
+            print(json_blob)
+        r = client.put("/search/asks/", json_data=json_blob)
+    else:
+        if args.explain:
+            print("request json: ")
+            print(json_blob)
+        r = client.post("/bundles/", json_data=json_blob)
+
+    r.raise_for_status()
+
+    if r.headers.get('Content-Type') != 'application/json':
+        print(f"invalid return Content-Type: {r.headers.get('Content-Type')}")
+        return
+
+    rows = r.json()["offers"]
+
+    if args.raw:
+        return rows
+    else:
+        if args.type == "reserved":
+            display_table(rows, displayable_fields_reserved)
+        else:
+            display_table(rows, displayable_fields)
+
+### vastai/api/query.py::numeric_version (original lines 13-33)
+def numeric_version(version_str):
+    try:
+        # Split the version string by the period
+        major, minor, patch = version_str.split('.')
+
+        # Pad each part with leading zeros to make it 3 digits
+        major = major.zfill(3)
+        minor = minor.zfill(3)
+        patch = patch.zfill(3)
+
+        # Concatenate the padded parts
+        numeric_version_str = f"{major}{minor}{patch}"
+
+        # Convert the concatenated string to an integer
+        result = int(numeric_version_str)
+        #print(result)
+        return result
+
+    except ValueError:
+        print("Invalid version string format. Expected format: X.X.X")
+        return None
+
+### vastai/api/query.py::offers_fields (original lines 109-166)
+offers_fields = {
+    "bw_nvlink",
+    "compute_cap",
+    "cpu_arch",
+    "cpu_cores",
+    "cpu_cores_effective",
+    "cpu_ghz",
+    "cpu_ram",
+    "cuda_max_good",
+    "datacenter",
+    "direct_port_count",
+    "driver_version",
+    "disk_bw",
+    "disk_space",
+    "dlperf",
+    "dlperf_per_dphtotal",
+    "dph_total",
+    "duration",
+    "external",
+    "flops_per_dphtotal",
+    "gpu_arch",
+    "gpu_display_active",
+    "gpu_frac",
+    # "gpu_ram_free_min",
+    "gpu_mem_bw",
+    "gpu_name",
+    "gpu_ram",
+    "gpu_total_ram",
+    "gpu_display_active",
+    "gpu_max_power",
+    "gpu_max_temp",
+    "has_avx",
+    "host_id",
+    "id",
+    "inet_down",
+    "inet_down_cost",
+    "inet_up",
+    "inet_up_cost",
+    "machine_id",
+    "min_bid",
+    "mobo_name",
+    "num_gpus",
+    "pci_gen",
+    "pcie_bw",
+    "reliability",
+    #"reliability2",
+    "rentable",
+    "rented",
+    "storage_cost",
+    "static_ip",
+    "total_flops",
+    "ubuntu_version",
+    "verification",
+    "verified",
+    "vms_enabled",
+    "geolocation",
+    "cluster_id"
+}
+
+### vastai/api/query.py::offers_alias (original lines 168-175)
+offers_alias = {
+    "cuda_vers": "cuda_max_good",
+    "display_active": "gpu_display_active",
+    #"reliability": "reliability2",
+    "dlperf_usd": "dlperf_per_dphtotal",
+    "dph": "dph_total",
+    "flops_usd": "flops_per_dphtotal",
+}
+
+### vastai/api/query.py::offers_mult (original lines 177-182)
+offers_mult = {
+    "cpu_ram": 1000,
+    "gpu_ram": 1000,
+    "gpu_total_ram" : 1000,
+    "duration": 24.0 * 60.0 * 60.0,
+}
+
+### vastai/api/query.py::parse_query (original lines 279-397)
+def parse_query(query_str: str, res: Dict = None, fields = {}, field_alias = {}, field_multiplier = {}) -> Dict:
+    """
+    Basically takes a query string (like the ones in the examples of commands for the search__offers function) and
+    processes it into a dict of URL parameters to be sent to the server.
+
+    :param str query_str:
+    :param Dict res:
+    :return Dict:
+    """
+    if query_str is None:
+        return res
+
+    if res is None: res = {}
+    if type(query_str) == list:
+        query_str = " ".join(query_str)
+    query_str = query_str.strip()
+
+    # Revised regex pattern to accurately capture quoted strings, bracketed lists, and single words/numbers
+    #pattern    = r"([a-zA-Z0-9_]+)\s*(=|!=|<=|>=|<|>| in | nin | eq | neq | not eq | not in )?\s*(\"[^\"]*\"|\[[^\]]+\]|[^ ]+)"
+    #pattern    = "([a-zA-Z0-9_]+)( *[=><!]+| +(?:[lg]te?|nin|neq|eq|not ?eq|not ?in|in) )?( *)(\[[^\]]+\]|[^ ]+)?( *)"
+    pattern     = r"([a-zA-Z0-9_]+)( *[=><!]+| +(?:[lg]te?|nin|neq|eq|not ?eq|not ?in|in) )?( *)(\[[^\]]+\]|\"[^\"]+\"|[^ ]+)?( *)"
+    opts        = re.findall(pattern, query_str)
+
+    #print("parse_query regex:")
+    #print(opts)
+
+    #print(opts)
+    # res = {}
+    op_names = {
+        ">=": "gte",
+        ">": "gt",
+        "gt": "gt",
+        "gte": "gte",
+        "<=": "lte",
+        "<": "lt",
+        "lt": "lt",
+        "lte": "lte",
+        "!=": "neq",
+        "==": "eq",
+        "=": "eq",
+        "eq": "eq",
+        "neq": "neq",
+        "noteq": "neq",
+        "not eq": "neq",
+        "notin": "notin",
+        "not in": "notin",
+        "nin": "notin",
+        "in": "in",
+    }
+
+
+
+    joined = "".join("".join(x) for x in opts)
+    if joined != query_str:
+        raise ValueError(
+            "Unconsumed text. Did you forget to quote your query? " + repr(joined) + " != " + repr(query_str))
+
+    for field, op, _, value, _ in opts:
+        value = value.strip(",[]")
+        op = op.strip()
+        op_name = op_names.get(op)
+
+        if field in field_alias:
+            old_field = field
+            field = field_alias[field]
+            if old_field in res:
+                res[field] = res.pop(old_field)
+
+        v = res.setdefault(field, {})
+
+        if (field == "driver_version") and ('.' in value):
+            value = numeric_version(value)
+
+        if not field in fields:
+            print("Warning: Unrecognized field: {}, see list of recognized fields.".format(field), file=sys.stderr);
+        if not op_name:
+            raise ValueError("Unknown operator. Did you forget to quote your query? " + repr(op).strip("u"))
+        if op_name in ["in", "notin"]:
+            value = [x.strip() for x in value.split(",") if x.strip()]
+        if not value:
+            raise ValueError("Value cannot be blank. Did you forget to quote your query? " + repr((field, op, value)))
+        if not field:
+            raise ValueError("Field cannot be blank. Did you forget to quote your query? " + repr((field, op, value)))
+        if value in ["?", "*", "any"]:
+            if op_name != "eq":
+                raise ValueError("Wildcard only makes sense with equals.")
+            if field in v:
+                del v[field]
+            if field in res:
+                del res[field]
+            continue
+
+        if isinstance(value, str):
+            value = value.replace('_', ' ')
+            value = value.strip('\"')
+        elif isinstance(value, list):
+            value = [x.replace('_', ' ')    for x in value]
+            value = [x.strip('\"')          for x in value]
+
+        if field in field_multiplier:
+            value = float(value) * field_multiplier[field]
+            v[op_name] = value
+        else:
+            #print(value)
+            if   (value == 'true') or (value == 'True'):
+                v[op_name] = True
+            elif (value == 'false') or (value == 'False'):
+                v[op_name] = False
+            elif (value == 'None') or (value == 'null'):
+                v[op_name] = None
+            else:
+                v[op_name] = value
+
+        if field not in res:
+            res[field] = v
+        else:
+            res[field].update(v)
+    #print(res)
+    return res
+
+### vastai/cli/display.py::displayable_fields (original lines 58-85)
+displayable_fields = (
+    # ("bw_nvlink", "Bandwidth NVLink", "{}", None, True),
+    ("id", "ID", "{}", None, True),
+    ("cuda_max_good", "CUDA", "{:0.1f}", None, True),
+    ("num_gpus", "N", "{}x", None, False),
+    ("gpu_name", "Model", "{}", None, True),
+    ("pcie_bw", "PCIE", "{:0.1f}", None, True),
+    ("cpu_ghz", "cpu_ghz", "{:0.1f}", None, True),
+    ("cpu_cores_effective", "vCPUs", "{:0.1f}", None, True),
+    ("cpu_ram", "RAM", "{:0.1f}", lambda x: x / 1000, False),
+    ("gpu_ram", "VRAM", "{:0.1f}", lambda x: x / 1000, False),
+    ("disk_space", "Disk", "{:.0f}", None, True),
+    ("dph_total", "$/hr", "{:0.4f}", None, True),
+    ("dlperf", "DLP", "{:0.1f}", None, True),
+    ("dlperf_per_dphtotal", "DLP/$", "{:0.2f}", None, True),
+    ("score", "score", "{:0.1f}", None, True),
+    ("driver_version", "NV Driver", "{}", None, True),
+    ("inet_up", "Net_up", "{:0.1f}", None, True),
+    ("inet_down", "Net_down", "{:0.1f}", None, True),
+    ("reliability", "R", "{:0.1f}", lambda x: x * 100, True),
+    ("duration", "Max_Days", "{:0.1f}", lambda x: x / (24.0 * 60.0 * 60.0), True),
+    ("machine_id", "mach_id", "{}", None, True),
+    ("verification", "status", "{}", None, True),
+    ("host_id", "host_id", "{}", None, True),
+    ("direct_port_count", "ports", "{}", None, True),
+    ("geolocation", "country", "{}", None, True),
+   #  ("direct_port_count", "Direct Port Count", "{}", None, True),
+)
+
+### vastai/cli/display.py::display_table (original lines 386-461)
+def display_table(rows: list, fields: Tuple, replace_spaces: bool = True, auto_width: bool = True) -> None:
+    """Basically takes a set of field names and rows containing the corresponding data and prints a nice tidy table
+    of it.
+
+    :param list rows: Each row is a dict with keys corresponding to the field names (first element) in the fields tuple.
+
+    :param Tuple fields: 5-tuple describing a field. First element is field name, second is human readable version, third is format string, fourth is a lambda function run on the data in that field, fifth is a bool determining text justification. True = left justify, False = right justify. Here is an example showing the tuples in action.
+
+    :rtype None:
+
+    Example of 5-tuple: ("cpu_ram", "RAM", "{:0.1f}", lambda x: x / 1000, False)
+    """
+    header = [name for _, name, _, _, _ in fields]
+    out_rows = [header]
+    lengths = [len(x) for x in header]
+    for instance in rows:
+        row = []
+        out_rows.append(row)
+        for key, name, fmt, conv, _ in fields:
+            conv = conv or (lambda x: x)
+            val = instance.get(key, None)
+            if val is None:
+                s = "-"
+            else:
+                val = conv(val)
+                s = fmt.format(val)
+            if replace_spaces:
+                s = s.replace(' ', '_')
+            idx = len(row)
+            lengths[idx] = max(len(s), lengths[idx])
+            row.append(s)
+
+    if auto_width:
+        width = shutil.get_terminal_size((80, 20)).columns
+        start_col_idxs = [0]
+        total_len = 4  # +6ch for row label and -2ch for missing last sep in "  ".join()
+        for i, l in enumerate(lengths):
+            total_len += l + 2
+            if total_len > width:
+                start_col_idxs.append(i)  # index for the start of the next group
+                total_len = l + 6         # l + 2 + the 4 from the initial length
+
+        groups = {}
+        for row in out_rows:
+            grp_num = 0
+            for i in range(len(start_col_idxs)):
+                start = start_col_idxs[i]
+                end = start_col_idxs[i+1] if i+1 < len(start_col_idxs) else len(lengths)
+                groups.setdefault(grp_num, []).append(row[start:end])
+                grp_num += 1
+
+        for i, group in groups.items():
+            idx = start_col_idxs[i]
+            group_lengths = lengths[idx:idx+len(group[0])]
+            for row_num, row in enumerate(group):
+                bg_color = BG_DARK_GRAY if (row_num - 1) % 2 else BG_LIGHT_GRAY
+                row_label = "  #" if row_num == 0 else f"{row_num:3d}"
+                out = [row_label]
+                for l, s, f in zip(group_lengths, row, fields[idx:idx+len(row)]):
+                    _, _, _, _, ljust = f
+                    if ljust: s = s.ljust(l)
+                    else:     s = s.rjust(l)
+                    out.append(s)
+                print(bg_color + FG_WHITE + "  ".join(out) + BG_RESET)
+            print()
+    else:
+        for row in out_rows:
+            out = []
+            for l, s, f in zip(lengths, row, fields):
+                _, _, _, _, ljust = f
+                if ljust:
+                    s = s.ljust(l)
+                else:
+                    s = s.rjust(l)
+                out.append(s)
+            print("  ".join(out))
+
+### vastai/cli/self_test/support_bundle.py::create_support_bundle (original lines 192-272)
+def create_support_bundle(
+    *,
+    machine_id: object,
+    output_dir: str | None = None,
+    result: dict[str, Any] | None = None,
+    cli_output: list[str] | None = None,
+    extra_files: dict[str, str] | None = None,
+    extra_errors: list[dict[str, str]] | None = None,
+    run_started_at: str | None = None,
+    command: list[str] | None = None,
+    secrets: list[str] | None = None,
+    include_local_host_artifacts: bool = False,
+    include_host_logs: bool | None = None,
+) -> dict[str, Any]:
+    """Create a redacted self-test support tarball and return metadata."""
+
+    if include_host_logs is not None:
+        include_local_host_artifacts = include_host_logs
+
+    created_at = utc_timestamp()
+    safe_id = _safe_machine_id(machine_id)
+    bundle_dir = Path(output_dir or DEFAULT_BUNDLE_DIR).expanduser()
+    bundle_dir.mkdir(parents=True, exist_ok=True)
+    bundle_path = bundle_dir / f"vast_selftest_{safe_id}_{created_at}.tar.gz"
+
+    files: dict[str, str] = {}
+    errors: list[dict[str, str]] = []
+    if cli_output:
+        files["self-test-output.log"] = _redact_text("\n".join(cli_output), secrets)
+    if result is not None:
+        files["self-test-result.json"] = json.dumps(_redact_json(result, secrets), indent=2, sort_keys=True)
+    if extra_files:
+        for name, content in extra_files.items():
+            files[name] = _redact_text(content, secrets)
+    if extra_errors:
+        errors.extend(_redact_json(extra_errors, secrets))
+    if include_local_host_artifacts:
+        host_files, host_errors = _collect_host_artifacts(secrets)
+        files.update(host_files)
+        errors.extend(host_errors)
+
+    manifest = {
+        "bundle_version": 1,
+        "machine_id": str(machine_id),
+        "created_at_utc": created_at,
+        "run_started_at_utc": run_started_at,
+        "command": _redact_json(command or [], secrets),
+        "max_text_bytes_per_artifact": MAX_TEXT_BYTES,
+        "max_log_bytes_per_artifact": MAX_LOG_BYTES,
+        "includes_local_host_artifacts": include_local_host_artifacts,
+        "files": sorted(files.keys()) + ["manifest.json", "collection-errors.json"],
+        "collection_errors": errors,
+        "note": (
+            "This bundle contains CLI-visible self-test evidence. Host OS artifacts "
+            "are included only when includes_local_host_artifacts=true; otherwise "
+            "host daemon/kaalia/system logs need host-side daemon/backend collection "
+            "or an explicit dump run on the actual host."
+        ),
+    }
+    files["manifest.json"] = json.dumps(manifest, indent=2, sort_keys=True)
+    files["collection-errors.json"] = json.dumps(errors, indent=2, sort_keys=True)
+
+    with tarfile.open(bundle_path, "w:gz") as tar:
+        for name, content in sorted(files.items()):
+            safe_name = _safe_archive_name(name)
+            artifact_text = content if JSON_ARTIFACT_RE.search(name) else _truncate_text(content, MAX_LOG_BYTES)
+            data = artifact_text.encode("utf-8", errors="replace")
+            info = tarfile.TarInfo(safe_name)
+            info.size = len(data)
+            info.mtime = int(time.time())
+            tar.addfile(info, fileobj=io.BytesIO(data))
+    os.chmod(bundle_path, 0o600)
+
+    size_bytes = bundle_path.stat().st_size
+    return {
+        "path": str(bundle_path),
+        "created_at_utc": created_at,
+        "size_bytes": size_bytes,
+        "files": sorted(files.keys()),
+        "collection_errors": errors,
+    }
+
+### vastai/cli/self_test/support_bundle.py::format_bundle_summary (original lines 275-291)
+def format_bundle_summary(bundle: dict[str, Any]) -> list[str]:
+    lines = [
+        "Self-test diagnostic bundle saved to:",
+        f"  {bundle.get('path')}",
+        "Bundle contents:",
+    ]
+    for name in bundle.get("files", []):
+        lines.append(f"  - {name}")
+    errors = bundle.get("collection_errors") or []
+    if errors:
+        lines.append("Some artifacts could not be collected:")
+        for item in errors[:10]:
+            lines.append(f"  - {item.get('artifact')}: {item.get('error')}")
+        if len(errors) > 10:
+            lines.append(f"  - ... {len(errors) - 10} more")
+    lines.append("Review this tarball before sharing it with support.")
+    return lines

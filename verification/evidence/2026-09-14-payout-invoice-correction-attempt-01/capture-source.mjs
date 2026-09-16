@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+const dir='verification/evidence/2026-09-14-payout-invoice-correction-attempt-01';
+const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
+const expression=`(()=>{const headings=[...document.querySelectorAll('h1,h2,h3,h4')];const ids=['minimum-payout-threshold','invoice-generation','payment-timeline','when-will-i-get-paid','my-account-is-not-generating-invoices'];return {url:location.href,title:document.title,suggest_edits:[...document.querySelectorAll('a')].find(a=>a.textContent.includes('Suggest edits'))?.href,sections:ids.map(id=>{const h=document.getElementById(id);if(!h)throw Error('Missing heading '+id);const next=headings[headings.indexOf(h)+1];if(!next)throw Error('Missing next heading '+id);const r=document.createRange();r.setStartAfter(h);r.setEndBefore(next);const e=document.createElement('div');e.append(r.cloneContents());return {heading:h.innerText.replace('Navigate to header','').trim(),heading_id:id,text:e.innerText||e.textContent}})}})()`;
+const observed=JSON.parse(execFileSync('agent-browser',['--session','payout-invoice-source','eval','-b',Buffer.from(expression).toString('base64')],{encoding:'utf8',maxBuffer:1024*1024}));
+for(const section of observed.sections)section.text_sha256=hash(section.text);
+const record={recorded_at:new Date().toISOString(),method:'Unauthenticated public browser navigation and exact section DOM extraction',...observed,limitations:'This records current published Vast guidance from the same docs repository. It is not independent backend scheduling, account enforcement, actual payment, or owner approval evidence. The deployed Git revision is not identified by the page.'};
+const file=dir+'/published-invoice-guidance-01.json';fs.writeFileSync(file,JSON.stringify(record,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({path:file,sha256:hash(fs.readFileSync(file)),...record},null,2));

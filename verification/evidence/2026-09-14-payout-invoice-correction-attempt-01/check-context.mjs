@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+const dir='verification/evidence/2026-09-14-payout-invoice-correction-attempt-01',name=process.argv[2];
+if(!/^context-[0-9]+$/.test(name))throw Error('Unique attempt required');
+const file=dir+'/'+name+'.json';if(fs.existsSync(file))throw Error('Refuse overwrite');
+const expected=new Map([['MCL-e2b956d14494e470',0],['MCL-df7b287adb0df683',1],['MCL-3d796f5ae7f2020e',2],['MCL-5936430d1b2d8de9',0],['MCL-3afd93ae0b6cf8a4',2],['MCL-bbd64c772e9b4693',1]]);
+const guidance=JSON.parse(fs.readFileSync(dir+'/published-invoice-guidance-01.json'));
+const agreementRef='verification/evidence/2026-09-09-host-authority-scan-attempt-01/agreement-full-source-01.json';
+const agreement=JSON.parse(fs.readFileSync(agreementRef)),timing=new Set(['MCL-3d796f5ae7f2020e','MCL-3afd93ae0b6cf8a4']);
+const started_at=new Date().toISOString(),response=await fetch('http://127.0.0.1:4000/__review__/api/context?path=%2Fhost%2Fpayment');
+const context=await response.json(),results=[];
+for(const [id,section] of expected){const claim=context.currentReview.page.claims.find(c=>c.id===id),basis=claim.authorityScan?.basis||[],g=basis.filter(b=>b.artifactRef===dir+'/published-invoice-guidance-01.json'),a=basis.filter(b=>b.artifactRef===agreementRef);results.push({id,checks:{status:claim.status==='PASS',readerLabel:claim.readerCopy?.statusLabel==='Published guidance checked',readerScope:/does not test invoice generation or payment processing/.test(claim.readerCopy?.finding||''),basisCount:basis.length===(timing.has(id)?2:1),exactGuidance:g.length===1&&g[0].excerpt===guidance.sections[section].text&&g[0].text_pointer==='/sections/'+section+'/text',separateAgreement:timing.has(id)?a.length===1&&a[0].text_pointer==='/sections/4/text'&&agreement.sections[4].text.includes(a[0].excerpt)&&a[0].excerpt.includes('within 14 days of a completed billing period'):a.length===0,noObsoleteCurrentGap:basis.every(b=>!/2.to.4|noon.Pacific|2–4/.test(b.support_rationale||''))},basis:basis.map(b=>({artifact:b.artifactRef,pointer:b.text_pointer,source:b.sourceUrl,support:b.support_rationale}))});}
+const result={started_at,finished_at:new Date().toISOString(),http_status:response.status,result:response.status===200&&results.every(r=>Object.values(r.checks).every(Boolean))?'PASS':'FAIL',results,limitations:'Current localhost reviewer context and exact source-excerpt mapping only, not payment execution.'};
+fs.writeFileSync(file,JSON.stringify(result,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({artifact:file,result:result.result,results:results.map(r=>({id:r.id,checks:r.checks}))}));process.exitCode=result.result==='PASS'?0:1;

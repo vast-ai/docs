@@ -1,0 +1,3 @@
+# Inventory amendment 04 — Host-account search context
+
+Before execution: the Not in Search page says to confirm the Host-enabled CLI account before its three searches. Client-key executions establish client offer visibility but not that exact account context. Add HOST-05, HOST-06 and HOST-07: execute the same three exact machine-filtered search forms from CLIENT-03..05 under the Host key, with the same default/no-default/explicit-any args and --limit 200. Retain only command, account role, timestamps, output digest, table headers and GPU-model presence. This remains canonical read-only POST /bundles/ search, no create/reservation/billing or Host change. Bind any Not in Search claim promotion to these Host-context runs; client runs remain separate supplemental proof.

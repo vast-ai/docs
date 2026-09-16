@@ -1,0 +1,46 @@
+{
+  "separate_from_operator33": true,
+  "decisions": [
+    {
+      "id": "CUR-97f860901c54e022",
+      "literal_sha256": "9d4c2cb9230cf05396134785f3a58079e489e48d08a4d9eac7d8a81c34eaaaf1",
+      "location": {
+        "source_file": "host/disable-ssh-password-login.mdx",
+        "start": 64,
+        "end": 66,
+        "text_sha256": "9d4c2cb9230cf05396134785f3a58079e489e48d08a4d9eac7d8a81c34eaaaf1"
+      },
+      "decision": "correction",
+      "proposed_status": "PASS",
+      "proposed_methods": [
+        "REPOSITORY_STATIC_CHECK",
+        "PUBLISHED_VENDOR_DOCUMENTATION"
+      ],
+      "proposed_classification": "REVIEWED_TECHNICAL_DECLARATION",
+      "proposed_owner_role": "Host documentation/source reviewer",
+      "source_refs": [
+        {
+          "source": "context-disable-ssh-password-login",
+          "text_pointer": "/lines/61-68",
+          "source_excerpt": "Now open a second terminal, leaving the first one connected, and log in using\nonly your key. This proves the key is what is getting you in.\n\n```bash\nssh -o PreferredAuthentications=publickey youruser@1.2.3.4\n```\n\nYou should get a shell prompt with no password asked."
+        },
+        {
+          "source": "ssh-sharing",
+          "text_pointer": "/blocks/ssh-sharing/text",
+          "source_excerpt": "ControlMaster Enables the sharing of multiple sessions over a single network connection. When set to yes , ssh(1) will listen for connections on a control socket specified using the ControlPath argument. Additional sessions can connect to this socket using the same ControlPath with ControlMaster set to no (the default). These sessions will try to reuse the master instance's network connection rather than initiating new ones, but will fall back to connecting normally if the control socket does not exist, or is not listening. Setting this to ask will cause ssh(1) to listen for control connections, but require confirmation using ssh-askpass(1) . If the ControlPath cannot be opened, ssh(1) will continue without connecting to a master instance. X11 and ssh-agent(1) forwarding is supported over these multiplexed connections, however the display and agent forwarded will be the one belonging to the master connection i.e. it is not possible to forward multiple displays or agents. Two additional options allow for opportunistic multiplexing: try to use a master connection but fall back to creating a new one if one does not already exist. These options are: auto and autoask . The latter requires confirmation like the ask option. ControlPath Specify the path to the control socket used for connection sharing as described in the ControlMaster section above or the string none to disable connection sharing. Arguments to ControlPath may use the tilde syntax to refer to a user's home directory, the tokens described in the TOKENS section and environment variables as described in the ENVIRONMENT VARIABLES section. It is recommended that any ControlPath used for opportunistic connection sharing include at least %h, %p, and %r (or alternatively %C) and be placed in a directory that is not writable by other users. This ensures that shared connections are uniquely identified. "
+        },
+        {
+          "source": "ssh-preferred",
+          "text_pointer": "/blocks/ssh-preferred/text",
+          "source_excerpt": "PreferredAuthentications Specifies the order in which the client should try authentication methods. This allows a client to prefer one method (e.g. keyboard-interactive ) over another method (e.g. password ). The default is: gssapi-with-mic,hostbased,publickey, keyboard-interactive,password "
+        }
+      ],
+      "support_rationale": "ControlPath=none disables connection sharing, ensuring this destination connection cannot reuse an already authenticated local multiplexing master. PreferredAuthentications=publickey restricts the authentication method. This checks a fresh public-key authentication when actually executed successfully; it does not identify a particular agent-held key, prove a current login or eliminate separately configured proxy-host authentication.",
+      "method_rationale": "Exact primary OpenSSH ControlPath/ControlMaster and PreferredAuthentications definitions plus complete command-context review; no live login. Preserve all prior PASS command evidence and mark affected procedure history for normal source-drift handling after acceptance.",
+      "limitation": "No current Host/account setting, key, SSH session, service, listing, maintenance, job, report submission, rental or paid test was changed/run. Existing screenshots have unknown capture date/version and demonstrate their displayed controls only. Source-defined instructions do not prove backend permissions, notification delivery, workload safety or a new runtime outcome.",
+      "next_action": "Integrate only the accepted exact occurrence/replacement and its stated dependencies. Preserve original evidence and procedure history; do not promote a whole live workflow from this source/static review.",
+      "replacement_text": "```bash\nssh -o ControlPath=none -o PreferredAuthentications=publickey youruser@1.2.3.4\n```",
+      "original_discrepancy": "A new terminal may reuse an existing SSH master connection, so the old command does not always test a new authentication."
+    }
+  ]
+}

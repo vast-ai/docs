@@ -1,0 +1,4 @@
+import fs from 'node:fs';import path from 'node:path';import{spawnSync}from'node:child_process';
+const [root,name,command,...args]=process.argv.slice(2);const dir=path.join(root,'verification/evidence/2026-09-14-payout-provider-correction-attempt-01');const target=path.join(dir,name+'.json');if(fs.existsSync(target))throw Error('refuse overwrite '+target);
+const started_at=new Date().toISOString();const r=spawnSync(command,args,{cwd:root,encoding:'utf8',maxBuffer:30000000});
+const record={started_at,finished_at:new Date().toISOString(),command:[command,...args],cwd:root,exit_code:r.status,signal:r.signal,error:r.error?.message??null,stdout:r.stdout,stderr:r.stderr};fs.writeFileSync(target,JSON.stringify(record,null,2)+'\n');console.log(JSON.stringify({artifact:target,exit_code:r.status,error:record.error,stdout:r.stdout?.slice(-1600),stderr:r.stderr?.slice(-600)}));process.exitCode=r.status??1;

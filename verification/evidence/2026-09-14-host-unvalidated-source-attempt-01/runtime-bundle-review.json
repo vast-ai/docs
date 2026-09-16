@@ -1,0 +1,232 @@
+{
+  "record_type": "BOUNDED_UNCHANGED_RUNTIME_SOURCE_REVIEW",
+  "claims": [
+    {
+      "claim_id": "MCL-14556d751bb3fc5b",
+      "full_literal": "For self-test failures, the CLI can create a diagnostic bundle. The normal command is:",
+      "support": "The CLI can create a diagnostic bundle on self-test failure: source wiring calls the bundle creator and the retained September 9 requirements failure produced a four-member archive.",
+      "limits": "Only the exact declaration/capability and named preflight archive are supported. Source files machines.py and support_bundle.py are byte-identical between executed ecf32efa and current-default 1c6f8b61. No whole-current-CLI execution, official diagnostic workload, all failure paths, remote logs, archive safety, owner approval or human acceptance is inferred.",
+      "basis": [
+        {
+          "kind": "CANONICAL_IMPLEMENTATION_SOURCE",
+          "sourceLabel": "Pinned CLI offer-expiration option declaration",
+          "sourceLocator": "/lines/775-815",
+          "sourceUrl": "https://github.com/vast-ai/vast-cli/blob/1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc/vastai/cli/commands/machines.py#L775-L815",
+          "artifactRef": "verification/evidence/2026-09-14-host-closure-correction-attempt-02/canonical-cli-machine-commands.py",
+          "excerpt": "    def ensure_support_bundle():\n        if result.get(\"success\"):\n            return None\n        if result.get(\"diagnostics\", {}).get(\"support_bundle\"):\n            return result[\"diagnostics\"][\"support_bundle\"]\n        if args.no_support_bundle or not support_bundles_enabled():\n            return None\n        if instance_id:\n            collect_instance_logs(instance_id)\n        try:\n            bundle = create_support_bundle(\n                machine_id=args.machine_id,\n                output_dir=args.support_bundle_dir,\n                result=result,\n                cli_output=cli_output,\n                extra_files=instance_log_files,\n                extra_errors=instance_log_errors,\n                run_started_at=run_started_at,\n                command=sys.argv,\n                secrets=[getattr(args, \"api_key\", None), os.environ.get(\"VAST_API_KEY\")],\n                include_local_host_artifacts=False,\n            )\n        except Exception as e:\n            error = redact_secret_text(e) or \"\"\n            result[\"diagnostics\"][\"support_bundle_error\"] = error\n            progress_print(f\"WARNING: failed to create self-test diagnostic bundle: {error}\")\n            return None\n        result[\"diagnostics\"][\"support_bundle\"] = bundle\n        return bundle\n\n    def finish_failure():\n        if args.raw:\n            ensure_support_bundle()\n            return result\n        if result.get(\"warning\"):\n            print(result[\"warning\"])\n        render_runtime_failure()\n        bundle = ensure_support_bundle()\n        if bundle:\n            for line in format_bundle_summary(bundle):\n                print(line)",
+          "text_pointer": "/lines/775-815",
+          "support_rationale": "The CLI can create a diagnostic bundle on self-test failure: source wiring calls the bundle creator and the retained September 9 requirements failure produced a four-member archive."
+        },
+        {
+          "kind": "CANONICAL_IMPLEMENTATION_SOURCE",
+          "sourceLabel": "vastai/cli/self_test/support_bundle.py at current-default 1c6f8b61",
+          "sourceLocator": "/lines/211-270",
+          "sourceUrl": "https://github.com/vast-ai/vast-cli/blob/1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc/vastai/cli/self_test/support_bundle.py#L211-L270",
+          "artifactRef": "verification/evidence/2026-09-14-host-unvalidated-source-attempt-01/sources/vastai/cli/self_test/support_bundle.py",
+          "excerpt": "    created_at = utc_timestamp()\n    safe_id = _safe_machine_id(machine_id)\n    bundle_dir = Path(output_dir or DEFAULT_BUNDLE_DIR).expanduser()\n    bundle_dir.mkdir(parents=True, exist_ok=True)\n    bundle_path = bundle_dir / f\"vast_selftest_{safe_id}_{created_at}.tar.gz\"\n\n    files: dict[str, str] = {}\n    errors: list[dict[str, str]] = []\n    if cli_output:\n        files[\"self-test-output.log\"] = _redact_text(\"\\n\".join(cli_output), secrets)\n    if result is not None:\n        files[\"self-test-result.json\"] = json.dumps(_redact_json(result, secrets), indent=2, sort_keys=True)\n    if extra_files:\n        for name, content in extra_files.items():\n            files[name] = _redact_text(content, secrets)\n    if extra_errors:\n        errors.extend(_redact_json(extra_errors, secrets))\n    if include_local_host_artifacts:\n        host_files, host_errors = _collect_host_artifacts(secrets)\n        files.update(host_files)\n        errors.extend(host_errors)\n\n    manifest = {\n        \"bundle_version\": 1,\n        \"machine_id\": str(machine_id),\n        \"created_at_utc\": created_at,\n        \"run_started_at_utc\": run_started_at,\n        \"command\": _redact_json(command or [], secrets),\n        \"max_text_bytes_per_artifact\": MAX_TEXT_BYTES,\n        \"max_log_bytes_per_artifact\": MAX_LOG_BYTES,\n        \"includes_local_host_artifacts\": include_local_host_artifacts,\n        \"files\": sorted(files.keys()) + [\"manifest.json\", \"collection-errors.json\"],\n        \"collection_errors\": errors,\n        \"note\": (\n            \"This bundle contains CLI-visible self-test evidence. Host OS artifacts \"\n            \"are included only when includes_local_host_artifacts=true; otherwise \"\n            \"host daemon/kaalia/system logs need host-side daemon/backend collection \"\n            \"or an explicit dump run on the actual host.\"\n        ),\n    }\n    files[\"manifest.json\"] = json.dumps(manifest, indent=2, sort_keys=True)\n    files[\"collection-errors.json\"] = json.dumps(errors, indent=2, sort_keys=True)\n\n    with tarfile.open(bundle_path, \"w:gz\") as tar:\n        for name, content in sorted(files.items()):\n            safe_name = _safe_archive_name(name)\n            artifact_text = content if JSON_ARTIFACT_RE.search(name) else _truncate_text(content, MAX_LOG_BYTES)\n            data = artifact_text.encode(\"utf-8\", errors=\"replace\")\n            info = tarfile.TarInfo(safe_name)\n            info.size = len(data)\n            info.mtime = int(time.time())\n            tar.addfile(info, fileobj=io.BytesIO(data))\n    os.chmod(bundle_path, 0o600)\n\n    size_bytes = bundle_path.stat().st_size\n    return {\n        \"path\": str(bundle_path),\n        \"created_at_utc\": created_at,\n        \"size_bytes\": size_bytes,\n        \"files\": sorted(files.keys()),",
+          "text_pointer": "/lines/211-270",
+          "support_rationale": "The CLI can create a diagnostic bundle on self-test failure: source wiring calls the bundle creator and the retained September 9 requirements failure produced a four-member archive."
+        },
+        {
+          "kind": "RUNTIME_OR_UI_OBSERVATION",
+          "sourceLabel": "selftest_preflight",
+          "sourceLocator": "/bundle_inventory/0",
+          "sourceUrl": "",
+          "artifactRef": "verification/evidence/2026-09-09-host-ssh-jupyter-selftest-attempt-01/selftest-normal-preflight-01.json",
+          "excerpt": "{\"members\":[{\"name\":\"collection-errors.json\",\"named_api_key_absent\":true,\"regular_file\":true,\"sha256\":\"4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945\",\"size\":2},{\"name\":\"manifest.json\",\"named_api_key_absent\":true,\"regular_file\":true,\"sha256\":\"318acfd4bc3f54295e357ed7627655de73bf865e588d3d376bfb8613cba45937\",\"size\":955},{\"name\":\"self-test-output.log\",\"named_api_key_absent\":true,\"regular_file\":true,\"sha256\":\"5d363fe3fccaf42a82d0107a6c992bfb39da146cb6268197a99bdce02f1b1ad0\",\"size\":569},{\"name\":\"self-test-result.json\",\"named_api_key_absent\":true,\"regular_file\":true,\"sha256\":\"c04bbc176a4324dba0990fd0c9a06abe7016c8227eb8da7b88606e6b661c7a4f\",\"size\":6155}],\"mode\":\"0o600\",\"name\":\"vast_selftest_150296_20260909T124717Z.tar.gz\",\"sha256\":\"622724ddc165d89a0d2917e011dbf3c8594f114a55f1f699d41f7bbb0d356e76\",\"size\":2663}",
+          "text_pointer": "/bundle_inventory/0",
+          "support_rationale": "The CLI can create a diagnostic bundle on self-test failure: source wiring calls the bundle creator and the retained September 9 requirements failure produced a four-member archive."
+        }
+      ]
+    },
+    {
+      "claim_id": "MCL-582bf3922775c488",
+      "full_literal": "Failure bundles are saved by default under:",
+      "support": "The following default-directory declaration is supported by the /tmp constant and the output_dir-or-default path selection. This is source-only: the retained run used an override.",
+      "limits": "Only the exact declaration/capability and named preflight archive are supported. Source files machines.py and support_bundle.py are byte-identical between executed ecf32efa and current-default 1c6f8b61. No whole-current-CLI execution, official diagnostic workload, all failure paths, remote logs, archive safety, owner approval or human acceptance is inferred. The default directory was not exercised; the preflight used an override.",
+      "basis": [
+        {
+          "kind": "CANONICAL_IMPLEMENTATION_SOURCE",
+          "sourceLabel": "vastai/cli/self_test/support_bundle.py at current-default 1c6f8b61",
+          "sourceLocator": "/lines/19-19",
+          "sourceUrl": "https://github.com/vast-ai/vast-cli/blob/1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc/vastai/cli/self_test/support_bundle.py#L19-L19",
+          "artifactRef": "verification/evidence/2026-09-14-host-unvalidated-source-attempt-01/sources/vastai/cli/self_test/support_bundle.py",
+          "excerpt": "DEFAULT_BUNDLE_DIR = \"/tmp\"",
+          "text_pointer": "/lines/19-19",
+          "support_rationale": "The following default-directory declaration is supported by the /tmp constant and the output_dir-or-default path selection. This is source-only: the retained run used an override."
+        },
+        {
+          "kind": "CANONICAL_IMPLEMENTATION_SOURCE",
+          "sourceLabel": "vastai/cli/self_test/support_bundle.py at current-default 1c6f8b61",
+          "sourceLocator": "/lines/211-215",
+          "sourceUrl": "https://github.com/vast-ai/vast-cli/blob/1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc/vastai/cli/self_test/support_bundle.py#L211-L215",
+          "artifactRef": "verification/evidence/2026-09-14-host-unvalidated-source-attempt-01/sources/vastai/cli/self_test/support_bundle.py",
+          "excerpt": "    created_at = utc_timestamp()\n    safe_id = _safe_machine_id(machine_id)\n    bundle_dir = Path(output_dir or DEFAULT_BUNDLE_DIR).expanduser()\n    bundle_dir.mkdir(parents=True, exist_ok=True)\n    bundle_path = bundle_dir / f\"vast_selftest_{safe_id}_{created_at}.tar.gz\"",
+          "text_pointer": "/lines/211-215",
+          "support_rationale": "The following default-directory declaration is supported by the /tmp constant and the output_dir-or-default path selection. This is source-only: the retained run used an override."
+        }
+      ]
+    },
+    {
+      "claim_id": "MCL-9006e38f7277157f",
+      "full_literal": "You can override the output directory:",
+      "support": "The CLI directory flag is wired to output_dir and path selection. The retained preflight run supplied an override and produced an archive; arbitrary directory permissions are not established.",
+      "limits": "Only the exact declaration/capability and named preflight archive are supported. Source files machines.py and support_bundle.py are byte-identical between executed ecf32efa and current-default 1c6f8b61. No whole-current-CLI execution, official diagnostic workload, all failure paths, remote logs, archive safety, owner approval or human acceptance is inferred.",
+      "basis": [
+        {
+          "kind": "CANONICAL_IMPLEMENTATION_SOURCE",
+          "sourceLabel": "Pinned CLI offer-expiration option declaration",
+          "sourceLocator": "/lines/704-704",
+          "sourceUrl": "https://github.com/vast-ai/vast-cli/blob/1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc/vastai/cli/commands/machines.py#L704-L704",
+          "artifactRef": "verification/evidence/2026-09-14-host-closure-correction-attempt-02/canonical-cli-machine-commands.py",
+          "excerpt": "    argument(\"--support-bundle-dir\", help=\"Directory for failure diagnostic bundles (default: /tmp)\", type=str),",
+          "text_pointer": "/lines/704-704",
+          "support_rationale": "The CLI directory flag is wired to output_dir and path selection. The retained preflight run supplied an override and produced an archive; arbitrary directory permissions are not established."
+        },
+        {
+          "kind": "CANONICAL_IMPLEMENTATION_SOURCE",
+          "sourceLabel": "Pinned CLI offer-expiration option declaration",
+          "sourceLocator": "/lines/784-788",
+          "sourceUrl": "https://github.com/vast-ai/vast-cli/blob/1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc/vastai/cli/commands/machines.py#L784-L788",
+          "artifactRef": "verification/evidence/2026-09-14-host-closure-correction-attempt-02/canonical-cli-machine-commands.py",
+          "excerpt": "        try:\n            bundle = create_support_bundle(\n                machine_id=args.machine_id,\n                output_dir=args.support_bundle_dir,\n                result=result,",
+          "text_pointer": "/lines/784-788",
+          "support_rationale": "The CLI directory flag is wired to output_dir and path selection. The retained preflight run supplied an override and produced an archive; arbitrary directory permissions are not established."
+        },
+        {
+          "kind": "CANONICAL_IMPLEMENTATION_SOURCE",
+          "sourceLabel": "vastai/cli/self_test/support_bundle.py at current-default 1c6f8b61",
+          "sourceLocator": "/lines/211-215",
+          "sourceUrl": "https://github.com/vast-ai/vast-cli/blob/1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc/vastai/cli/self_test/support_bundle.py#L211-L215",
+          "artifactRef": "verification/evidence/2026-09-14-host-unvalidated-source-attempt-01/sources/vastai/cli/self_test/support_bundle.py",
+          "excerpt": "    created_at = utc_timestamp()\n    safe_id = _safe_machine_id(machine_id)\n    bundle_dir = Path(output_dir or DEFAULT_BUNDLE_DIR).expanduser()\n    bundle_dir.mkdir(parents=True, exist_ok=True)\n    bundle_path = bundle_dir / f\"vast_selftest_{safe_id}_{created_at}.tar.gz\"",
+          "text_pointer": "/lines/211-215",
+          "support_rationale": "The CLI directory flag is wired to output_dir and path selection. The retained preflight run supplied an override and produced an archive; arbitrary directory permissions are not established."
+        },
+        {
+          "kind": "RUNTIME_OR_UI_OBSERVATION",
+          "sourceLabel": "selftest_preflight",
+          "sourceLocator": "/command",
+          "sourceUrl": "",
+          "artifactRef": "verification/evidence/2026-09-09-host-ssh-jupyter-selftest-attempt-01/selftest-normal-preflight-01.json",
+          "excerpt": "[\"vastai\",\"--retry\",\"1\",\"--raw\",\"self-test\",\"machine\",\"150296\",\"--support-bundle-dir\",\"<private-support-bundle-directory>\"]",
+          "text_pointer": "/command",
+          "support_rationale": "The CLI directory flag is wired to output_dir and path selection. The retained preflight run supplied an override and produced an archive; arbitrary directory permissions are not established."
+        }
+      ]
+    },
+    {
+      "claim_id": "MCL-151132b1bb16b498",
+      "full_literal": "- `self-test-output.log`",
+      "support": "The exact filename is a possible bundle member in canonical source and is present in the retained preflight-failure archive. This proves the “can include” occurrence only, not every failure path or archive completeness.",
+      "limits": "Only the exact declaration/capability and named preflight archive are supported. Source files machines.py and support_bundle.py are byte-identical between executed ecf32efa and current-default 1c6f8b61. No whole-current-CLI execution, official diagnostic workload, all failure paths, remote logs, archive safety, owner approval or human acceptance is inferred.",
+      "basis": [
+        {
+          "kind": "CANONICAL_IMPLEMENTATION_SOURCE",
+          "sourceLabel": "vastai/cli/self_test/support_bundle.py at current-default 1c6f8b61",
+          "sourceLocator": "/lines/217-251",
+          "sourceUrl": "https://github.com/vast-ai/vast-cli/blob/1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc/vastai/cli/self_test/support_bundle.py#L217-L251",
+          "artifactRef": "verification/evidence/2026-09-14-host-unvalidated-source-attempt-01/sources/vastai/cli/self_test/support_bundle.py",
+          "excerpt": "    files: dict[str, str] = {}\n    errors: list[dict[str, str]] = []\n    if cli_output:\n        files[\"self-test-output.log\"] = _redact_text(\"\\n\".join(cli_output), secrets)\n    if result is not None:\n        files[\"self-test-result.json\"] = json.dumps(_redact_json(result, secrets), indent=2, sort_keys=True)\n    if extra_files:\n        for name, content in extra_files.items():\n            files[name] = _redact_text(content, secrets)\n    if extra_errors:\n        errors.extend(_redact_json(extra_errors, secrets))\n    if include_local_host_artifacts:\n        host_files, host_errors = _collect_host_artifacts(secrets)\n        files.update(host_files)\n        errors.extend(host_errors)\n\n    manifest = {\n        \"bundle_version\": 1,\n        \"machine_id\": str(machine_id),\n        \"created_at_utc\": created_at,\n        \"run_started_at_utc\": run_started_at,\n        \"command\": _redact_json(command or [], secrets),\n        \"max_text_bytes_per_artifact\": MAX_TEXT_BYTES,\n        \"max_log_bytes_per_artifact\": MAX_LOG_BYTES,\n        \"includes_local_host_artifacts\": include_local_host_artifacts,\n        \"files\": sorted(files.keys()) + [\"manifest.json\", \"collection-errors.json\"],\n        \"collection_errors\": errors,\n        \"note\": (\n            \"This bundle contains CLI-visible self-test evidence. Host OS artifacts \"\n            \"are included only when includes_local_host_artifacts=true; otherwise \"\n            \"host daemon/kaalia/system logs need host-side daemon/backend collection \"\n            \"or an explicit dump run on the actual host.\"\n        ),\n    }\n    files[\"manifest.json\"] = json.dumps(manifest, indent=2, sort_keys=True)",
+          "text_pointer": "/lines/217-251",
+          "support_rationale": "The exact filename is a possible bundle member in canonical source and is present in the retained preflight-failure archive. This proves the “can include” occurrence only, not every failure path or archive completeness."
+        },
+        {
+          "kind": "RUNTIME_OR_UI_OBSERVATION",
+          "sourceLabel": "selftest_preflight",
+          "sourceLocator": "/bundle_inventory/0/members/2/name",
+          "sourceUrl": "",
+          "artifactRef": "verification/evidence/2026-09-09-host-ssh-jupyter-selftest-attempt-01/selftest-normal-preflight-01.json",
+          "excerpt": "self-test-output.log",
+          "text_pointer": "/bundle_inventory/0/members/2/name",
+          "support_rationale": "The exact filename is a possible bundle member in canonical source and is present in the retained preflight-failure archive. This proves the “can include” occurrence only, not every failure path or archive completeness."
+        }
+      ]
+    },
+    {
+      "claim_id": "MCL-33c81159a9587c53",
+      "full_literal": "- `self-test-result.json`",
+      "support": "The exact filename is a possible bundle member in canonical source and is present in the retained preflight-failure archive. This proves the “can include” occurrence only, not every failure path or archive completeness.",
+      "limits": "Only the exact declaration/capability and named preflight archive are supported. Source files machines.py and support_bundle.py are byte-identical between executed ecf32efa and current-default 1c6f8b61. No whole-current-CLI execution, official diagnostic workload, all failure paths, remote logs, archive safety, owner approval or human acceptance is inferred.",
+      "basis": [
+        {
+          "kind": "CANONICAL_IMPLEMENTATION_SOURCE",
+          "sourceLabel": "vastai/cli/self_test/support_bundle.py at current-default 1c6f8b61",
+          "sourceLocator": "/lines/217-251",
+          "sourceUrl": "https://github.com/vast-ai/vast-cli/blob/1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc/vastai/cli/self_test/support_bundle.py#L217-L251",
+          "artifactRef": "verification/evidence/2026-09-14-host-unvalidated-source-attempt-01/sources/vastai/cli/self_test/support_bundle.py",
+          "excerpt": "    files: dict[str, str] = {}\n    errors: list[dict[str, str]] = []\n    if cli_output:\n        files[\"self-test-output.log\"] = _redact_text(\"\\n\".join(cli_output), secrets)\n    if result is not None:\n        files[\"self-test-result.json\"] = json.dumps(_redact_json(result, secrets), indent=2, sort_keys=True)\n    if extra_files:\n        for name, content in extra_files.items():\n            files[name] = _redact_text(content, secrets)\n    if extra_errors:\n        errors.extend(_redact_json(extra_errors, secrets))\n    if include_local_host_artifacts:\n        host_files, host_errors = _collect_host_artifacts(secrets)\n        files.update(host_files)\n        errors.extend(host_errors)\n\n    manifest = {\n        \"bundle_version\": 1,\n        \"machine_id\": str(machine_id),\n        \"created_at_utc\": created_at,\n        \"run_started_at_utc\": run_started_at,\n        \"command\": _redact_json(command or [], secrets),\n        \"max_text_bytes_per_artifact\": MAX_TEXT_BYTES,\n        \"max_log_bytes_per_artifact\": MAX_LOG_BYTES,\n        \"includes_local_host_artifacts\": include_local_host_artifacts,\n        \"files\": sorted(files.keys()) + [\"manifest.json\", \"collection-errors.json\"],\n        \"collection_errors\": errors,\n        \"note\": (\n            \"This bundle contains CLI-visible self-test evidence. Host OS artifacts \"\n            \"are included only when includes_local_host_artifacts=true; otherwise \"\n            \"host daemon/kaalia/system logs need host-side daemon/backend collection \"\n            \"or an explicit dump run on the actual host.\"\n        ),\n    }\n    files[\"manifest.json\"] = json.dumps(manifest, indent=2, sort_keys=True)",
+          "text_pointer": "/lines/217-251",
+          "support_rationale": "The exact filename is a possible bundle member in canonical source and is present in the retained preflight-failure archive. This proves the “can include” occurrence only, not every failure path or archive completeness."
+        },
+        {
+          "kind": "RUNTIME_OR_UI_OBSERVATION",
+          "sourceLabel": "selftest_preflight",
+          "sourceLocator": "/bundle_inventory/0/members/3/name",
+          "sourceUrl": "",
+          "artifactRef": "verification/evidence/2026-09-09-host-ssh-jupyter-selftest-attempt-01/selftest-normal-preflight-01.json",
+          "excerpt": "self-test-result.json",
+          "text_pointer": "/bundle_inventory/0/members/3/name",
+          "support_rationale": "The exact filename is a possible bundle member in canonical source and is present in the retained preflight-failure archive. This proves the “can include” occurrence only, not every failure path or archive completeness."
+        }
+      ]
+    },
+    {
+      "claim_id": "MCL-23baa90e841cbe43",
+      "full_literal": "- `manifest.json`",
+      "support": "The exact filename is a possible bundle member in canonical source and is present in the retained preflight-failure archive. This proves the “can include” occurrence only, not every failure path or archive completeness.",
+      "limits": "Only the exact declaration/capability and named preflight archive are supported. Source files machines.py and support_bundle.py are byte-identical between executed ecf32efa and current-default 1c6f8b61. No whole-current-CLI execution, official diagnostic workload, all failure paths, remote logs, archive safety, owner approval or human acceptance is inferred.",
+      "basis": [
+        {
+          "kind": "CANONICAL_IMPLEMENTATION_SOURCE",
+          "sourceLabel": "vastai/cli/self_test/support_bundle.py at current-default 1c6f8b61",
+          "sourceLocator": "/lines/217-251",
+          "sourceUrl": "https://github.com/vast-ai/vast-cli/blob/1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc/vastai/cli/self_test/support_bundle.py#L217-L251",
+          "artifactRef": "verification/evidence/2026-09-14-host-unvalidated-source-attempt-01/sources/vastai/cli/self_test/support_bundle.py",
+          "excerpt": "    files: dict[str, str] = {}\n    errors: list[dict[str, str]] = []\n    if cli_output:\n        files[\"self-test-output.log\"] = _redact_text(\"\\n\".join(cli_output), secrets)\n    if result is not None:\n        files[\"self-test-result.json\"] = json.dumps(_redact_json(result, secrets), indent=2, sort_keys=True)\n    if extra_files:\n        for name, content in extra_files.items():\n            files[name] = _redact_text(content, secrets)\n    if extra_errors:\n        errors.extend(_redact_json(extra_errors, secrets))\n    if include_local_host_artifacts:\n        host_files, host_errors = _collect_host_artifacts(secrets)\n        files.update(host_files)\n        errors.extend(host_errors)\n\n    manifest = {\n        \"bundle_version\": 1,\n        \"machine_id\": str(machine_id),\n        \"created_at_utc\": created_at,\n        \"run_started_at_utc\": run_started_at,\n        \"command\": _redact_json(command or [], secrets),\n        \"max_text_bytes_per_artifact\": MAX_TEXT_BYTES,\n        \"max_log_bytes_per_artifact\": MAX_LOG_BYTES,\n        \"includes_local_host_artifacts\": include_local_host_artifacts,\n        \"files\": sorted(files.keys()) + [\"manifest.json\", \"collection-errors.json\"],\n        \"collection_errors\": errors,\n        \"note\": (\n            \"This bundle contains CLI-visible self-test evidence. Host OS artifacts \"\n            \"are included only when includes_local_host_artifacts=true; otherwise \"\n            \"host daemon/kaalia/system logs need host-side daemon/backend collection \"\n            \"or an explicit dump run on the actual host.\"\n        ),\n    }\n    files[\"manifest.json\"] = json.dumps(manifest, indent=2, sort_keys=True)",
+          "text_pointer": "/lines/217-251",
+          "support_rationale": "The exact filename is a possible bundle member in canonical source and is present in the retained preflight-failure archive. This proves the “can include” occurrence only, not every failure path or archive completeness."
+        },
+        {
+          "kind": "RUNTIME_OR_UI_OBSERVATION",
+          "sourceLabel": "selftest_preflight",
+          "sourceLocator": "/bundle_inventory/0/members/1/name",
+          "sourceUrl": "",
+          "artifactRef": "verification/evidence/2026-09-09-host-ssh-jupyter-selftest-attempt-01/selftest-normal-preflight-01.json",
+          "excerpt": "manifest.json",
+          "text_pointer": "/bundle_inventory/0/members/1/name",
+          "support_rationale": "The exact filename is a possible bundle member in canonical source and is present in the retained preflight-failure archive. This proves the “can include” occurrence only, not every failure path or archive completeness."
+        }
+      ]
+    },
+    {
+      "claim_id": "MCL-e5ac633b4cd16181",
+      "full_literal": "- `collection-errors.json`",
+      "support": "The exact filename is a possible bundle member in canonical source and is present in the retained preflight-failure archive. This proves the “can include” occurrence only, not every failure path or archive completeness.",
+      "limits": "Only the exact declaration/capability and named preflight archive are supported. Source files machines.py and support_bundle.py are byte-identical between executed ecf32efa and current-default 1c6f8b61. No whole-current-CLI execution, official diagnostic workload, all failure paths, remote logs, archive safety, owner approval or human acceptance is inferred.",
+      "basis": [
+        {
+          "kind": "CANONICAL_IMPLEMENTATION_SOURCE",
+          "sourceLabel": "vastai/cli/self_test/support_bundle.py at current-default 1c6f8b61",
+          "sourceLocator": "/lines/217-251",
+          "sourceUrl": "https://github.com/vast-ai/vast-cli/blob/1c6f8b61d3929a7ae423f89a3a0a53e4e9be02bc/vastai/cli/self_test/support_bundle.py#L217-L251",
+          "artifactRef": "verification/evidence/2026-09-14-host-unvalidated-source-attempt-01/sources/vastai/cli/self_test/support_bundle.py",
+          "excerpt": "    files: dict[str, str] = {}\n    errors: list[dict[str, str]] = []\n    if cli_output:\n        files[\"self-test-output.log\"] = _redact_text(\"\\n\".join(cli_output), secrets)\n    if result is not None:\n        files[\"self-test-result.json\"] = json.dumps(_redact_json(result, secrets), indent=2, sort_keys=True)\n    if extra_files:\n        for name, content in extra_files.items():\n            files[name] = _redact_text(content, secrets)\n    if extra_errors:\n        errors.extend(_redact_json(extra_errors, secrets))\n    if include_local_host_artifacts:\n        host_files, host_errors = _collect_host_artifacts(secrets)\n        files.update(host_files)\n        errors.extend(host_errors)\n\n    manifest = {\n        \"bundle_version\": 1,\n        \"machine_id\": str(machine_id),\n        \"created_at_utc\": created_at,\n        \"run_started_at_utc\": run_started_at,\n        \"command\": _redact_json(command or [], secrets),\n        \"max_text_bytes_per_artifact\": MAX_TEXT_BYTES,\n        \"max_log_bytes_per_artifact\": MAX_LOG_BYTES,\n        \"includes_local_host_artifacts\": include_local_host_artifacts,\n        \"files\": sorted(files.keys()) + [\"manifest.json\", \"collection-errors.json\"],\n        \"collection_errors\": errors,\n        \"note\": (\n            \"This bundle contains CLI-visible self-test evidence. Host OS artifacts \"\n            \"are included only when includes_local_host_artifacts=true; otherwise \"\n            \"host daemon/kaalia/system logs need host-side daemon/backend collection \"\n            \"or an explicit dump run on the actual host.\"\n        ),\n    }\n    files[\"manifest.json\"] = json.dumps(manifest, indent=2, sort_keys=True)",
+          "text_pointer": "/lines/217-251",
+          "support_rationale": "The exact filename is a possible bundle member in canonical source and is present in the retained preflight-failure archive. This proves the “can include” occurrence only, not every failure path or archive completeness."
+        },
+        {
+          "kind": "RUNTIME_OR_UI_OBSERVATION",
+          "sourceLabel": "selftest_preflight",
+          "sourceLocator": "/bundle_inventory/0/members/0/name",
+          "sourceUrl": "",
+          "artifactRef": "verification/evidence/2026-09-09-host-ssh-jupyter-selftest-attempt-01/selftest-normal-preflight-01.json",
+          "excerpt": "collection-errors.json",
+          "text_pointer": "/bundle_inventory/0/members/0/name",
+          "support_rationale": "The exact filename is a possible bundle member in canonical source and is present in the retained preflight-failure archive. This proves the “can include” occurrence only, not every failure path or archive completeness."
+        }
+      ]
+    }
+  ],
+  "equivalence_ref": "verification/evidence/2026-09-14-host-unvalidated-source-attempt-01/runtime-source-equivalence.json"
+}

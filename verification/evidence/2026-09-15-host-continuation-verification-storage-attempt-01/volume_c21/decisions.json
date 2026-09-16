@@ -1,0 +1,55 @@
+{
+  "record_type": "ADJACENT_VOLUME_C21_PROPOSAL",
+  "decisions": [
+    {
+      "id": "VOL-C21",
+      "literal_sha256": "ec961dc11c04a4338f20ec90f97acb2aaa7dad8c28d9bd4e4a5ad5d4e8035cbd",
+      "location": {
+        "source_file": "host/volume-offers.mdx",
+        "start": 51,
+        "end": 60,
+        "text_sha256": "ec961dc11c04a4338f20ec90f97acb2aaa7dad8c28d9bd4e4a5ad5d4e8035cbd"
+      },
+      "locations": [
+        {
+          "source_file": "host/volume-offers.mdx",
+          "start": 51,
+          "end": 60,
+          "text_sha256": "ec961dc11c04a4338f20ec90f97acb2aaa7dad8c28d9bd4e4a5ad5d4e8035cbd"
+        }
+      ],
+      "decision": "correction",
+      "proposed_status": "PASS",
+      "proposed_methods": [
+        "CANONICAL_IMPLEMENTATION_SOURCE",
+        "STATIC_CONTEXT_REVIEW"
+      ],
+      "proposed_classification": "REVIEWED_TECHNICAL_DECLARATION",
+      "proposed_owner_role": "Documentation technical-source reviewer",
+      "replacement_text": "You can publish GPU and volume offers together:\n\n```bash\nvastai list machine <machine-id> \\\n  --vol_size <capacity-gb> \\\n  --vol_price <usd-per-gb-month> \\\n  --end_date <date>\n```\n\nSet `--vol_size 0` when you do not want the machine listing to include a volume offer. For a nonzero offer, pass an explicit size and price so the advertised capacity is intentional.",
+      "source_refs": [
+        {
+          "source": "context-volume-offers",
+          "text_pointer": "/lines/49-62",
+          "source_excerpt": "## Publish Local Storage\n\nYou can publish GPU and volume offers together:\n\n```bash\nvastai list machine <machine-id> \\\n  --vol_size <capacity-gb> \\\n  --vol_price <usd-per-gb-month> \\\n  --end_date <date>\n```\n\nSet `--vol_size 0` when you do not want the machine listing to include a volume offer. Pass an explicit size and price so the advertised capacity is intentional.\n\nYou can also publish storage separately:"
+        },
+        {
+          "source": "cli-volume-options",
+          "text_pointer": "/blocks/cli-volume-options/text",
+          "source_excerpt": "        price_inetu_ = str(args.price_inetu)\n        price_inetd_ = str(args.price_inetd)\n        min_chunk_ = str(args.min_chunk)\n        discount_rate_ = str(args.discount_rate)\n        duration_ = str(args.duration)\n        if args.raw:\n            return rj\n        else:\n            print(f\"offers created/updated for machine {id},  @ ${price_gpu_}/gpu/hr, ${price_inetu_}/GB up, ${price_inetd_}/GB down, {min_chunk_}/min gpus, max discount_rate {discount_rate_}, duration {duration_}\")\n            num_extended = rj.get(\"extended\", 0)\n            if num_extended > 0:\n                print(f\"extended {num_extended} client contracts to {args.end_date}\")\n    else:\n        if args.raw:\n            return rj\n        else:\n            print(rj.get(\"msg\", rj))\n\n\n@parser.command(\n    argument(\"id\", help=\"id of machine to list\", type=int),\n    argument(\"-g\", \"--price_gpu\", help=\"per gpu rental price in $/hour  (price for active instances)\", type=float),\n    argument(\"-s\", \"--price_disk\",\n             help=\"storage price in $/GB/month (price for inactive instances), default: $0.10/GB/month\", type=float),\n    argument(\"-u\", \"--price_inetu\", help=\"price for internet upload bandwidth in $/GB\", type=float),\n    argument(\"-d\", \"--price_inetd\", help=\"price for internet download bandwidth in $/GB\", type=float),\n    argument(\"-b\", \"--price_min_bid\", help=\"per gpu minimum bid price floor in $/hour\", type=float),\n    argument(\"-r\", \"--discount_rate\", help=\"Max long term prepay discount rate fraction, default: 0.4 \", type=float),\n    argument(\"-m\", \"--min_chunk\", help=\"minimum amount of gpus (default: 1)\", type=int, default=1),\n    argument(\"-e\", \"--end_date\", help=\"contract offer expiration - the available until date (optional, in unix float timestamp or MM/DD/YYYY format)\", type=str),\n    argument(\"-l\", \"--duration\", help=\"Updates end_date daily to be duration from current date. Cannot be combined with end_date. Format is: `n days`, `n weeks`, `n months`, `n years`, or total intended duration in seconds.\"),\n    argument(\"-v\", \"--vol_size\", help=\"Size for volume contract offer. Defaults to half of available disk. Set 0 to not create a volume contract offer.\", type=int),\n    argument(\"-z\", \"--vol_price\", help=\"Price for disk on volume contract offer. Defaults to price_disk. Invalid if vol_size is 0.\", type=float),\n    usage=\"vastai list machine ID [options]\",\n    help=\"[Host] list a machine for rent\",\n    epilog=deindent(\"\"\"\n        Performs the same action as pressing the \"LIST\" button on the site https://cloud.vast.ai/host/machines.\n        On the end date the listing will expire and your machine will unlist. However any existing client jobs will still remain until ended by their owners.\n        Once you list your machine and it is rented, it is extremely important that you don't interfere with the machine in any way.\n        If your machine has an active client job and then goes offline, crashes, or has performance problems, this could permanently lower your reliability rating.\n        We strongly recommend you test the machine first and only list when ready.\n\n        Raising any resource price above the current contract price writes a\n        pending row to `pending_price_increases` for each affected client.\n        Clients review and accept those rows via the console or\n        `vastai show pending-price-increases`; auto-extend stops at the old\n        price until they accept.\n    \"\"\")\n)\ndef list__machine(args):\n    \"\"\"List a machine for rent.\"\"\"\n    return list_machine_impl(args, args.id)\n"
+        },
+        {
+          "source": "cli-list-volume",
+          "text_pointer": "/blocks/cli-list-volume/text",
+          "source_excerpt": "    \"\"\"Shared logic for listing a single machine.\"\"\"\n    from vastai.cli.util import string_to_unix_epoch\n\n    client = get_client(args)\n    end_date = string_to_unix_epoch(args.end_date) if args.end_date else None\n\n    json_blob = {\n        'machine': id,\n        'price_gpu': args.price_gpu,\n        'price_disk': args.price_disk,\n        'price_inetu': args.price_inetu,\n        'price_inetd': args.price_inetd,\n        'price_min_bid': args.price_min_bid,\n        'min_chunk': args.min_chunk,\n        'end_date': end_date,\n        'credit_discount_max': args.discount_rate,\n        'duration': args.duration,\n        'vol_size': args.vol_size,\n        'vol_price': args.vol_price,\n    }\n    if args.explain:\n        print(\"request json: \")\n        print(json_blob)\n\n    rj = machines_api.list_machine(\n        client, id=id, price_gpu=args.price_gpu, price_disk=args.price_disk,\n        price_inetu=args.price_inetu, price_inetd=args.price_inetd,\n        price_min_bid=args.price_min_bid, min_chunk=args.min_chunk,\n        end_date=end_date, discount_rate=args.discount_rate,\n        duration=args.duration, vol_size=args.vol_size, vol_price=args.vol_price,\n    )\n"
+        }
+      ],
+      "support_rationale": "This already source-reviewed PASS occurrence contains the exact VOL-C38 advice sentence at its final line. Apply the accepted clarification that an explicit volume price is for a nonzero offer; the CLI declares vol_price invalid when vol_size is0. The complete list-machine fence and introduction remain byte-identical and are supported by the exact current CLI option/payload declarations.",
+      "method_rationale": "Preserve the existing canonical-source/static-context method and PASS; this is a required containing-occurrence consistency correction, not new runtime evidence or an additional resolved passage.",
+      "limitation": "Command fence unchanged. No machine listing, volume offer, allocation, mount, rental or deletion operation. Preserve every prior evidence/source reference and historical review.",
+      "next_action": "Retain the scoped source binding and recheck if its wording or authoritative source changes.",
+      "containing_occurrence_of": "VOL-C38",
+      "additional_resolved_credit": 0
+    }
+  ]
+}

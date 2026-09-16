@@ -1,0 +1,163 @@
+openapi: 3.0.0
+info:
+  title: Metrics GPU API
+  description: Show current GPU market metrics
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/metrics/gpu/current/:
+    get:
+      summary: show gpu metrics
+      description: |
+        Returns a current snapshot of supply, demand, and pricing across all GPU types on the Vast marketplace. Use filters to narrow results to verified or datacenter machines.
+
+        CLI Usage: `vastai metrics gpu [options]`
+      security:
+      - BearerAuth: []
+      parameters:
+      - name: verified
+        in: query
+        required: false
+        description: Filter by verification status
+        schema:
+          type: string
+          enum:
+          - 'yes'
+          - 'no'
+          - all
+          default: 'yes'
+      - name: hosting_type
+        in: query
+        required: false
+        description: Filter by hosting type
+        schema:
+          type: string
+          enum:
+          - all
+          - secure_cloud
+          - community
+          default: all
+      - name: num_gpus
+        in: query
+        required: false
+        description: GPU count bucket or "all" for true population
+        schema:
+          type: string
+          default: all
+      responses:
+        '200':
+          description: Success response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  gpus:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        gpu_name:
+                          type: string
+                          example: RTX 4090
+                        total:
+                          type: integer
+                          description: Total number of machines
+                        available:
+                          type: integer
+                          description: Available machines
+                        rented_verified:
+                          type: integer
+                          description: Rented verified machines
+                        avail_verified:
+                          type: integer
+                          description: Available verified machines
+                        rented_unverified:
+                          type: integer
+                          description: Rented unverified machines
+                        avail_unverified:
+                          type: integer
+                          description: Available unverified machines
+                        usage:
+                          type: number
+                          description: Current utilization percentage
+                        usage_30d:
+                          type: number
+                          description: 30-day average utilization percentage
+                        dlperf:
+                          type: number
+                          description: Deep learning performance score
+                        tflops:
+                          type: number
+                          description: GPU TFLOPS rating
+                        price_p10:
+                          type: number
+                          description: 10th percentile price per GPU per hour
+                        price_p25:
+                          type: number
+                          description: 25th percentile price
+                        price_median:
+                          type: number
+                          description: Median price per GPU per hour
+                        price_p75:
+                          type: number
+                          description: 75th percentile price
+                        price_p90:
+                          type: number
+                          description: 90th percentile price
+                        tflops_per_dollar:
+                          type: number
+                          description: TFLOPS per dollar
+                        dlperf_per_dollar:
+                          type: number
+                          description: Deep learning performance per dollar
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: API requests too frequent endpoint threshold=3.0
+      tags:
+      - Machines
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: API key must be provided in the Authorization header
+  schemas:
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+        msg:
+          type: string
+x-rate-limit:
+  threshold: 3.0
+  per: request
+  description: Maximum request frequency per IP address for this endpoint
+x-cli-commands:
+- name: metrics gpu
+  description: Show current GPU market metrics
+  endpoint: /api/v0/metrics/gpu/current/
+  method: GET
+  example: vastai metrics gpu

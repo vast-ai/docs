@@ -1,0 +1,20 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {execFileSync,spawn} from 'node:child_process';
+const root=process.cwd(), dir='verification/evidence/2026-09-14-payout-terms-correction-attempt-01';
+const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
+const git=args=>execFileSync('git',args,{cwd:root,encoding:'utf8',maxBuffer:32*1024*1024});
+const gitHash=args=>new Promise((resolve,reject)=>{const h=crypto.createHash('sha256'),p=spawn('git',args,{cwd:root});p.stdout.on('data',b=>h.update(b));p.on('error',reject);p.on('close',code=>code===0?resolve(h.digest('hex')):reject(Error('git hash exited '+code)));});
+const files=[...new Set(git(['ls-files','-z','--cached','--others','--exclude-standard']).split('\0').filter(Boolean))].sort().map(p=>{
+ if(!fs.existsSync(p))return {path:p,type:'missing'};
+ const s=fs.lstatSync(p);return s.isSymbolicLink()?{path:p,type:'symlink',target:fs.readlinkSync(p)}:{path:p,type:'file',sha256:hash(fs.readFileSync(p))};
+});
+const write=(p,v)=>fs.writeFileSync(path.join(dir,p),v,{flag:'wx'});
+write('baseline.json',JSON.stringify({recorded_at:new Date().toISOString(),head:git(['rev-parse','HEAD']).trim(),branch:git(['branch','--show-current']).trim(),git_status:git(['status','--porcelain=v1','--untracked-files=all']),index_diff_sha256:await gitHash(['diff','--cached','--binary']),working_diff_sha256:await gitHash(['diff','--binary']),files},null,2)+'\n');
+write('pre-correction-model.json',fs.readFileSync('verification/current-host-docs-review.json'));
+write('pre-correction-payment.mdx',fs.readFileSync('host/payment.mdx'));
+const m=JSON.parse(fs.readFileSync('verification/current-host-docs-review.json'));
+const candidates=m.pages.flatMap(p=>p.claims.filter(c=>c.status==='FAIL'||(/third.party|not responsible|liability/i.test(c.text)&&c.status!=='PASS')).map(c=>({page:p.route,heading:c.headings,id:c.id,status:c.status,text:c.text})));
+write('candidate-inventory.json',JSON.stringify({recorded_at:new Date().toISOString(),method:'All FAIL occurrences plus non-PASS third-party/not-responsible/liability literals; candidates are not automatic closures.',counts:m.counts,candidates},null,2)+'\n');
+console.log(JSON.stringify({files:files.length,candidates:candidates.length,counts:m.counts.claim_statuses}));

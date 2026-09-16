@@ -1,0 +1,14 @@
+{
+  "repository": "/private/tmp/host-docs-d10-3o6tftdu/self-test",
+  "revision": "6f93fc4ba8ec61e3360b28829e91665f3ba7ade6",
+  "repository_path": "Makefile",
+  "full_source_sha256": "dc0b65fc780e99c66af7fcc9cd8721ffb5693d0e9ad19757c7419d332847c3f0",
+  "excerpts": [
+    {
+      "start": 1,
+      "end": 53,
+      "text": "# Multi-arch buildx Makefile for the verification self-test images.\n#\n# Produces four images on $(IMAGE):\n#   make cu118 -> $(IMAGE):self-test-cuda-11.8 (linux/amd64; legacy GPUs/drivers)\n#   make cu128 -> $(IMAGE):self-test-cuda-12.8 (linux/amd64,arm64)\n#   make cu130 -> $(IMAGE):self-test-cuda-13.0 (linux/amd64,arm64)\n#   make cu133 -> $(IMAGE):self-test-cuda-13.3 (linux/amd64,arm64)\n#   make all          Build all four\n#   make qemu-reset   Reset binfmt/QEMU if multi-arch builds core-dump\n#\n# Defaults push to the registry. For a local single-platform build:\n#   make cu128 OUTPUT=--load PLATFORMS_MODERN=linux/amd64\n\nIMAGE            ?= vastai/test\nTAG_PREFIX       ?= self-test-cuda-\nBUILDER          ?= multi-arch-builder\nOUTPUT           ?= --push\n\nPLATFORMS_LEGACY ?= linux/amd64\nPLATFORMS_MODERN ?= linux/amd64,linux/arm64\n\n.PHONY: all cu118 cu128 cu130 cu133 buildx-setup qemu-reset\n\nall: cu118 cu128 cu130 cu133\n\nbuildx-setup:\n\t@docker buildx inspect $(BUILDER) >/dev/null 2>&1 || \\\n\t\tdocker buildx create --name $(BUILDER) --driver docker-container --bootstrap\n\nqemu-reset:\n\tdocker run --privileged --rm tonistiigi/binfmt:latest --uninstall 'qemu-*'\n\tdocker run --privileged --rm tonistiigi/binfmt:qemu-v6.2.0 --install all\n\ncu118: buildx-setup\n\tdocker buildx build \\\n\t\t--builder $(BUILDER) \\\n\t\t--platform $(PLATFORMS_LEGACY) \\\n\t\t--progress=plain \\\n\t\t--build-arg BASE_IMAGE=ubuntu:22.04 \\\n\t\t--build-arg CUDA_REPO_DISTRO=ubuntu2204 \\\n\t\t--build-arg CUDA_VERSION=11.8 \\\n\t\t-t $(IMAGE):$(TAG_PREFIX)11.8 \\\n\t\t$(OUTPUT) \\\n\t\t.\n\ncu128: buildx-setup\n\tdocker buildx build \\\n\t\t--builder $(BUILDER) \\\n\t\t--platform $(PLATFORMS_MODERN) \\\n\t\t--progress=plain \\\n\t\t--build-arg CUDA_VERSION=12.8 \\\n\t\t-t $(IMAGE):$(TAG_PREFIX)12.8 \\\n\t\t$(OUTPUT) \\"
+    }
+  ],
+  "scope": "Pinned source declaration; not a runtime observation or backend enforcement proof."
+}

@@ -1,0 +1,176 @@
+> ## Documentation Index
+> Fetch the complete documentation index at: https://docs.vast.ai/llms.txt
+> Use this file to discover all available pages before exploring further.
+
+# Host Payouts
+
+This guide explains how Vast.ai host payouts work, when invoices are generated, when payments are sent, and what to do if you experience a payout issue.
+
+## Available Payout Methods
+
+Vast.ai currently supports payouts through:
+
+* Wise
+* PayPal
+* Stripe
+
+Hosts are responsible for ensuring they can receive business-to-business (B2B) payments through their selected payout provider in their country or region.
+
+Before selecting a payout method, verify that:
+
+* The service is available in your country.
+* Your account is fully verified.
+* Your account can receive business payments.
+* Any required identity, tax, or business verification has been completed.
+* There are no restrictions, limitations, or compliance holds on your account.
+
+Please refer to your payout provider's documentation for regional availability, account requirements, and verification requirements.
+
+**Note:** Vast.ai is not responsible for delays, restrictions, compliance reviews, account limitations, or rejected payments imposed by Wise, PayPal, Stripe, or any other financial institution.
+
+***
+
+## Payout Schedule
+
+### Minimum Payout Threshold
+
+Your account must accumulate at least **\$20 USD** before an invoice can be generated.
+
+Balances below \$20 USD will automatically roll forward until the minimum threshold is reached.
+
+### Invoice Generation
+
+Invoices are generated weekly on **Fridays**.
+
+To generate an invoice:
+
+* You must have a valid payout method connected to your Vast.ai account.
+* Your account balance must meet the \$20 minimum payout threshold.
+
+### Payment Timeline
+
+It typically takes up to **two weeks to receive your first payout**.
+
+Example:
+
+* Week 1: Earnings accrue.
+* Friday: Invoice is generated and marked as **Pending**.
+* Week 2 Friday: Payment is submitted to your selected payout provider.
+* Funds are then processed by Wise, PayPal, or Stripe and may take additional time to appear in your account depending on the provider and your region.
+
+### Invoice Statuses
+
+#### Pending
+
+A Pending invoice has been generated and is scheduled for payment during the next payout cycle.
+
+Invoices generated on Friday are generally scheduled to be paid on the following Friday.
+
+#### Paid
+
+An invoice is marked as Paid once Vast.ai has submitted the payout to your selected payout provider.
+
+The Paid status reflects the status of the payout within Vast.ai's billing system only. It does not indicate whether the funds have completed processing within Wise, PayPal, or Stripe.
+
+After a payout has been submitted, your payout provider may require additional processing time before funds appear in your account.
+
+***
+
+# Frequently Asked Questions
+
+## When will I get paid?
+
+It typically takes up to two weeks to receive your first payout.
+
+Invoices are generated weekly on Fridays. Once an invoice is generated, it enters a pending state and is scheduled for payment during the following Friday payout cycle.
+
+After the payout is submitted, your payout provider may require additional processing time before funds appear in your account.
+
+## Why does my invoice show "Paid" when I haven't received the funds yet?
+
+The Paid status indicates that Vast.ai has submitted the payout to your selected payout provider.
+
+The Paid status only reflects the payout status within Vast.ai's billing system. It does not indicate whether the funds have completed processing within Wise, PayPal, or Stripe.
+
+Before contacting support, please verify:
+
+* Your payout account is active and fully verified.
+* Your payout provider is not requesting additional documentation.
+* There are no account limitations, restrictions, compliance reviews, or holds.
+* Your account can receive business payments for services provided.
+
+If you have confirmed your payout account is in good standing and still have not received your funds after a reasonable processing period, please contact support for further review.
+
+## I see my invoice is marked as Pending. What does this mean?
+
+A Pending invoice has been generated but has not yet entered the payment phase.
+
+Invoices are generated every Friday and are generally scheduled to be paid on the following Friday.
+
+Once Vast.ai submits the payout to your selected payout provider, the invoice status will change to Paid.
+
+## Can Vast.ai send my payout via direct bank transfer (ACH, SWIFT, wire transfer, etc.)?
+
+No.
+
+Vast.ai only supports payouts through:
+
+* Wise
+* PayPal
+* Stripe
+
+Direct bank transfers, ACH payments, wire transfers, and SWIFT payments are not available.
+
+## My account is not generating invoices.
+
+Invoices are only generated when:
+
+* A payout method is connected to your Vast.ai account.
+* Your balance has reached the \$20 minimum payout threshold.
+
+If either requirement is not met, an invoice will not be generated.
+
+Please verify that your payout method has been connected correctly in your account settings.
+
+## Can I generate an invoice manually?
+
+### Customizing Invoice Information
+
+Hosts may customize the information that appears on invoices by navigating to:
+
+`Settings → Invoice Information`
+
+From this page, you can add or update:
+
+* Company name
+* Business address
+* Tax identification information
+* Other billing details you would like displayed on invoices
+
+### Downloading Invoices and Payout Records
+
+To view and download invoices, navigate to:
+
+`Earnings → Payout History`
+
+From the Payout History section, you can:
+
+* View historical payouts
+* Filter records by date range
+* Download payout records in CSV format
+* Download payout records in PDF format
+
+## How much can I make hosting on Vast.ai?
+
+Host earnings depend on several factors, including:
+
+* Hardware specifications
+* Pricing
+* Uptime and reliability
+* Geographic location
+* Current customer demand
+
+To understand current market pricing and utilization trends, visit the [Market Stats](https://cloud.vast.ai/host/market/) page.
+You must be signed in as a host with at least one registered machine to access this page. Alternatively, check out [GPU market prices](https://vast.ai/pricing) or the [Host Earnings Calculator](https://vast.ai/hosting/calculator).
+
+Market conditions change over time, so earnings cannot be guaranteed.

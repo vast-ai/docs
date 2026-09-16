@@ -1,0 +1,91 @@
+{
+  "record_type": "INDEPENDENT_CREDENTIAL_STORAGE_PROPOSAL_REVIEW",
+  "reviewed_at_utc": "2026-09-15T16:10:47.637722+00:00",
+  "result": "AMENDMENT_REQUIRED",
+  "reviewed_claim_ids": [
+    "MCL-9ad33b25fd88c5cb"
+  ],
+  "accepted_as_is": [],
+  "needs_amendment": [
+    "MCL-9ad33b25fd88c5cb"
+  ],
+  "input_hashes": {
+    "inventory.json": "80453f380d96b3f785710a0e92fc0249b88b742e93ee285460972ad52651bd14",
+    "decisions.json": "3ff9e2ee738e79eba616438dd924cf9fbb060ca8fb74e146bc044db52b48d748",
+    "sources.json": "ed3eeadbeca0e81089ac1313b0a2ad56d1d28a2d19ffb9761a19c5b398e1ba2b",
+    "checks.json": "27d3b86aedb93cbe0d865e97e871944b34e5e1267b4df7304a00d3f32d3337ab"
+  },
+  "checks": {
+    "full_baseline_claim_and_literal_match": true,
+    "baseline_commit": "0ceaea76003ef7f2e0307b2fcf633475ef876f07",
+    "baseline_model_sha256": "fdc4acb9f3bef3b6d0a3e55b9b5a51c5c0f9c94a04c19bf152b894bbcace41f5",
+    "decision_selectors_exact": 8,
+    "source_alias_hashes_exact": 8,
+    "parent_hashes_exact": 11,
+    "excerpt_parent_selectors_exact": 8,
+    "all_four_installed_source_files_byte_equal_to_retained_manifest": true,
+    "fenced_replacement_equals_tested_script": true,
+    "harness_guard_literal_equals_retained_sitecustomize": true,
+    "five_recorded_cases_and_harness_inspected_without_rerunning": true
+  },
+  "findings": [
+    {
+      "id": "CREDENTIAL-R1",
+      "severity": "must_correct",
+      "claim_id": "MCL-9ad33b25fd88c5cb",
+      "title": "Match the CLI\u2019s XDG path selection before hardening",
+      "evidence": [
+        {
+          "path": "proposed-command.sh",
+          "text_pointer": "/lines/5-6"
+        },
+        {
+          "path": "primary/xdg/__init__.py",
+          "text_pointer": "/lines/61-86"
+        },
+        {
+          "path": "primary/xdg/__init__.py",
+          "text_pointer": "/lines/132-134"
+        }
+      ],
+      "finding": "The shell accepts any nonempty XDG_CONFIG_HOME, but the installed xdg helper ignores relative paths and uses the default. With relative XDG_CONFIG_HOME and an existing default0644 key, the recipe can harden a different file while the actual CLI overwrites the unsafe default file. Umask alone does not change an existing file mode.",
+      "requested_change": "Mirror the helper\u2019s absolute-path/default selection, or reject relative XDG_CONFIG_HOME before any mutation; retain an exact source binding. Add a focused synthetic relative-XDG existing-default0644 case to the revised recipe check.",
+      "scope": "Source-derived discrepancy; no new CLI execution was needed to establish it."
+    },
+    {
+      "id": "CREDENTIAL-R2",
+      "severity": "must_correct",
+      "claim_id": "MCL-9ad33b25fd88c5cb",
+      "title": "Avoid changing credential selection when the prompt is cancelled",
+      "evidence": [
+        {
+          "path": "proposed-command.sh",
+          "text_pointer": "/lines/12-15"
+        },
+        {
+          "path": "primary/vastai/cli/util.py",
+          "text_pointer": "/lines/177-184"
+        },
+        {
+          "path": "primary/vastai/cli/main.py",
+          "text_pointer": "/lines/173-179"
+        }
+      ],
+      "finding": "The recipe creates an empty current key file before prompting. When only a legacy key exists, blank input or EOF exits but leaves the empty new file: later CLI startup skips legacy migration and selects that empty current file. The existing blank-input fixture covers an already existing current file, so it does not exercise this cancellation regression.",
+      "requested_change": "Read and require nonempty input before creating/modifying filesystem paths; keep restrictive directory/file modes before the CLI write. Add focused blank and EOF legacy-only cases that retain existing credential selection/content.",
+      "scope": "Practical cancellation side effect established from exact ordering and retained migration/key-resolution code; no Host/account operation."
+    }
+  ],
+  "accepted_scope": [
+    "The five recorded macOS synthetic runs test actual installed CLI1.5.6 and the exact shell recipe. The observation hook checks modes before delegating to the unchanged CLI open, rather than implementing the fix.",
+    "The restrictive-mode workaround, regular-file/symlink check, silent prompt and subshell are otherwise proportionate to the original0644 failure.",
+    "The retained limits explicitly distinguish file modes from secret process arguments, no real authentication, no new Linux/Windows runtime, and no corrected CLI release.",
+    "Original CLI failure and procedure evidence must remain historical after an accepted replacement; the proposal does not erase them."
+  ],
+  "root_response": "Root accepted both narrow findings and will retain this packet unchanged, preparing a sibling revision02 and justified focused retests.",
+  "review_limits": [
+    "Read-only source, hashes, frozen baseline and retained fixture inspection.",
+    "No credential, CLI recipe, Host, network, key storage or paid operation was executed by this independent review.",
+    "No customer docs, model, source registry or original proposal file was changed."
+  ]
+}

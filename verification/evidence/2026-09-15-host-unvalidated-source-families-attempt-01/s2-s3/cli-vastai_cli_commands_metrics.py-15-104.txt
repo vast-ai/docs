@@ -1,0 +1,90 @@
+_VERIFIED_MAP = {"true": "yes", "false": "no", "all": "all"}
+_HOSTING_MAP = {"true": "secure_cloud", "false": "community", "all": "all"}
+
+_NEEDS_MACHINE_MSG = "No metrics available. This endpoint is for hosts with active machines."
+
+
+_GPU_CURRENT_FIELDS = (
+    ("gpu_name",          "GPU",      "{}",     None, True),
+    ("total",             "Total",    "{}",     None, False),
+    ("available",         "Avail",    "{}",     None, False),
+    ("usage",             "Usage%",   "{:.1f}", None, False),
+    ("rented_verified",   "Rnt/Ver",  "{}",     None, False),
+    ("avail_verified",    "Avl/Ver",  "{}",     None, False),
+    ("rented_unverified", "Rnt/Unv",  "{}",     None, False),
+    ("avail_unverified",  "Avl/Unv",  "{}",     None, False),
+    ("dlperf",            "DLPerf",   "{:.1f}", None, False),
+    ("tflops",            "TFLOPS",   "{:.1f}", None, False),
+    ("tflops_per_dollar", "TFLOPS/$", "{:.1f}", None, False),
+    ("price_p10",         "P10 $/hr", "{:.4f}", None, False),
+    ("price_median",      "Med $/hr", "{:.4f}", None, False),
+    ("price_p90",         "P90 $/hr", "{:.4f}", None, False),
+)
+
+
+_GPU_TRENDS_FIELDS = (
+    ("date",              "Date",     "{}",     None, True),
+    ("rented_verified",   "Rnt/Ver",  "{}",     None, False),
+    ("avail_verified",    "Avl/Ver",  "{}",     None, False),
+    ("rented_unverified", "Rnt/Unv",  "{}",     None, False),
+    ("avail_unverified",  "Avl/Unv",  "{}",     None, False),
+    ("total",             "Total",    "{}",     None, False),
+    ("rented_p10",        "R.p10",    "{:.4f}", None, False),
+    ("rented_median",     "R.med",    "{:.4f}", None, False),
+    ("rented_p90",        "R.p90",    "{:.4f}", None, False),
+    ("avail_p10",         "A.p10",    "{:.4f}", None, False),
+    ("avail_median",      "A.med",    "{:.4f}", None, False),
+    ("avail_p90",         "A.p90",    "{:.4f}", None, False),
+)
+
+
+_GPU_LOCATION_FIELDS = (
+    ("gpu_name",     "GPU",       "{}",     None, True),
+    ("city",         "City",      "{}",     None, True),
+    ("country_code", "CC",        "{}",     None, True),
+    ("num_gpus",     "GPUs",      "{}",     None, False),
+    ("rented",       "Rented",    "{}",     None, False),
+    ("verified",     "Verified",  "{}",     None, False),
+    ("latitude",     "Lat",       "{:.4f}", None, False),
+    ("longitude",    "Lon",       "{:.4f}", None, False),
+)
+
+
+@parser.command(
+    argument("--verified", type=str, choices=["true", "false", "all"], default="all",
+             help="Filter GPUs by verification status"),
+    argument("--datacenter", type=str, choices=["true", "false", "all"], default="all",
+             help="Filter GPUs by datacenter hosting type"),
+    argument("--num-gpus", type=str, choices=["all", "1", "2", "4", "8"], default="all",
+             help="Filter by machine GPU-count bucket (1x, 2x, 4x, 8x)"),
+    usage="vastai metrics gpu [OPTIONS]",
+    help="[Host] Get current GPU market metrics",
+    epilog=deindent("""
+        Get current GPU metrics with counts, usage, performance, and pricing.
+        For historical metrics, see the `metrics gpu-trends` command.
+        Requires host or admin access.
+
+        Examples:
+            vastai metrics gpu
+            vastai metrics gpu --verified true --datacenter true
+            vastai metrics gpu --num-gpus 8
+            vastai metrics gpu --raw
+    """),
+)
+def metrics__gpu(args):
+    """Get current GPU metrics."""
+    client = get_client(args)
+    resp = metrics_api.gpu_current(
+        client,
+        verified=_VERIFIED_MAP[args.verified],
+        hosting_type=_HOSTING_MAP[args.datacenter],
+        num_gpus=args.num_gpus,
+    )
+    if resp.get("needs_machine"):
+        print(_NEEDS_MACHINE_MSG)
+        return
+    if args.raw:
+        print(json.dumps(resp, indent=1))
+        return
+    display_table(resp.get("gpus", []), _GPU_CURRENT_FIELDS)
+

@@ -1,0 +1,21 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
+import {execFileSync} from 'node:child_process';
+const dir='verification/evidence/2026-09-14-payout-terms-correction-attempt-01',name=process.argv[2];
+if(!/^(before|after)-faq-[0-9]+$/.test(name))throw Error('Unique attempt required');
+const out=dir+'/'+name+'.json';if(fs.existsSync(out))throw Error('Refuse overwrite');
+const session='payout-faq-review',started_at=new Date().toISOString();
+const browser=(...args)=>execFileSync('agent-browser',['--session',session,...args],{encoding:'utf8',maxBuffer:24*1024*1024,timeout:45000});
+const evaluate=js=>JSON.parse(browser('eval','-b',Buffer.from(js).toString('base64')));
+const id='MCL-9826b26393329d27';let live,offline,error=null;
+try {
+ browser('open','http://127.0.0.1:4000/host/payment#can-vast-send-direct-bank-transfers');
+ browser('wait','--fn','!!document.querySelector("#__vast_review_host__")?.shadowRoot.querySelector("#current-section-filter")');
+ live=evaluate(`(async()=>{const id='${id}',r=await fetch('/__review__/api/context?path=%2Fhost%2Fpayment'),ctx=await r.json(),c=ctx.currentReview.page.claims.find(c=>c.id===id),shadow=document.querySelector('#__vast_review_host__').shadowRoot;if(!shadow.querySelector('#panel').classList.contains('open'))shadow.querySelector('#pill').click();const card=shadow.querySelector('[data-current-claim="'+id+'"]');card.querySelector('[data-show-current-claim]').click();const highlighted=[...(CSS.highlights.get('vast-review-claim')||[])].map(r=>r.toString()).join(' '),links=[...card.querySelectorAll('a[href*="basis="]')],proof=[];for(const a of links){const res=await fetch(a.href),text=await res.text();proof.push({status:res.status,faq:text.includes('SWIFT payments are not available'),scope:/published guidance|published payout|publication description/i.test(text),source:text.includes('docs.vast.ai/host/payment')});}return {claim:{id:c.id,status:c.status,text:c.text,reader:c.readerCopy},highlighted,proof,checks:{publishedRestriction:c.text.includes('SWIFT')&&/unavailable|not available/.test(c.text),attributed:/published.*guidance/i.test(c.text),shown:highlighted.includes('SWIFT'),scopedProof:proof.some(p=>p.status===200&&p.faq&&p.scope&&p.source),oldAnchor:!!document.getElementById('direct-bank-transfer'),replacementAlias:!!document.getElementById('how-do-i-set-up-payouts')}}})()`);
+ browser('open',pathToFileURL(path.resolve('verification/host-docs-review.html')).href);
+ browser('wait','--fn','!!document.querySelector("#search")');
+ offline=evaluate(`(()=>{const id='${id}';document.getElementById('clear').click();document.getElementById('status').value='ALL';const search=document.getElementById('search');search.value=id;search.dispatchEvent(new Event('input'));const card=document.querySelector('.claim'),proof=[];for(const b of card.querySelectorAll('[data-basis]')){b.click();const text=document.getElementById('viewer-body').textContent;proof.push({open:document.getElementById('viewer').open,faq:text.includes('SWIFT payments are not available'),scope:/published guidance|published payout|publication description/i.test(text),fingerprint:text.includes('SHA-256')});document.getElementById('close-viewer').click();}card.querySelector('[data-passage]').click();const passage=document.querySelector('.source-line.highlight')?.textContent||'';return {proof,passage,checks:{passage:passage.includes('SWIFT')&&/published.*guidance/i.test(passage),scopedProof:proof.some(p=>p.open&&p.faq&&p.scope&&p.fingerprint),noRemoteRequests:performance.getEntriesByType('resource').length===0}}})()`);
+}catch(e){error=String(e.message).slice(0,1500);}
+const result={started_at,finished_at:new Date().toISOString(),result:!error&&[...Object.values(live?.checks||{}),...Object.values(offline?.checks||{})].every(Boolean)?'PASS':'FAIL',method:'Exact FAQ passage, retained published-source proof controls and legacy anchors in localhost and offline reviewers; no payout action.',live,offline,error};
+fs.writeFileSync(out,JSON.stringify(result,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({artifact:out,result:result.result,live:live?.checks,offline:offline?.checks,error}));process.exitCode=result.result==='PASS'?0:1;

@@ -1,0 +1,676 @@
+"""
+CLI utility functions and constants for the Vast.ai CLI.
+
+Extracted from vast.py - contains version checking, config directory setup,
+constants, and various helper functions used by CLI commands.
+"""
+
+from __future__ import unicode_literals, print_function
+
+import re
+import json
+import sys
+import argparse
+import os
+import time
+import math
+import subprocess
+import shutil
+import requests
+import getpass
+from pathlib import Path
+from datetime import date, datetime, timedelta, timezone
+from concurrent.futures import ThreadPoolExecutor
+from typing import Dict, List, Optional
+
+# Re-export string_to_unix_epoch so CLI command modules can import from here
+from vastai.api.query import string_to_unix_epoch  # noqa: F401
+from vastai.utils import VERSION, parse_version, parse_env, smart_split  # noqa: F401
+
+
+# Server URL default — canonical definition lives in api/client.py
+from vastai.api.client import server_url_default  # noqa: E402, F401
+
+# Sentinel for API key argument default (to distinguish "not provided" from None)
+api_key_guard = object()
+
+
+# ---------------------------------------------------------------------------
+# App constants
+# ---------------------------------------------------------------------------
+
+APP_NAME = "vastai"
+
+# Define emoji support and fallbacks
+_HAS_EMOJI = sys.stdout.encoding and 'utf' in sys.stdout.encoding.lower()
+SUCCESS = "\u2705" if _HAS_EMOJI else "[OK]"
+WARN    = "\u26a0\ufe0f" if _HAS_EMOJI else "[!]"
+FAIL    = "\u274c" if _HAS_EMOJI else "[X]"
+INFO    = "\u2139\ufe0f" if _HAS_EMOJI else "[i]"
+
+
+# ---------------------------------------------------------------------------
+# Config directory setup
+# ---------------------------------------------------------------------------
+
+try:
+    # Although xdg-base-dirs is the newer name, there's
+    # python compatibility issues with dependencies that
+    # can be unresolvable using things like python 3.9
+    # So we actually use the older name, thus older
+    # version for now. This is as of now (2024/11/15)
+    # the safer option. -cjm
+    import xdg
+
+    DIRS = {
+        'config': xdg.xdg_config_home(),
+        'temp': xdg.xdg_cache_home(),
+        'state': xdg.xdg_state_home(),
+    }
+    # Not part of DIRS: DIRS entries are this CLI's own runtime data and get
+    # auto-created below regardless of install method. DATA_HOME is where a
+    # *managed install* lives (selfupdate.install_root()) — a pip install
+    # must never side-effect that directory into existence just by running.
+    DATA_HOME = xdg.xdg_data_home()
+
+except Exception:
+    # Reasonable defaults.
+    from pathlib import Path
+    _home = str(Path.home())
+    DIRS = {
+        'config': os.path.join(_home, '.config'),
+        'temp': os.path.join(_home, '.cache'),
+        'state': os.path.join(_home, '.local', 'state'),
+    }
+    DATA_HOME = os.path.join(_home, '.local', 'share')
+
+for key in DIRS.keys():
+    DIRS[key] = path = os.path.join(DIRS[key], APP_NAME)
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+CACHE_FILE = os.path.join(DIRS['temp'], "gpu_names_cache.json")
+GPU_TYPES_CACHE_FILE = os.path.join(DIRS['temp'], "gpu_types_cache.json")
+CACHE_DURATION = timedelta(hours=24)
+
+
+def _get_gpu_names() -> Optional[List[str]]:
+    """Returns a set of GPU names available on Vast.ai, with results cached for 24 hours."""
+
+    def is_cache_valid() -> bool:
+        """Checks if the cache file exists and is less than 24 hours old."""
+        if not os.path.exists(CACHE_FILE):
+            return False
+        cache_age = datetime.now() - datetime.fromtimestamp(os.path.getmtime(CACHE_FILE))
+        return cache_age < CACHE_DURATION
+
+    if is_cache_valid():
+        try:
+            with open(CACHE_FILE, "r") as file:
+                gpu_names = json.load(file)
+        except (OSError, json.JSONDecodeError):
+            gpu_names = None
+    else:
+        endpoint = "/api/v0/gpu_names/unique/"
+        url = f"{server_url_default}{endpoint}"
+        try:
+            r = requests.get(url, headers={})
+            r.raise_for_status()
+            gpu_names = r.json()
+        except (requests.exceptions.RequestException, ValueError):
+            return None
+        try:
+            with open(CACHE_FILE, "w") as file:
+                json.dump(gpu_names, file)
+        except OSError:
+            pass
+
+    try:
+        return [
+            name.replace(" ", "_").replace("-", "_") for name in gpu_names['gpu_names']
+        ]
+    except (TypeError, KeyError):
+        return None
+
+
+def _get_gpu_types() -> Optional[List[dict]]:
+    """Returns the GPU type catalog from /api/v0/gpu_types/, cached for 24 hours.
+
+    Source of truth for canonical GPU names and per-card VRAM. Returns None on
+    any error so callers fall back to the hardcoded constants (never empty).
+    """
+
+    def is_cache_valid() -> bool:
+        """Checks if the cache file exists and is less than 24 hours old."""
+        if not os.path.exists(GPU_TYPES_CACHE_FILE):
+            return False
+        cache_age = datetime.now() - datetime.fromtimestamp(os.path.getmtime(GPU_TYPES_CACHE_FILE))
+        return cache_age < CACHE_DURATION
+
+    if is_cache_valid():
+        try:
+            with open(GPU_TYPES_CACHE_FILE, "r") as file:
+                payload = json.load(file)
+        except (OSError, json.JSONDecodeError):
+            payload = None
+    else:
+        endpoint = "/api/v0/gpu_types/"
+        url = f"{server_url_default}{endpoint}"
+        try:
+            r = requests.get(url, headers={})
+            r.raise_for_status()
+            payload = r.json()
+        except (requests.exceptions.RequestException, ValueError):
+            return None
+        try:
+            with open(GPU_TYPES_CACHE_FILE, "w") as file:
+                json.dump(payload, file)
+        except OSError:
+            pass
+
+    try:
+        return payload['gpu_types']
+    except (TypeError, KeyError):
+        return None
+
+
+APIKEY_FILE = os.path.join(DIRS['config'], "vast_api_key")
+APIKEY_FILE_HOME = os.path.expanduser("~/.vast_api_key")  # Legacy
+TFAKEY_FILE = os.path.join(DIRS['config'], "vast_tfa_key")
+
+if not os.path.exists(APIKEY_FILE) and os.path.exists(APIKEY_FILE_HOME):
+    #print(f'copying key from {APIKEY_FILE_HOME} -> {APIKEY_FILE}')
+    shutil.copyfile(APIKEY_FILE_HOME, APIKEY_FILE)
+
+
+def format_key_suffix(k):
+    """Format the last 4 chars of an API key for display, e.g. '...a3f9'."""
+    if k and len(k) >= 4:
+        return f"...{k[-4:]}"
+    return "(empty)"
+
+
+# ---------------------------------------------------------------------------
+# Simple utility class
+# ---------------------------------------------------------------------------
+
+class Object(object):
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Validation helpers
+# ---------------------------------------------------------------------------
+
+def validate_seconds(value):
+    """Validate that the input value is a valid number for seconds between yesterday and Jan 1, 2100."""
+    try:
+        val = int(value)
+
+        # Calculate min_seconds as the start of yesterday in seconds
+        yesterday = datetime.now() - timedelta(days=1)
+        min_seconds = int(yesterday.timestamp())
+
+        # Calculate max_seconds for Jan 1st, 2100 in seconds
+        max_date = datetime(2100, 1, 1, 0, 0, 0)
+        max_seconds = int(max_date.timestamp())
+
+        if not (min_seconds <= val <= max_seconds):
+            raise argparse.ArgumentTypeError(f"{value} is not a valid second timestamp.")
+        return val
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{value} is not a valid integer.")
+
+
+# ---------------------------------------------------------------------------
+# VRL (Vast Resource Locator) parsing
+# ---------------------------------------------------------------------------
+
+class VRLException(Exception):
+    pass
+
+def parse_vast_url(url_str):
+    """
+    Breaks up a vast-style url in the form instance_id:path and does
+    some basic sanity type-checking.
+
+    :param url_str:
+    :return:
+    """
+
+    instance_id = None
+    path = url_str
+    #print(f'url_str: {url_str}')
+    if (":" in url_str):
+        url_parts = url_str.split(":", 2)
+        if len(url_parts) == 2:
+            (instance_id, path) = url_parts
+        else:
+            raise VRLException("Invalid VRL (Vast resource locator).")
+    else:
+        try:
+            instance_id = int(path)
+            path = "/"
+        except:
+            pass
+
+    valid_unix_path_regex = re.compile('^(/)?([^/\0]+(/)?)+$')
+    # Got this regex from https://stackoverflow.com/questions/537772/what-is-the-most-correct-regular-expression-for-a-unix-file-path
+    if (path != "/") and (valid_unix_path_regex.match(path) is None):
+        raise VRLException(f"Path component: {path} of VRL is not a valid Unix style path.")
+
+    #print(f'instance_id: {instance_id}')
+    #print(f'path: {path}')
+    return (instance_id, path)
+
+
+# ---------------------------------------------------------------------------
+# SSH key helpers
+# ---------------------------------------------------------------------------
+
+def get_ssh_key(argstr):
+    # Import deindent from display module (avoids circular imports)
+    from vastai.cli.display import deindent
+
+    ssh_key = argstr
+    # Including a path to a public key is pretty reasonable.
+    if os.path.exists(argstr):
+        with open(argstr) as f:
+            ssh_key = f.read()
+
+    if "PRIVATE KEY" in ssh_key:
+        raise ValueError(deindent("""
+            \U0001f434 Woah, hold on there, partner!
+
+            That's a *private* SSH key.  You need to give the *public*
+            one. It usually starts with 'ssh-rsa', is on a single line,
+            has around 200 or so "base64" characters and ends with
+            some-user@some-where. "Generate public ssh key" would be
+            a good search term if you don't know how to do this.
+        """, add_separator=False))
+
+    if not ssh_key.lower().startswith('ssh'):
+        raise ValueError(deindent("""
+            Are you sure that's an SSH public key?
+
+            Usually it starts with the stanza 'ssh-(keytype)'
+            where the keytype can be things such as rsa, ed25519-sk,
+            or dsa. What you passed me was:
+
+            {}
+
+            And welp, that just don't look right.
+        """.format(ssh_key), add_separator=False))
+
+    return ssh_key
+
+
+def generate_ssh_key(auto_yes=False):
+    """
+    Generate a new SSH key pair using ssh-keygen and return the public key content.
+
+    Args:
+        auto_yes (bool): If True, automatically answer yes to prompts
+
+    Returns:
+        str: The content of the generated public key
+
+    Raises:
+        SystemExit: If ssh-keygen is not available or key generation fails
+    """
+
+    print("No SSH key provided. Generating a new SSH key pair and adding public key to account...")
+
+    # Define paths
+    ssh_dir = Path.home() / '.ssh'
+    private_key_path = ssh_dir / 'id_ed25519'
+    public_key_path = ssh_dir / 'id_ed25519.pub'
+
+    # Create .ssh directory if it doesn't exist
+    try:
+        ssh_dir.mkdir(mode=0o700, exist_ok=True)
+    except OSError as e:
+        print(f"Error creating .ssh directory: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    # Check if any part of the key pair already exists and backup if needed
+    if private_key_path.exists() or public_key_path.exists():
+        print(f"An SSH key pair 'id_ed25519' already exists in {ssh_dir}")
+        if auto_yes:
+            print("Auto-answering yes to backup existing key pair.")
+            response = 'y'
+        else:
+            response = input("Would you like to generate a new key pair and backup your existing id_ed25519 key pair. [y/N]: ").lower()
+        if response not in ['y', 'yes']:
+            print("Aborted. No new key generated.")
+            sys.exit(0)
+
+        # Generate timestamp for backup
+        timestamp = int(time.time())
+        backup_private_path = ssh_dir / f'id_ed25519.backup_{timestamp}'
+        backup_public_path = ssh_dir / f'id_ed25519.pub.backup_{timestamp}'
+
+        try:
+            # Backup existing private key if it exists
+            if private_key_path.exists():
+                private_key_path.rename(backup_private_path)
+                print(f"Backed up existing private key to: {backup_private_path}")
+
+            # Backup existing public key if it exists
+            if public_key_path.exists():
+                public_key_path.rename(backup_public_path)
+                print(f"Backed up existing public key to: {backup_public_path}")
+
+        except OSError as e:
+            print(f"Error backing up existing SSH keys: {e}", file=sys.stderr)
+            sys.exit(1)
+
+        print("Generating new SSH key pair and adding public key to account...")
+
+    # Check if ssh-keygen is available
+    try:
+        subprocess.run(['ssh-keygen', '--help'], capture_output=True, check=False)
+    except FileNotFoundError:
+        print("Error: ssh-keygen not found. Please install OpenSSH client tools.", file=sys.stderr)
+        sys.exit(1)
+
+    # Generate the SSH key pair
+    try:
+        cmd = [
+            'ssh-keygen',
+            '-t', 'ed25519',       # Ed25519 key type
+            '-f', str(private_key_path),  # Output file path
+            '-N', '',              # Empty passphrase
+            '-C', f'{os.getenv("USER") or os.getenv("USERNAME", "user")}-vast.ai'  # User
+        ]
+
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            input='y\n',           # Automatically answer 'yes' to overwrite prompts
+            check=True
+        )
+
+    except subprocess.CalledProcessError as e:
+        print(f"Error generating SSH key: {e}", file=sys.stderr)
+        if e.stderr:
+            print(f"ssh-keygen error: {e.stderr}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Unexpected error during key generation: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    # Set proper permissions for the private key
+    try:
+        private_key_path.chmod(0o600)  # Read/write for owner only
+    except OSError as e:
+        print(f"Warning: Could not set permissions for private key: {e}", file=sys.stderr)
+
+    # Read and return the public key content
+    try:
+        with open(public_key_path, 'r') as f:
+            public_key_content = f.read().strip()
+
+        return public_key_content
+
+    except IOError as e:
+        print(f"Error reading generated public key: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
+# List / threading helpers
+# ---------------------------------------------------------------------------
+
+def split_list(lst, k):
+    """
+    Splits a list into sublists of maximum size k.
+    """
+    return [lst[i:i + k] for i in range(0, len(lst), k)]
+
+
+def exec_with_threads(f, args, nt=16, max_retries=5):
+    def worker(sub_args):
+        for arg in sub_args:
+            retries = 0
+            while retries <= max_retries:
+                try:
+                    result = None
+                    if isinstance(arg, tuple):
+                        result = f(*arg)
+                    else:
+                        result = f(arg)
+                    if result:  # Assuming a truthy return value means success
+                        break
+                except Exception as e:
+                    print(str(e))
+                    pass
+                retries += 1
+                stime = 0.25 * 1.3 ** retries
+                print(f"retrying in {stime}s")
+                time.sleep(stime)  # Exponential backoff
+
+    # Split args into nt sublists
+    args_per_thread = math.ceil(len(args) / nt)
+    sublists = [args[i:i + args_per_thread] for i in range(0, len(args), args_per_thread)]
+
+    with ThreadPoolExecutor(max_workers=nt) as executor:
+        executor.map(worker, sublists)
+
+
+# ---------------------------------------------------------------------------
+# Date / scheduling helpers
+# ---------------------------------------------------------------------------
+
+def default_start_date():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+def default_end_date():
+    return (datetime.now(timezone.utc) + timedelta(days=7)).strftime("%Y-%m-%d")
+
+def convert_timestamp_to_date(unix_timestamp):
+    utc_datetime = datetime.fromtimestamp(unix_timestamp, tz=timezone.utc)
+    return utc_datetime.strftime("%Y-%m-%d")
+
+def parse_day_cron_style(value):
+    """
+    Accepts an integer string 0-6 or '*' to indicate 'Every day'.
+    Returns 0-6 as int, or None if '*'.
+    """
+    val = str(value).strip()
+    if val == "*":
+        return None
+    try:
+        day = int(val)
+        if 0 <= day <= 6:
+            return day
+    except ValueError:
+        pass
+    raise argparse.ArgumentTypeError("Day must be 0-6 (0=Sunday) or '*' for every day.")
+
+def parse_hour_cron_style(value):
+    """
+    Accepts an integer string 0-23 or '*' to indicate 'Every hour'.
+    Returns 0-23 as int, or None if '*'.
+    """
+    val = str(value).strip()
+    if val == "*":
+        return None
+    try:
+        hour = int(val)
+        if 0 <= hour <= 23:
+            return hour
+    except ValueError:
+        pass
+    raise argparse.ArgumentTypeError("Hour must be 0-23 or '*' for every hour.")
+
+def convert_dates_to_timestamps(args):
+    end_timestamp = time.time()
+    start_timestamp = time.time() - (24 * 60 * 60)
+
+    from dateutil import parser as dateutil_parser
+
+    if args.end_date:
+        try:
+            end_timestamp = _parse_date_to_utc_timestamp(args.end_date, dateutil_parser)
+        except ValueError as e:
+            print(f"Warning: Invalid end date format! Ignoring end date! \n {str(e)}")
+
+    if args.start_date:
+        try:
+            start_timestamp = _parse_date_to_utc_timestamp(args.start_date, dateutil_parser)
+        except ValueError as e:
+            print(f"Warning: Invalid start date format! Ignoring start date! \n {str(e)}")
+
+    return start_timestamp, end_timestamp
+
+
+def _parse_date_to_utc_timestamp(value, dateutil_parser):
+    """Parse a user-supplied date string into a UNIX timestamp.
+
+    Naive inputs (e.g. 'YYYY-MM-DD') are interpreted as UTC so that filter
+    windows don't shift with the caller's local timezone. Aware inputs keep
+    their declared offset.
+    """
+    dt = dateutil_parser.parse(str(value))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.timestamp()
+
+def validate_frequency_values(day_of_the_week, hour_of_the_day, frequency):
+
+    # Helper to raise an error with a consistent message.
+    def raise_frequency_error():
+        msg = ""
+        if frequency == "HOURLY":
+            msg += "For HOURLY jobs, day and hour must both be \"*\"."
+        elif frequency == "DAILY":
+            msg += "For DAILY jobs, day must be \"*\" and hour must have a value between 0-23."
+        elif frequency == "WEEKLY":
+            msg += "For WEEKLY jobs, day must have a value between 0-6 and hour must have a value between 0-23."
+        sys.exit(msg)
+
+    if frequency == "HOURLY":
+        if not (day_of_the_week is None and hour_of_the_day is None):
+            raise_frequency_error()
+    if frequency == "DAILY":
+        if not (day_of_the_week is None and hour_of_the_day is not None):
+            raise_frequency_error()
+    if frequency == "WEEKLY":
+        if not (day_of_the_week is not None and hour_of_the_day is not None):
+            raise_frequency_error()
+
+
+def add_scheduled_job(client, args, req_json, cli_command, api_endpoint, request_method, instance_id, contract_end_date=None):
+    start_timestamp, end_timestamp = convert_dates_to_timestamps(args)
+    if args.end_date is None:
+        end_timestamp = contract_end_date
+        args.end_date = convert_timestamp_to_date(contract_end_date)
+
+    if start_timestamp >= end_timestamp:
+        raise ValueError("--start_date must be less than --end_date.")
+
+    day, hour, frequency = args.day, args.hour, args.schedule
+
+    request_body = {
+        "start_time": start_timestamp,
+        "end_time": end_timestamp,
+        "api_endpoint": api_endpoint,
+        "request_method": request_method,
+        "request_body": req_json,
+        "day_of_the_week": day,
+        "hour_of_the_day": hour,
+        "frequency": frequency,
+        "instance_id": instance_id
+    }
+
+    response = client.post("/commands/schedule_job/", json_data=request_body)
+
+    if args.explain:
+        print("request json: ")
+        print(request_body)
+
+    if response.status_code == 200:
+        print(f"add_scheduled_job insert: success - Scheduling {frequency} job to {cli_command} from {args.start_date} UTC to {args.end_date} UTC")
+    elif response.status_code == 401:
+        print(f"add_scheduled_job insert: failed status_code: {response.status_code}. It could be because you aren't using a valid api_key.")
+    elif response.status_code == 422:
+        user_input = input("Existing scheduled job found. Do you want to update it (y|n)? ")
+        if user_input.strip().lower() == "y":
+            scheduled_job_id = response.json()["scheduled_job_id"]
+            response = update_scheduled_job(client, cli_command, f"/commands/schedule_job/{scheduled_job_id}/", frequency, args.start_date, args.end_date, request_body)
+        else:
+            print("Job update aborted by the user.")
+    else:
+        print(f"add_scheduled_job insert: failed error: {response.status_code}. Response body: {response.text}")
+
+def update_scheduled_job(client, cli_command, schedule_job_path, frequency, start_date, end_date, request_body):
+    response = client.put(schedule_job_path, json_data=request_body)
+
+    response.raise_for_status()
+    if response.status_code == 200:
+        print(f"add_scheduled_job update: success - Scheduling {frequency} job to {cli_command} from {start_date} UTC to {end_date} UTC")
+        print(response.json())
+    elif response.status_code == 401:
+        print(f"add_scheduled_job update: failed status_code: {response.status_code}. It could be because you aren't using a valid api_key.")
+    else:
+        print(f"add_scheduled_job update: failed status_code: {response.status_code}.")
+        print(response.json())
+
+    return response
+
+
+# ---------------------------------------------------------------------------
+# Permissions
+# ---------------------------------------------------------------------------
+
+def load_permissions_from_file(file_path):
+    with open(file_path, 'r') as file:
+        return json.load(file)
+
+
+def get_template_arguments():
+    from vastai.cli.parser import argument
+    return [
+        argument("--name", help="name of the template", type=str),
+        argument("--image", help="docker container image to launch", type=str),
+        argument("--image_tag", help="docker image tag (can also be appended to end of image_path)", type=str),
+        argument("--href", help="link you want to provide", type=str),
+        argument("--repo", help="link to repository", type=str),
+        argument("--login", help="docker login arguments for private repo authentication, surround with ''", type=str),
+        argument("--env", help="Contents of the 'Docker options' field", type=str),
+        argument("--ssh", help="Launch as an ssh instance type", action="store_true"),
+        argument("--jupyter", help="Launch as a jupyter instance instead of an ssh instance", action="store_true"),
+        argument("--direct", help="Use (faster) direct connections for jupyter & ssh", action="store_true"),
+        argument("--jupyter-dir", help="For runtype 'jupyter', directory in instance to use to launch jupyter. Defaults to image's working directory", type=str),
+        argument("--jupyter-lab", help="For runtype 'jupyter', Launch instance with jupyter lab", action="store_true"),
+        argument("--onstart-cmd", help="contents of onstart script as single argument", type=str),
+        argument("--search_params", help="search offers filters", type=str),
+        argument("-n", "--no-default", action="store_true", help="Disable default search param query args"),
+        argument("--disk_space", help="disk storage space, in GB", type=str),
+        argument("--readme", help="readme string", type=str),
+        argument("--hide-readme", help="hide the readme from users", action="store_true"),
+        argument("--desc", help="description string", type=str),
+        argument("--public", help="make template available to public", action="store_true"),
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Verification thresholds
+# ---------------------------------------------------------------------------
+
+def required_inet_mbps(gpu_total_ram_mib):
+    """Machine-total VRAM-scaled bandwidth floor for the self-test pre-flight check.
+
+    Returns the minimum inet_down / inet_up (Mb/s) a machine needs to qualify
+    for the GPU verification pipeline. Floors at 100, caps at 500, scales
+    linearly with total VRAM against a 192 GiB reference point.
+
+    Falsy / missing gpu_total_ram falls to the 100 Mb/s floor. The column is
+    MiB (binary), so a B200 reporting 183359 MiB (~179 GiB) lands at 466
+    Mb/s; the cap is reached once total VRAM crosses 192 GiB, e.g. multi-GPU
+    machines.
+    """
+    total_vram_gib = (gpu_total_ram_mib or 0) / 1024.0
+    return min(500.0, max(100.0, 500.0 * total_vram_gib / 192.0))

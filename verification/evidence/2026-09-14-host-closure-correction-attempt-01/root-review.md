@@ -1,0 +1,17 @@
+# Final integration review
+
+14 September 2026. Primary-agent review of the independent writer's closure batch and the separately authored six historical Python fixture updates. No blocking source or fixture finding remains in this bounded batch. Human acceptance and the remaining publication decisions are still pending.
+
+Final model SHA-256: `6b6dbb92474917893ff67fb5e9466966aa52e796eb46de171432c9dcf208e1eb`. Registry SHA-256: `6997552e8fee36aa619915508f57feb47a9f5e7de32d8a7787e9ef960935c37c`.
+
+- Reviewed all customer MDX edits, including adjacent verification wording, against the retained correction sources and upstream PR948. The eleven remaining stronger assertions remain unchanged and visible as FAIL.
+- Reviewed all six historical Python fixture diffs. Their expected historical counts, IDs and rejection checks remain; they now read the actual frozen source bytes for those historical revisions.
+- Independently reran the final closure suite with bundled **Node 24.19.0** on macOS: **8/8 passed**, no skips. Before/after implementation and model hashes match. [Exact result](root-closure-suite.json).
+- Completed a fresh `npm ci` using the locked dependencies in the isolated integration checkout. Started the loopback preview and review server with Node24 at ports3012/4012. The initial sandbox socket denial was resolved by authorized local-server execution; it was not a product failure. No Linux/Windows browser setup was rerun.
+- Checked the rendered application text and absence of the withdrawn checklist, plain-preview absence of review controls, the corrected reliability/maintenance wording, and the application's exact passage/proof controls. [Commands and observations](browser-commands.json), [rendered application review](application-review.png). Account-page navigation rendered successfully. These are targeted browser observations, not a new full reviewer campaign.
+- Found a real source-link mismatch: the application's correct excerpt initially linked the account overview. [Failed source response](application-proof-http.json). The writer corrected both per-observation URL bindings and added positive/negative tests. After restarting the review server, the application's evidence page displayed the application URL. Both account and application exact-source endpoints returned200 with their correct respective canonical destinations. [Final response evidence](canonical-url-final.json). No status promotion accompanied this fix.
+- A later optional screenshot command failed because the browser daemon became unresponsive; it supplies no proof. The subsequent account snapshot and session close completed. The existing successful application screenshot and final HTTP/source checks are retained separately.
+
+The previously retained Phase57 reviewer checks are reused only for their matching, unchanged implementation bytes and stated scope. The all-44-page integration run in this batch predates the final annotation/link-only corrections; final focused tests and the targeted checks above cover those corrections. No Host/account API operation, rental, payment, storage deletion, reboot or infrastructure change ran here.
+
+The original nine illustration assets still require their separately recorded identifier-redaction and Product review. Nothing in this code/source review accepts those assets or the remaining tax, rental, Teams, data-lifecycle or operational decisions. See the [closure handoff](../../host-docs-closure-summary.md).

@@ -1,0 +1,83 @@
+{
+  "record_type": "ZERO_CREDIT_STORAGE_CAVEAT_PROPOSAL",
+  "state": "SEALED_SOURCE_REVIEW_PROPOSAL_NOT_APPLIED",
+  "baseline_commit": "09212ce653938550097714529e5dd1677638e777",
+  "baseline_model_sha256": "fc76c7280e3b94ede14bd25e909e22eba7eff7f4c05996a081d31810df0335c7",
+  "reviewed_count": 1,
+  "resolution_credit": 0,
+  "source_index": "sources-05.json",
+  "source_index_sha256": "29483ec3f384304b6a2458d44d0d549b9171bde286185c852876a04572c8c318",
+  "decisions": [
+    {
+      "id": "VOL-C28",
+      "literal_sha256": "39bc884cde010798d8bff867c01132d6042e1a5876a64bbc87cfb9aaec1f2ee5",
+      "location": {
+        "source_file": "host/volume-offers.mdx",
+        "start": 82,
+        "end": 82,
+        "text_sha256": "39bc884cde010798d8bff867c01132d6042e1a5876a64bbc87cfb9aaec1f2ee5"
+      },
+      "current_status": "PASS",
+      "current_text": "  Do not remove renter files or edit Docker's storage directories manually to reclaim space. Use the normal offer, instance, and volume lifecycle. If the platform's available-capacity figures do not reconcile, collect the machine and offer output before contacting support.",
+      "decision": "correction",
+      "proposed_status": "PASS",
+      "proposed_methods": [
+        "STATIC_CONTEXT_REVIEW",
+        "CANONICAL_IMPLEMENTATION_SOURCE",
+        "PUBLISHED_VENDOR_DOCUMENTATION"
+      ],
+      "proposed_classification": "REVIEWED_ADVICE_WITH_FACTUAL_INPUTS",
+      "proposed_owner_role": "Documentation technical-source reviewer",
+      "replacement_text": "  Do not remove renter files or edit Docker's storage directories manually to reclaim space. Use the normal offer, instance, and volume lifecycle. Do not rely on instance or volume deletion as proof that the underlying storage has been securely wiped. If the platform's available-capacity figures do not reconcile, collect the machine and offer output before contacting support.",
+      "source_refs": [
+        {
+          "source": "current-volume-context",
+          "text_pointer": "/lines/38-47",
+          "source_excerpt": "## Volume Lifecycle\n\n1. **Prepare host storage.** Put Docker's data root on fast SSD or NVMe storage using XFS project quotas. See [Storage Setup](/host/storage-setup).\n2. **Publish a volume offer.** Create it with the machine listing or list storage separately. This advertises a maximum rentable capacity; it does not create a renter volume.\n3. **A renter creates a volume.** The renter searches offers and chooses a fixed size. That allocation persists independently of any one instance.\n4. **The renter attaches it to an instance.** A new or existing volume is linked while a Docker instance is created and appears at the selected mount path.\n5. **The renter reuses or deletes it.** Destroying the instance leaves the volume intact. To delete the volume permanently, the renter must first destroy every instance using it.\n6. **The host unlists the offer when needed.** Unlisting stops advertising that offer. It is different from the renter deleting an owned volume.\n\nFor the renter's console and CLI workflow, see [Volumes](/guides/instances/storage/volumes)."
+        },
+        {
+          "source": "current-volume-context",
+          "text_pointer": "/lines/73-83",
+          "source_excerpt": "## Shared Disk Capacity\n\nLocal volume allocations use the same machine storage pool as renter instance disks. Stopped instances, cached images, and other allocated storage also need space in that pool.\n\nThe capacity in a volume offer is the maximum amount renters may allocate; publishing the offer does not itself create a renter volume. When a renter creates a volume, its requested size is allocated from that offer and must be included when you plan the shared disk pool.\n\nFor example, if you advertise a 500 GB offer and a renter creates a 200 GB volume, include that 200 GB allocation in your storage plan. Keep enough headroom for active volume contracts and new instance creation.\n\n<Warning>\n  Do not remove renter files or edit Docker's storage directories manually to reclaim space. Use the normal offer, instance, and volume lifecycle. If the platform's available-capacity figures do not reconcile, collect the machine and offer output before contacting support.\n</Warning>"
+        },
+        {
+          "source": "cli-delete-volume",
+          "text_pointer": "/excerpts/2/text",
+          "source_excerpt": "\n@parser.command(\n    argument(\"id\", help=\"id of volume contract\", type=int),\n    usage=\"vastai delete volume ID\",\n    help=\"Delete a volume\",\n    epilog=deindent(\"\"\"\n        Deletes volume with the given ID. All instances using the volume must be destroyed before the volume can be deleted.\n    \"\"\"),\n)\ndef delete__volume(args):\n    \"\"\"Delete a volume.\"\"\"\n    client = get_client(args)\n    result = storage_api.delete_volume(client, id=args.id)\n    if args.raw:\n        return result\n    else:\n        print(\"Deleted. {}\".format(result))\n\n\n@parser.command(\n    argument(\"source\", help=\"id of volume contract being cloned\", type=int),\n    argument(\"dest\", help=\"id of volume offer volume is being copied to\", type=int),\n    argument(\"-s\", \"--size\", help=\"Size of new volume contract, in GB. Must be greater than or equal to the source volume, and less than or equal to the destination offer.\", type=float),\n    argument(\"-d\", \"--disable_compression\", action=\"store_true\", help=\"Do not compress volume data before copying.\"),\n    usage=\"vastai clone volume <source_id> <dest_id> [options]\",\n    help=\"Clone an existing volume\",\n    epilog=deindent(\"\"\"\n        Create a new volume with the given offer, by copying the existing volume.\n        Size defaults to the size of the existing volume, but can be increased if there is available space.\n    \"\"\"),\n)\ndef clone__volume(args):\n    \"\"\"Clone an existing volume.\"\"\"\n    if args.explain:\n        print(\"request json: \")\n        print({\"src_id\": args.source, \"dst_id\": args.dest})\n\n    client = get_client(args)\n    result = storage_api.clone_volume(client, source=args.source, dest=args.dest,\n                                      size=args.size, disable_compression=args.disable_compression)\n    if args.raw:\n        return result\n    else:\n        print(\"Created. {}\".format(result))\n\n\n# ---------------------------------------------------------------------------\n# show volumes\n# ---------------------------------------------------------------------------\n\n@parser.command(\n    argument(\"-t\", \"--type\", help=\"volume type to display. Default to all. Possible values are \\\"local\\\", \\\"all\\\", \\\"network\\\"\", type=str, default=\"all\"),\n    usage=\"vastai show volumes [OPTIONS]\",\n    help=\"Show stats on owned volumes.\",\n    epilog=deindent(\"\"\"\n        Show stats on owned volumes\n    \"\"\"),\n)\ndef show__volumes(args):\n    \"\"\"Show stats on owned volumes.\"\"\"\n    client = get_client(args)\n    processed = storage_api.show_volumes(client, type=args.type)\n    for row in processed:\n        for k, v in row.items():\n            row[k] = strip_strings(v)\n    if args.raw:\n        return processed\n    else:\n        display_table(processed, volume_fields, replace_spaces=False)\n\n"
+        },
+        {
+          "source": "published-volumes",
+          "text_pointer": "/lines/66-84",
+          "source_excerpt": "### Deleting volume\n\nTo delete a volume, the instance it is attached to must be **deleted first**. Deleting a volume that is currently **mounted to a running or stopped instance is not allowed**.\n\nDelete a Volume:\n\n1. Make sure the volume is **not attached** to any instance.\n   &#x20;If it is, **delete the instance** first from the Instances page.\n2. Once the volume is detached, go to the **Storage** page.\n3. Find the volume you want to delete, click on the **three-dot menu** (⋮) next to it, and select **\"Delete volume\"**.\n\n   <Frame caption=\"Delete volume\">\n     <img src=\"https://mintcdn.com/vastai-80aa3a82/1a9mKbP8zn3lYY0d/images/volumes-9.webp?fit=max&auto=format&n=1a9mKbP8zn3lYY0d&q=85&s=cb0d822b0931c74b3f25b9ddddd960e4\" alt=\"Delete volume\" width=\"1280\" height=\"540\" data-path=\"images/volumes-9.webp\" />\n   </Frame>\n4. Confirm the deletion. This action is **permanent** and cannot be undone.\n\n<Warning>\n  Important: Deleting a volume will permanently remove all data stored in it. Make sure to back up any important data before proceeding.\n</Warning>"
+        },
+        {
+          "source": "nist-sanitization",
+          "text_pointer": "/blocks/assurance/text",
+          "source_excerpt": "4.5. Sanitization Assurance\nPer ISO/IEC 27040 [15], verifying the adequacy or effectiveness of sanitization outcomes is an\nimportant aspect of a media sanitization program. The results of attempted sanitization\ntechniques are inspected (see Sec. 4.5.1), and a decision on the adequacy of the results is made\n(see Sec. 4.5.2). These activities are shown as the “Validate” decision point in Fig. 1. If the\noutcomes are expected and appropriate, the sanitization is accepted. If outcomes are not\nacceptable, then sanitization is repeated. Repeated sanitization should recheck the reusability\nof media because a previous sanitization technique may have rendered the media unusable or\ninoperable."
+        },
+        {
+          "source": "nist-sanitization",
+          "text_pointer": "/blocks/verification/text",
+          "source_excerpt": "4.5.1. Sanitization Verification\nThe goal of sanitization verification is to determine the outcome of the sanitization technique\nused during the sanitization operation. The sanitization results should be inspected to verify\nthat the sanitization technique was completed successfully."
+        },
+        {
+          "source": "request-context",
+          "text_pointer": "/user_concern",
+          "source_excerpt": "The parent reports the user previously raised deletion versus secure wiping. This is an attributed paraphrase, not a verbatim transcript or independent evidence of platform sanitization."
+        }
+      ],
+      "original_discrepancy": "The existing warning covers capacity/lifecycle safety, but does not explicitly distinguish normal instance/volume deletion from proof of underlying-media sanitization. This is a clarity addition requested by the user through the parent, not evidence that the existing warning failed.",
+      "support_rationale": "The retained volume lifecycle documents separate deletion and persistent storage. NIST4.5 and4.5.1 make sanitization assurance depend on inspecting the selected sanitization technique and its results. The new sentence is the limited inference that the ordinary deletion event alone is not proof of that separate assurance; it neither claims Vast omits sanitization nor promises any specific wipe standard. Existing lifecycle/support advice and prior source evidence remain unchanged.",
+      "method_rationale": "Full current warning/context and exact retained lifecycle/CLI guidance were reviewed. Current primary NIST sanitization-assurance text supports the caution. No deletion, media inspection, wipe test or platform-security runtime proof is required to document this bounded advice.",
+      "limitation": "No Vast erasure implementation, data recovery result, compliance certification, wipe standard or secure-erasure guarantee is asserted. No Host/storage/instance/volume mutation, image pull or paid run. Existing runtime/procedure outcomes and all historical evidence remain unchanged.",
+      "next_action": "Integrate separately as PASS-to-PASS wording clarification with zero resolution credit, retaining original advice and evidence. Keep HQ-STORAGE-REMOVAL only for any future erasure guarantee rather than as a blocker on this accurate caution.",
+      "residual_topic": {
+        "key": "HQ-STORAGE-REMOVAL",
+        "title": "Any future secure-erasure guarantee"
+      },
+      "resolution_credit": 0
+    }
+  ],
+  "inventory": "inventory-05.json",
+  "revision": "05"
+}

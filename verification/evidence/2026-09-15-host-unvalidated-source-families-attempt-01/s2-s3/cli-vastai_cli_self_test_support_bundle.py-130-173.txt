@@ -1,0 +1,44 @@
+def _collect_host_artifacts(secrets: list[str] | None = None) -> tuple[dict[str, str], list[dict[str, str]]]:
+    files: dict[str, str] = {}
+    errors: list[dict[str, str]] = []
+
+    for path in sorted(Path("/var/lib/vastai_kaalia").glob("kaalia.log*")):
+        if not path.is_file():
+            continue
+        archive_name = f"host/kaalia/{path.name}"
+        try:
+            files[archive_name] = _redact_text(_read_file_tail(path, MAX_LOG_BYTES), secrets)
+        except Exception as exc:
+            errors.append({"artifact": archive_name, "error": _redact_text(exc, secrets)})
+
+    daemon_json = Path("/etc/docker/daemon.json")
+    if daemon_json.exists():
+        try:
+            files["host/etc-docker-daemon.json"] = _redact_text(_read_file_tail(daemon_json, MAX_TEXT_BYTES), secrets)
+        except Exception as exc:
+            errors.append({"artifact": "host/etc-docker-daemon.json", "error": _redact_text(exc, secrets)})
+    else:
+        errors.append({"artifact": "host/etc-docker-daemon.json", "error": "file not found"})
+
+    command_specs = [
+        ("host/dmesg-filtered.log", ["dmesg", "-T"], "dmesg"),
+        (
+            "host/journalctl-docker-vastai_kaalia.log",
+            ["journalctl", "-b", "-p", "err..alert", "-u", "docker", "-u", "vastai_kaalia", "--since", "-24h", "--no-pager"],
+            "journalctl",
+        ),
+        ("host/nvidia-smi.txt", ["nvidia-smi"], "nvidia-smi"),
+        ("host/nvidia-smi-L.txt", ["nvidia-smi", "-L"], "nvidia-smi -L"),
+        ("host/docker-info.txt", ["docker", "info"], "docker info"),
+        ("host/ip-addr.txt", ["ip", "addr"], "ip addr"),
+        ("host/ss-tlnp-summary.txt", ["ss", "-tlnp"], "ss -tlnp summary"),
+    ]
+
+    for archive_name, command, label in command_specs:
+        output, error = _run_command(command)
+        if archive_name == "host/dmesg-filtered.log":
+            output = "\n".join(line for line in output.splitlines() if DMESG_KEYWORDS_RE.search(line))
+        elif archive_name == "host/ss-tlnp-summary.txt":
+            output = _summarize_ss_output(output)
+        files[archive_name] = _truncate_text(_redact_text(output, secrets), MAX_TEXT_BYTES)
+        if error:

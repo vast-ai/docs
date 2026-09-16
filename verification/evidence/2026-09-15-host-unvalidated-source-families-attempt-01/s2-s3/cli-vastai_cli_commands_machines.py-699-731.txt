@@ -1,0 +1,33 @@
+@parser.command(
+    argument("machine_id", help="Machine ID", type=str),
+    argument("--debugging", action="store_true", help="Enable debugging output"),
+    argument("--ignore-requirements", action="store_true", help="Ignore the minimum system requirements and run the self test regardless"),
+    argument("--test-image", help="Use a custom self-test image for testing custom self-test images. Overrides VAST_SELF_TEST_IMAGE and CUDA mapping.", type=str),
+    argument("--support-bundle-dir", help="Directory for failure diagnostic bundles (default: /tmp)", type=str),
+    argument("--no-support-bundle", action="store_true", help="Do not create a diagnostic tarball when the self-test fails"),
+    usage="vastai self-test machine <machine_id> [--debugging] [--ignore-requirements] [--test-image IMAGE]",
+    help="[Host] Perform a self-test on the specified machine",
+    epilog=deindent("""
+        This command tests if a machine meets specific requirements and
+        runs a series of tests to ensure it's functioning correctly.
+
+        Examples:
+         vastai self-test machine 12345
+         vastai self-test machine 12345 --debugging
+    """),
+)
+def self_test__machine(args):
+    """
+    Performs a self-test on the specified machine to verify its compliance with
+    required specifications and functionality.
+    """
+    instance_id = None
+    result = base_result(args.machine_id)
+    run_started_at = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    cli_output = []
+    instance_log_files = {}
+    instance_log_errors = []
+    instance_log_collected = set()
+    ignore_requirements_warning = (
+        "WARNING: --ignore-requirements is set. Requirement checks are skipped as a "
+        "pass/fail gate, and passing this self-test does not qualify this machine for verification."

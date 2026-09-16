@@ -1,0 +1,43 @@
+    argument("name", type=str, nargs="?", default="RTX 5090,RTX 4090,RTX 3090",
+             help="GPU name, comma-separated list, or 'all'. Underscores are accepted in place of spaces."),
+    argument("--verified", type=str, choices=["true", "false", "all"], default="all",
+             help="Filter by verified status"),
+    argument("--datacenter", type=str, choices=["true", "false", "all"], default="all",
+             help="Filter by datacenter hosting type"),
+    argument("--num-gpus", type=str, choices=["all", "1", "2", "4", "8"], default="all",
+             help="Filter by machine GPU-count bucket (1x, 2x, 4x, 8x)"),
+    argument("--start", type=int, default=None, help="Start unix timestamp"),
+    argument("--end", type=int, default=None, help="End unix timestamp"),
+    argument("--step", type=int, default=None,
+             help="Time between data points in seconds (e.g. 3600 for hourly). Minimum 60s; step may be raised server-side to cap points returned."),
+    argument("--full", action="store_true", default=False,
+             help="Show all data points instead of sampling ~20"),
+    usage="vastai metrics gpu-trends [NAME] [OPTIONS]",
+    help="[Host] Get GPU market history",
+    epilog=deindent("""
+        Show GPU supply/demand and pricing trends over time. Defaults to RTX 5090, 4090, 3090
+        for the last 24 hours. Requires host or admin access.
+
+        Examples:
+            vastai metrics gpu-trends
+            vastai metrics gpu-trends "RTX 4090"
+            vastai metrics gpu-trends "RTX 4090" --full
+            vastai metrics gpu-trends "RTX 4090" --raw
+            vastai metrics gpu-trends all --verified true --datacenter true
+            vastai metrics gpu-trends "RTX 5090" --num-gpus 8
+            vastai metrics gpu-trends "RTX 4090,H100_SXM" --start 1773298800 --end 1773817200 --step 3600
+    """),
+)
+def metrics__gpu_trends(args):
+    """Get GPU metrics history."""
+    # Accept underscores as space aliases: "H100_SXM" -> "H100 SXM"
+    args.name = args.name.replace("_", " ")
+    client = get_client(args)
+    resp = metrics_api.gpu_history(
+        client,
+        gpu_name=args.name,
+        verified=_VERIFIED_MAP[args.verified],
+        hosting_type=_HOSTING_MAP[args.datacenter],
+        start=args.start,
+        end=args.end,
+        step=args.step,

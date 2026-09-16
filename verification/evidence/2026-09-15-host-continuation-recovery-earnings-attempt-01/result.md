@@ -1,0 +1,7 @@
+The accepted 148-passage Recovery and Earnings review is applied locally: 142 passages PASS within their recorded source scope, one editorial passage NOT_APPLICABLE, and five financial passages remain UNVALIDATED in the existing two Host-team topics. Seventy-nine wording corrections cover headless installation, offline-machine diagnostics, kernel upgrades and Earnings guidance.
+
+The source and procedure impact review found no changed unselected claim literals. Eighty-one procedure/node records retain their exact prior statuses and evidence; command changes occur only in twenty UNVALIDATED and seven BLOCKED records. The one affected PASS record has no changed command fence. No installation, reboot, Host recovery, export, payout, account mutation or backend permission test was executed.
+
+Recovery revision03 corrects one out-of-range source locator from444–452 to444–451 while retaining revision02 substantive evidence. Earnings revision04 preserves the accepted full-function source review and five financial residuals; rejected01/02 attempts remain history and are not adjudication evidence. Earlier117,121,120,88,318 and358 reviews and all eight owner-question objects are preserved.
+
+Paired projection, strict source binding, model preservation, reviewer and offline export checks are recorded in checks.json when completed. Root performs the separate real-browser review and any subsequent signed integration.
