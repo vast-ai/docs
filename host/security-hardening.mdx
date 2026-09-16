@@ -1,0 +1,121 @@
+---
+title: "Security Hardening"
+description: "Set up SSH keys, a host firewall, management interfaces, and updates on a host machine, with a command to check each one."
+---
+
+A host machine has a public IPv4 address with a range of forwarded ports and
+serves clients continuously. Several of its configuration settings are
+[verification requirements](/host/verification-stages).
+
+These pages give each setting, the command that reports its current value, and
+the procedure to change it. The steps are the same on Ubuntu Server 22.04 and
+24.04.
+
+## Before you start
+
+These pages assume a fresh Ubuntu Server install on a machine that is not yet
+listed. Work through them in order before the machine takes its first rental,
+while no change can interrupt a client.
+
+<Warning>
+**Do not work through these pages end to end on a machine that is already
+configured and renting.** Several steps close network access, change who can
+log in, or restart a service. On a machine with instances running, this can
+disconnect clients mid-workload, lock you out of the machine, or take it
+offline.
+
+On an existing machine, use one page at a time: run the check command, change
+one setting, confirm the machine is still reachable from outside, then
+continue. Run the disruptive steps in a
+[maintenance window](/host/cli/schedule-maint).
+</Warning>
+
+<Note>
+**Configuring the machine is the host's responsibility.** Vast does not
+configure your hardware, network, or operating system. The
+[verification requirements](/host/verification-stages) list what the platform
+checks automatically; these pages are the setup those requirements assume.
+
+Completing these pages does not guarantee verification. Machines also fail or
+lose verification for reliability, performance, and network reasons unrelated
+to this configuration.
+</Note>
+
+## Have a way in that is not SSH
+
+[SSH Access](/host/security/ssh-access) and
+[The Host Firewall](/host/security/host-firewall) can both leave the machine
+unreachable over SSH. Confirm your fallback access works before you begin.
+
+**If the machine has a BMC** — IPMI, iDRAC, or iLO — the BMC console is your
+fallback. Log in to it now to confirm it works.
+
+**If the machine has no BMC**, which is common on consumer and workstation
+boards, the fallback is a monitor and keyboard attached to the machine. If you
+cannot reach the machine physically, schedule an automatic undo before each
+change. This runs `ufw disable` in ten minutes:
+
+```bash
+sudo systemd-run --on-active=10m --unit=undo-firewall ufw disable
+```
+
+```
+Running timer as unit: undo-firewall.timer
+```
+
+Make the change, open a **new** connection from outside to confirm the machine
+is still reachable, then cancel the undo:
+
+```bash
+sudo systemctl stop undo-firewall.timer
+```
+
+If the change locks you out instead, the timer runs and you can reconnect.
+
+<Note>
+An SSH tunnel to the BMC is not a fallback. A tunnel requires a working SSH
+connection, which is what these changes can break. Reach the BMC over its own
+network connection.
+</Note>
+
+## Setting up a machine
+
+Work through these in order on a new machine.
+
+<CardGroup cols={2}>
+
+<Card title="SSH Access" href="/host/security/ssh-access" icon="key">
+Key-only login, a unique key pair per machine, and removing keys no longer in use
+</Card>
+
+<Card title="Accounts and Sudo" href="/host/security/accounts-and-sudo" icon="users">
+Who can log in, who can become root, and removing unused accounts
+</Card>
+
+<Card title="The Host Firewall" href="/host/security/host-firewall" icon="shield-halved">
+What ufw covers, what Docker handles instead, and verifying from outside
+</Card>
+
+<Card title="Management Interfaces" href="/host/security/management-interfaces" icon="server">
+BMC, IPMI, iDRAC, and iLO credentials, and keeping them off the public internet
+</Card>
+
+<Card title="Automatic Security Updates" href="/host/security/automatic-security-updates" icon="arrows-rotate">
+Keeping Ubuntu security updates on, and the kernel reboot in a maintenance window
+</Card>
+
+</CardGroup>
+
+## If something goes wrong
+
+<CardGroup cols={2}>
+
+<Card title="Recovery" href="/host/security/recovery" icon="life-ring">
+Undo a change that locked you out: SSH config, keys, firewall rules, accounts
+</Card>
+
+<Card title="Offline Machine" href="/host/machine-offline" icon="plug-circle-xmark">
+Diagnose a machine that has dropped off the marketplace
+</Card>
+
+</CardGroup>
