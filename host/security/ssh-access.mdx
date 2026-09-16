@@ -1,0 +1,392 @@
+---
+title: "SSH Access"
+description: "Set up key-only SSH login on a host machine, give every machine its own key pair, and remove keys that are no longer in use."
+---
+
+## Before you start
+
+This page can leave the machine unreachable over SSH. Confirm your fallback
+access works before you begin.
+
+**If the machine has a BMC** — IPMI, iDRAC, or iLO — the BMC console is your
+fallback. Log in to it now to confirm it works.
+
+**If the machine has no BMC**, which is common on consumer and workstation
+boards, the fallback is a monitor and keyboard attached to the machine. Step 2
+below is the protection against lockout: it confirms your key works before
+anything stops accepting passwords.
+
+See [Security Hardening](/host/security-hardening#have-a-way-in-that-is-not-ssh)
+for the full explanation.
+
+<Note>
+An SSH tunnel to the BMC is not a fallback. A tunnel requires a working SSH
+connection, which is what the steps below can break. Reach the BMC over its own
+network connection.
+</Note>
+
+---
+
+Password authentication is the SSH setting verification checks. A machine with
+it enabled will not pass. Follow the steps in order.
+
+<Warning>
+Keep your current session open until the end of this page. Close it only after
+logging in again in a second terminal and confirming it works.
+</Warning>
+
+## 1. See what sshd is actually doing
+
+`sshd -T` reports the configuration the daemon resolved, with defaults applied
+and every included file merged in. This differs from what any single config
+file contains.
+
+```bash
+sudo sshd -T | grep -E '^(permitrootlogin|pubkeyauthentication|passwordauthentication|kbdinteractiveauthentication|permitemptypasswords)'
+```
+
+```
+permitrootlogin without-password
+pubkeyauthentication yes
+passwordauthentication yes
+kbdinteractiveauthentication no
+permitemptypasswords no
+```
+
+Target values:
+
+| Setting | Target | Reason |
+| --- | --- | --- |
+| `permitrootlogin` | `without-password` or `no` | No password login as root |
+| `pubkeyauthentication` | `yes` | Required for key login |
+| `passwordauthentication` | `no` | Required for verification |
+| `kbdinteractiveauthentication` | `no` | A second route to password prompts |
+| `permitemptypasswords` | `no` | Never allow a blank password |
+
+If every line already matches, this page is complete.
+
+<Note>
+`PermitRootLogin prohibit-password` in the config file is reported by `sshd -T`
+as `without-password`. The two spellings are equivalent, and every OpenSSH
+build on 22.04 and 24.04 reports the older one. This does not mean your change
+failed.
+</Note>
+
+A fresh Ubuntu install reports `passwordauthentication yes`. Ubuntu ships that
+setting commented out, and sshd enables password login when it is absent.
+`kbdinteractiveauthentication` is already `no` on a stock install, because
+Ubuntu sets it explicitly.
+
+<Warning>
+`sshd -T` does not evaluate `Match` blocks. A `Match Address` or `Match User`
+block that re-enables password authentication will not appear in the output
+above, so the machine can report the correct values here and still accept
+passwords. Check for `Match` blocks directly:
+
+```bash
+sudo grep -rn '^[[:space:]]*Match' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/
+```
+
+No output means there are none. If there are, read their contents before
+relying on anything else on this page.
+</Warning>
+
+## 2. Add your key and confirm it works
+
+Run this from your own computer. Replace `youruser` with your login name on the
+machine and `1.2.3.4` with its IP address, here and in every command below.
+
+```bash
+ssh-copy-id youruser@1.2.3.4
+```
+
+```
+Number of key(s) added: 1
+```
+
+<Note>
+`ssh-copy-id` signs in to install the key, so on a machine that already refuses
+passwords it fails with `Permission denied (publickey)`. Copy the key over a
+session you already have instead:
+
+```bash
+ssh-copy-id -o PreferredAuthentications=publickey youruser@1.2.3.4
+```
+
+Do not re-enable password authentication to make `ssh-copy-id` work.
+</Note>
+
+Open a second terminal, leaving the first connected, and log in with your key
+only. This confirms the key is what grants access, rather than a password:
+
+```bash
+ssh -o PreferredAuthentications=publickey youruser@1.2.3.4
+```
+
+The result should be a shell prompt with no password requested.
+
+<Warning>
+If this returns `Permission denied (publickey)` on a machine that still allows
+passwords, the key is not working. Stop here and fix it. Confirm the key is in
+`~/.ssh/authorized_keys` on the machine, that `~/.ssh` is mode `700`, and that
+`authorized_keys` is mode `600`.
+</Warning>
+
+## 3. Correct the files that already exist
+
+<Warning>
+Do not run this until step 2 succeeded. If your key is not accepted yet, this
+will lock you out.
+</Warning>
+
+Save a copy of the current configuration, `sshd_config` and every drop-in file
+beside it:
+
+```bash
+sudo sh -c 'for f in /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf; do
+  if [ -e "$f" ] && [ ! -e "$f.orig" ]; then cp "$f" "$f.orig"; fi
+done'
+```
+
+```
+(no output)
+```
+
+The `[ ! -e "$f.orig" ]` test skips files already copied, so re-running this
+later preserves the original rather than overwriting it with modified state.
+
+Set both password-related settings to `no` everywhere they appear, including
+the files in `/etc/ssh/sshd_config.d/`:
+
+```bash
+sudo sed -i -E 's/^[[:space:]]*#?[[:space:]]*(PasswordAuthentication|KbdInteractiveAuthentication)[[:space:]]+.*/\1 no/I' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null
+```
+
+```
+(no output)
+```
+
+This matches commented lines, indented lines, and files installed by a cloud or
+vendor image.
+
+<Warning>
+Uncommenting a line is not sufficient. The value must be `no`, because
+`PasswordAuthentication yes` allows passwords whether or not it is commented.
+The command above also rewrites matching lines inside `Match` blocks, so check
+any block you added deliberately.
+</Warning>
+
+### Or edit the files yourself
+
+To avoid running a search and replace across a live SSH configuration, open
+`/etc/ssh/sshd_config` and set:
+
+```
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+```
+
+Then confirm nothing in the drop-in directory contradicts it:
+
+```bash
+sudo grep -rn -iE '^[[:space:]]*(PasswordAuthentication|KbdInteractiveAuthentication)' /etc/ssh/sshd_config.d/
+```
+
+Change any line reading `yes` to `no`.
+
+## 4. Write one file that takes precedence
+
+Step 3 corrected the files that exist now. This step sets the same values in a
+single file that takes precedence over any file a future package installs
+alongside it.
+
+The number prefix determines precedence. `sshd_config` includes the drop-in
+directory on its first line, files are read in sorted order, and OpenSSH keeps
+the **first** value it reads for a setting. A file named `01-` therefore takes
+precedence over `50-cloud-init.conf`, and a file named `99-` would not.
+
+```bash
+sudo tee /etc/ssh/sshd_config.d/01-vast-hardening.conf <<'EOF'
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+PermitRootLogin prohibit-password
+PermitEmptyPasswords no
+EOF
+```
+
+```
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+PermitRootLogin prohibit-password
+PermitEmptyPasswords no
+```
+
+`prohibit-password` allows root login with a key, which keeps automation and
+recovery paths working. If nothing on the machine needs a root SSH session, use
+`no` instead and `sudo` from your own account.
+
+## 5. Apply and verify
+
+`sshd -t` checks the configuration for errors. The `&&` runs the restart only
+if that check passes, so a broken config cannot take SSH down. Changes take
+effect when the service restarts.
+
+```bash
+sudo sshd -t && sudo systemctl restart ssh.service
+```
+
+No output means both commands succeeded. Existing sessions stay connected.
+
+Query the running daemon again:
+
+```bash
+sudo sshd -T | grep -E '^(permitrootlogin|passwordauthentication|kbdinteractiveauthentication)'
+```
+
+```
+permitrootlogin without-password
+passwordauthentication no
+kbdinteractiveauthentication no
+```
+
+<Check>
+Once `passwordauthentication` reads `no`, log in once more from your own
+computer to confirm, then close your original session. If your machine was
+flagged for password login, the error clears within about two hours.
+</Check>
+
+If any line still reports the wrong value, another file takes precedence over
+yours. Identify it, matching settings rather than comments:
+
+```bash
+sudo grep -rnE '^[[:space:]]*(PasswordAuthentication|PermitRootLogin|KbdInteractiveAuthentication)' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/
+```
+
+```
+/etc/ssh/sshd_config:PasswordAuthentication no
+/etc/ssh/sshd_config:KbdInteractiveAuthentication no
+/etc/ssh/sshd_config.d/00-vendor.conf:PasswordAuthentication yes
+/etc/ssh/sshd_config.d/01-vast-hardening.conf:PasswordAuthentication no
+```
+
+A file sorting before `01-` takes precedence. Either correct that file or
+rename yours to sort ahead of it, then restart and check again.
+
+## 6. Give every machine its own key pair
+
+A unique key pair per machine is a
+[verification requirement](/host/verification-stages). One key reused across a
+fleet means a single compromise exposes every machine.
+
+Generate a pair per machine on your own computer, named to identify the
+machine:
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/vast-gpu01 -C "vast-gpu01"
+ssh-copy-id -i ~/.ssh/vast-gpu01.pub youruser@1.2.3.4
+```
+
+Record which key belongs to which machine in `~/.ssh/config`:
+
+```
+Host vast-gpu01
+    HostName 1.2.3.4
+    User youruser
+    IdentityFile ~/.ssh/vast-gpu01
+    IdentitiesOnly yes
+```
+
+`IdentitiesOnly yes` is required. Without it, ssh offers every key you have to
+every machine it connects to.
+
+**To migrate a fleet that already shares one key**, do one machine at a time
+and do not remove the old key until the new one works:
+
+1. Generate the new pair for that machine and install it with `ssh-copy-id`.
+2. Log in with the new key only:
+   `ssh -i ~/.ssh/vast-gpu01 -o IdentitiesOnly=yes youruser@1.2.3.4`.
+3. Once that succeeds, remove the shared key's line from
+   `~/.ssh/authorized_keys` on that machine.
+4. Confirm you can still log in, then move to the next machine.
+
+Once the shared key is removed from every machine, delete it from your own
+computer.
+
+<Note>
+If you set up the rate limit described in
+[The Host Firewall](/host/security/host-firewall), this procedure can trigger
+it, because it opens several connections from one address in quick succession.
+Connections that hang immediately after a burst are the rate limit. Wait about
+thirty seconds and continue.
+</Note>
+
+## 7. Remove keys that are no longer in use
+
+Every line in `authorized_keys` is a person or a script that can log in as that
+user. A replaced laptop or a provisioning key from the machine's previous
+configuration keeps working until it is removed.
+
+Back up every file first:
+
+```bash
+sudo sh -c 'for f in /root/.ssh/authorized_keys /home/*/.ssh/authorized_keys; do
+  if [ -e "$f" ] && [ ! -e "$f.bak" ]; then cp "$f" "$f.bak"; fi
+done'
+```
+
+```
+(no output)
+```
+
+List every authorized key on the machine, for every account. The `sudo` must be
+on the commands inside the loop rather than on `awk`, because home directories
+are mode `0750`: without it the loop finds nothing and reports success:
+
+```bash
+awk -F: '$3>=1000 && $3<65534 {print $1, $6}' /etc/passwd | while read -r u h; do
+  sudo test -f "$h/.ssh/authorized_keys" && sudo sed "s|^|$u: |" "$h/.ssh/authorized_keys"
+done
+sudo test -f /root/.ssh/authorized_keys && sudo sed 's|^|root: |' /root/.ssh/authorized_keys
+```
+
+```
+youruser: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... vast-gpu01
+youruser: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... oldlaptop
+```
+
+The comment at the end of each line identifies the key. Delete the lines that
+are no longer in use.
+
+<Warning>
+Do not remove the key your current session is using. `Offering public key` in
+`ssh -v` output lists every key the client attempts, which is usually several.
+The key that worked is on the `Server accepts key` line:
+
+```bash
+ssh -v -o BatchMode=yes youruser@1.2.3.4 true 2>&1 | grep 'Server accepts key'
+```
+
+```
+debug1: Server accepts key: /home/you/.ssh/vast-gpu01 ED25519 SHA256:xK9...
+```
+</Warning>
+
+You can also restrict which accounts sshd accepts, which is a shorter list to
+audit than every `authorized_keys` file:
+
+```bash
+sudo sshd -T | grep -E '^(allowusers|allowgroups|denyusers|denygroups)'
+```
+
+No output means no restriction is set, and any account with a valid key can log
+in.
+
+---
+
+## If you are locked out
+
+Use your fallback access — the BMC console, or a monitor and keyboard — and
+follow [Recovery](/host/security/recovery), which restores the configuration
+files saved in step 3 and the keys backed up in step 7.

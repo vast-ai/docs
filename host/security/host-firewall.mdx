@@ -1,0 +1,239 @@
+---
+title: "The Host Firewall"
+description: "Set up ufw on a host machine, understand what it covers and what Docker handles instead, and verify reachability from outside."
+---
+
+## Before you start
+
+This page can leave the machine unreachable over SSH. Confirm your fallback
+access works before you begin.
+
+**If the machine has a BMC** — IPMI, iDRAC, or iLO — the BMC console is your
+fallback. Log in to it now to confirm it works.
+
+**If the machine has no BMC**, which is common on consumer and workstation
+boards, the fallback is a monitor and keyboard attached to the machine. If you
+cannot reach the machine physically, schedule an automatic undo. This disables
+the firewall in ten minutes:
+
+```bash
+sudo systemd-run --on-active=10m --unit=undo-firewall ufw disable
+```
+
+```
+Running timer as unit: undo-firewall.timer
+```
+
+Make the change, open a **new** connection from outside to confirm the machine
+is still reachable, then cancel the undo with
+`sudo systemctl stop undo-firewall.timer`. If the change locks you out instead,
+the timer runs and you can reconnect.
+
+See [Security Hardening](/host/security-hardening#have-a-way-in-that-is-not-ssh)
+for the full explanation.
+
+<Note>
+An SSH tunnel to the BMC is not a fallback. A tunnel requires a working SSH
+connection, which is what the steps below can break. Reach the BMC over its own
+network connection.
+</Note>
+
+---
+
+A firewall on a host machine prevents services you did not intend to publish
+from being reachable from the internet.
+
+<Warning>
+Read this whole page before running any of it, and never enable a firewall from
+a session you cannot afford to lose.
+</Warning>
+
+## What ufw covers here
+
+Instances are Docker containers with published ports, and
+[Docker's own documentation](https://docs.docker.com/engine/network/packet-filtering-firewalls/)
+states that this traffic does not pass through ufw:
+
+> When you publish a container's ports using Docker, traffic to and from that
+> container gets diverted before it goes through the ufw firewall settings.
+
+ufw therefore governs services listening on the host itself, such as sshd and
+anything else you installed. It does not filter client instance ports in either
+direction. This has two consequences:
+
+- Enabling ufw will not disconnect running instances.
+- `ufw status` does not report what the internet can reach. Only a scan from
+  outside the network reports that.
+
+<Warning>
+Do not add rules to Docker's `DOCKER-USER` chain to filter instance ports.
+Clients are required to reach those ports, and rules there break rentals in
+ways that are difficult to diagnose.
+</Warning>
+
+<Note>
+These steps use `ufw` because it ships with Ubuntu Server. If you run nftables,
+firewalld, or raw iptables, apply the same rules there. The checks below still
+report whether the result is correct.
+</Note>
+
+## Check what is running now
+
+Before changing anything, check whether the machine already has a firewall:
+
+```bash
+sudo ufw status verbose
+```
+
+```
+Status: inactive
+```
+
+<Warning>
+If this reports `Status: active`, do **not** run the commands below in the
+order given. Unlike `ufw enable`, `ufw default` applies immediately and asks
+for no confirmation, so changing the default policy on a live firewall takes
+effect at once. Your own session survives on its existing connection, but any
+host service without an explicit allow rule — including SSH on your next login
+— stops accepting new connections.
+
+On a machine with ufw already active: add the allow rules first, confirm a new
+connection from outside works, then change the default policy last.
+</Warning>
+
+## Work out the ports you forwarded
+
+The requirement is **5 forwarded ports per GPU minimum, 100 per GPU
+recommended**. Count the GPUs in the machine:
+
+```bash
+nvidia-smi -L | wc -l
+```
+
+```
+8
+```
+
+| GPUs | Minimum ports | Recommended ports |
+| --- | --- | --- |
+| 1 | 5 | 100 |
+| 4 | 20 | 400 |
+| 8 | 40 | 800 |
+
+The range to allow is the one configured on your router to forward to this
+machine. If you do not know it, get it from your router's port-forwarding
+configuration before continuing.
+
+## Add the rules
+
+Allow your own SSH first. Check which port sshd is on rather than assuming 22:
+
+```bash
+sudo sshd -T | grep '^port'
+```
+
+```
+port 22
+```
+
+Then allow that port, substituting it into the command below if it is not 22:
+
+```bash
+sudo ufw limit 22/tcp comment 'admin ssh'
+```
+
+```
+Rules updated
+Rules updated (v6)
+```
+
+`limit` allows the connection but blocks a source address that opens six or
+more connections in thirty seconds.
+
+Then allow the forwarded range. The protocol is required whenever you specify a
+range rather than a single port:
+
+```bash
+sudo ufw allow 40000:40800/tcp comment 'vast forwarded ports'
+sudo ufw allow 40000:40800/udp comment 'vast forwarded ports'
+```
+
+```
+Rules updated
+Rules updated (v6)
+```
+
+These rules cover anything in that range listening on the host directly rather
+than through a container. Instance ports are unaffected either way.
+
+## Set the default policy and enable
+
+```bash
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+```
+
+```
+Default incoming policy changed to 'deny'
+(be sure to update your rules accordingly)
+Default outgoing policy changed to 'allow'
+(be sure to update your rules accordingly)
+```
+
+<Warning>
+Outgoing must remain `allow`. The Vast daemon reaches the platform over an
+outbound connection, and blocking outbound traffic takes the machine off the
+marketplace.
+</Warning>
+
+```bash
+sudo ufw enable
+```
+
+```
+Command may disrupt existing ssh connections. Proceed with operation (y|n)? y
+Firewall is active and enabled on system startup
+```
+
+## Verify
+
+```bash
+sudo ufw status verbose
+```
+
+```
+Status: active
+Logging: on (low)
+Default: deny (incoming), allow (outgoing), disabled (routed)
+New profiles: skip
+
+To                         Action      From
+--                         ------      ----
+22/tcp                     LIMIT IN    Anywhere                   # admin ssh
+40000:40800/tcp            ALLOW IN    Anywhere                   # vast forwarded ports
+40000:40800/udp            ALLOW IN    Anywhere                   # vast forwarded ports
+22/tcp (v6)                LIMIT IN    Anywhere (v6)              # admin ssh
+40000:40800/tcp (v6)       ALLOW IN    Anywhere (v6)              # vast forwarded ports
+40000:40800/udp (v6)       ALLOW IN    Anywhere (v6)              # vast forwarded ports
+```
+
+Ubuntu enables IPv6 in ufw by default, so every rule appears twice. This is
+correct output, not a duplicate.
+
+Open a **new** terminal and connect again before closing the session you
+enabled the firewall from.
+
+<Check>
+If the new connection succeeds, the firewall is configured. If it hangs, use
+your fallback access to run `sudo ufw disable` and start again. See
+[Recovery](/host/security/recovery) for the full reset.
+</Check>
+
+## If clients cannot reach the machine
+
+| Symptom | Where to look |
+| --- | --- |
+| Machine drops off the marketplace | Outgoing policy set to `deny` |
+| Instances run but clients cannot connect | Your router's port forwarding, your upstream or ISP firewall, or the daemon. Not ufw, which does not filter instance ports |
+| You cannot SSH in after enabling | No allow rule for your admin port |
+| Connections hang after several rapid ones | The `limit` rule; it clears in about thirty seconds |
