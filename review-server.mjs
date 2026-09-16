@@ -31,6 +31,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { serveReviewPresentation } from './scripts/review_presentation.mjs';
 import { INSTALL_INTAKE_PATH, INSTALL_INTAKE_ARTIFACTS, loadInstallEvidenceIntake } from './scripts/current_host_install_evidence_intake.mjs';
 import { AUTHORITY_SCAN_PATH, AUTHORITY_SCAN_DECISION, AUTHORITY_SCAN_RELOCATION, AUTHORITY_SCAN_SOURCE_CHANGED } from './scripts/current_host_authority_scan.mjs';
 import { loadCurrentHostReviewTransition } from './scripts/current_host_review_transition.mjs';
@@ -6157,6 +6158,7 @@ h1{font-size:22px} table{border-collapse:collapse;margin:12px 0}td,th{border:1px
 .btn.primary{background:#4a5cf0;color:#fff}.muted{color:#687086}#importResult{min-height:24px;font-weight:600}
 code{background:#f0f0f6;padding:2px 5px;border-radius:4px}</style></head><body>
 <h1>Vast.ai docs review — PR 185 feedback</h1>
+<p><a class="btn" href="/__review__/presentation/">Review presentation</a></p>
 <p><b>${items.length}</b> item(s), <b>${open}</b> open. Feedback is stored in this local review workspace (default <code>review-feedback/</code>).</p>
 ${vvSummary}
 <table><tr><th>Reviewer</th><th>Items</th></tr>${rows}</table>
@@ -6849,6 +6851,7 @@ const OVERLAY_JS = String.raw`
     '<aside id="panel" role="dialog" aria-modal="false" aria-labelledby="reviewPanelTitle" aria-hidden="true" tabindex="-1">' +
       '<header><b id="reviewPanelTitle">Docs review &mdash; PR 185</b><button id="closePanel" type="button" title="Close" aria-label="Close docs review panel">&times;</button></header>' +
       '<div class="meta">Reviewer: <b id="who">&mdash;</b> <button id="editWho">change</button></div>' +
+      '<div class="exports" style="padding:8px 14px"><a href="/__review__/presentation/" target="_blank" rel="noopener noreferrer">Review presentation</a></div>' +
       '<div class="filters">' +
         '<label><input type="checkbox" id="allPages"> Notes from all pages</label>' +
         '<button id="addPageNote" class="primary">+ Page note</button>' +
@@ -9407,6 +9410,7 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 403, { error: 'review proxy requests require the expected loopback Host' });
     return;
   }
+  if (await serveReviewPresentation(req, res, path.join(VV_REPOSITORY_ROOT, 'review-presentation'))) return;
   const url = new URL(req.url, `http://localhost:${PORT}`);
   if (url.pathname.startsWith('/__review__')) {
     try { await handleReviewRoute(req, res, url); } catch (e) { sendJson(res, 500, { error: String(e.message || e) }); }

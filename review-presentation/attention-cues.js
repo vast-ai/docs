@@ -1,0 +1,1150 @@
+window.attentionCues = {
+  "version": 1,
+  "scenes": [
+    {
+      "scene": 1,
+      "id": "purpose",
+      "cues": [
+        {
+          "id": "updated-host-docs",
+          "label": "Updated Host docs",
+          "kind": "focus",
+          "sentenceStart": 1,
+          "sentenceEnd": 2,
+          "rect": [
+            0.249,
+            0.204,
+            0.255,
+            0.047
+          ],
+          "labelAt": [
+            0.519,
+            0.173
+          ],
+          "arrowTo": [
+            0.445,
+            0.229
+          ]
+        },
+        {
+          "id": "open-review",
+          "label": "Review beside the docs",
+          "kind": "click",
+          "sentenceStart": 5,
+          "sentenceEnd": 5,
+          "rect": [
+            0.835,
+            0.931,
+            0.153,
+            0.051
+          ],
+          "labelAt": [
+            0.646,
+            0.879
+          ],
+          "arrowTo": [
+            0.881,
+            0.956
+          ]
+        }
+      ]
+    },
+    {
+      "scene": 2,
+      "id": "setup-checkout",
+      "cues": [
+        {
+          "id": "setup-prerequisites",
+          "label": "Git + Node 24",
+          "kind": "focus",
+          "sentenceStart": 2,
+          "sentenceEnd": 2,
+          "rect": [
+            0.04583333333333333,
+            0.2886284722222222,
+            0.9083333333333333,
+            0.07666666666666666
+          ],
+          "labelAt": [
+            0.74,
+            0.18
+          ],
+          "arrowTo": [
+            0.827,
+            0.32696180555555554
+          ]
+        },
+        {
+          "id": "setup-fetch-pr",
+          "label": "Copy these five commands",
+          "kind": "focus",
+          "sentenceStart": 3,
+          "sentenceEnd": 4,
+          "rect": [
+            0.06527777777777778,
+            0.4547395833333333,
+            0.8694444444444445,
+            0.25
+          ],
+          "labelAt": [
+            0.71,
+            0.75
+          ],
+          "arrowTo": [
+            0.813,
+            0.5797395833333333
+          ]
+        }
+      ]
+    },
+    {
+      "scene": 3,
+      "id": "setup-start",
+      "cues": [
+        {
+          "id": "setup-docs-command",
+          "label": "Terminal 1: docs",
+          "kind": "focus",
+          "sentenceStart": 2,
+          "sentenceEnd": 2,
+          "rect": [
+            0.06388888888888888,
+            0.3198611111111111,
+            0.8722222222222222,
+            0.04477430555555555
+          ],
+          "labelAt": [
+            0.74,
+            0.22
+          ],
+          "arrowTo": [
+            0.814,
+            0.34224826388888885
+          ]
+        },
+        {
+          "id": "setup-overlay-command",
+          "label": "Terminal 2: review overlay",
+          "kind": "focus",
+          "sentenceStart": 3,
+          "sentenceEnd": 3,
+          "rect": [
+            0.06388888888888888,
+            0.4907465277777778,
+            0.8722222222222222,
+            0.0895486111111111
+          ],
+          "labelAt": [
+            0.7,
+            0.41
+          ],
+          "arrowTo": [
+            0.814,
+            0.5355208333333333
+          ]
+        },
+        {
+          "id": "setup-review-url",
+          "label": "Open the Host overview",
+          "kind": "click",
+          "sentenceStart": 4,
+          "sentenceEnd": 4,
+          "rect": [
+            0.04583333333333333,
+            0.7626041666666666,
+            0.9083333333333333,
+            0.13675347222222223
+          ],
+          "labelAt": [
+            0.72,
+            0.54
+          ],
+          "arrowTo": [
+            0.827,
+            0.8309809027777777
+          ]
+        },
+        {
+          "id": "setup-plain-docs",
+          "label": "3000 = plain docs",
+          "kind": "focus",
+          "sentenceStart": 5,
+          "sentenceEnd": 5,
+          "rect": [
+            0.06319444444444444,
+            0.8558159722222223,
+            0.8736111111111111,
+            0.02798611111111111
+          ],
+          "labelAt": [
+            0.74,
+            0.54
+          ],
+          "arrowTo": [
+            0.8145,
+            0.8698090277777778
+          ]
+        },
+        {
+          "id": "setup-presentation-url",
+          "label": "Open this presentation",
+          "kind": "click",
+          "sentenceStart": 6,
+          "sentenceEnd": 7,
+          "rect": [
+            0.04583333333333333,
+            0.6125173611111111,
+            0.9083333333333333,
+            0.13675347222222223
+          ],
+          "labelAt": [
+            0.72,
+            0.41
+          ],
+          "arrowTo": [
+            0.827,
+            0.6808940972222222
+          ]
+        }
+      ]
+    },
+    {
+      "scene": 4,
+      "id": "account-ui",
+      "cues": [
+        {
+          "id": "account-finding",
+          "label": "Account check finding",
+          "kind": "focus",
+          "sentenceStart": 1,
+          "sentenceEnd": 2,
+          "rect": [
+            0.752,
+            0.394,
+            0.231,
+            0.134
+          ],
+          "labelAt": [
+            0.534,
+            0.358
+          ],
+          "arrowTo": [
+            0.861,
+            0.434
+          ]
+        },
+        {
+          "id": "corrected-settings",
+          "label": "Corrected Settings wording",
+          "kind": "focus",
+          "sentenceStart": 3,
+          "sentenceEnd": 4,
+          "rect": [
+            0.251,
+            0.454,
+            0.479,
+            0.091
+          ],
+          "labelAt": [
+            0.329,
+            0.364
+          ],
+          "arrowTo": [
+            0.47,
+            0.47
+          ]
+        },
+        {
+          "id": "account-source",
+          "label": "Source and its limits",
+          "kind": "focus",
+          "sentenceStart": 5,
+          "sentenceEnd": 6,
+          "rect": [
+            0.757,
+            0.681,
+            0.224,
+            0.181
+          ],
+          "labelAt": [
+            0.563,
+            0.726
+          ],
+          "arrowTo": [
+            0.834,
+            0.746
+          ]
+        }
+      ]
+    },
+    {
+      "scene": 5,
+      "id": "actual-cli",
+      "cues": [
+        {
+          "id": "exact-search",
+          "label": "Exact offer search",
+          "kind": "focus",
+          "sentenceStart": 1,
+          "sentenceEnd": 2,
+          "rect": [
+            0.177,
+            0.197,
+            0.454,
+            0.028
+          ],
+          "labelAt": [
+            0.649,
+            0.171
+          ],
+          "arrowTo": [
+            0.556,
+            0.211
+          ]
+        },
+        {
+          "id": "eight-offers",
+          "label": "Exit 0 · eight offers",
+          "kind": "focus",
+          "sentenceStart": 3,
+          "sentenceEnd": 3,
+          "rect": [
+            0.177,
+            0.331,
+            0.65,
+            0.078
+          ],
+          "labelAt": [
+            0.646,
+            0.277
+          ],
+          "arrowTo": [
+            0.568,
+            0.346
+          ]
+        },
+        {
+          "id": "retained-search-source",
+          "label": "Inspect retained source",
+          "kind": "click",
+          "sentenceStart": 4,
+          "sentenceEnd": 5,
+          "rect": [
+            0.149,
+            0.784,
+            0.293,
+            0.03
+          ],
+          "labelAt": [
+            0.49,
+            0.783
+          ],
+          "arrowTo": [
+            0.358,
+            0.799
+          ]
+        },
+        {
+          "id": "search-scope",
+          "label": "Search only · no rental",
+          "kind": "focus",
+          "sentenceStart": 6,
+          "sentenceEnd": 6,
+          "rect": [
+            0.15,
+            0.527,
+            0.697,
+            0.108
+          ],
+          "labelAt": [
+            0.647,
+            0.738
+          ],
+          "arrowTo": [
+            0.629,
+            0.624
+          ]
+        }
+      ]
+    },
+    {
+      "scene": 6,
+      "id": "host-checklist",
+      "cues": [
+        {
+          "id": "post-install-checks",
+          "label": "Separate post-install checks",
+          "kind": "focus",
+          "sentenceStart": 3,
+          "sentenceEnd": 3,
+          "rect": [
+            0.251,
+            0.255,
+            0.48,
+            0.143
+          ],
+          "labelAt": [
+            0.346,
+            0.162
+          ],
+          "arrowTo": [
+            0.477,
+            0.309
+          ]
+        },
+        {
+          "id": "show-services",
+          "label": "Show on page",
+          "kind": "click",
+          "sentenceStart": 4,
+          "sentenceEnd": 4,
+          "rect": [
+            0.752,
+            0.468,
+            0.08,
+            0.044
+          ],
+          "labelAt": [
+            0.565,
+            0.397
+          ],
+          "arrowTo": [
+            0.792,
+            0.491
+          ]
+        },
+        {
+          "id": "services-sentence",
+          "label": "Exact services sentence",
+          "kind": "focus",
+          "sentenceStart": 5,
+          "sentenceEnd": 5,
+          "rect": [
+            0.272,
+            0.482,
+            0.138,
+            0.031
+          ],
+          "labelAt": [
+            0.391,
+            0.418
+          ],
+          "arrowTo": [
+            0.351,
+            0.499
+          ]
+        }
+      ]
+    },
+    {
+      "scene": 7,
+      "id": "host-result",
+      "cues": [
+        {
+          "id": "service-observation",
+          "label": "Saved service result",
+          "kind": "focus",
+          "sentenceStart": 1,
+          "sentenceEnd": 1,
+          "rect": [
+            0.149,
+            0.082,
+            0.431,
+            0.046
+          ],
+          "labelAt": [
+            0.635,
+            0.115
+          ],
+          "arrowTo": [
+            0.486,
+            0.104
+          ]
+        },
+        {
+          "id": "service-command-output",
+          "label": "Command · exit 0 · active",
+          "kind": "focus",
+          "sentenceStart": 2,
+          "sentenceEnd": 2,
+          "rect": [
+            0.158,
+            0.573,
+            0.316,
+            0.265
+          ],
+          "labelAt": [
+            0.54,
+            0.665
+          ],
+          "arrowTo": [
+            0.433,
+            0.824
+          ]
+        },
+        {
+          "id": "output-hash",
+          "label": "Retained output hash",
+          "kind": "focus",
+          "sentenceStart": 4,
+          "sentenceEnd": 5,
+          "rect": [
+            0.161,
+            0.862,
+            0.565,
+            0.027
+          ],
+          "labelAt": [
+            0.601,
+            0.794
+          ],
+          "arrowTo": [
+            0.593,
+            0.876
+          ]
+        },
+        {
+          "id": "service-scope",
+          "label": "What this check does not prove",
+          "kind": "focus",
+          "sentenceStart": 6,
+          "sentenceEnd": 6,
+          "rect": [
+            0.15,
+            0.375,
+            0.7,
+            0.079
+          ],
+          "labelAt": [
+            0.615,
+            0.298
+          ],
+          "arrowTo": [
+            0.619,
+            0.396
+          ]
+        }
+      ]
+    },
+    {
+      "scene": 8,
+      "id": "client-rental",
+      "cues": [
+        {
+          "id": "client-instance-claim",
+          "label": "Client-side claim",
+          "kind": "focus",
+          "sentenceStart": 1,
+          "sentenceEnd": 2,
+          "rect": [
+            0.272,
+            0.482,
+            0.21,
+            0.033
+          ],
+          "labelAt": [
+            0.342,
+            0.411
+          ],
+          "arrowTo": [
+            0.414,
+            0.499
+          ]
+        },
+        {
+          "id": "same-rental",
+          "label": "Same recorded rental",
+          "kind": "focus",
+          "sentenceStart": 3,
+          "sentenceEnd": 4,
+          "rect": [
+            0.149,
+            0.375,
+            0.701,
+            0.08
+          ],
+          "labelAt": [
+            0.622,
+            0.3
+          ],
+          "arrowTo": [
+            0.618,
+            0.4
+          ],
+          "image": "assets/client-rental-proof.png"
+        },
+        {
+          "id": "api-readback",
+          "label": "Direct API readback",
+          "kind": "focus",
+          "sentenceStart": 5,
+          "sentenceEnd": 5,
+          "rect": [
+            0.175,
+            0.749,
+            0.221,
+            0.078
+          ],
+          "labelAt": [
+            0.513,
+            0.729
+          ],
+          "arrowTo": [
+            0.366,
+            0.789
+          ],
+          "image": "assets/client-rental-proof.png"
+        }
+      ]
+    },
+    {
+      "scene": 9,
+      "id": "rental-result",
+      "cues": [
+        {
+          "id": "gpu-calculation",
+          "label": "GPU calculation",
+          "kind": "focus",
+          "sentenceStart": 1,
+          "sentenceEnd": 1,
+          "rect": [
+            0.149,
+            0.546,
+            0.708,
+            0.132
+          ],
+          "labelAt": [
+            0.642,
+            0.48
+          ],
+          "arrowTo": [
+            0.562,
+            0.612
+          ]
+        },
+        {
+          "id": "cuda-result",
+          "label": "CUDA available · result 1240",
+          "kind": "focus",
+          "sentenceStart": 2,
+          "sentenceEnd": 2,
+          "rect": [
+            0.187,
+            0.757,
+            0.236,
+            0.108
+          ],
+          "labelAt": [
+            0.516,
+            0.755
+          ],
+          "arrowTo": [
+            0.371,
+            0.854
+          ]
+        },
+        {
+          "id": "original-rental-destroy",
+          "label": "Original rental destroyed",
+          "kind": "focus",
+          "sentenceStart": 3,
+          "sentenceEnd": 3,
+          "rect": [
+            0.051389,
+            0.235729,
+            0.897222,
+            0.21217
+          ],
+          "labelAt": [
+            0.62,
+            0.137
+          ],
+          "arrowTo": [
+            0.248,
+            0.411
+          ],
+          "image": "assets/client-cleanup-proof.png"
+        },
+        {
+          "id": "original-rental-absence",
+          "label": "Independent absence checks",
+          "kind": "focus",
+          "sentenceStart": 4,
+          "sentenceEnd": 4,
+          "rect": [
+            0.051389,
+            0.464566,
+            0.897222,
+            0.227187
+          ],
+          "labelAt": [
+            0.662,
+            0.2
+          ],
+          "arrowTo": [
+            0.167,
+            0.628
+          ],
+          "image": "assets/client-cleanup-proof.png"
+        },
+        {
+          "id": "original-rental-source",
+          "label": "Saved record · exact revision",
+          "kind": "focus",
+          "sentenceStart": 5,
+          "sentenceEnd": 5,
+          "rect": [
+            0.051389,
+            0.70842,
+            0.897222,
+            0.162639
+          ],
+          "labelAt": [
+            0.638,
+            0.568
+          ],
+          "arrowTo": [
+            0.345,
+            0.835
+          ],
+          "image": "assets/client-cleanup-proof.png"
+        },
+        {
+          "id": "gpu-result-scope",
+          "label": "Small calculation only",
+          "kind": "focus",
+          "sentenceStart": 6,
+          "sentenceEnd": 7,
+          "rect": [
+            0.15,
+            0.921,
+            0.698,
+            0.056
+          ],
+          "labelAt": [
+            0.583,
+            0.841
+          ],
+          "arrowTo": [
+            0.584,
+            0.943
+          ]
+        }
+      ]
+    },
+    {
+      "scene": 10,
+      "id": "docker-failure",
+      "cues": [
+        {
+          "id": "original-failure",
+          "label": "Original failed run",
+          "kind": "focus",
+          "sentenceStart": 1,
+          "sentenceEnd": 1,
+          "rect": [
+            0.123,
+            0.032,
+            0.258,
+            0.029
+          ],
+          "labelAt": [
+            0.522,
+            0.051
+          ],
+          "arrowTo": [
+            0.345,
+            0.048
+          ]
+        },
+        {
+          "id": "host-sees-gpus-docker-fails",
+          "label": "Host sees GPUs · Docker fails",
+          "kind": "focus",
+          "sentenceStart": 2,
+          "sentenceEnd": 3,
+          "rect": [
+            0.123,
+            0.299,
+            0.736,
+            0.051
+          ],
+          "labelAt": [
+            0.525,
+            0.24
+          ],
+          "arrowTo": [
+            0.653,
+            0.338
+          ]
+        },
+        {
+          "id": "runtime-error",
+          "label": "Error requests --runtime=nvidia",
+          "kind": "focus",
+          "sentenceStart": 4,
+          "sentenceEnd": 4,
+          "rect": [
+            0.123,
+            0.349,
+            0.738,
+            0.047
+          ],
+          "labelAt": [
+            0.474,
+            0.247
+          ],
+          "arrowTo": [
+            0.399,
+            0.38
+          ]
+        },
+        {
+          "id": "failure-record",
+          "label": "Failed attempt retained",
+          "kind": "focus",
+          "sentenceStart": 5,
+          "sentenceEnd": 6,
+          "rect": [
+            0.123,
+            0.084,
+            0.421,
+            0.143
+          ],
+          "labelAt": [
+            0.604,
+            0.135
+          ],
+          "arrowTo": [
+            0.459,
+            0.172
+          ]
+        }
+      ]
+    },
+    {
+      "scene": 11,
+      "id": "docker-retest",
+      "cues": [
+        {
+          "id": "corrected-command",
+          "label": "Published command retest",
+          "kind": "focus",
+          "sentenceStart": 1,
+          "sentenceEnd": 1,
+          "rect": [
+            0.145,
+            0.382,
+            0.573,
+            0.026
+          ],
+          "labelAt": [
+            0.632,
+            0.29
+          ],
+          "arrowTo": [
+            0.432,
+            0.396
+          ]
+        },
+        {
+          "id": "four-gpus-match",
+          "label": "Same four GPUs",
+          "kind": "focus",
+          "sentenceStart": 2,
+          "sentenceEnd": 2,
+          "rect": [
+            0.145,
+            0.355,
+            0.575,
+            0.055
+          ],
+          "labelAt": [
+            0.648,
+            0.289
+          ],
+          "arrowTo": [
+            0.622,
+            0.396
+          ]
+        },
+        {
+          "id": "no-leftover-container",
+          "label": "No test container left running",
+          "kind": "focus",
+          "sentenceStart": 3,
+          "sentenceEnd": 3,
+          "rect": [
+            0.145,
+            0.462,
+            0.686,
+            0.054
+          ],
+          "labelAt": [
+            0.514,
+            0.543
+          ],
+          "arrowTo": [
+            0.512,
+            0.483
+          ]
+        },
+        {
+          "id": "separate-retest-record",
+          "label": "Separate dated retest",
+          "kind": "focus",
+          "sentenceStart": 4,
+          "sentenceEnd": 5,
+          "rect": [
+            0.145,
+            0.091,
+            0.422,
+            0.13
+          ],
+          "labelAt": [
+            0.647,
+            0.148
+          ],
+          "arrowTo": [
+            0.465,
+            0.183
+          ]
+        }
+      ]
+    },
+    {
+      "scene": 12,
+      "id": "review-it",
+      "cues": [
+        {
+          "id": "click-review",
+          "label": "Click Review",
+          "kind": "click",
+          "sentenceStart": 1,
+          "sentenceEnd": 1,
+          "rect": [
+            0.835,
+            0.931,
+            0.153,
+            0.051
+          ],
+          "labelAt": [
+            0.66,
+            0.878
+          ],
+          "arrowTo": [
+            0.885,
+            0.955
+          ],
+          "image": "assets/overview-docs.png"
+        },
+        {
+          "id": "relevant-section",
+          "label": "Find the relevant section",
+          "kind": "focus",
+          "sentenceStart": 2,
+          "sentenceEnd": 2,
+          "rect": [
+            0.752,
+            0.154,
+            0.22,
+            0.025
+          ],
+          "labelAt": [
+            0.53,
+            0.154
+          ],
+          "arrowTo": [
+            0.85,
+            0.166
+          ],
+          "image": "assets/review-tools.png"
+        },
+        {
+          "id": "click-show-on-page",
+          "label": "Show on page",
+          "kind": "click",
+          "sentenceStart": 3,
+          "sentenceEnd": 3,
+          "rect": [
+            0.752,
+            0.501,
+            0.08,
+            0.045
+          ],
+          "labelAt": [
+            0.564,
+            0.425
+          ],
+          "arrowTo": [
+            0.792,
+            0.523
+          ],
+          "image": "assets/review-tools.png"
+        },
+        {
+          "id": "open-saved-result",
+          "label": "Open the saved result",
+          "kind": "click",
+          "sentenceStart": 4,
+          "sentenceEnd": 4,
+          "rect": [
+            0.753,
+            0.696,
+            0.101,
+            0.027
+          ],
+          "labelAt": [
+            0.539,
+            0.677
+          ],
+          "arrowTo": [
+            0.807,
+            0.71
+          ],
+          "image": "assets/review-tools.png"
+        },
+        {
+          "id": "comment-exact-wording",
+          "label": "Comment on selected wording",
+          "kind": "click",
+          "sentenceStart": 5,
+          "sentenceEnd": 5,
+          "rect": [
+            0.745,
+            0.796,
+            0.14,
+            0.044
+          ],
+          "labelAt": [
+            0.516,
+            0.798
+          ],
+          "arrowTo": [
+            0.812,
+            0.819
+          ]
+        },
+        {
+          "id": "set-reviewer-name",
+          "label": "Set your reviewer name",
+          "kind": "click",
+          "sentenceStart": 6,
+          "sentenceEnd": 6,
+          "rect": [
+            0.805,
+            0.056,
+            0.045,
+            0.031
+          ],
+          "labelAt": [
+            0.581,
+            0.105
+          ],
+          "arrowTo": [
+            0.827,
+            0.073
+          ]
+        },
+        {
+          "id": "export-local-feedback",
+          "label": "Export local feedback",
+          "kind": "focus",
+          "sentenceStart": 7,
+          "sentenceEnd": 7,
+          "rect": [
+            0.744,
+            0.912,
+            0.173,
+            0.07
+          ],
+          "labelAt": [
+            0.516,
+            0.847
+          ],
+          "arrowTo": [
+            0.791,
+            0.932
+          ],
+          "image": "assets/review-tools.png"
+        },
+        {
+          "id": "github-evidence-link",
+          "label": "Click Evidence on GitHub",
+          "kind": "click",
+          "sentenceStart": 8,
+          "sentenceEnd": 8,
+          "image": "assets/review-resources.png",
+          "rect": [
+            0.10486111111111111,
+            0.4900173611111111,
+            0.1805447048611111,
+            0.06222222222222222
+          ],
+          "labelAt": [
+            0.295,
+            0.49
+          ]
+        },
+        {
+          "id": "github-evidence-folder",
+          "label": "Evidence folder",
+          "kind": "focus",
+          "sentenceStart": 9,
+          "sentenceEnd": 9,
+          "image": "assets/review-resources.png",
+          "rect": [
+            0.10486111111111111,
+            0.5777951388888889,
+            0.36666666666666664,
+            0.054322916666666665
+          ],
+          "labelAt": [
+            0.305,
+            0.49
+          ],
+          "arrowTo": [
+            0.44,
+            0.6
+          ]
+        },
+        {
+          "id": "owner-questions-link",
+          "label": "Click Owner questions",
+          "kind": "click",
+          "sentenceStart": 10,
+          "sentenceEnd": 10,
+          "image": "assets/review-resources.png",
+          "rect": [
+            0.5284722222222222,
+            0.4900173611111111,
+            0.16190321180555556,
+            0.06222222222222222
+          ],
+          "labelAt": [
+            0.71,
+            0.49
+          ]
+        },
+        {
+          "id": "owner-questions-detail",
+          "label": "Questions and proposed owners",
+          "kind": "focus",
+          "sentenceStart": 11,
+          "sentenceEnd": 11,
+          "image": "assets/owner-questions.png",
+          "rect": [
+            0.105,
+            0.142,
+            0.775,
+            0.1
+          ],
+          "labelAt": [
+            0.44,
+            0.075
+          ]
+        }
+      ]
+    }
+  ]
+};

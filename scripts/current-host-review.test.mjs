@@ -144,6 +144,7 @@ async function fixtureRoot() {
     path.join(root, 'verification', 'evidence', '2026-09-08-host-client-unblocking-attempt-01', item));
   await fs.copyFile(path.join(ROOT, 'verification', 'current-host-readonly-findings.json'), path.join(root, 'verification', 'current-host-readonly-findings.json'));
   await fs.mkdir(path.join(root, 'scripts'), { recursive: true });
+  await fs.copyFile(path.join(ROOT, 'scripts', 'review_presentation.mjs'), path.join(root, 'scripts', 'review_presentation.mjs'));
   await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_install_evidence_intake.mjs'),
     path.join(root, 'scripts', 'current_host_install_evidence_intake.mjs'));
   await fs.copyFile(path.join(ROOT, 'scripts', 'current_host_authority_scan.mjs'), path.join(root, 'scripts', 'current_host_authority_scan.mjs'));

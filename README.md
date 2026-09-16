@@ -2,6 +2,51 @@
 
 Source for [docs.vast.ai](https://docs.vast.ai), the official documentation for the Vast.ai GPU cloud marketplace. Covers renting or hosting GPU instances, deploying serverless inference workloads, and using the CLI, SDK, and REST API.
 
+## Review PR 185 locally
+
+Install Git and Node.js 24 LTS (including npm), then check out the unmerged PR:
+
+```bash
+git clone https://github.com/vast-ai/docs.git docs-pr185
+cd docs-pr185
+git fetch origin pull/185/head
+git switch --detach FETCH_HEAD
+npm ci
+```
+
+Use a full clone/fetch, without `--depth`: the evidence viewer reads pinned
+historical Git revisions. No Vast account, API key, or hardware is needed to read
+the docs and retained records.
+
+In one terminal, from `docs-pr185`, start the docs preview:
+
+```bash
+npm run dev:review -- --port 3000
+```
+
+In another terminal in the same checkout, start the review overlay:
+
+```bash
+node review-server.mjs --host 127.0.0.1 --port 4000 --target http://127.0.0.1:3000
+```
+
+Open <http://127.0.0.1:4000/host/hosting-overview> and click **Review**.
+**Review presentation** in the panel opens the bundled video and HTML walkthrough,
+setup guide, owner questions, and retained evidence links. The same link appears
+on the [review dashboard](http://127.0.0.1:4000/__review__/), or open
+<http://127.0.0.1:4000/__review__/presentation/> directly. Both terminals stay
+running; no third server is needed. Presentation files live in `review-presentation/`
+and are excluded from the customer-facing Mintlify preview on port 3000.
+
+Feedback stays in this checkout's `review-feedback/` directory. Export it from
+the panel to share it; starting the reviewer does not post anything. Before
+refreshing the PR checkout, stop these two processes and run `git status --short`
+to check for local work; preserve it before fetching and switching again.
+
+The reader reports source drift when a document has changed since its retained
+review. The presentation and historical records do not override that check or
+establish that a later version was executed on hardware.
+
 ## Updating the API reference
 
 API endpoint specs live in `api-reference/openapi/yaml/` (one file per endpoint). The combined spec consumed by Mintlify is `api-reference/openapi.yaml`.

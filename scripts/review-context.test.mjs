@@ -100,6 +100,7 @@ async function materializeReviewedSourceFixture(fixtureRoot) {
 
 async function copyInstallationIntakeModule(fixtureRoot) {
   await fs.mkdir(path.join(fixtureRoot, 'scripts'), { recursive: true });
+  await fs.copyFile(path.join(ROOT, 'scripts', 'review_presentation.mjs'), path.join(fixtureRoot, 'scripts', 'review_presentation.mjs'));
   await fs.copyFile(path.join(ROOT, 'scripts', 'host_review_reader_copy.mjs'), path.join(fixtureRoot, 'scripts', 'host_review_reader_copy.mjs'));
   await fs.copyFile(path.join(ROOT, 'scripts', 'host_review_work_queue.mjs'), path.join(fixtureRoot, 'scripts', 'host_review_work_queue.mjs'));
   await fs.copyFile(path.join(ROOT, 'scripts', 'host_review_owner_questions.mjs'), path.join(fixtureRoot, 'scripts', 'host_review_owner_questions.mjs'));
