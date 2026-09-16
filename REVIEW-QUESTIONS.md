@@ -17,6 +17,18 @@
 > 2. In the local review kit, open `http://localhost:4000/review-questions`, select a question, and comment — it lands in the same feedback export as your page comments.
 > 3. Reply on the linked Jira ticket.
 
+## Reviewing Simple and Advanced examples
+
+The September 16 presentation change is intentional: **Simple** shows the shortest complete path, while a collapsed **Advanced** section holds longer variants, optional diagnostics, and explanations. Review both in their surrounding procedure. Essential prerequisites must remain visible before the command they govern.
+
+Assume the reader administers their own host and has root or sudo access. Judge each precaution against a concrete consequence. Do not require credential-handling wrappers, permission-management scripts, or repeated warnings merely because an example uses root or accepts a key. Hidden-input prompts can be an Advanced option; keep real credentials out of published examples and review artifacts.
+
+Preserve checks that prevent erasing the wrong device, losing SSH access, interrupting active rentals, or continuing after a failed prerequisite. If a short example loses one of these checks, identify that specific failure and propose the smallest correction. Do not restore a long script solely because the earlier audit contained it.
+
+Keep credential types distinct: Host Setup supplies a temporary installation key; ordinary CLI account API keys do not expire by default. Automatic rotation of a machine key does not establish automatic rotation of every account key. See the [CLI authentication reference](https://docs.vast.ai/cli/authentication#key-expiration).
+
+**Evidence status:** the changed pages passed MDX compilation, browser expand/collapse checks, and Bash syntax checks. The documented host commands were not executed. Existing source-bound evidence needs refreshing; this presentation decision does not renew a runtime result or change a recorded PASS/FAIL status.
+
 ## Input 1. IA approval
 
 **Owner: Michele + docs owners · Round 0 · unblocks everything**

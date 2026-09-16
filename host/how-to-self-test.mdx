@@ -11,7 +11,14 @@ personas:
 
 <div className="persona-chips"><span className="persona-chip">Pro Operator</span><span className="persona-chip">Headless / DC</span></div>
 
-Self-test checks a listed machine against the CLI’s preflight requirements and attempts a temporary diagnostic rental. It does not by itself establish platform verification or readiness for every renter workload.
+You can start a self-test from the **Web UI** or run one with the **Vast CLI**:
+
+| Method | Where to start |
+| --- | --- |
+| [Web UI](#web-ui-self-test) | Choose **Test machine** from the machine’s menu on the Machines page. |
+| [Vast CLI](#vast-cli-self-test) | Run `vastai self-test machine <machine_id>` in a terminal on a computer outside the host’s network. |
+
+The CLI’s checks and diagnostic options are described below. A self-test result does not by itself establish platform verification or readiness for every renter workload.
 
 <Note>
 Passing self-test is one part of preparing for verification; the machine must also meet the published [verification requirements](/host/verification-stages#additional-requirements-for-verification). A pass does not guarantee verification, search placement or rentals.
@@ -19,39 +26,14 @@ Passing self-test is one part of preparing for verification; the machine must al
 
 ## Before You Run It
 
-- Install the [Vast CLI](https://cloud.vast.ai/cli/), then follow [CLI Hello World](/cli/hello-world) to authenticate and verify the installation. For host-oriented command guidance, see [Host CLI/API/SDK](/host/cli-api-sdk).
-- Set the API key for the host-enabled account that owns the machine. For host key guidance, see [Host Account Security](/host/account-security-for-hosts).
+- Use the host-enabled account that owns the machine.
 - List the machine.
 - Make sure no client is actively renting it.
-- Run from outside the host LAN when testing ports, such as a cloud VM or mobile connection. Same-LAN tests can be confused by NAT hairpinning.
-
-```bash
-# Run in Bash on Linux or macOS. Enter the key at the prompt.
-(
-  set +x
-  umask 077
-  case "${XDG_CONFIG_HOME:-}" in
-    /*) task_vast_key_dir="$XDG_CONFIG_HOME/vastai" ;;
-    *) task_vast_key_dir="$HOME/.config/vastai" ;;
-  esac
-  task_vast_key_file="$task_vast_key_dir/vast_api_key"
-  if [ -L "$task_vast_key_file" ] || { [ -e "$task_vast_key_file" ] && [ ! -f "$task_vast_key_file" ]; }; then
-    printf 'Expected a regular key file; inspect the configured path before continuing.\n' >&2
-    exit 1
-  fi
-  read -r -s -p 'Host API key: ' task_vast_key || exit 1
-  printf '\n'
-  [ -n "$task_vast_key" ] || exit 1
-  mkdir -p "$task_vast_key_dir" && chmod 700 "$task_vast_key_dir" || exit 1
-  touch "$task_vast_key_file" && chmod 600 "$task_vast_key_file" || exit 1
-  vastai set api-key "$task_vast_key"
-)
-```
 
 <span id="what-the-self-test-checks" aria-hidden="true" />
 ## What Self-Test Checks
 
-The CLI checks for a rentable offer and evaluates its reported requirements. If those checks allow the run, it attempts a temporary diagnostic rental, starts the selected image, polls progress and reports the result. It also attempts to destroy the temporary instance. If cleanup reports a failure, follow the displayed instructions to check and remove the remaining test instance.
+The checks in this section describe the **CLI self-test**. The CLI checks for a rentable offer and evaluates its reported requirements. If those checks allow the run, it attempts a temporary diagnostic rental, starts the selected image, polls progress and reports the result. It also attempts to destroy the temporary instance. If cleanup reports a failure, follow the displayed instructions to check and remove the remaining test instance.
 
 Before attempting the temporary diagnostic rental, the CLI looks for a rentable offer and checks its reported requirements:
 
@@ -84,6 +66,12 @@ Hyperthreads and logical CPUs do not count as physical cores.
 
 ## Run The Test
 
+### Web UI Self-Test
+
+1. Open the **Machines** page in the Vast Web UI and find your machine.
+2. Open its three-dot menu and select **Test machine**.
+3. In the **Self Test** dialog, leave **Ignore system requirements** unchecked for a normal run, then select **Run Test**. The Web UI opens a new tab to run the test.
+
 <Frame caption="The Machines list exposes the Test machine action for a listed host.">
   ![Test machine action in the Machines list](/images/host-self-test-machine-menu.webp)
 </Frame>
@@ -92,11 +80,25 @@ Hyperthreads and logical CPUs do not count as physical cores.
   ![Self-Test confirmation dialog](/images/host-self-test-status.webp)
 </Frame>
 
-Run:
+### Vast CLI Self-Test
+
+Follow [CLI Hello World](/cli/hello-world) to install the CLI and authenticate with an API key for the host account that owns the machine. See [Host Account Security](/host/account-security-for-hosts) for key guidance.
+
+Run the CLI on a computer **outside the host’s LAN**, such as a cloud VM or a laptop using mobile data with Wi-Fi disconnected. The CLI connects to the temporary instance’s public IP and mapped port. An SSH session on the host still runs the CLI inside the host’s network, even if you connect from elsewhere.
+
+<Note>
+NAT hairpinning lets a local device reach another local device through its public address. A same-LAN test can fail when hairpinning is unavailable, or pass without testing the full Internet path when it is enabled. That pass can miss double-NAT forwarding problems or ISP firewall restrictions. Enabling hairpinning is not a substitute for testing from an external network. See [Network & Ports](/host/network-ports#test-ports-outside-lan).
+</Note>
+
+**Simple**
+
+From that external computer, run:
 
 ```bash
 vastai self-test machine <machine_id>
 ```
+
+<Accordion title="Advanced">
 
 To choose where failure bundles are saved:
 
@@ -105,7 +107,9 @@ vastai self-test machine <machine_id> \
   --support-bundle-dir /path/to/output
 ```
 
-Do not paste API keys or account-specific commands into public channels.
+See the [CLI command reference](/cli/reference/self-test-machine) for debugging and other options.
+
+</Accordion>
 
 If the test passes, the CLI reports success.
 

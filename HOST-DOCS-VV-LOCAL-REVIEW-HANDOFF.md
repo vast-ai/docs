@@ -4,6 +4,12 @@ This handover is for a reviewer using the same Mac as the current checkout. It
 asks for an independent evidence review, not a rubber-stamp approval and not a
 rerun of paid, destructive, mutating, WAN, VM, or GPU-load procedures.
 
+## September 16 update: command-example presentation
+
+For the current Simple/Advanced edits, use the [command-example review guidance](./REVIEW-QUESTIONS.md#reviewing-simple-and-advanced-examples), also available at `/review-questions` in the local preview. Short examples are deliberate; assess their completeness and concrete risks in the context of a host administrator with root/sudo access.
+
+The older targets, counts, and evidence below describe their recorded checkpoints. They have not been refreshed for these presentation edits. Syntax and browser checks do not establish that the documented host operations ran.
+
 ## Copy-paste request to the reviewer
 
 Hi — could you please independently review the Host Docs V&V package on this

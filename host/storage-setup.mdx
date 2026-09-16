@@ -68,11 +68,28 @@ Do not work around quota errors by removing Docker quota settings. Fix the files
 <span id="disposable-device-example" aria-hidden="true" />
 ## Disposable Device Example
 
-Use this only after you have confirmed the target partition, RAID device, or LVM volume is safe to dedicate to Docker.
+**Simple**
+
+Inspect the partition, RAID device, or LVM volume you intend to dedicate to Docker. Replace the example path with your device:
+
+```bash
+lsblk -f /dev/mapper/vg1-lv--1
+findmnt -S /dev/mapper/vg1-lv--1
+```
+
+`findmnt` shows any mount it finds for that device. Confirm that the device contains no OS or renter data before preparing it. If you need to format it manually, use the Advanced procedure below.
+
+<Warning>
+The Advanced formatting command erases the selected device. Confirm the exact device path and arrange maintenance with no active rentals or other storage users before running it.
+</Warning>
+
+<Accordion title="Advanced">
+
+Use this only after confirming that the target device is safe to erase. Replace the example path below; the command checks the device and asks you to type its path again. If the device is mounted, unmounting must succeed before formatting.
 
 ```bash
 (
-  VAST_DOCKER_DEVICE=/dev/mapper/vg1-lv--1  # Replace with your confirmed disposable device.
+  VAST_DOCKER_DEVICE=/dev/mapper/vg1-lv--1
   [ -b "$VAST_DOCKER_DEVICE" ] || exit 1
   lsblk -f "$VAST_DOCKER_DEVICE" || exit 1
   findmnt -S "$VAST_DOCKER_DEVICE" || true
@@ -97,6 +114,8 @@ sudo xfs_quota -x -c "state" /var/lib/docker
 ```
 
 If you are starting from a raw disk, create a partition first. The [Headless Install Path](/host/headless-install) includes a `cfdisk` example.
+
+</Accordion>
 
 <span id="fstab-example" aria-hidden="true" />
 ## Example fstab Line
@@ -135,23 +154,7 @@ Plan the storage migration for maintenance with no active rentals or other stora
 
 ## Installer Connection
 
-Review the prepared Docker storage in the Host Installer Wizard’s Storage step. If you use the [headless fallback installer](/host/installing-host-software#headless-fallback), use the installer downloaded from the official Setup page and pass the verified block device behind the Docker mount:
-
-```bash
-(
-  # Replace the example device and port range with your prepared values.
-  IFS= read -r -s -p "Paste current Vast host setup key: " VAST_HOST_KEY || exit 1
-  printf '\n'
-  [ -n "$VAST_HOST_KEY" ] || exit 1
-  sudo python3 ./install "$VAST_HOST_KEY" \
-    --no-driver \
-    --docker-partition /dev/mapper/vg1-lv--1 \
-    --ports 40000 40799
-  VAST_INSTALL_RESULT=$?
-  unset VAST_HOST_KEY
-  exit "$VAST_INSTALL_RESULT"
-)
-```
+Review the prepared Docker storage in the Host Installer Wizard’s Storage step. For command-line installation, follow the [headless fallback installer instructions](/host/installing-host-software#headless-fallback) and add `--docker-partition` with the verified block device behind your Docker mount. For example, add `--docker-partition /dev/mapper/vg1-lv--1`, replacing the path with your prepared device.
 
 Fix ext4, missing quotas, or wrong-device mounts before installing.
 

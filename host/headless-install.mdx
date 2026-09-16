@@ -7,6 +7,9 @@ personas:
   - headless-operator
 ---
 
+import HostInstallCommand from '/snippets/host/install-command.mdx';
+import HostPortRange from '/snippets/host/port-range.mdx';
+
 <div className="persona-chips"><span className="persona-chip">Headless / DC</span></div>
 
 Use this path when the host is installed and operated entirely over SSH, BMC, or IPMI: no display, keyboard, or desktop environment. It takes a clean Ubuntu Server machine to a listed Vast host from the command line.
@@ -219,33 +222,20 @@ Keep the SSH session open until the wizard finishes. If the connection might dro
 tmux new -s vast-install
 ```
 
-The wizard includes checks for account access, drivers, hardware, storage, ports, network speed, installation and self-test readiness. Use the current Setup command for the intended account; do not reuse old commands or another account’s credential. Do not assume a separately configured API key is an interchangeable substitute.
+The wizard includes checks for account access, drivers, hardware, storage, ports, network speed, installation and self-test readiness. Copy a fresh command from Setup for the intended account; its temporary installation key is different from a CLI account API key.
 
 If the SSH terminal cannot drive the TUI reliably, use the raw installer as a headless fallback. Include both the prepared Docker storage device and the direct port range:
 
-```bash
-mkdir -p ~/vast-install &&
-cd ~/vast-install &&
-wget https://console.vast.ai/install -O install &&
-IFS= read -r -s -p "Paste current Vast host setup key: " VAST_HOST_KEY &&
-printf '\n' &&
-[ -n "$VAST_HOST_KEY" ] &&
-sudo python3 ./install "$VAST_HOST_KEY" \
-  --no-driver \
-  --docker-partition /dev/mapper/vg1-lv--1 \
-  --ports 40000 40799
-unset VAST_HOST_KEY
-```
+<HostInstallCommand />
 
-Use `--no-driver` only after `nvidia-smi` shows all GPUs. Replace the Docker storage device and ports with your actual host values.
 
 ## Step 8: Configure GRUB Only When Needed
 
 Do not change kernel boot parameters during a normal Docker-only install unless you are fixing a specific driver problem or enabling [VM support](/host/vms). If you are preparing VM support, edit `/etc/default/grub` and add the VM-related options for your CPU platform:
 
+Preserve existing `GRUB_CMDLINE_LINUX` options when adding this setting. On AMD systems, enable IOMMU in firmware and verify IOMMU groups.
+
 ```text
-# Preserve other existing GRUB_CMDLINE_LINUX options.
-# AMD: enable IOMMU in firmware and verify IOMMU groups.
 GRUB_CMDLINE_LINUX="nvidia_drm.modeset=0"
 ```
 
@@ -265,18 +255,10 @@ sudo update-grub
 
 Forward the direct port range from outside your network to the host for both TCP and UDP. Set the port range for client instances if you did not already pass it to the installer. This 8-GPU example gives about 100 direct ports per listed GPU:
 
-```bash
-# Apply network changes during planned maintenance after reviewing active rentals.
-printf %s "40000-40799" | sudo tee /var/lib/vastai_kaalia/host_port_range &&
-sudo cat /var/lib/vastai_kaalia/host_port_range &&
-sudo systemctl restart vastai.service
-# Inspect daemon output separately for startup or network errors.
-sudo tail -n 50 /var/lib/vastai_kaalia/kaalia.log
-```
+<HostPortRange />
 
-Use `echo -n` so the file contains only the dash-separated range.
 
-Size the range for the number of GPUs you plan to list with [Network & Ports](/host/network-ports#ports-per-gpu). Test that ports are reachable **from outside your LAN**: same-LAN tests can fail from NAT hairpinning. One option is to run `sudo nc -l -p PORT` on the host and check from an external network or [portchecker.co](https://portchecker.co).
+Size the range for the number of GPUs you plan to list with [Network & Ports](/host/network-ports#ports-per-gpu). Test that ports are reachable **from outside your LAN**, even if a same-LAN test passes through NAT hairpinning. A local pass can miss double-NAT forwarding problems or ISP firewall restrictions. Follow the [external port-test steps](/host/network-ports#test-ports-outside-lan).
 
 ## Step 10: Fix NVML Error If Needed
 
@@ -309,8 +291,8 @@ nvidia-smi
 ## Step 12: List, Self-Test, And Monitor
 
 1. List the machine and set pricing.
-2. Run the self-test from a machine with the CLI, the required account access and network connectivity: [How to Self-Test](/host/how-to-self-test). If the installer starts its self-test helper automatically, that helper waits about 10 minutes before the attempt; watch `/var/lib/vastai_kaalia/self_test.log`.
-3. If the self-test reaches the host’s public address from behind the same NAT, the router needs NAT hairpinning for that path. If it is unavailable, run from an external network, such as a cloud VM or mobile connection.
+2. Choose the [Web UI or Vast CLI self-test](/host/how-to-self-test). If the installer starts its self-test helper automatically, that helper waits about 10 minutes before the attempt; watch `/var/lib/vastai_kaalia/self_test.log`.
+3. For the CLI self-test, run the command on a computer outside the host’s network, such as a cloud VM or a laptop on mobile data. A test running on the host or elsewhere on its LAN does not establish Internet reachability, even when NAT hairpinning is enabled.
 4. Watch the first day over SSH: keep an eye on `vastai.service`, Docker, GPU visibility, port reachability, and the self-test log.
 
 ## Related Pages

@@ -8,6 +8,8 @@ personas:
   - headless-operator
 ---
 
+import HostPortRange from '/snippets/host/port-range.mdx';
+
 <div className="persona-chips"><span className="persona-chip">Pro Operator</span><span className="persona-chip">Headless / DC</span></div>
 
 Configure public inbound networking before verification. Vast hosts need direct ports reachable from outside the host LAN.
@@ -34,24 +36,13 @@ Forward both TCP and UDP for the configured direct port range. TCP-only forwardi
 
 In the Host Installer Wizard, enter the same range you forwarded.
 
-For the raw installer:
-
-```bash
-sudo python3 ./install "$VAST_HOST_KEY" --ports 40000 40799
-```
+For the [raw installer](/host/installing-host-software#headless-fallback), include `--ports 40000 40799` in the install command, replacing the range with your forwarded ports.
 
 For an installed host:
 
-```bash
-# Apply network changes during planned maintenance after reviewing active rentals.
-printf %s "40000-40799" | sudo tee /var/lib/vastai_kaalia/host_port_range &&
-sudo cat /var/lib/vastai_kaalia/host_port_range &&
-sudo systemctl restart vastai.service
-# Inspect daemon output separately for startup or network errors.
-sudo tail -n 50 /var/lib/vastai_kaalia/kaalia.log
-```
+<HostPortRange />
 
-Confirm that the stored range is `40000-40799` and matches your router/firewall rules. Check daemon logs for errors after the restart, then test reachability from outside the LAN; reading back the file does not prove that forwarding works.
+After applying the range, [test reachability from outside the LAN](#test-ports-outside-lan).
 
 <span id="cgnat-starlink-ipv6" aria-hidden="true" />
 ## CGNAT, Starlink, IPv6-Only, Or No Public IP
@@ -63,19 +54,15 @@ Compare your router WAN IP with your public IP and test from outside the LAN. If
 <span id="test-ports-outside-lan" aria-hidden="true" />
 ## Test Ports From Outside The LAN
 
-Same-LAN tests can be misleading because of NAT hairpinning. Test from a different network, such as mobile data, a cloud VM, or another external machine.
+Test from a different network, such as a cloud VM or a laptop on mobile data with Wi-Fi disconnected. A same-LAN test can fail without NAT hairpinning, or pass through a local hairpin path while Internet connections remain blocked by double-NAT forwarding problems or ISP firewall restrictions. Enabling hairpinning does not validate the external path; test from outside the host’s network even when local tests pass.
 
-Use two SSH sessions on the host; do not paste the following lines into one shell. In the first session, start the temporary TCP listener and leave it running. While it is still running, use the second session to confirm the port is listening:
+**Simple**
+
+On the host, start a temporary TCP listener in an empty directory. Leave it running while you test from another computer:
 
 ```bash
-# First SSH session: serve only a newly created empty directory, without sudo.
 VAST_PORT_TEST_DIR=$(mktemp -d) &&
 python3 -m http.server 40000 --bind 0.0.0.0 --directory "$VAST_PORT_TEST_DIR"
-# After stopping the server with Ctrl+C:
-rmdir "$VAST_PORT_TEST_DIR"
-
-# Second SSH session, while the server is running:
-sudo ss -ltnp | grep ':40000'
 ```
 
 From macOS or Linux outside the LAN:
@@ -94,7 +81,7 @@ curl.exe http://PUBLIC_IP:40000/
 
 Use the TCP checks above from an external machine to test inbound TCP reachability.
 
-For UDP, watch for packets on the host:
+For UDP, open a second session on the host and watch for packets:
 
 ```bash
 sudo tcpdump -ni any udp port 40000
@@ -115,7 +102,27 @@ $udp.Send($bytes, $bytes.Length, "PUBLIC_IP", 40000)
 $udp.Close()
 ```
 
-When testing is complete, return to the first session and press `Ctrl+C`. From the second session, repeat the listener check and confirm that it returns no match. Stop all temporary listeners before running the installer.
+When testing is complete, press `Ctrl+C` in the listener session, then remove the empty directory:
+
+```bash
+rmdir "$VAST_PORT_TEST_DIR"
+```
+
+Stop `tcpdump` with `Ctrl+C` as well. Stop all temporary listeners before running the installer.
+
+<Accordion title="Advanced">
+
+If the external TCP test fails, use a second SSH session on the host to check whether the temporary server is listening:
+
+```bash
+sudo ss -ltnp | grep ':40000'
+```
+
+Run this check while the server is running. If no listener appears, fix that first; if it does, check the host firewall, router forwarding, and upstream network. Run the check again after stopping the server to confirm the temporary listener is gone.
+
+The empty serving directory keeps the test response predictable and avoids exposing files from your current directory. Port `40000` does not require running the HTTP server as root.
+
+</Accordion>
 
 During self-test, troubleshoot the exact public IP and port reported by the CLI, such as `https://PUBLIC_IP:PORT/progress`.
 
