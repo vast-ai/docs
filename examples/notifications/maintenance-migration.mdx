@@ -1,0 +1,205 @@
+---
+title: "Migrate an Instance Before Scheduled Maintenance"
+slug: "vast-notifications-maintenance-migration"
+createdAt: "Wed Sep 09 2026 00:00:00 GMT+0000 (Coordinated Universal Time)"
+updatedAt: "Wed Sep 09 2026 00:00:00 GMT+0000 (Coordinated Universal Time)"
+---
+
+import WebhookAutomationSetup from '/snippets/notifications/webhook-automation-setup.mdx';
+
+Use this example to move a job off an instance before its host machine goes down for scheduled maintenance. Vast.ai sends an **Upcoming instance downtime** notification with the affected instance and machine; the handler below looks up the window, copies your work off the instance, starts a replacement on a different machine, and destroys the original once the replacement is running.
+
+This page builds on the receiver pattern from [Send Notifications to Slack](/examples/notifications/slack-webhook). For the companion example that reacts to unplanned machine loss, see [Route Around Offline Instances](/examples/notifications/offline-aware-load-balancer).
+
+<WebhookAutomationSetup />
+
+## What Happens Without This
+
+A host schedules maintenance on the machine your instance runs on. Vast.ai sends you an **Upcoming instance downtime** notification with the window. If nothing acts on it, your instance goes down when the window opens, and whatever was on its disk is unavailable until the host brings the machine back.
+
+This tutorial catches that notice in code, copies your checkpoint or working directory off the instance, starts a replacement on a different machine, and destroys the original once the replacement is running. Maintenance becomes a move you schedule instead of an outage you discover.
+
+## How the Events Fit Together
+
+| Event | `data` fields | Your action |
+| --- | --- | --- |
+| `upcoming_downtime` | `instance_id`, `machine_id`, `maintenance_id` | Look up the window, then migrate before it opens |
+| `instance_started` | `instance_id`, `machine_id` | Replacement is running: destroy the original |
+
+<Note>
+Today the `upcoming_downtime` payload identifies the maintenance but does not include its start time or duration. You look those up with one API call, shown below. The payload is being extended to carry the window directly; when it does, the lookup becomes a fallback rather than a required step.
+</Note>
+
+## Look Up the Maintenance Window
+
+Query maintenance windows by machine ID and match on the `maintenance_id` from the payload. A machine can have more than one window scheduled.
+
+```bash
+curl -sS -X POST "https://console.vast.ai/api/v0/machines/maintenances" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"machine_ids": [447823]}'
+```
+
+```json
+[
+  {
+    "id": 88213,
+    "machine_id": 447823,
+    "start_time": 1757649600,
+    "duration_hours": 6,
+    "maintenance_category": "software"
+  }
+]
+```
+
+`start_time` is a Unix timestamp in seconds. The response has no end time; compute it as `start_time + 3600 * duration_hours`.
+
+## Write the Migration Handler
+
+Create `migrate.py`. It registers two handlers with the shared receiver and owns one piece of state: which new instance is replacing which old one.
+
+```python
+#!/usr/bin/env python3
+import os
+import threading
+import time
+
+import requests
+from vastai import VastAI
+
+from receiver import on, serve
+
+API_KEY = os.environ["VAST_API_KEY"]
+vast = VastAI(api_key=API_KEY)
+API = "https://console.vast.ai/api/v0"
+AUTH = {"Authorization": f"Bearer {API_KEY}"}
+
+MIGRATE_LEAD_SECONDS = 2 * 3600      # start the move this long before the window opens
+CHECKPOINT_DIR = "/workspace/checkpoints"
+CLOUD_CONNECTION_ID = os.environ.get("VAST_CLOUD_CONNECTION_ID")   # from Cloud Sync in the console
+
+REPLACING: dict[int, int] = {}       # new_instance_id -> old_instance_id
+
+
+def maintenance_window(machine_id: int, maintenance_id: int) -> dict | None:
+    r = requests.post(f"{API}/machines/maintenances", headers=AUTH,
+                      json={"machine_ids": [machine_id]}, timeout=10)
+    r.raise_for_status()
+    for w in r.json():
+        if w["id"] == maintenance_id:
+            w["end_time"] = w["start_time"] + 3600 * w["duration_hours"]
+            return w
+    return None
+
+
+def save_checkpoint(instance_id: int) -> None:
+    """Get state off the instance. Replace with your own rsync/s3 sync if you already have one."""
+    vast.cloud_copy(
+        src=CHECKPOINT_DIR,
+        dst=f"/vast-checkpoints/{instance_id}",
+        instance=str(instance_id),
+        connection=CLOUD_CONNECTION_ID,
+        transfer="Instance to Cloud",
+    )
+
+
+def place_replacement(old: dict, exclude_machines: list[int]) -> int:
+    """Rent the same GPU and image on a different machine. Returns the new instance ID."""
+    offers = vast.search_offers(
+        query=f"gpu_name={old['gpu_name'].replace(' ', '_')} num_gpus={old['num_gpus']} "
+              f"rentable=true dph<={old['dph_total'] * 1.25:.3f}",
+        order="dph",
+        limit=20,
+    )
+    offer = next(o for o in offers if o["machine_id"] not in exclude_machines)
+    result = vast.create_instance(
+        id=offer["id"],
+        image=old["image_uuid"],
+        disk=old["disk_space"],
+        label=old.get("label"),
+        env=old.get("extra_env"),
+        onstart_cmd=os.environ.get("RESUME_CMD"),     # your job's "resume from checkpoint" command
+    )
+    return result["new_contract"]
+
+
+def migrate(instance_id: int, exclude_machines: list[int]) -> None:
+    old = vast.show_instance(id=instance_id)
+    print(f"migrating instance {instance_id} off machine {old['machine_id']}", flush=True)
+    save_checkpoint(instance_id)
+    new_id = place_replacement(old, exclude_machines)
+    REPLACING[new_id] = instance_id
+    print(f"replacement instance {new_id} created; waiting for it to start", flush=True)
+
+
+@on("upcoming_downtime")
+def on_upcoming_downtime(evt: dict) -> None:
+    d = evt.get("data") or {}
+    if evt.get("data_truncated") or "instance_id" not in d:
+        print("payload incomplete; check instances manually", flush=True)
+        return
+    window = maintenance_window(d["machine_id"], d["maintenance_id"])
+    if window is None:
+        print(f"maintenance {d['maintenance_id']} no longer scheduled; nothing to do", flush=True)
+        return
+
+    starts_in = window["start_time"] - time.time()
+    delay = max(0, starts_in - MIGRATE_LEAD_SECONDS)
+    print(f"maintenance on machine {d['machine_id']} starts in {starts_in/3600:.1f}h "
+          f"for {window['duration_hours']}h; migrating in {delay/3600:.1f}h", flush=True)
+    threading.Timer(delay, migrate, args=(d["instance_id"], [d["machine_id"]])).start()
+
+
+@on("instance_started")
+def on_instance_started(evt: dict) -> None:
+    new_id = (evt.get("data") or {}).get("instance_id")
+    old_id = REPLACING.pop(new_id, None)
+    if old_id is None:
+        return                                        # not one of ours
+    print(f"instance {new_id} running; destroying original {old_id}", flush=True)
+    vast.destroy_instance(id=old_id)
+
+
+if __name__ == "__main__":
+    serve()
+```
+
+A few points about the design:
+
+- **The move starts on your schedule, not the host's.** `MIGRATE_LEAD_SECONDS` decides how long before the window the migration begins. Set it longer than your checkpoint copy plus the replacement's image pull.
+- **The replacement excludes the machine under maintenance.** `place_replacement` skips any offer on `machine_id`. Without that, the cheapest offer is often another slot on the same machine.
+- **The original is destroyed only after the replacement reports `instance_started`.** That event fires once, when a new rental first runs. Until then you pay for both instances, which is the price of not losing the job.
+- **The checkpoint copy is the part only you can own.** Vast.ai cannot know when a file is fully written. If your job already pushes checkpoints to your own storage on a schedule, replace `save_checkpoint` with a no-op and point `RESUME_CMD` at that location.
+
+## Run It
+
+```bash
+export VAST_API_KEY VAST_WEBHOOK_SECRET
+export VAST_CLOUD_CONNECTION_ID=<your Cloud Sync connection id>
+export RESUME_CMD='cd /workspace && python train.py --resume-from /workspace/checkpoints/latest'
+python3 migrate.py
+```
+
+Then simulate a downtime notice against a real instance you own. Set `MIGRATE_LEAD_SECONDS` high, or the event will schedule the move for later rather than now:
+
+```bash
+python3 simulate.py upcoming_downtime \
+  '{"instance_id": <your instance id>, "machine_id": <its machine id>, "maintenance_id": 0}'
+```
+
+Because `maintenance_id` `0` does not exist, the handler logs "no longer scheduled" and stops, which confirms the lookup path works. To exercise the full migration, temporarily change `maintenance_window` to return a fake window a few hours out.
+
+## What This Does Not Cover
+
+- **Multi-instance jobs.** Each affected instance gets its own `upcoming_downtime` event. A distributed job needs a coordinator that moves all ranks together.
+- **Windows that fire while the receiver is down.** Timers live in process memory. For production, persist the pending migrations or poll the maintenance endpoint for your instances' machines on startup.
+- **Contract expiry.** A rental that reaches its end date is deleted, not paused. The **Instance expiring soon** notification gives three days of notice and pairs naturally with the same `save_checkpoint` step.
+
+## Production Notes
+
+- Run the receiver on an always-on host with a stable HTTPS URL, not on a rented GPU instance.
+- Persist any state that must survive a restart: pending migrations in Tutorial 1, the pool and blacklist in Tutorial 2.
+- Keep a periodic reconciliation against `GET /api/v0/instances/` as a backstop. Webhook delivery is at-least-once and can be delayed by retries.
+- Rotate the webhook secret if it is ever exposed, and update `VAST_WEBHOOK_SECRET` before the next delivery.
+- Before depending on any `data` field, confirm it with a test delivery or a simulated event. The set of fields per event is documented in [Notification Webhooks](/guides/reference/notification-webhooks) and may grow over time.

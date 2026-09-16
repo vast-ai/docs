@@ -1,0 +1,245 @@
+## Before You Start
+
+### Prerequisites
+
+- A Vast.ai API key from [Keys](https://cloud.vast.ai/manage-keys/)
+- Python 3.10 or newer with `requests` and the `vastai` SDK installed
+- A public HTTPS URL for your receiver. For local testing use a tunnel such as Tunnelmole, ngrok, or Cloudflare Tunnel; for production deploy the receiver on an always-on host
+
+```bash
+mkdir vast-webhook-automation
+cd vast-webhook-automation
+python3 -m venv .venv
+. .venv/bin/activate
+pip install requests vastai
+```
+
+<Warning>
+Run the receiver somewhere other than the GPU instances it manages. Its job is to outlive them.
+</Warning>
+
+### The Event Payload
+
+Every delivery is a signed JSON `POST`. The fields these tutorials use are `notif_type`, `event_id`, and `data`:
+
+```json
+{
+  "event_id": "7e9a2c4e6f9e4a24a53b77c2d8e3f0aa",
+  "user_id": 123,
+  "notif_type": "upcoming_downtime",
+  "subject": "Upcoming Instance Downtime",
+  "message": "Your instance 33502355 on machine 447823 is scheduled for maintenance ...",
+  "data": { "instance_id": 33502355, "machine_id": 447823, "maintenance_id": 88213 },
+  "data_truncated": false,
+  "timestamp": 1757433600.123
+}
+```
+
+`data` is always a JSON object or `null`. If the platform had to drop it for size, `data_truncated` is `true` and you should fall back to reading the instance from the API. Signing, headers, and retry rules are documented in [Notification Webhooks](/guides/reference/notification-webhooks).
+
+Three rules apply to every receiver in this guide:
+
+1. **Verify the signature** over the raw request body before doing anything else.
+2. **Return `2xx` within 10 seconds.** Put the event on a queue and do the work in a background thread. Any `4xx` other than `408` or `429` is treated as a permanent failure and the event is not retried.
+3. **Deduplicate on `event_id`.** Delivery is at-least-once.
+
+### Shared Receiver
+
+Both downtime tutorials plug handlers into the same receiver. Create `receiver.py`:
+
+```python
+#!/usr/bin/env python3
+"""Verify, deduplicate, enqueue, acknowledge. Handlers run on a worker thread."""
+import hashlib
+import hmac
+import json
+import os
+import queue
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+VAST_WEBHOOK_SECRET = os.environ["VAST_WEBHOOK_SECRET"].encode("utf-8")
+PORT = int(os.environ.get("PORT", "8787"))
+MAX_SIGNATURE_AGE_SECONDS = 300
+
+EVENTS: "queue.Queue[dict]" = queue.Queue()
+HANDLERS: dict[str, callable] = {}      # notif_type -> function(evt)
+_seen: dict[str, float] = {}            # event_id -> first-seen time
+_seen_lock = threading.Lock()
+
+
+def on(notif_type: str):
+    """Decorator: register a handler for a notification type slug."""
+    def register(fn):
+        HANDLERS[notif_type] = fn
+        return fn
+    return register
+
+
+def verify_vast_signature(headers, raw_body: bytes) -> bool:
+    timestamp = headers.get("X-Vast-Timestamp", "")
+    signature = headers.get("X-Vast-Signature-256", "")
+    if not timestamp or not signature.startswith("sha256="):
+        return False
+    try:
+        if abs(time.time() - int(timestamp)) > MAX_SIGNATURE_AGE_SECONDS:
+            return False
+    except ValueError:
+        return False
+    digest = hmac.new(
+        VAST_WEBHOOK_SECRET, timestamp.encode("utf-8") + b"." + raw_body, hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(signature, f"sha256={digest}")
+
+
+def first_time_seen(event_id: str) -> bool:
+    now = time.time()
+    with _seen_lock:
+        for k, t in list(_seen.items()):          # expire after 24h
+            if now - t > 86400:
+                del _seen[k]
+        if event_id in _seen:
+            return False
+        _seen[event_id] = now
+        return True
+
+
+class Handler(BaseHTTPRequestHandler):
+    def _reply(self, status: int):
+        self.send_response(status)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def do_GET(self):
+        self._reply(200 if self.path == "/health" else 404)
+
+    def do_POST(self):
+        raw = self.rfile.read(int(self.headers.get("Content-Length", "0") or "0"))
+        if not verify_vast_signature(self.headers, raw):
+            self._reply(401)
+            return
+        try:
+            evt = json.loads(raw.decode("utf-8") or "{}")
+        except json.JSONDecodeError:
+            self._reply(400)
+            return
+        if not isinstance(evt, dict) or "event_id" not in evt:
+            self._reply(400)
+            return
+        if first_time_seen(evt["event_id"]):
+            EVENTS.put(evt)
+        self._reply(202)                             # acknowledge before doing any work
+
+    def log_message(self, fmt, *args):
+        print(f"{self.address_string()} - {fmt % args}", flush=True)
+
+
+def worker():
+    while True:
+        evt = EVENTS.get()
+        fn = HANDLERS.get(evt.get("notif_type"))
+        if fn is None:
+            print(f"ignored notif_type={evt.get('notif_type')}", flush=True)
+            continue
+        try:
+            fn(evt)
+        except Exception as e:                       # never let one event kill the loop
+            print(f"handler error notif_type={evt.get('notif_type')}: {e!r}", flush=True)
+
+
+def serve():
+    threading.Thread(target=worker, daemon=True).start()
+    print(f"listening on http://127.0.0.1:{PORT}", flush=True)
+    ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+```
+
+<Note>
+A `401` on a bad signature discards that event permanently. That is the right behavior for a request that is not from Vast.ai, but it means a wrong secret in `VAST_WEBHOOK_SECRET` silently loses real events. Always confirm with the test delivery before relying on the receiver.
+</Note>
+
+### Create the Webhook
+
+Create a webhook subscribed to the events you need. The list below covers both downtime tutorials; trim it if you only follow one. The response includes the signing secret, which is returned only at creation and on rotation.
+
+```bash
+read -rsp "Vast.ai API key: " VAST_API_KEY; export VAST_API_KEY; echo
+
+cat > create-webhook.json <<JSON
+{
+  "name": "Downtime automation",
+  "webhook_url": "https://example.com/replace-after-tunnel",
+  "event_types": [
+    "client:upcoming_downtime",
+    "client:instance_started",
+    "client:instance_offline",
+    "client:instance_online",
+    "client:instance_resumed",
+    "client:instance_stopped",
+    "client:instance_deleted"
+  ]
+}
+JSON
+
+curl --fail-with-body -sS \
+  -X POST "https://console.vast.ai/api/v0/webhooks/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data @create-webhook.json | tee vast-webhook.json
+
+export WEBHOOK_ID="$(python3 -c 'import json; print(json.load(open("vast-webhook.json"))["webhook"]["id"])')"
+export VAST_WEBHOOK_SECRET="$(python3 -c 'import json; print(json.load(open("vast-webhook.json"))["webhook"]["webhook_secret"])')"
+```
+
+Subscribing a webhook to an event turns on the webhook channel for that event in your notification preferences. Start your receiver, expose it over HTTPS, and update `webhook_url` to the public address exactly as in the [Slack example](/examples/notifications/slack-webhook#point-the-webhook-at-your-tunnel). Then send a test delivery:
+
+```bash
+curl --fail-with-body -sS \
+  -X POST "https://console.vast.ai/api/v0/webhooks/$WEBHOOK_ID/test/" \
+  -H "Authorization: Bearer $VAST_API_KEY"
+```
+
+The receiver should log `ignored notif_type=webhook_test`. That confirms the signature and the tunnel are correct.
+
+### Simulate an Event Locally
+
+You cannot schedule maintenance on a machine you rent, and you do not want to wait for a real outage to test your handler. Create `simulate.py`, which signs a payload with your webhook secret and posts it to the local receiver:
+
+```python
+#!/usr/bin/env python3
+"""Usage: python3 simulate.py upcoming_downtime '{"instance_id": 1, "machine_id": 2, "maintenance_id": 3}'"""
+import hashlib, hmac, json, os, sys, time, uuid
+import requests
+
+secret = os.environ["VAST_WEBHOOK_SECRET"].encode("utf-8")
+notif_type, data = sys.argv[1], json.loads(sys.argv[2])
+
+body = json.dumps({
+    "event_id": uuid.uuid4().hex,
+    "user_id": 0,
+    "notif_type": notif_type,
+    "subject": f"simulated {notif_type}",
+    "message": "simulated",
+    "data": data,
+    "data_truncated": False,
+    "timestamp": time.time(),
+}).encode("utf-8")
+
+ts = str(int(time.time()))
+sig = hmac.new(secret, ts.encode() + b"." + body, hashlib.sha256).hexdigest()
+r = requests.post(
+    f"http://127.0.0.1:{os.environ.get('PORT', '8787')}/",
+    data=body,
+    headers={
+        "Content-Type": "application/json",
+        "X-Vast-Event-Id": json.loads(body)["event_id"],
+        "X-Vast-Delivery-Attempt": "1",
+        "X-Vast-Timestamp": ts,
+        "X-Vast-Signature-256": f"sha256={sig}",
+    },
+    timeout=10,
+)
+print(r.status_code)
+```
+
+Use real instance and machine IDs from `vastai show instances` when you simulate, so the handler's API calls succeed.
