@@ -1,0 +1,227 @@
+openapi: 3.0.0
+info:
+  title: Vast.ai API - SLA Backtest
+  description: Replay historical machine earnings through SLA settlement math.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/host/sla_backtest/:
+    get:
+      summary: sla backtest
+      operationId: slaBacktest
+      description: |
+        Replays a machine's historical compute earnings and uptime through SLA settlement math
+        to preview SLA charges and credits before listing with SLA. The maximum date range is
+        366 days (inclusive); the default lookback is 90 days when custom dates are omitted.
+
+        Requires `machine_read` permission. See [SLA Earnings Backtester](/host/sla-backtester) for usage guide.
+      security:
+      - BearerAuth: []
+      parameters:
+      - name: machine_id
+        in: query
+        required: true
+        schema:
+          type: integer
+        description: ID of your machine.
+      - name: r
+        in: query
+        required: true
+        schema:
+          type: number
+          format: float
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 0.9999
+        description: Reliability level to simulate (greater than 0 and at most 0.9999). Used as both claim and client target in the simulation. Exactly 1.0 is rejected.
+      - name: p
+        in: query
+        schema:
+          type: number
+          format: float
+          minimum: 0
+          exclusiveMinimum: true
+          exclusiveMaximum: true
+          maximum: 1
+          default: 0.6667
+        description: Host confidence (greater than 0 and less than 1). Maps to sla_sigma_x when listing. Default 0.6667 (normal).
+      - name: start_date
+        in: query
+        schema:
+          type: integer
+        description: Range start as Unix epoch seconds. Default is 90 days before end_date.
+      - name: end_date
+        in: query
+        schema:
+          type: integer
+        description: Range end as Unix epoch seconds. Default is now.
+      - name: reliability
+        in: query
+        schema:
+          type: number
+          format: float
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 1
+        description: Optional flat uptime override (greater than 0 and at most 1) for all replayed days. Exactly 0 is rejected.
+      - name: beta
+        in: query
+        schema:
+          type: number
+          format: float
+          default: 0.5
+        description: |
+          Timescale mix used in settlement simulation. Not user-configurable for host API keys —
+          the API derives weighting from `r` (recent vs longer-term uptime). Omit this parameter.
+
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  machine_id:
+                    type: integer
+                  has_data:
+                    type: boolean
+                    description: false when no days in the range had earnings to replay.
+                  start_day:
+                    type: integer
+                    description: UTC day index (days since 1970-01-01).
+                  end_day:
+                    type: integer
+                    description: UTC day index (days since 1970-01-01).
+                  covered_days:
+                    type: integer
+                  skipped_days:
+                    type: integer
+                  reliability:
+                    type: number
+                    format: float
+                  fleet_reliability:
+                    type: number
+                    format: float
+                    description: Average reliability across your machines (including this one). Context only.
+                  params:
+                    type: object
+                    properties:
+                      r:
+                        type: number
+                        format: float
+                      p:
+                        type: number
+                        format: float
+                      sigma_x:
+                        type: number
+                        format: float
+                      reliability:
+                        type: number
+                        format: float
+                        nullable: true
+                      beta:
+                        type: number
+                        format: float
+                  daily_results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        day:
+                          type: integer
+                        gpu:
+                          type: number
+                          format: float
+                        storage:
+                          type: number
+                          format: float
+                        bandwidth:
+                          type: number
+                          format: float
+                        uptime:
+                          type: number
+                          format: float
+                        sla:
+                          type: number
+                          format: float
+                        historical_sla:
+                          type: number
+                          format: float
+                  summary:
+                    type: object
+                    properties:
+                      total_gpu:
+                        type: number
+                        format: float
+                      total_storage:
+                        type: number
+                        format: float
+                      total_bandwidth:
+                        type: number
+                        format: float
+                      total_sla:
+                        type: number
+                        format: float
+                      total_earnings:
+                        type: number
+                        format: float
+                      total_historical_sla:
+                        type: number
+                        format: float
+                      worst_day_loss:
+                        type: number
+                        format: float
+                      reserve:
+                        type: number
+                        format: float
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    enum:
+                    - invalid_range
+                    - range_too_large
+                    - bad_request
+                    - invalid_params
+                  msg:
+                    type: string
+        '403':
+          description: Forbidden — not machine owner
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: not_owner
+        '404':
+          description: Machine not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: machine_not_found
+        '429':
+          description: Too Many Requests — rate limit exceeded
+      tags:
+      - Host
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer authentication with API key in Authorization header

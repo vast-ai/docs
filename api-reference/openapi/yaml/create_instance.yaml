@@ -23,7 +23,9 @@ paths:
 
         For detailed template usage, see [Creating and Using Templates with API](/api-reference/creating-and-using-templates-with-api).
 
-        CLI Usage: `vastai create instance <offer_id> <image> [options]`
+        **SLA note:** `target_reliability` is REST-only at rent time. The published CLI and SDK cannot pass this field until support ships. Use the web console or `PUT /api/v0/asks/{id}/` with `target_reliability` in the request body to enable SLA coverage — see [SLA Coverage](/guides/instances/choosing/sla-coverage).
+
+        CLI Usage: `vastai create instance <offer_id> --image <image> [options]` (no `target_reliability` flag today)
       security:
       - BearerAuth: []
       tags:
@@ -61,8 +63,21 @@ paths:
                 disk:
                   type: number
                   format: float
+                  minimum: 8
                   description: |
-                    Size of local disk partition (in GB)
+                    Size of local disk partition (in GB). Minimum 8 when specified.
+                target_reliability:
+                  type: number
+                  format: float
+                  minimum: 0
+                  exclusiveMaximum: true
+                  description: |
+                    Client SLA coverage target (greater than 0 and less than 1). When set on an SLA-enabled offer
+                    (`sla_r_claim > 0`), locks SLA terms on the new contract. Omit or set to 0 for a non-SLA rental.
+                    Use the same value you used in search when comparing `dph_total`.
+                    Common failures: `invalid_args` when the offer has no SLA or the target is out of range;
+                    `invalid_price` when the quote is stale relative to search (re-search with matching storage
+                    and `target_reliability`, then rent again). See [SLA Coverage](/guides/instances/choosing/sla-coverage).
                 runtype:
                   type: string
                   description: |
@@ -162,6 +177,8 @@ paths:
                       description: Mount path for the volume inside the container (e.g., `/workspace`)
             example:
               image: vastai/base-image:@vastai-automatic-tag
+              disk: 50
+              target_reliability: 0.95
       responses:
         '200':
           description: Instance created successfully
@@ -179,7 +196,10 @@ paths:
                     description: ID of the newly created instance contract
                     example: 1234568
         '400':
-          description: Bad Request
+          description: |
+            Bad Request. Includes invalid or out-of-range `target_reliability`, renting with SLA on a non-SLA
+            offer, SSH key requirements, and `invalid_price` when the create request does not match a fresh
+            search quote (re-search with the same `target_reliability` and disk/storage, then retry).
           content:
             application/json:
               schema:
@@ -323,6 +343,6 @@ x-cli-commands:
   endpoint: /api/v0/asks/{id}/
   method: PUT
   examples:
-  - vast create instance 1234567 --image tensorflow/tensorflow:latest-gpu --disk 32
-  - vast create instance 1234567 --template abc123def456
-  - vast create instance 1234567 --price 0.4 --disk 100 --env JUPYTER_TOKEN=abc123
+  - vastai create instance 1234567 --image tensorflow/tensorflow:latest-gpu --disk 32
+  - vastai create instance 1234567 --template abc123def456
+  - vastai create instance 1234567 --price 0.4 --disk 100 --env JUPYTER_TOKEN=abc123

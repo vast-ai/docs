@@ -194,6 +194,7 @@ Below is the complete mapping of which endpoints each permission category contro
 
 - [Show Machines](/api-reference/machines/show-machines)
 - [Show Reports](/api-reference/machines/show-reports)
+- [SLA Backtest](/api-reference/host/sla-backtest) — API-only (hosts): replay historical earnings through SLA math. Requires `machine_read`. See [SLA Backtester](/host/sla-backtester). Console hosts should use **Set Pricing → SLA** preview instead.
 
 ### machine\_write
 
@@ -207,6 +208,25 @@ Below is the complete mapping of which endpoints each permission category contro
 - [Unlist Machine](/api-reference/machines/unlist-machine)
 - [Unlist Volume](/api-reference/volumes/unlist-volume)
 
+**Host SLA scoped-key recipe (minimum):** Create via [Create API Key](/api-reference/accounts/create-api-key). See [Creating Scoped Keys](#creating-scoped-keys) for the required `api` wrapper.
+
+```json
+{
+  "api": {
+    "machine_read": {},
+    "machine_write": {},
+    "billing_read": {}
+  }
+}
+```
+
+| Task | Permission | Console fallback |
+| --- | --- | --- |
+| List/update SLA via `create_asks` | `machine_write` | **Set Pricing → SLA** → LIST |
+| SLA backtester | `machine_read` | Console SLA preview |
+| Schedule / cancel maintenance | `machine_write` | None (CLI/REST only) |
+| Monitor `sla_earn` | `billing_read` | Host → Billing / Earnings |
+
 ### misc
 
 - [Show Workergroups](/api-reference/serverless/show-workergroup)
@@ -219,6 +239,20 @@ Below is the complete mapping of which endpoints each permission category contro
 - [Search Benchmarks](/api-reference/search/search-benchmarks)
 - [Search Offers](/api-reference/search/search-offers)
 - [Search Volumes](/api-reference/volumes/search-volumes)
+
+**Client SLA search → REST rent (minimum):** Create via [Create API Key](/api-reference/accounts/create-api-key) with the `api` wrapper below (`misc` covers bundles search).
+
+```json
+{
+  "api": {
+    "misc": {},
+    "instance_write": {},
+    "instance_read": {}
+  }
+}
+```
+
+Published OpenAPI charge `type` values for `GET /api/v0/charges/` are `gpu`, `disk`, `bwd`, and `bwu`. Prefer **Account → Billing** in the console for SLA settlement credit reconciliation until client charge schemas document SLA line items.
 
 ### team\_read
 

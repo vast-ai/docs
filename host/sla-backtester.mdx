@@ -1,0 +1,330 @@
+---
+title: "SLA Earnings Backtester"
+description: "Replay your machine's historical earnings through SLA math to preview SLA charges and credits before listing."
+"canonical": "/host/sla-backtester"
+---
+
+The **SLA (Service Level Agreement) earnings backtester** lets you answer a practical question before you list: *if clients had rented with reliability target **`r`** and I offered SLA at confidence **`p`**, how would that have affected my earnings on this machine over the last few months?*
+
+**Console hosts:** use **Set Pricing → SLA** in the web console to preview SLA charges — you do not need this API.
+
+**API hosts:** this endpoint replays historical earnings through SLA math to estimate SLA charges and worst-day credit risk before listing. (**`r`** = reliability level used as both claim and target in the simulation; **`p`** = host confidence — both defined in [Query parameters](#query-parameters) below.)
+
+It replays your machine's **real historical compute earnings and reliability** through the same SLA settlement math used in production, then compares the simulated result to what you actually earned from SLA (if anything).
+
+See [Choose your path](#choose-your-path) below.
+
+<Note>
+**Don't want to use the API?** The backtester is optional. Use the web console SLA preview and the [economics walkthrough](/host/sla-offers#economics-walkthrough) on SLA Offers to evaluate SLA before listing. The backtester is for hosts who want historical replay via the API.
+</Note>
+
+## Choose your path
+
+| If you want to… | Use |
+| --- | --- |
+| Preview SLA before your first listing | Web console (**Set Pricing → SLA** on the machine page) — no API key needed |
+| Simulate historical earnings for one machine | This page's single-machine `curl` example |
+| Review many machines at once | [Fleet workflow](#fleet-workflow) below (advanced; Linux/macOS + `jq`) |
+
+## When to use it
+
+Use the backtester before you enable SLA on a listing, or when you want to tune parameters. The machine needs at least a few weeks of rental history.
+
+If `has_data` is `false`, widen the date range or pick a machine with more rental activity.
+
+Use the backtester to:
+
+- Pick a reliability claim and confidence before you enable SLA on a listing
+- Compare how SLA charge and worst-case credit change across targets
+- Stress-test a lower reliability assumption before you commit
+- Compare to history — each day includes `historical_sla`, your machine's realized SLA earnings on that day (zero if you were not offering SLA)
+
+For how SLA offers work once listed, see [SLA Offers](/host/sla-offers).
+
+## How it works
+
+1. You choose a machine, date range, reliability level (`r`), and confidence (`p`).
+2. The API loads per-day earnings from your machine's rental history.
+3. For each active day, it computes GPU, storage, and bandwidth earnings plus simulated SLA host earnings.
+4. It returns a day-by-day breakdown and summary totals.
+
+**Simulated vs listing parameters.** In the backtester, reliability **claim and client target are both set to `r`**. That is a conservative what-if: it pretends every client targeted your claim. When you list, you set only **`sla_r_claim`** (and `sla_sigma_x`); clients choose their own `target_reliability` at search/rent time. Workflow: backtest `worst_day_loss` at a candidate claim level, then verify visible SLA charges in **Set Pricing → SLA** (or `dph_total` in search at realistic client targets) before listing.
+
+**Active vs idle days.** **Idle days** are days with no rental earnings on the machine (no active compute rental). These days typically produce no SLA charge or credit in the simulation. Days with no rental activity appear in the results as zero-filled rows but do not count toward `covered_days`. Only days with actual earnings are replayed through SLA math.
+
+<Note>
+**Simulation vs live listing**
+- The backtester sets claim equal to target and may show higher SLA charges than live listing when clients choose targets below your claim.
+- For client-visible pricing (`dph_total`), use **Set Pricing → SLA** in the console or search with a realistic `target_reliability`.
+- For tail risk, trust `worst_day_loss`, not headline `total_sla`.
+- Timescale mix (`β`) is derived from `r` (weights recent vs longer-term uptime in settlement). Hosts cannot set β via the listing API.
+</Note>
+
+## Before you start
+
+**Prerequisites:** API key with `machine_read` permission, machine ID from the [Host Machines page](https://cloud.vast.ai/host/machines), and `curl` (or Postman). On Windows, use WSL or Postman. This is the same numeric machine ID as `machid` on the earnings API and `machine` in listing requests.
+
+1. Open **Account → API Keys** in the console and create a key with **`machine_read`** enabled.
+2. Copy the token and use `Authorization: Bearer YOUR_API_KEY` in the examples below. See [Create API Key](/api-reference/accounts/create-api-key) and [Authentication](/api-reference/authentication).
+3. Find your machine ID on the [Host Machines page](https://cloud.vast.ai/host/machines). The machine must have at least a few weeks of rental activity — new or idle machines should use the console **Set Pricing → SLA** preview instead (the backtester returns `has_data: false` without sufficient history).
+4. Run the baseline request in [Example request](#example-request) and check `has_data` in the response.
+
+## API reference
+
+<Note>
+The backtester is available through the REST API only. You must own the machine and use an API key with **`machine_read`** permission. Python SDK (`vastai` package) support is not yet available — use the `curl` examples below.
+</Note>
+
+```
+GET /api/v0/host/sla_backtest/
+```
+
+Requires Bearer authentication. This endpoint is rate-limited like other host API endpoints — see [Rate Limits and Errors](/api-reference/rate-limits-and-errors) for retry guidance.
+
+### Query parameters
+
+| Parameter | Required | Description |
+| --- | --- | --- |
+| `machine_id` | Yes | ID of your machine |
+| `r` | Yes | Reliability level to simulate (greater than 0 and at most **0.9999**). Used as **both claim and client target** in the simulation. Example: `0.95` = 95%. Exactly `1.0` is rejected. |
+| `p` | No | Host confidence (greater than 0 and **less than 1** — not equal to 1). Maps to the same spread used when listing with `sla_sigma_x` — see [Confidence values](#confidence-values-p) below. Default: `0.6667` (normal confidence, ≈ 67%). |
+| `start_date` | No | Range start as Unix epoch seconds. Default: 90 days before `end_date`. |
+| `end_date` | No | Range end as Unix epoch seconds. Default: now. |
+| `reliability` | No | Optional flat uptime override (greater than 0 and at most 1). Ignores historical uptime — useful for what-if analysis. Use `0.01` to approximate near-total downtime; `0` is rejected with `400 bad_request`. |
+| `beta` | No | Not user-configurable — the API derives timescale weighting from `r`. |
+
+### Limits
+
+| Limit | Value |
+| --- | --- |
+| Default lookback | 90 days |
+| Maximum range | 366 days (inclusive) |
+| Ownership | Must own the machine |
+| Rate limits | Per-endpoint; see [Rate Limits and Errors](/api-reference/rate-limits-and-errors) |
+
+### Example request
+
+Minimal baseline (default 90-day lookback — no custom dates required):
+
+```bash
+curl -s -H "Authorization: Bearer YOUR_API_KEY" \
+  "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=12345&r=0.95&p=0.6667"
+```
+
+Custom date range (optional — Jan–Apr 2024 for illustration):
+
+```bash
+# start_date = Jan 1, 2024 UTC; end_date = Apr 1, 2024 UTC
+# Linux: date -u -d '2024-01-01' +%s
+# macOS: date -u -j -f '%Y-%m-%d' '2024-01-01' +%s
+# On Windows, use WSL or an online epoch converter.
+curl -s -H "Authorization: Bearer YOUR_API_KEY" \
+  "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=12345&r=0.95&p=0.6667&start_date=1704067200&end_date=1711929600"
+```
+
+Compare two confidence levels on the same history:
+
+```bash
+# Normal confidence (~67%, default 0.6667)
+curl -s -H "Authorization: Bearer YOUR_API_KEY" \
+  "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=12345&r=0.99&p=0.6667"
+
+# High confidence (~83%) — tighter spread, lower simulated SLA charges
+curl -s -H "Authorization: Bearer YOUR_API_KEY" \
+  "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=12345&r=0.99&p=0.83"
+```
+
+Stress-test with flat 90% uptime:
+
+```bash
+curl -s -H "Authorization: Bearer YOUR_API_KEY" \
+  "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=12345&r=0.99&p=0.6667&reliability=0.90"
+```
+
+## Reading the response
+
+**If you only read three fields:** Check `has_data` (widen dates if `false`), then `summary.worst_day_loss`, then `summary.total_sla`.
+
+A successful response looks like this (fields abbreviated):
+
+```json
+{
+  "success": true,
+  "machine_id": 12345,
+  "has_data": true,
+  "start_day": 19723,
+  "end_day": 19812,
+  "covered_days": 45,
+  "skipped_days": 45,
+  "reliability": 0.998500,
+  "fleet_reliability": 0.991200,
+  "params": {
+    "r": 0.95,
+    "p": 0.6667,
+    "sigma_x": 0.5,
+    "reliability": null,
+    "beta": 0.5
+  },
+  "daily_results": [
+    {
+      "day": 19723,
+      "gpu": 84.0,
+      "storage": 2.4,
+      "bandwidth": 0.1,
+      "uptime": 1.0,
+      "sla": 0.18,
+      "historical_sla": 0.0
+    }
+  ],
+  "summary": {
+    "total_gpu": 3780.0,
+    "total_storage": 108.0,
+    "total_bandwidth": 4.5,
+    "total_sla": 8.1,
+    "total_earnings": 3900.6,
+    "total_historical_sla": 0.0,
+    "worst_day_loss": 42.0,
+    "reserve": 0.0
+  }
+}
+```
+
+### Top-level fields
+
+| Field | Meaning |
+| --- | --- |
+| `has_data` | `true` if at least one day in the range had earnings to replay. When `false`, there was no billable rental activity in the range: `covered_days` is `0`, `skipped_days` equals the number of days in the requested window, `daily_results` contains one zero-filled row per day in the window (not an empty array), summary totals are `0.0`, and top-level `reliability` is `null`. Try a wider window or a machine with more rental history. |
+| `start_day`, `end_day` | UTC day indices. The API computes `day = floor(epoch_seconds / 86400)`. Same encoding as `daily_results[].day`. To convert a day index to an approximate UTC date: `date -u -d "@$((day * 86400))" +%Y-%m-%d` (Linux). Do not assume `day × 86400` equals UTC midnight for that calendar day. Most hosts can ignore these and use `start_date`/`end_date` in requests. |
+| `covered_days` | Days with rental activity replayed through SLA math |
+| `skipped_days` | Days in the range with no activity (zero-filled in `daily_results`) |
+| `reliability` | Actual uptime ratio over the range (`total uptime / total active time`) |
+| `fleet_reliability` | Average reliability across your machines (including this one). Context only; may be uninformative if you operate a single machine. |
+
+### Per-day fields (`daily_results`)
+
+| Field | Meaning |
+| --- | --- |
+| `gpu`, `storage`, `bandwidth` | That day's compute earnings breakdown ($) |
+| `uptime` | Uptime fraction for the day (0–1), or your flat override if set |
+| `sla` | **Simulated SLA host earnings** for the day. Positive = you keep the SLA charge; negative = you credit the client |
+| `historical_sla` | What you **actually** earned from SLA that day (signed). Zero if you were not offering SLA |
+
+Review `sla` day by day in `daily_results` to see which days would have helped or hurt under the chosen parameters. Compare against `historical_sla` to see how simulated economics differ from reality.
+
+### Summary fields
+
+| Field | Meaning |
+| --- | --- |
+| `total_gpu`, `total_storage`, `total_bandwidth` | Compute earnings over covered days |
+| `total_sla` | Net simulated SLA earnings. Positive = SLA would have added income overall |
+| `total_earnings` | Compute + simulated SLA |
+| `total_historical_sla` | Sum of realized historical SLA in the range |
+| `worst_day_loss` | Largest single-day client credit (your worst simulated loss). Always a non-negative dollar amount — unlike signed `sla` / `sla_earn` fields |
+| `reserve` | Reserved for future use — ignore in production decisions today. |
+
+## Interpreting results
+
+### Mostly positive `sla` values
+
+Your historical reliability was strong relative to the simulated target. SLA would likely have been a net positive — small SLA charges on strong days, few days with credits.
+
+### Negative `sla` on specific days
+
+Those days had reliability below the simulated target. The magnitude shows how much you would have credited. If you see clusters of negative days, consider a lower claim, wider confidence, or fixing reliability before listing SLA.
+
+### `total_sla` near zero
+
+Break-even territory — SLA charges and credits roughly balance. Typical when your actual reliability matches the simulated target.
+
+### `total_sla` strongly negative
+
+Under the simulated parameters, SLA would have cost you money over this window. Either improve reliability, lower the claim, or widen confidence before listing.
+
+### Using `reliability` override
+
+Setting `reliability=0.90` while keeping `r=0.99` answers: *if every active day had 90% uptime, how bad would SLA credits get?* Use this to understand worst-case credit exposure before committing to a high claim.
+
+## Confidence values (`p`)
+
+<Warning>
+**`p` and `sla_sigma_x` use different scales** — do not copy numeric values between them. For example, `p=0.5` (wide confidence) maps to `sla_sigma_x ≈ 1.0`, not `0.5`. Use the table below to translate between the two.
+</Warning>
+
+The backtester accepts **`p`** (confidence) instead of `sla_sigma_x`. The mappings below match common listing values:
+
+| Confidence `p` | Approx. label | Listing equivalent |
+| --- | --- | --- |
+| `0.83` | Tight | `sla_sigma_x ≈ 0.2` |
+| `0.6667` | Normal (default) | `sla_sigma_x ≈ 0.5` |
+| `0.50` | Wide | `sla_sigma_x ≈ 1.0` |
+
+Tighter confidence (higher `p`) does **not** reduce credit owed on a miss — use `worst_day_loss` and `reliability=` overrides to model settlement exposure.
+
+## Error responses
+
+| HTTP | `error` / shape | Cause |
+| --- | --- | --- |
+| 400 | `invalid_range` | Date window invalid |
+| 400 | `range_too_large` | Window exceeds the maximum span |
+| 400 | `bad_request` | Out-of-range `r`, `p`, or date parameters |
+| 400 | `invalid_params` | Simulation math failure after validation (check claim/confidence inputs) |
+| 403 | `not_owner` | Machine belongs to another host |
+| 404 | `machine_not_found` | Invalid `machine_id` |
+| 429 | *(rate limited)* | Too many requests — retry with backoff. See [Rate Limits and Errors](/api-reference/rate-limits-and-errors). |
+
+For missing or invalid API keys and permission denials (`machine_read`), see [Authentication](/api-reference/authentication).
+
+## Recommended workflow
+
+1. **Run a baseline backtest** on a machine with at least a few weeks of rental history:
+   - Check your machine's uptime history on the [Host Machines page](https://cloud.vast.ai/host/machines), then use the console SLA preview or backtester — do not rely on the dashboard reliability score alone (see [Machine reliability score vs SLA reliability](/host/sla-offers#machine-reliability-score-vs-sla-reliability)).
+   - Choose an `r` at or slightly below the claim you plan to publish.
+   - Use normal confidence (`p=0.6667`).
+   - If `has_data` is `false`, widen the date range or wait for more rental history.
+2. **Check `worst_day_loss`** — can you absorb that credit from a bad day?
+3. **Try a higher `r`** (for example `0.99`) and see how `total_sla` changes.
+4. **Run a stress test** with `reliability=0.90` at your intended claim.
+5. **List with `sla_r_claim`** — set claim (and `sla_sigma_x`) on the offer; clients choose their own targets in search (see [SLA Offers](/host/sla-offers)).
+
+## Fleet workflow
+
+This section is for hosts automating fleet review. Console-only hosts can run the baseline `curl` once per machine instead.
+
+```bash
+export VAST_API_KEY="YOUR_API_KEY"
+```
+
+1. List machine IDs: `vastai show machines -q` (numeric IDs only) or `vastai show machines --raw | jq -r '.machines[].id'`.
+2. Run backtests **sequentially** (one machine at a time):
+
+```bash
+for id in $(vastai show machines -q); do
+  resp=$(curl -s -H "Authorization: Bearer $VAST_API_KEY" \
+    "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=$id&r=0.95&p=0.6667" \
+    || echo '{"error":"request_failed"}')
+  if echo "$resp" | jq -e '.error' >/dev/null 2>&1; then
+    echo "machine_id=$id error: $(echo "$resp" | jq -r '.error')"
+  else
+    echo "$resp" | jq '{machine_id: '"$id"', worst_day_loss: .summary.worst_day_loss, total_sla: .summary.total_sla, has_data: .has_data}'
+  fi
+  sleep 2
+done
+```
+
+Expect roughly two seconds per machine minimum (`sleep 2` plus request time). For 50 machines, budget at least a few minutes. Run off-peak before a fleet SLA rollout. On `429`, back off per [Rate Limits and Errors](/api-reference/rate-limits-and-errors). Parallel requests are not recommended unless you implement backoff.
+
+3. Compare `worst_day_loss` and `total_sla` across machines.
+4. Apply `sla_r_claim` / `sla_sigma_x` when listing via the API (see [SLA Offers](/host/sla-offers#api-for-automation)).
+
+## When stuck
+
+- **`has_data: false`** — Widen the date range or wait for rental history.
+- **`401`** — Check API key permissions (`machine_read`) and Bearer header format.
+- **Still stuck** — Ask in the [host Discord](https://discord.gg/hSuEbSQ4X8).
+
+## Related documentation
+
+- [SLA Backtest API](/api-reference/host/sla-backtest) — formal API reference for this endpoint
+- [SLA Offers](/host/sla-offers) — listing parameters, economics, and risk scenarios
+- [SLA Coverage (clients)](/guides/instances/choosing/sla-coverage) — how renters choose targets and read `dph_total`
+- [API permissions](/api-reference/permissions) — `machine_read` scope required

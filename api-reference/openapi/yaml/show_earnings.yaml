@@ -14,6 +14,8 @@ paths:
       description: |
         Retrieves the earnings history for a specified time range and optionally per machine.
 
+        **Note:** `per_day[]` aggregates SLA earnings across your entire fleet for each UTC day, even when `machid` is set. For machine-scoped SLA totals, use `per_machine[].sla_earn`.
+
         CLI Usage: `vastai show earnings [options]`
       security:
       - BearerAuth: []
@@ -28,12 +30,16 @@ paths:
         in: query
         schema:
           type: integer
-        description: Start day for the earnings report.
+        description: |
+          Start day for the earnings report as a UTC day index:
+          `floor(unix_epoch_seconds / 86400)`. Prefer `last_days` when you do not need an absolute window.
       - name: eday
         in: query
         schema:
           type: integer
-        description: End day for the earnings report.
+        description: |
+          End day for the earnings report as a UTC day index:
+          `floor(unix_epoch_seconds / 86400)` (inclusive end of the window when used with `sday`).
       - name: machid
         in: query
         schema:
@@ -63,6 +69,9 @@ paths:
                         type: number
                       total_bwd:
                         type: number
+                      total_sla:
+                        type: number
+                        description: Net SLA earnings over the requested window.
                   username:
                     type: string
                   email:
@@ -107,6 +116,9 @@ paths:
                           type: number
                         bwd_earn:
                           type: number
+                        sla_earn:
+                          type: number
+                          description: Net SLA earnings for this machine over the window.
                   per_day:
                     type: array
                     items:
@@ -122,6 +134,9 @@ paths:
                           type: number
                         bwd_earn:
                           type: number
+                        sla_earn:
+                          type: number
+                          description: Net host SLA settlement for the UTC day. Positive when the host keeps the SLA charge; negative when the host credits the client.
         '400':
           description: Bad Request - Invalid input syntax
           content:

@@ -12,9 +12,11 @@ paths:
       summary: list machine
       description: |
         Creates or updates ask contracts for a machine to list it for rent on the vast.ai platform.
-        Allows setting pricing, minimum GPU requirements, end date and discount rates.
+        Allows setting offer pricing, rental types, end dates, discount rates, and SLA parameters.
 
-        CLI Usage: `vastai list machine <machine_id> [options]`
+        SLA request-body fields (`sla_r_claim`, `sla_sigma_x`, optional `sla_max_beta`) are supported on this REST endpoint. SLA activates when `sla_r_claim > 0`. Host-sent `sla_r_target` / legacy `sla_reliability` are ignored — clients choose coverage at search/rent time. The published CLI and SDK do not yet expose SLA fields — use the host console (**Set Pricing → SLA**) or REST/`curl` until CLI/SDK support ships.
+
+        CLI Usage (non-SLA fields): `vastai list machine <machine_id> [options]`
       security:
       - BearerAuth: []
       requestBody:
@@ -61,6 +63,39 @@ paths:
                   type: number
                   format: float
                   description: Maximum discount rate allowed for prepaid credits
+                sla_r_claim:
+                  type: number
+                  format: float
+                  minimum: 0
+                  maximum: 0.9999
+                  description: |
+                    Host reliability claim. Values above 0 enable SLA on the offer.
+                    Must be greater than 0 and at most 0.9999 when enabling SLA; exactly 1.0 is rejected.
+                    Set to 0 to disable SLA on new rentals.
+                sla_sigma_x:
+                  type: number
+                  format: float
+                  description: |
+                    Host confidence spread — how wide your belief is around the claim.
+                    Must be greater than 0 and at most 3.0. Defaults to 0.5 when enabling SLA.
+                sla_max_beta:
+                  type: number
+                  format: float
+                  description: |
+                    Optional ask term capping how aggressively long-running contracts may weight recent
+                    uptime versus longer history in settlement. Hosts do not set β — the platform derives
+                    β from the client's target_reliability at rent. Leave unset for uncapped. When set,
+                    must be in (0, 1) and at least the default beta derived at your claim.
+                sla_r_target:
+                  type: number
+                  format: float
+                  description: |
+                    Ignored on asks. Client coverage target is supplied at search/rent time
+                    (`target_reliability`), not set by the host.
+                sla_reliability:
+                  type: number
+                  format: float
+                  description: Legacy alias for sla_r_target; ignored on asks.
       responses:
         '200':
           description: Successful response
@@ -71,15 +106,43 @@ paths:
                 properties:
                   success:
                     type: boolean
-                  extended:
-                    type: integer
-                    description: Number of client contracts extended to new end date
-                  msg:
-                    type: string
-                    description: Status message if success is false
+                  you_sent:
+                    type: object
+                    description: Echo of the request body
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        machine_id:
+                          type: integer
+                        user_id:
+                          type: integer
+                        extended:
+                          type: integer
+                          description: Number of rental contracts extended
+                        new_contracts:
+                          type: array
+                          items:
+                            type: integer
+                          description: IDs of newly created contracts
+                        upd_contracts:
+                          type: array
+                          items:
+                            type: integer
+                          description: IDs of updated contracts
                 example:
                   success: true
-                  extended: 2
+                  you_sent:
+                    machine: 12345
+                    sla_r_claim: 0.99
+                    sla_sigma_x: 0.5
+                  results:
+                  - machine_id: 12345
+                    user_id: 67890
+                    extended: 1
+                    new_contracts: []
+                    upd_contracts: [1]
         '400':
           description: Bad Request
           content:
@@ -89,12 +152,32 @@ paths:
                 properties:
                   error:
                     type: string
-                    example: invalid_args
+                    enum:
+                    - invalid_args
+                    - invalid_sla_params
+                    - sla_not_approved
+                    - sla_daemon_outdated
+                    example: invalid_sla_params
                   msg:
                     type: string
-                    example: Invalid machine id or parameters
+                    example: No such machine(s) for your account
+        '401':
+          description: Unauthorized — missing permission or invalid API key
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                  msg:
+                    type: string
+                    example: Your key lacks the machine_write permission group
         '403':
-          description: Forbidden
+          description: Forbidden — machine locked
           content:
             application/json:
               schema:
@@ -102,10 +185,12 @@ paths:
                 properties:
                   error:
                     type: string
-                    example: not_authorized
+                    enum:
+                    - machine_locked
+                    example: machine_locked
                   msg:
                     type: string
-                    example: Only machine owner can create ask contracts
+                    example: Machine is decommissioned or migration-locked
       tags:
       - Machines
 components:

@@ -88,7 +88,25 @@ paths:
                       example: ["RTX_3090", "RTX_4090"]
                 reliability:
                   type: object
-                  description: 'Machine reliability score (0-1). Example: {"gte": 0.99}'
+                  description: 'Historical machine reliability score (0-1), not the host SLA claim. Example: {"gte": 0.99}'
+                target_reliability:
+                  type: object
+                  description: |
+                    Client SLA coverage target. Value must be greater than 0 and less than 1 (exclusive bounds —
+                    same as create-instance). When set, search prices include the SLA charge in dph_total and
+                    returns search.slaPremiumPerHour. Pass the same target again on PUT /api/v0/asks/{id}/ to
+                    enable coverage. Example: {"eq": 0.95}
+                has_sla:
+                  type: object
+                  description: |
+                    Restrict to offers with SLA enabled (true) or without (false). Example: {"eq": true}
+                  properties:
+                    eq:
+                      type: boolean
+                expected_reliability:
+                  type: object
+                  description: |
+                    Host SLA claim on the offer (0-1). Example: {"gte": 0.99}
                 num_gpus:
                   type: object
                   description: 'Number of GPUs. Example: {"gte": 4} or {"in": [1, 2, 4, 8]}'
@@ -266,7 +284,7 @@ paths:
                       Default is 8GB.
             example:
               limit: 100
-              type: on-demand
+              type: ondemand
               verified: 
                 eq: true
               rentable: 
@@ -362,7 +380,7 @@ paths:
                   vram_costperhour: 0.009876
                   webpage: null
                   vms_enabled: false
-                  expected_reliability: 0.5
+                  expected_reliability: 0.99
                   is_vm_deverified: false
                   resource_type: "gpu"
                   cluster_id: null
@@ -381,12 +399,14 @@ paths:
                   search:
                     gpuCostPerHour: 0.123456
                     diskHour: 0.123456
+                    slaPremiumPerHour: 0.008
                     totalHour: 0.234567
                     discountTotalHour: 0.01
                     discountedTotalPerHour: 0.224567
                   instance:
                     gpuCostPerHour: 0.01
                     diskHour: 0.02
+                    slaPremiumPerHour: 0.008
                     totalHour: 0.03
                     discountTotalHour: 0.001
                     discountedTotalPerHour: 0.029
