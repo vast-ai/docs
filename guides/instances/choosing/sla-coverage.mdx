@@ -24,6 +24,7 @@ This page explains SLA from the renter side: how to find SLA offers, how pricing
 | I use only the CLI today | **Cannot enable SLA at rent time** — CLI search only quotes pricing. After rent, verify with `vastai show instances --raw` (`target_reliability` > 0). To enable coverage, use the console or [API automation](#api-automation) (REST) |
 | Understand charges and credits | [How pricing works](#how-pricing-works) → [What happens after you rent](#what-happens-after-you-rent) |
 | Automate search → rent → verify | [API automation](#api-automation) (REST). **Billing reconciliation:** SLA settlement credits appear in the console billing UI today — not in `GET /api/v0/charges/` or client webhooks |
+| View SLA settlement credits | **Console only** today (**Account → Billing**). The Charges API does not include SLA credit lines, and there are no SLA credit webhooks. |
 
 <Note>
 SLA applies to **on-demand rentals only** — not interruptible/bid or reserved/prepay contracts. See [Instance Pricing](/guides/instances/pricing).
@@ -141,6 +142,8 @@ Always compare **`dph_total`**, not just GPU price, when SLA matters. Sort by `d
 
 Console-only renters can skip this section — use [In the web console](#in-the-web-console) above.
 
+CLI and SDK `create instance` cannot set `target_reliability`. After a CLI/SDK search, finish rent in the console (Reliability target, then confirm an SLA charge line) or use the REST example below. If the instance has no SLA charge line, you do not have coverage.
+
 Renters set **`target_reliability`** on search and on REST rent. **`sla_r_target`** is a stored field name in some instance filters — do not send it in the rent body.
 
 **Billing reconciliation:** SLA settlement credits appear in the console billing UI today. They are not included in `GET /api/v0/charges/` and client webhooks for SLA credits are not available — plan manual console reconciliation after UTC settlement (see [FAQ](#where-do-i-see-historical-sla-credits)).
@@ -179,7 +182,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/asks/OFFER_ID/" \
 
 See [Create Instance](/api-reference/instances/create-instance) and [Search Offers](/api-reference/search/search-offers).
 
-**API key permissions:** create a scoped key with `misc` (search/bundles), `instance_write` (create-instance), and preferably `instance_read` (verify show-instances). See [Authentication](/api-reference/authentication) and [Permissions](/api-reference/permissions).
+**API key permissions:** create a scoped key with `misc` (search/bundles), `instance_write` (create-instance), and `instance_read` (verify with `GET /api/v1/instances/` or `vastai show instances --raw`). These three categories are the minimum for search → rent → verify. See [Authentication](/api-reference/authentication) and [Client SLA scoped-key recipe](/api-reference/permissions#client-sla-scoped-key-recipe).
 
 **3. Verify** via `GET /api/v1/instances/` or `vastai show instances --raw`: confirm `target_reliability > 0`. For running instances, check `instance.slaPremiumPerHour`; search-context snapshots use `search.slaPremiumPerHour`. Requires `instance_read`. Pass an explicit `limit` (default can be as low as **5**; maximum **25** per request). Paginate by passing each response’s `next_token` as the **`after_token`** query parameter until `next_token` is null.
 
