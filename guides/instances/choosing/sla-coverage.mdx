@@ -4,7 +4,7 @@ description: "Rent GPU instances with reliability guarantees. Learn how SLA char
 "canonical": "/guides/instances/choosing/sla-coverage"
 ---
 
-Some Vast.ai offers include a **Service Level Agreement (SLA)** — a reliability guarantee you can add to an **on-demand** rental. You choose a reliability **target** when you search, pay a small hourly **SLA charge** on top of compute, and if measured reliability falls short of that target, you receive settlement credits.
+Some Vast.ai offers include a **Service Level Agreement (SLA)** — an optional reliability promise on an **on-demand** rental. You pay a small hourly **SLA charge** only after you set a reliability **target** at rent time. If measured uptime falls short of that target, you receive a settlement credit. Search can quote the price; it does not turn coverage on by itself.
 
 This page explains SLA from the renter side: how to find SLA offers, how pricing works, and when you get credited.
 
@@ -203,6 +203,21 @@ curl -s -X PUT "https://console.vast.ai/api/v0/asks/OFFER_ID/" \
 ```
 
 See [Create Instance](/api-reference/instances/create-instance) and [Search Offers](/api-reference/search/search-offers).
+
+**Rent with a template** (the template supplies the image; still send the same target and enough disk):
+
+```bash
+curl -s -X PUT "https://console.vast.ai/api/v0/asks/OFFER_ID/" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "template_hash_id": "YOUR_TEMPLATE_HASH",
+    "disk": 50,
+    "target_reliability": 0.95
+  }'
+```
+
+`template_hash_id` is the content hash of a saved template. Request fields override template defaults. `target_reliability` must match the value you searched with, and `disk` must meet the offer minimum, or rent can fail with `invalid_price`. See [Create Instance](/api-reference/instances/create-instance).
 
 **API key permissions:** create a scoped key with `misc` (search/bundles), `instance_write` (create-instance), and `instance_read` (verify with `GET /api/v1/instances/` or `vastai show instances-v1 --raw`). These three categories are the minimum for search → rent → verify. See [Authentication](/api-reference/authentication) and [Client SLA scoped-key recipe](/api-reference/permissions#client-sla-scoped-key-recipe).
 
