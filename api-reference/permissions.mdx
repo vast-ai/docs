@@ -62,6 +62,11 @@ You can create scoped keys using:
 - **CLI**: [`vastai create api-key`](/cli/reference/create-api-key)
 - **SDK**: [`vast.create_api_key()`](/sdk/python/reference/create-api-key)
 
+### SLA workflows (scoped keys)
+
+- **Hosts (list, backtest, earnings):** Minimum permissions: `machine_read`, `machine_write`, and `billing_read`. See [Host SLA scoped-key recipe](#host-sla-scoped-key-recipe) under `machine_write`. [SLA Backtest](/api-reference/host/sla-backtest) is listed under `machine_read` and needs `machine_read` only for that call; listing and earnings still need the other two permissions. `machine_write` alone is not enough.
+- **Clients (search → REST rent with SLA):** Minimum permissions: `misc`, `instance_read`, and `instance_write`. See [Client SLA scoped-key recipe](#client-sla-scoped-key-recipe) under `misc`. For console billing of SLA credits, use **Account → Billing** (not the charges API alone).
+
 ## Custom Roles
 
 Custom roles let you assign the same set of permissions to multiple team members.
@@ -194,7 +199,7 @@ Below is the complete mapping of which endpoints each permission category contro
 
 - [Show Machines](/api-reference/machines/show-machines)
 - [Show Reports](/api-reference/machines/show-reports)
-- [SLA Backtest](/api-reference/host/sla-backtest) — API-only (hosts): replay historical earnings through SLA math. Requires `machine_read`. See [SLA Backtester](/host/sla-backtester). Console hosts should use **Set Pricing → SLA** preview instead.
+- [SLA Backtest](/api-reference/host/sla-backtest) — API-only (hosts): replay historical earnings through SLA math. Requires `machine_read`. See [SLA Backtester](/host/sla-backtester). Console hosts should use the **Set Pricing → SLA** preview instead. Host SLA automation also requires `machine_write` and `billing_read`; see the [host SLA recipe](#host-sla-scoped-key-recipe) under `machine_write`.
 
 ### machine\_write
 
@@ -208,7 +213,9 @@ Below is the complete mapping of which endpoints each permission category contro
 - [Unlist Machine](/api-reference/machines/unlist-machine)
 - [Unlist Volume](/api-reference/volumes/unlist-volume)
 
-**Host SLA scoped-key recipe (minimum):** Create via [Create API Key](/api-reference/accounts/create-api-key). See [Creating Scoped Keys](#creating-scoped-keys) for the required `api` wrapper.
+<a id="host-sla-scoped-key-recipe"></a>
+
+**Host only — minimum SLA API key.** Create via [Create API Key](/api-reference/accounts/create-api-key). See [Creating Scoped Keys](#creating-scoped-keys) for the required `api` wrapper. This key is for listing, backtest, and earnings — not a write-only listing key.
 
 ```json
 {
@@ -240,7 +247,9 @@ Below is the complete mapping of which endpoints each permission category contro
 - [Search Offers](/api-reference/search/search-offers)
 - [Search Volumes](/api-reference/volumes/search-volumes)
 
-**Client SLA search → REST rent (minimum):** Create via [Create API Key](/api-reference/accounts/create-api-key) with the `api` wrapper below (`misc` covers bundles search).
+<a id="client-sla-scoped-key-recipe"></a>
+
+**Client (renter) only — search and REST rent.** Create via [Create API Key](/api-reference/accounts/create-api-key) with the `api` wrapper below (`misc` covers bundle search / the bundles search API).
 
 ```json
 {
@@ -252,7 +261,11 @@ Below is the complete mapping of which endpoints each permission category contro
 }
 ```
 
-Published OpenAPI charge `type` values for `GET /api/v0/charges/` are `gpu`, `disk`, `bwd`, and `bwu`. Prefer **Account → Billing** in the console for SLA settlement credit reconciliation until client charge schemas document SLA line items.
+**SLA settlement credits:** Use the web console (**Account → Billing**) to view SLA credits. The Charges API (`GET /api/v0/charges/`) does not yet include SLA settlement line items; `items[].type` is limited to `gpu`, `disk`, `bwd`, and `bwu`.
+
+<Note title="API integrators">
+OpenAPI documents charge `type` values only; do not use this endpoint alone to reconcile SLA credits.
+</Note>
 
 ### team\_read
 
