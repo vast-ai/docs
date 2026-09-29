@@ -20,6 +20,7 @@ SLA settlement is **asymmetric by design**: when reliability is strong relative 
 
 | Goal | Start here |
 | --- | --- |
+| Understand what SLA is | [SLA in plain language](#sla-in-plain-language) |
 | Preview economics and enable SLA in the console | [How it works](#how-it-works-plain-english) → [Listing an SLA offer](#listing-an-sla-offer). Planned downtime during active rentals still needs [CLI/REST schedule maint](#scheduled-maintenance) — no in-console scheduler. |
 | Enable or update SLA via API | [Before you enable SLA](#before-you-enable-sla) → [API (for automation)](#api-for-automation) |
 | I list with CLI only (no SLA flags yet) | **Set Pricing → SLA** + **LIST** in the console, or REST `PUT /api/v0/machines/create_asks/` — SLA flags are **not** in `vastai list machine` yet |
@@ -63,6 +64,27 @@ On outage days you may still bill clients for **intended** compute **and** owe S
 
 - Optional: run the [backtester](/host/sla-backtester) after you have weeks of history; otherwise use the web console SLA preview and the economics walkthrough on this page.
 - **New or low-history machines:** If the backtester returns `has_data: false`, rely on the web console SLA preview. Wait for rental history before trusting `worst_day_loss`. Consider wider confidence or a more conservative claim until you have a few weeks of data.
+
+## SLA in plain language
+
+SLA is an optional reliability promise on **on-demand** rentals. You do not have to offer it.
+
+1. **You (the host)** say how often you expect the machine to be up. That is your **claim**.
+2. You also say how sure you are of that claim. That is your **confidence**. Tighter confidence makes the renter's extra fee smaller.
+3. The **renter** picks how much uptime they want. That is their **target**. You do not set their target.
+4. The renter pays a small extra hourly fee, the **SLA charge**, on top of the GPU price.
+5. Each day, Vast checks how long that rental was actually up.
+6. If uptime met their target, you keep the fee.
+7. If uptime missed their target, the renter gets a **credit** from your earnings. One bad day can cost more than many days of fees.
+
+What this is not:
+
+- It is not the reliability score on the offer card.
+- Listing the machine does not turn SLA on. You turn it on in **Set Pricing → SLA** (or with the listing API). The CLI `list machine` command cannot set it today.
+- It applies only to **on-demand** rentals, not interruptible or reserved ones.
+- An outage does not erase that day's GPU bill. The renter's compensation is a separate credit.
+
+The field names for claim, confidence, and target are in [How it works (plain English)](#how-it-works-plain-english) below. Renters get the same story in [SLA in plain language](/guides/instances/choosing/sla-coverage#sla-in-plain-language).
 
 ## How it works (plain English)
 
