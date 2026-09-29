@@ -21,7 +21,7 @@ This page explains SLA from the renter side: how to find SLA offers, how pricing
 | Goal | Start here |
 | --- | --- |
 | Rent with SLA in the console | [Finding SLA offers → In the web console](#in-the-web-console) |
-| I use only the CLI today | **Cannot enable SLA at rent time** — CLI search only quotes pricing. After rent, verify with `vastai show instances --raw` (`target_reliability` > 0). To enable coverage, use the console or [API automation](#api-automation) (REST) |
+| I use only the CLI today | **Cannot enable SLA at rent time** — CLI search only quotes pricing. After rent, verify with `vastai show instances-v1 --raw` (`target_reliability` > 0). To enable coverage, use the console or [API automation](#api-automation) (REST) |
 | Understand charges and credits | [How pricing works](#how-pricing-works) → [What happens after you rent](#what-happens-after-you-rent) |
 | Automate search → rent → verify | [API automation](#api-automation) (REST). **Billing reconciliation:** SLA settlement credits appear in the console billing UI today — not in `GET /api/v0/charges/` or client webhooks |
 | View SLA settlement credits | **Console only** today (**Account → Billing**). The Charges API does not include SLA credit lines, and there are no SLA credit webhooks. |
@@ -182,9 +182,9 @@ curl -s -X PUT "https://console.vast.ai/api/v0/asks/OFFER_ID/" \
 
 See [Create Instance](/api-reference/instances/create-instance) and [Search Offers](/api-reference/search/search-offers).
 
-**API key permissions:** create a scoped key with `misc` (search/bundles), `instance_write` (create-instance), and `instance_read` (verify with `GET /api/v1/instances/` or `vastai show instances --raw`). These three categories are the minimum for search → rent → verify. See [Authentication](/api-reference/authentication) and [Client SLA scoped-key recipe](/api-reference/permissions#client-sla-scoped-key-recipe).
+**API key permissions:** create a scoped key with `misc` (search/bundles), `instance_write` (create-instance), and `instance_read` (verify with `GET /api/v1/instances/` or `vastai show instances-v1 --raw`). These three categories are the minimum for search → rent → verify. See [Authentication](/api-reference/authentication) and [Client SLA scoped-key recipe](/api-reference/permissions#client-sla-scoped-key-recipe).
 
-**3. Verify** via `GET /api/v1/instances/` or `vastai show instances --raw`: confirm `target_reliability > 0`. For running instances, check `instance.slaPremiumPerHour`; search-context snapshots use `search.slaPremiumPerHour`. Requires `instance_read`. Pass an explicit `limit` (default can be as low as **5**; maximum **25** per request). Paginate by passing each response’s `next_token` as the **`after_token`** query parameter until `next_token` is null.
+**3. Verify** via `GET /api/v1/instances/` or `vastai show instances-v1 --raw`: confirm `target_reliability > 0`. For running instances, check `instance.slaPremiumPerHour`; search-context snapshots use `search.slaPremiumPerHour`. Requires `instance_read`. Pass an explicit `limit` (default can be as low as **5**; maximum **25** per request). Paginate by passing each response’s `next_token` as the **`after_token`** query parameter until `next_token` is null. On the CLI, use `--limit` and `--next-token` with `show instances-v1`.
 
 **Billing reconciliation (console):** confirming coverage does not show SLA settlement credits. After UTC settlement, open **Account → Billing**. `GET /api/v0/charges/` does not list those credits.
 
@@ -208,7 +208,7 @@ See [Create Instance](/api-reference/instances/create-instance) and [Search Offe
 
 When you rent an SLA-backed offer **with a target set**:
 
-1. **Contract terms lock in** — your reliability target, the host's claim, and host confidence (how the host priced SLA around their claim) are fixed for that rental. You only compare the SLA charge or `dph_total` — confidence is a host-side pricing knob, not a setting you control.
+1. **Contract terms lock in** — your reliability target, the host's claim, and host confidence (how the host priced SLA around their claim) are fixed for that rental. When comparing offers, use the SLA charge line or `dph_total`. Host confidence is not shown in the client UI and is not a setting you control.
 2. **Daily billing** — you pay compute plus the SLA charge each day.
 3. **Daily settlement** — Vast measures reliability across multiple timescales and calculates any SLA credit.
 4. **Credits appear in billing** — settlement credits improve your balance; strong days mean you paid the SLA charge with no credit.
@@ -274,7 +274,7 @@ Production settlement uses the multi-window reliability blend described above, n
 
 ### API integrators
 
-Console users: open **Instances** → select your instance → **price details** to confirm the SLA charge and target. Skip the block below if you do not use the API. (CLI can **read** these fields via `vastai show instances --raw`; enabling SLA still requires console or REST — see [Finding SLA offers](#finding-sla-offers).)
+Console users: open **Instances** → select your instance → **price details** to confirm the SLA charge and target. Skip the block below if you do not use the API. (CLI can **read** these fields via `vastai show instances-v1 --raw`; enabling SLA still requires console or REST — see [Finding SLA offers](#finding-sla-offers).)
 
 <details>
 <summary>API integrators: field names and filters</summary>
