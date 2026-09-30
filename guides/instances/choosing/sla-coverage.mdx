@@ -193,7 +193,7 @@ curl -s -X POST "https://console.vast.ai/api/v0/bundles/" \
   }'
 ```
 
-**2. Rent** the chosen offer ID and pass the **same** target:
+**2. Rent** the chosen offer. Use `offers[].id` (or `ask_contract_id`) from the search response as `{id}` in `PUT /api/v0/asks/{id}/`. Do not use `bundle_id`. Save `new_contract` from the rent response, then find that contract while paging `GET /api/v1/instances/` and read `target_reliability` and `instance.slaPremiumPerHour` on that row. Pass the **same** reliability target you searched with:
 
 ```bash
 curl -s -X PUT "https://console.vast.ai/api/v0/asks/OFFER_ID/" \
@@ -239,6 +239,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/asks/OFFER_ID/" \
 | Offer not found or not available | HTTP 404 `invalid_args` (`msg` may include `no_such_ask`) | Do not retry that id; search again and rent a current offer |
 | Ask cannot start now (`cancel_unavail`) | HTTP 410, error `no_such_ask` | Search for a new offer; this is not a transient glitch to retry on the same id |
 | Price mismatch after stale quote | HTTP 400 `invalid_price` | Re-search with the same `target_reliability` and storage (`allocated_storage` / `--storage`), then rent again |
+| Too many requests | HTTP 429 | Wait and retry the same rent. The API may return `API requests too frequent` |
 
 | Channel | Default storage | Field | Units (label) |
 | --- | --- | --- | --- |
