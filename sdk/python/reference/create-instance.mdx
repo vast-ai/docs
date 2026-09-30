@@ -181,7 +181,27 @@ result = client.create_instance(
 print(result)
 ```
 
-**SLA via REST:** `create_instance()` cannot set `target_reliability`. To enable the SLA, rent with REST and pass the same target you searched with:
+**SLA via REST:** `create_instance()` cannot set `target_reliability`. If you only use Python, rent with REST and pass the same target you searched with:
+
+```python
+import requests
+
+offer_id = 12345  # offer/ask ID from search, not a running instance ID
+response = requests.put(
+    f"https://console.vast.ai/api/v0/asks/{offer_id}/",
+    headers={"Authorization": "Bearer YOUR_API_KEY"},
+    json={
+        "image": "pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime",
+        "disk": 50,
+        "target_reliability": 0.95,
+    },
+    timeout=60,
+)
+response.raise_for_status()
+print(response.json())  # new_contract is the rental instance ID
+```
+
+The same call with curl:
 
 ```bash
 curl -s -X PUT "https://console.vast.ai/api/v0/asks/OFFER_ID/" \
