@@ -23,7 +23,7 @@ Not listed yet? Finish [machine setup](/host/hosting-overview#machine-setup) and
 | Goal | Start here |
 | --- | --- |
 | Understand what SLA is | [SLA in plain language](#sla-in-plain-language) |
-| Preview economics and enable SLA in the console | [How it works](#how-it-works-plain-english) → [Listing an SLA offer](#listing-an-sla-offer). Warn renters from the console ([Set a maintenance window](/host/set-maintenance-window)) or with [CLI/REST schedule maint](#scheduled-maintenance). SLA service-credit review uses the CLI/REST path. |
+| Preview economics and enable SLA in the console | [How it works](#how-it-works-plain-english) → [Listing an SLA offer](#listing-an-sla-offer). For downtime, use the console ([Set a maintenance window](/host/set-maintenance-window)) or [CLI/REST](#scheduled-maintenance). Use one path per window. |
 | Enable or update SLA via API | [Before you enable SLA](#before-you-enable-sla) → [API (for automation)](#api-for-automation) |
 | I list with CLI only (no SLA flags yet) | **Set Pricing → SLA** + **LIST** in the console, or REST `PUT /api/v0/machines/create_asks/` — SLA flags are **not** in `vastai list machine` yet |
 | Monitor settlement after listing | [Monitoring SLA after listing](#monitoring-sla-after-listing) |
@@ -32,7 +32,7 @@ Not listed yet? Finish [machine setup](/host/hosting-overview#machine-setup) and
 
 1. Complete [host setup](https://cloud.vast.ai/host/setup/) and list your machine.
 2. Test on a [separate client account](/host/hosting-overview#testing-your-own-machine) (billed like any rental).
-3. Install the [CLI](/cli/hello-world) (required for SLA maintenance scheduling).
+3. Install the [CLI](/cli/hello-world) if you schedule maintenance or read earnings from the CLI. The console [Set a maintenance window](/host/set-maintenance-window) page can notify renters without the CLI.
 4. Confirm SLA account access (**Set Pricing → SLA** panel visible; if missing, contact support).
 5. Preview economics (console SLA panel or [backtester](/host/sla-backtester)), then set the reliability commitment/confidence.
 6. Enable SLA listing and verify in search (`machine_id=` filter).
@@ -41,7 +41,7 @@ Not listed yet? Finish [machine setup](/host/hosting-overview#machine-setup) and
 ## Before you enable SLA
 
 <Warning>
-If you expect downtime during active rentals, warn renters before you enable an SLA. The console path is [Set a maintenance window](/host/set-maintenance-window) (Host → Machines → Settings → Machine Maintenances). For SLA service-credit review, also schedule at least 24 hours ahead with the [CLI](/host/cli/schedule-maint) or the [REST schedule-maintenance API](/api-reference/machines/schedule-maint). A service credit is not guaranteed.
+If you expect downtime during active rentals, notify renters before you take the machine down. Use either the console ([Set a maintenance window](/host/set-maintenance-window)) or the CLI/REST ([`vastai schedule maint`](/host/cli/schedule-maint)). Use one path per window. For SLA service-credit review, follow [Scheduled maintenance](#scheduled-maintenance): at least 24 hours' notice. A service credit is not guaranteed.
 </Warning>
 
 **Pre-flight checklist (before tuning reliability commitment and confidence):**
@@ -507,7 +507,11 @@ Clients pay more because you admit greater uncertainty. Use this if your reliabi
 
 ### Scheduled maintenance
 
-**Planned SLA maintenance (may earn a service credit):** Schedule at least 24 hours in advance with [`vastai schedule maint`](/host/cli/schedule-maint) (or the [REST schedule-maintenance API](/api-reference/machines/schedule-maint)). Include `--sdate` and `--duration`. Advance notice (not the category value) is what makes maintenance “planned” for service-credit review. Valid `--maintenance_category` values: `power`, `internet`, `disk`, `gpu`, `software`, `other`. A service credit is not guaranteed. Renters should check **Instances** for status. Credited maintenance is not a separate field on instance webhooks or `GET /api/v0/charges/`. The CLI does not send `maintenance_reason`; the REST body can. Credit eligibility is evaluated on a case-by-case basis.
+<Note title="One window, one path">
+Notify renters in the console ([Set a maintenance window](/host/set-maintenance-window)) or with CLI/REST. After you schedule from the CLI or API, confirm the window under **Host → Machines → Settings → Machine Maintenances**. Do not schedule the same downtime twice. SLA service-credit review looks for at least 24 hours of notice. A service credit is not guaranteed.
+</Note>
+
+**Planned SLA maintenance (renters may qualify for a service credit — not guaranteed):** Schedule at least 24 hours in advance with [`vastai schedule maint`](/host/cli/schedule-maint) (or the [REST schedule-maintenance API](/api-reference/machines/schedule-maint)). Include `--sdate` and `--duration`. Advance notice (not the category value) is what makes maintenance “planned” for service-credit review. Valid `--maintenance_category` values: `power`, `internet`, `disk`, `gpu`, `software`, `other`. Renters should check **Instances** for status. Credited maintenance is not a separate field on instance webhooks or `GET /api/v0/charges/`. The CLI does not send `maintenance_reason`; the REST body can. Credit eligibility is evaluated on a case-by-case basis.
 
 **CLI `--sdate` uses Unix epoch seconds (UTC)**; the REST body uses ISO 8601 UTC. **CLI `--duration` is in hours.** Schedule maintenance **sequentially** across a fleet. On HTTP 429, wait and retry with backoff (for example, `sleep 2` between machines). See [Rate Limits and Errors](/api-reference/rate-limits-and-errors).
 
