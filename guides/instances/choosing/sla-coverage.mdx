@@ -1,10 +1,10 @@
 ---
-title: "SLA Coverage"
-description: "Rent GPU instances with reliability guarantees. Learn how SLA charges, credits, and search filters work."
+title: "SLA"
+description: "Rent GPU instances with an SLA. Learn how the SLA fee, reliability target, and service credits work."
 "canonical": "/guides/instances/choosing/sla-coverage"
 ---
 
-Some Vast.ai offers include a **Service Level Agreement (SLA)** — an optional reliability promise on an **on-demand** rental. You pay a small hourly **SLA charge** only after you set a reliability **target** at rent time. If measured uptime falls short of that target, you receive a settlement credit. Search can quote the price; it does not turn coverage on by itself.
+Some Vast.ai offers include a **Service Level Agreement (SLA)** — an optional reliability promise on an **on-demand** rental. You pay a small hourly **SLA fee** only after you set a **reliability target** at rent time. If measured uptime falls short of that target, you receive a **service credit**. Search can quote the price; it does not turn the SLA on by itself.
 
 This page explains SLA from the renter side: how to find SLA offers, how pricing works, and when you get credited.
 
@@ -12,20 +12,20 @@ This page explains SLA from the renter side: how to find SLA offers, how pricing
 
 An SLA is an optional reliability promise on an **on-demand** GPU rental. You do not have to use it.
 
-1. The **host** says how often they expect the machine to be up. That is their **claim**.
-2. **You** choose how much uptime you want. That is your **target**. A higher target costs more.
-3. You pay a small extra hourly fee, the **SLA charge**, on top of the GPU price.
+1. The **host** states a **reliability commitment**: how often they expect the machine to be up.
+2. **You** choose a **reliability target**: how much uptime you want. A higher target costs more.
+3. You pay an **SLA fee** (a service level fee) on top of the GPU price.
 4. Each day, Vast checks how long your instance was actually up.
-5. If uptime met your target, the host keeps that fee.
-6. If uptime missed your target, you get money back as a **credit** on your account. That credit can be larger than the fee you paid that day.
+5. If uptime met your reliability target, the host keeps the SLA fee.
+6. If uptime missed your reliability target, you receive a **service credit**. That credit can be larger than the SLA fee you paid that day.
 
 A few things people mix up:
 
 - The **reliability score** on an offer card is a separate marketplace signal. It is not your SLA.
 - The GPU bill does **not** stop during an outage. SLA pays you back later as a credit, usually after the next UTC midnight.
-- A search filter does **not** buy coverage. You have to set a reliability target when you rent, in the web console or with the API. The CLI cannot turn SLA on today.
+- A search filter does **not** turn on an SLA. You have to set a reliability target when you rent, in the web console or with the API. The CLI cannot turn SLA on today.
 - SLA is only for **on-demand** rentals, not interruptible (spot) or reserved rentals.
-- If the price breakdown has **no SLA charge line**, you do not have coverage.
+- If the price breakdown has **no SLA fee line**, you do not have an SLA.
 
 Hosts who want the same idea from the listing side can read [SLA in plain language](/host/sla-offers#sla-in-plain-language).
 
@@ -34,7 +34,7 @@ Hosts who want the same idea from the listing side can read [SLA in plain langua
 </Note>
 
 <Warning>
-`target_reliability` is **not yet** available on the published `vastai create instance` CLI or Python SDK `create_instance()`. Searching with a target only quotes pricing — use the **web console** or **REST** create-instance to enable coverage (see [Finding SLA offers](#finding-sla-offers)).
+`target_reliability` is **not yet** available on the published `vastai create instance` CLI or Python SDK `create_instance()`. Searching with a target only quotes pricing — use the **web console** or **REST** create-instance to enable the SLA (see [Finding SLA offers](#finding-sla-offers)).
 </Warning>
 
 ## Choose your path
@@ -43,28 +43,28 @@ Hosts who want the same idea from the listing side can read [SLA in plain langua
 | --- | --- |
 | Understand what SLA is | [SLA in plain language](#sla-in-plain-language) |
 | Rent with SLA in the console | [Finding SLA offers → In the web console](#in-the-web-console) |
-| I use only the CLI today | **Cannot enable SLA at rent time** — CLI search only quotes pricing. After rent, verify with `vastai show instances-v1 --raw` (`target_reliability` > 0). To enable coverage, use the console or [API automation](#api-automation) (REST) |
+| I use only the CLI today | **Cannot enable SLA at rent time** — CLI search only quotes pricing. After rent, verify with `vastai show instances-v1 --raw` (`target_reliability` > 0). To enable the SLA, use the console or [API automation](#api-automation) (REST) |
 | Understand charges and credits | [How pricing works](#how-pricing-works) → [What happens after you rent](#what-happens-after-you-rent) |
-| Automate search → rent → verify | [API automation](#api-automation) (REST). **Billing reconciliation:** SLA settlement credits appear in the console billing UI today — not in `GET /api/v0/charges/` or client webhooks |
-| View SLA settlement credits | **Console only** today (**Account → Billing**). The Charges API does not include SLA credit lines, and there are no SLA credit webhooks. |
+| Automate search → rent → verify | [API automation](#api-automation) (REST). **Billing reconciliation:** service credits appear in the console billing UI today — not in `GET /api/v0/charges/` or client webhooks |
+| View service credits | **Console only** today (**Account → Billing**). The Charges API does not include SLA credit lines, and there are no SLA credit webhooks. |
 
 <Note>
 SLA applies to **on-demand rentals only** — not interruptible/bid or reserved/prepay contracts. See [Instance Pricing](/guides/instances/pricing).
 </Note>
 
 <Note>
-You do not post escrow or collateral for SLA. You pay the SLA charge while your rental contract is active (including during outages, before settlement credits are applied). Settlement happens automatically on a daily UTC cadence.
+You do not post escrow or collateral for SLA. You pay the SLA charge while your rental contract is active (including during outages, before service credits are applied). Settlement happens automatically on a daily UTC cadence.
 </Note>
 
 ## What SLA protects
 
 SLA is a **contractual, per-rental** reliability guarantee with automatic daily settlement. It is **not** the same as verification or the **reliability score** on offer cards — those are platform trust signals (see [Machine Tiers](/guides/instances/choosing/find-and-rent#machine-tiers)).
 
-For SLA-covered on-demand contracts:
+For on-demand contracts with an SLA:
 
 - You are charged for **compute, storage, and the SLA charge** for the rental day, including periods when the instance is unavailable.
 - Offline time is tracked as an outage in reliability measurements.
-- If you qualify for compensation, a **settlement credit** posts after daily settlement (UTC) — typically within a few hours after UTC midnight for the prior day — not in the same hour as the outage.
+- If you qualify for compensation, a **service credit** posts after daily settlement (UTC) — typically within a few hours after UTC midnight for the prior day — not in the same hour as the outage.
 
 SLA is most useful for **long-running production workloads** where unexpected downtime has a real cost beyond the hourly rate.
 
@@ -81,14 +81,14 @@ Bandwidth is billed separately from usage (`inet_*` rates) and is **not** includ
 | Factor | What it means for you |
 | --- | --- |
 | Your reliability target | Higher target → higher SLA charge |
-| Host SLA claim | Maximum reliability the host advertises on the listing (`expected_reliability`). Higher claim → lower SLA charge at a given target |
+| Host reliability commitment | Maximum reliability the host advertises on the listing (`expected_reliability`). Higher commitment → lower SLA fee at a given reliability target |
 | Host confidence | Host-side pricing setting that affects SLA charge size. **You do not set this** — the host chooses it, and it is **not shown on offer cards**. Compare offers using `dph_total` or the SLA charge line in the price breakdown |
 
-**Rule of thumb:** pick a target **at or below** the host's claim for the best value. Asking for 99% coverage on a host who only claims 95% costs much more than asking for 95% on a host who claims 99%. In search results, the host claim appears as **expected reliability** / SLA claim on the offer (API: `expected_reliability`) — not the Reliability Score on the card.
+**Rule of thumb:** pick a reliability target **at or below** the host's reliability commitment for the best value. Asking for a 99% reliability target on a host whose reliability commitment is only 95% costs much more than asking for 95% on a host whose reliability commitment is 99%. In search results, the host reliability commitment appears as **expected reliability** on the offer (API: `expected_reliability`) — not the Reliability Score on the card.
 
 ### Example: H100 at $3.50/hr GPU
 
-Searching with **target reliability 95%** on an offer where the host **claims 99%** with normal confidence:
+Searching with a **reliability target of 95%** on an offer where the host's **reliability commitment is 99%** with normal confidence:
 
 | Cost component | Approx. rate |
 | --- | --- |
@@ -100,17 +100,17 @@ Searching with **target reliability 95%** on an offer where the host **claims 99
 ## Finding SLA offers
 
 <Warning>
-**No SLA charge line in the price breakdown = no SLA coverage.** Filtering to SLA listings or searching with a reliability target only quotes pricing. Coverage requires setting **Reliability target** in the console (or passing `target_reliability` on REST create-instance) before you rent.
+**No SLA fee line in the price breakdown means you do not have an SLA.** Filtering to SLA listings or searching with a reliability target only quotes pricing. The SLA starts only when you set **Reliability target** in the console (or pass `target_reliability` on REST create-instance) before you rent.
 </Warning>
 
-**Decision rule:** Search filters **quote** SLA pricing only. Coverage activates only when you rent via the **web console** (Reliability target set) or **REST** create-instance (`target_reliability` on `PUT /api/v0/asks/{id}/`). The CLI cannot enable SLA at rent time today — see [API automation](#api-automation) for the minimum REST rent path.
+**Decision rule:** Search filters **quote** SLA pricing only. The SLA starts only when you rent via the **web console** (Reliability target set) or **REST** create-instance (`target_reliability` on `PUT /api/v0/asks/{id}/`). The CLI cannot enable the SLA at rent time today — see [API automation](#api-automation) for the minimum REST rent path.
 
 ### In the web console
 
 1. Open [Search](https://cloud.vast.ai/create/) and confirm **On-demand** is selected (SLA does not apply to interruptible rentals).
-2. In Search filters (left filter bar), set **Reliability target** to your desired coverage level — for example **95%** or **99%**. If you do not set a target, you are not opting into SLA.
-3. Optionally narrow results with an SLA-enabled / `has_sla` filter if shown. Filtering listings is **not** the same as enabling coverage.
-4. Before you click **RENT**, confirm the price breakdown shows an **SLA charge** line. No SLA charge means no SLA coverage for that rental.
+2. In Search filters (left filter bar), set **Reliability target** to your desired reliability target — for example **95%** or **99%**. If you do not set a target, you are not opting into SLA.
+3. Optionally narrow results with an SLA-enabled / `has_sla` filter if shown. Filtering listings is **not** the same as enabling the SLA.
+4. Before you click **RENT**, confirm the price breakdown shows an **SLA fee** line. No SLA fee line means that rental has no SLA.
 5. Rent as usual. Your target is locked at rent time.
 
 CLI and API examples below use the same filters.
@@ -121,16 +121,16 @@ CLI and API examples below use the same filters.
 | --- | --- | --- |
 | `target_reliability` | Your desired reliability level. Also drives SLA charge calculation and ranking. | `target_reliability=0.95` |
 | `has_sla` | Restrict to offers with (or without) SLA enabled. | `has_sla=true` |
-| `expected_reliability` | Filter by the host's advertised claim. | `expected_reliability>=0.99` |
+| `expected_reliability` | Filter by the host's advertised reliability commitment. | `expected_reliability>=0.99` |
 
 <Note>
-**API integrators:** `reliability` is the historical machine score, not the host’s SLA claim. Use `has_sla=true` and/or `expected_reliability` to find SLA listings.
+**API integrators:** `reliability` is the historical machine score, not the host’s reliability commitment. Use `has_sla=true` and/or `expected_reliability` to find SLA listings.
 </Note>
 
 **CLI examples:**
 
 ```bash
-# SLA offers where the host claims at least 99% reliability
+# SLA offers where the host reliability commitments at least 99% reliability
 vastai search offers 'has_sla=true expected_reliability>=0.99 target_reliability=0.95'
 
 # Compare total cost including SLA charge
@@ -143,7 +143,7 @@ When you set `target_reliability`, search results include:
 | --- | --- |
 | `search.slaPremiumPerHour` | SLA charge for this offer at your target (API field name) |
 | `dph_total` | Total hourly cost **including** the SLA charge |
-| `expected_reliability` | Host's reliability claim |
+| `expected_reliability` | Host's reliability commitment |
 
 Hover over the price breakdown on an offer card to see GPU, storage, bandwidth, and the SLA charge separately.
 
@@ -153,7 +153,7 @@ When you search with an SLA target, reserved-instance discounts may not apply to
 
 ### Comparing offers
 
-| Offer | GPU/hr | Host claim | Your target | SLA charge/hr |
+| Offer | GPU/hr | Host commitment | Your target | SLA charge/hr |
 | --- | --- | --- | --- | --- |
 | A | $3.50 | 99% | 95% | ~$0.008 |
 | B | $3.50 | 95% | 95% | much higher |
@@ -162,17 +162,17 @@ Always compare **`dph_total`**, not just GPU price, when SLA matters. Sort by `d
 
 ### API automation
 
-**Prerequisites:** You should be comfortable with REST, an API key, and JSON. Otherwise stay on [In the web console](#in-the-web-console). Happy path: search with `has_sla` and your storage size, rent with `PUT` and the same `target_reliability`, then confirm coverage on the instance.
+**Prerequisites:** You should be comfortable with REST, an API key, and JSON. Otherwise stay on [In the web console](#in-the-web-console). Happy path: search with `has_sla` and your storage size, rent with `PUT` and the same `target_reliability`, then confirm the SLA on the instance.
 
 Console-only renters can skip the rest of this section.
 
-CLI and SDK `create instance` cannot set `target_reliability`. After a CLI/SDK search, complete the rental in the console (set Reliability target, then confirm an SLA charge line) or use the REST example below. If the instance has no SLA charge line, you do not have coverage.
+CLI and SDK `create instance` cannot set `target_reliability`. After a CLI/SDK search, complete the rental in the console (set Reliability target, then confirm an SLA charge line) or use the REST example below. If the instance has no SLA charge line, you do not have an SLA.
 
 For repeated search calls, `POST /api/v0/bundles/` is rate-limited. On HTTP 429, wait and retry. See [Rate Limits and Errors](/api-reference/rate-limits-and-errors).
 
 Renters set **`target_reliability`** on search and on REST rent. **`sla_r_target`** is a stored field name in some instance filters — do not send it in the rent body.
 
-**Billing reconciliation:** SLA settlement credits appear in the console billing UI today. They are not included in `GET /api/v0/charges/` and client webhooks for SLA credits are not available — plan manual console reconciliation after UTC settlement (see [FAQ](#where-do-i-see-historical-sla-credits)).
+**Billing reconciliation:** service credits appear in the console billing UI today. They are not included in `GET /api/v0/charges/` and client webhooks for SLA credits are not available — plan manual console reconciliation after UTC settlement (see [FAQ](#where-do-i-see-historical-sla-credits)).
 
 **1. Search** (prices `dph_total` at your target — include storage explicitly so quotes are comparable):
 
@@ -227,12 +227,12 @@ curl -s -X PUT "https://console.vast.ai/api/v0/asks/OFFER_ID/" \
 
 **3. Verify** via `GET /api/v1/instances/` or `vastai show instances-v1 --raw`: confirm `target_reliability > 0`. For running instances, check `instance.slaPremiumPerHour`; search-context snapshots use `search.slaPremiumPerHour`. Requires `instance_read`. Pass an explicit `limit` (default can be as low as **5**; maximum **25** per request). Paginate by passing each response’s `next_token` as the **`after_token`** query parameter until `next_token` is null. On the CLI, use `--limit` and `--next-token` with `show instances-v1`.
 
-**Billing reconciliation (console):** confirming coverage does not show SLA settlement credits. After UTC settlement, open **Account → Billing**. `GET /api/v0/charges/` does not list those credits.
+**Billing reconciliation (console):** confirming the SLA does not show service credits. After UTC settlement, open **Account → Billing**. `GET /api/v0/charges/` does not list those credits.
 
 | Symptom | Typical response | What to do |
 | --- | --- | --- |
 | Target on a non-SLA offer | HTTP 400 `invalid_args` | Search with `has_sla=true`; confirm `expected_reliability` |
-| Target out of range / invalid | HTTP 400 `invalid_args` | Use `0 < target_reliability < 1`; stay at or below a realistic host claim |
+| Target out of range / invalid | HTTP 400 `invalid_args` | Use `0 < target_reliability < 1`; stay at or below a realistic host reliability commitment |
 | Offer unavailable / stale | HTTP 404 `invalid_args` (check `msg` for `no_such_ask`) | Re-search and rent a current offer ID |
 | Cannot start immediately (`cancel_unavail`) | HTTP 410 `no_such_ask` | Offer cannot start now; pick another offer or retry later — see [Create Instance](/api-reference/instances/create-instance) |
 | Price mismatch after stale quote | HTTP 400 `invalid_price` | Re-search with the same `target_reliability` and storage (`allocated_storage` / `--storage`), then rent again |
@@ -249,10 +249,10 @@ curl -s -X PUT "https://console.vast.ai/api/v0/asks/OFFER_ID/" \
 
 When you rent an SLA-backed offer **with a target set**:
 
-1. **Contract terms lock in** — your reliability target, the host's claim, and host confidence (how the host priced SLA around their claim) are fixed for that rental. When comparing offers, use the SLA charge line or `dph_total`. Host confidence is not shown in the client UI and is not a setting you control.
+1. **Contract terms lock in** — your reliability target, the host's reliability commitment, and host confidence (how the host priced SLA around their reliability commitment) are fixed for that rental. When comparing offers, use the SLA charge line or `dph_total`. Host confidence is not shown in the client UI and is not a setting you control.
 2. **Daily billing** — you pay compute plus the SLA charge each day.
 3. **Daily settlement** — Vast measures reliability across multiple timescales and calculates any SLA credit.
-4. **Credits appear in billing** — settlement credits improve your balance; strong days mean you paid the SLA charge with no credit.
+4. **Credits appear in billing** — service credits improve your balance; strong days mean you paid the SLA charge with no credit.
 
 ### What you pay during an outage
 
@@ -262,7 +262,7 @@ Billing continues during downtime. You are still charged for **compute, storage,
 
 **Stop vs destroy:** Stopping pauses compute but storage and contract charges can continue. **Destroying the instance** ends future daily charges; final SLA settlement still posts when the contract closes. If you abandon a failed host, destroy only after saving any data you need.
 
-If you qualify for compensation, a **settlement credit** is applied after daily settlement (UTC), typically within a few hours after UTC midnight for the prior day — not in the same hour as the outage.
+If you qualify for compensation, a **service credit** is applied after daily settlement (UTC), typically within a few hours after UTC midnight for the prior day — not in the same hour as the outage.
 
 ### How reliability is measured
 
@@ -276,15 +276,15 @@ Scheduled maintenance with adequate advance notice (typically 24+ hours) may be 
 
 ### Credit scenarios (simplified)
 
-Using the H100 example ($84/day compute, ~$0.20/day SLA charge, target 95%, host claim 99%):
+Using the H100 example ($84/day compute, ~$0.20/day SLA charge, target 95%, host reliability commitment 99%):
 
-| Scenario | Approx. SLA charge | Approx. settlement credit | Net vs no SLA (approx.) |
+| Scenario | Approx. SLA charge | Approx. service credit | Net vs no SLA (approx.) |
 | --- | --- | --- | --- |
 | Above target (excellent / good day) | ~$0.20/day | $0 (often) | **−$0.20** (you paid the SLA charge) |
 | Near / below target on blended measure (~95%) | ~$0.20/day | ~$42 | **+$41.80** (net credit after SLA charge) |
 | Severe shortfall (~90% or less) | ~$0.20/day | ~$84 | **+$83.80** |
 
-**How to read “Net vs no SLA”:** negative = you paid more than without SLA; positive = you received a net credit versus renting the same offer without SLA coverage.
+**How to read “Net vs no SLA”:** negative = you paid more than without SLA; positive = you received a net credit versus renting the same offer without the SLA.
 
 Production settlement can issue credits even when a single daily snapshot looks close to your target, because measurement uses the blended daily reliability calculation.
 
@@ -311,7 +311,7 @@ Production settlement uses the multi-window reliability blend described above, n
 
 1. Open **Instances** and select your running instance.
 2. Open **price details** (or the instance billing panel) and confirm an **SLA charge** line is present.
-3. If the UI shows your **reliability target**, confirm it matches what you selected at search time. If you do not see a target or SLA charge, you likely rented without SLA coverage.
+3. If the UI shows your **reliability target**, confirm it matches what you selected at search time. If you do not see a target or SLA charge, you likely rented without the SLA.
 
 ### API integrators
 
@@ -322,21 +322,21 @@ Console users: open **Instances** → select your instance → **price details**
 
 Show-instances output may include `target_reliability` and price fields under `search` / `instance` (including `slaPremiumPerHour`).
 
-To find SLA-covered instances, filter **client-side** from the show-instances response (`target_reliability > 0`, `instance.slaPremiumPerHour`). Prefer client-side filtering in production. OpenAPI documents optional `select_filters` on stored fields such as `sla_r_target` / `target_reliability` when present; computed fields (for example `has_sla`) are not filterable. Do not rely on `select_filters` alone for SLA detection.
+To find instances with an SLA, filter **client-side** from the show-instances response (`target_reliability > 0`, `instance.slaPremiumPerHour`). Prefer client-side filtering in production. OpenAPI documents optional `select_filters` on stored fields such as `sla_r_target` / `target_reliability` when present; computed fields (for example `has_sla`) are not filterable. Do not rely on `select_filters` alone to detect an SLA.
 
 | Client-visible concept | Search / bundles | Active rental (`GET /api/v1/instances/`) |
 | --- | --- | --- |
 | Your reliability target | `target_reliability` (quote only until rent) | `target_reliability` |
 | SLA charge rate | `search.slaPremiumPerHour` | `instance.slaPremiumPerHour` |
-| Host SLA claim | `expected_reliability` | `sla_r_claim` |
+| Host reliability commitment | `expected_reliability` | `sla_r_claim` |
 
-Host ask field `sla_r_claim` on listings is host-side; on active rentals the locked claim appears as `sla_r_claim` in show-instances. Host confidence is **not shown on offer cards** — compare offers using `dph_total` or the SLA charge line. Confirm field names against a live `--raw` response before building parsers.
+Host ask field `sla_r_claim` on listings is host-side; on active rentals the locked reliability commitment appears as `sla_r_claim` in show-instances. Host confidence is **not shown on offer cards** — compare offers using `dph_total` or the SLA charge line. Confirm field names against a live `--raw` response before building parsers.
 </details>
 
 ## When SLA is not available
 
 - **Interruptible (bid) rentals** never include SLA, even on SLA-enabled machines. Use on-demand with a reliability target set.
-- **Prepaid / reserved-only flows** may reject SLA parameters. Use on-demand rentals for SLA coverage.
+- **Prepaid / reserved-only flows** may reject SLA parameters. Use on-demand rentals for an SLA.
 - Offers without SLA (`expected_reliability = 0` / `has_sla=false`) are excluded when you filter with `has_sla=true` or set a positive `target_reliability`.
 - If SLA parameters on an offer are invalid for your target, search may flag an SLA pricing error instead of showing a charge.
 
@@ -358,7 +358,7 @@ No. Verification is a platform quality signal (see [Machine Tiers](/guides/insta
 
 **Console:** After UTC settlement, open **Account → Billing** and look for SLA credit line items alongside compute charges.
 
-**API:** Prefer **Account → Billing** for SLA settlement credit reconciliation. Published OpenAPI for `GET /api/v0/charges/` documents charge `type` values `gpu`, `disk`, `bwd`, and `bwu` — not a dedicated SLA settlement type. Client webhooks for SLA credits are not available. Host-side settlement visibility uses [machine earnings](/api-reference/billing/show-earnings) (`sla_earn`) — that path is for hosts, not renters.
+**API:** Prefer **Account → Billing** for service credit reconciliation. Published OpenAPI for `GET /api/v0/charges/` documents charge `type` values `gpu`, `disk`, `bwd`, and `bwu` — not a dedicated SLA settlement type. Client webhooks for SLA credits are not available. Host-side settlement visibility uses [machine earnings](/api-reference/billing/show-earnings) (`sla_earn`) — that path is for hosts, not renters.
 
 ## Related documentation
 

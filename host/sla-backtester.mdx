@@ -8,7 +8,7 @@ The **SLA (Service Level Agreement) earnings backtester** lets you answer a prac
 
 **Console hosts:** use **Set Pricing → SLA** in the web console to preview SLA charges — you do not need this API.
 
-**API hosts:** this endpoint replays historical earnings through SLA math to estimate SLA charges and worst-day credit risk before listing. (**`r`** = reliability level used as both claim and target in the simulation; **`p`** = host confidence — both defined in [Query parameters](#query-parameters) below.)
+**API hosts:** this endpoint replays historical earnings through SLA math to estimate SLA charges and worst-day credit risk before listing. (**`r`** = reliability level used as both reliability commitment and target in the simulation; **`p`** = host confidence — both defined in [Query parameters](#query-parameters) below.)
 
 It replays your machine's **real historical compute earnings and reliability** through the same SLA settlement math used in production, then compares the simulated result to what you actually earned from SLA (if anything).
 
@@ -34,7 +34,7 @@ If `has_data` is `false`, widen the date range or pick a machine with more renta
 
 Use the backtester to:
 
-- Pick a reliability claim and confidence before you enable SLA on a listing
+- Pick a reliability commitment and confidence before you enable SLA on a listing
 - Compare how SLA charge and worst-case credit change across targets
 - Stress-test a lower reliability assumption before you commit
 - Compare to history — each day includes `historical_sla`, your machine's realized SLA earnings on that day (zero if you were not offering SLA)
@@ -48,13 +48,13 @@ For how SLA offers work once listed, see [SLA Offers](/host/sla-offers).
 3. For each active day, it computes GPU, storage, and bandwidth earnings plus simulated SLA host earnings.
 4. It returns a day-by-day breakdown and summary totals.
 
-**Simulated vs listing parameters.** In the backtester, reliability **claim and client target are both set to `r`**. That is a conservative what-if: it pretends every client targeted your claim. When you list, you set only **`sla_r_claim`** (and `sla_sigma_x`); clients choose their own `target_reliability` at search/rent time. Workflow: backtest `worst_day_loss` at a candidate claim level, then verify visible SLA charges in **Set Pricing → SLA** (or `dph_total` in search at realistic client targets) before listing.
+**Simulated vs listing parameters.** In the backtester, the reliability **commitment and the client reliability target are both set to `r`**. That is a conservative what-if: it pretends every client targeted your reliability commitment. When you list, you set only **`sla_r_claim`** (and `sla_sigma_x`); clients choose their own `target_reliability` at search/rent time. Workflow: backtest `worst_day_loss` at a candidate reliability commitment, then verify visible SLA fees in **Set Pricing → SLA** (or `dph_total` in search at realistic client targets) before listing.
 
 **Active vs idle days.** **Idle days** are days with no rental earnings on the machine (no active compute rental). These days typically produce no SLA charge or credit in the simulation. Days with no rental activity appear in the results as zero-filled rows but do not count toward `covered_days`. Only days with actual earnings are replayed through SLA math.
 
 <Note>
 **Simulation vs live listing**
-- The backtester sets claim equal to target and may show higher SLA charges than live listing when clients choose targets below your claim.
+- The backtester sets the reliability commitment equal to target and may show higher SLA charges than live listing when clients choose targets below your reliability commitment.
 - For client-visible pricing (`dph_total`), use **Set Pricing → SLA** in the console or search with a realistic `target_reliability`.
 - For tail risk, trust `worst_day_loss`, not headline `total_sla`.
 - Timescale mix (`β`) is derived from `r` (weights recent vs longer-term uptime in settlement). Hosts cannot set β via the listing API.
@@ -86,7 +86,7 @@ Requires Bearer authentication. This endpoint is rate-limited like other host AP
 | Parameter | Required | Description |
 | --- | --- | --- |
 | `machine_id` | Yes | ID of your machine |
-| `r` | Yes | Reliability level to simulate (greater than 0 and at most **0.9999**). Used as **both claim and client target** in the simulation. Example: `0.95` = 95%. Exactly `1.0` is rejected. |
+| `r` | Yes | Reliability level to simulate (greater than 0 and at most **0.9999**). Used as **both reliability commitment and client target** in the simulation. Example: `0.95` = 95%. Exactly `1.0` is rejected. |
 | `p` | No | Host confidence (greater than 0 and **less than 1** — not equal to 1). Maps to the same spread used when listing with `sla_sigma_x` — see [Confidence values](#confidence-values-p) below. Default: `0.6667` (normal confidence, ≈ 67%). |
 | `start_date` | No | Range start as Unix epoch seconds. Default: 90 days before `end_date`. |
 | `end_date` | No | Range end as Unix epoch seconds. Default: now. |
@@ -230,7 +230,7 @@ Your historical reliability was strong relative to the simulated target. SLA wou
 
 ### Negative `sla` on specific days
 
-Those days had reliability below the simulated target. The magnitude shows how much you would have credited. If you see clusters of negative days, consider a lower claim, wider confidence, or fixing reliability before listing SLA.
+Those days had reliability below the simulated target. The magnitude shows how much you would have credited. If you see clusters of negative days, consider a lower reliability commitment, wider confidence, or fixing reliability before listing SLA.
 
 ### `total_sla` near zero
 
@@ -238,11 +238,11 @@ Break-even territory — SLA charges and credits roughly balance. Typical when y
 
 ### `total_sla` strongly negative
 
-Under the simulated parameters, SLA would have cost you money over this window. Either improve reliability, lower the claim, or widen confidence before listing.
+Under the simulated parameters, SLA would have cost you money over this window. Either improve reliability, lower the reliability commitment, or widen confidence before listing.
 
 ### Using `reliability` override
 
-Setting `reliability=0.90` while keeping `r=0.99` answers: *if every active day had 90% uptime, how bad would SLA credits get?* Use this to understand worst-case credit exposure before committing to a high claim.
+Setting `reliability=0.90` while keeping `r=0.99` answers: *if every active day had 90% uptime, how bad would SLA credits get?* Use this to understand worst-case credit exposure before committing to a high reliability commitment.
 
 ## Confidence values (`p`)
 
@@ -267,7 +267,7 @@ Tighter confidence (higher `p`) does **not** reduce credit owed on a miss — us
 | 400 | `invalid_range` | Date window invalid |
 | 400 | `range_too_large` | Window exceeds the maximum span |
 | 400 | `bad_request` | Out-of-range `r`, `p`, or date parameters |
-| 400 | `invalid_params` | Simulation math failure after validation (check claim/confidence inputs) |
+| 400 | `invalid_params` | Simulation math failure after validation (check the reliability commitment/confidence inputs) |
 | 403 | `not_owner` | Machine belongs to another host |
 | 404 | `machine_not_found` | Invalid `machine_id` |
 | 429 | *(rate limited)* | Too many requests — retry with backoff. See [Rate Limits and Errors](/api-reference/rate-limits-and-errors). |
@@ -278,13 +278,13 @@ For missing or invalid API keys and permission denials (`machine_read`), see [Au
 
 1. **Run a baseline backtest** on a machine with at least a few weeks of rental history:
    - Check your machine's uptime history on the [Host Machines page](https://cloud.vast.ai/host/machines), then use the console SLA preview or backtester — do not rely on the dashboard reliability score alone (see [Machine reliability score vs SLA reliability](/host/sla-offers#machine-reliability-score-vs-sla-reliability)).
-   - Choose an `r` at or slightly below the claim you plan to publish.
+   - Choose an `r` at or slightly below the reliability commitment you plan to publish.
    - Use normal confidence (`p=0.6667`).
    - If `has_data` is `false`, widen the date range or wait for more rental history.
 2. **Check `worst_day_loss`** — can you absorb that credit from a bad day?
 3. **Try a higher `r`** (for example `0.99`) and see how `total_sla` changes.
-4. **Run a stress test** with `reliability=0.90` at your intended claim.
-5. **List with `sla_r_claim`** — set claim (and `sla_sigma_x`) on the offer; clients choose their own targets in search (see [SLA Offers](/host/sla-offers)).
+4. **Run a stress test** with `reliability=0.90` at your intended reliability commitment.
+5. **List with `sla_r_claim`** — set the reliability commitment (and `sla_sigma_x`) on the offer; clients choose their own targets in search (see [SLA Offers](/host/sla-offers)).
 
 ## Fleet workflow
 
@@ -326,5 +326,5 @@ Expect roughly two seconds per machine minimum (`sleep 2` plus request time). Fo
 
 - [SLA Backtest API](/api-reference/host/sla-backtest) — formal API reference for this endpoint
 - [SLA Offers](/host/sla-offers) — listing parameters, economics, and risk scenarios
-- [SLA Coverage (clients)](/guides/instances/choosing/sla-coverage) — how renters choose targets and read `dph_total`
+- [SLA (clients)](/guides/instances/choosing/sla-coverage) — how renters choose targets and read `dph_total`
 - [API permissions](/api-reference/permissions) — `machine_read` scope required
