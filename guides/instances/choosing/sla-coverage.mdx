@@ -43,7 +43,7 @@ Hosts who want the same idea from the listing side can read [SLA in plain langua
 | --- | --- |
 | Understand what SLA is | [SLA in plain language](#sla-in-plain-language) |
 | Rent with SLA in the console | [Finding SLA offers → In the web console](#in-the-web-console) |
-| I use only the CLI today | **Cannot enable SLA at rent time** — CLI search only quotes pricing. After rent, verify with `vastai show instances-v1 --raw` (`target_reliability` > 0). To enable the SLA, use the console or [API automation](#api-automation) (REST) |
+| I use only the CLI today | **Cannot enable the SLA at rent time** — CLI search only quotes pricing. From `vastai search offers --raw`, use `offers[].id` as the ask id, then rent in the console or with `PUT /api/v0/asks/{id}/` and the same `target_reliability` ([API automation](#api-automation)). After rent, verify with `vastai show instances-v1 --raw` (`target_reliability` > 0) |
 | Understand charges and credits | [How pricing works](#how-pricing-works) → [What happens after you rent](#what-happens-after-you-rent) |
 | Automate search → rent → verify | [API automation](#api-automation) (REST). **Billing reconciliation:** service credits appear in the console billing UI today — not in `GET /api/v0/charges/` or client webhooks |
 | View service credits | **Console only** today (**Account → Billing**). The Charges API does not include SLA credit lines, and there are no SLA credit webhooks. |
@@ -225,7 +225,10 @@ curl -s -X PUT "https://console.vast.ai/api/v0/asks/OFFER_ID/" \
 
 **API key permissions:** create a scoped key with `misc` (search/bundles), `instance_write` (create-instance), and `instance_read` (verify with `GET /api/v1/instances/` or `vastai show instances-v1 --raw`). These three categories are the minimum for search → rent → verify. See [Authentication](/api-reference/authentication) and [Client SLA scoped-key recipe](/api-reference/permissions#client-sla-scoped-key-recipe).
 
-**3. Verify** via `GET /api/v1/instances/` or `vastai show instances-v1 --raw`: confirm `target_reliability > 0`. For running instances, check `instance.slaPremiumPerHour`; search-context snapshots use `search.slaPremiumPerHour`. Requires `instance_read`. Pass an explicit `limit` (default can be as low as **5**; maximum **25** per request). Paginate by passing each response’s `next_token` as the **`after_token`** query parameter until `next_token` is null. On the CLI, use `--limit` and `--next-token` with `show instances-v1`.
+**3. Verify** via `GET /api/v1/instances/` or `vastai show instances-v1 --raw`: confirm `target_reliability > 0`. For running instances, check `instance.slaPremiumPerHour`; search-context snapshots use `search.slaPremiumPerHour`. Requires `instance_read`.
+
+- **REST** (`GET /api/v1/instances/`): pass an explicit `limit` and page with `after_token` (the response `next_token`). The server default `limit` can be as low as **5** (maximum **25**).
+- **CLI** (`vastai show instances-v1`): use `--limit` and `--next-token`. The CLI default `--limit` is **25** unless you set it.
 
 **Billing reconciliation (console):** confirming the SLA does not show service credits. After UTC settlement, open **Account → Billing**. `GET /api/v0/charges/` does not list those credits.
 
