@@ -54,7 +54,7 @@ Hosts who want the same idea from the listing side can read [SLA in plain langua
 2. Confirm the price breakdown shows an **SLA fee** line before you rent.
 3. Click **RENT**. An SLA does not apply to interruptible or bid rentals.
 4. After rent, open **Instances**, select the instance, and open **price details**. An **SLA fee** line means the SLA is on.
-5. For service credits after downtime, check **Account → Billing**. They are not in the Charges API.
+5. For service credits after downtime, open **Account → Billing** and look for SLA credit line items after UTC settlement. They are not in the Charges API.
 
 Stop here unless you automate. The steps under [In the web console](#in-the-web-console) repeat this list with the same controls. [API automation](#api-automation) is for API keys.
 
@@ -244,7 +244,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/asks/OFFER_ID/" \
   }'
 ```
 
-`template_hash_id` is the content hash of a saved template. The template supplies the image, so this example omits `image`. Send `image` only when you want to override the template image. The request body must include `image`, `template_hash_id`, or both. Request fields override template defaults. `target_reliability` must match the value you searched with, and `disk` must meet the offer minimum, or rent can fail with `invalid_price`. See [Create Instance](/api-reference/instances/create-instance).
+`template_hash_id` is the content hash of a saved template. Include `template_hash_id` to rent from the template. Add `image` only when you want to override the template image. A request needs at least one of those fields. A template rent can send `template_hash_id` alone. Request fields override template defaults. `target_reliability` must match the value you searched with, and `disk` must meet the offer minimum, or rent can fail with `invalid_price`. See [Create Instance](/api-reference/instances/create-instance).
 
 **API key permissions:** create a scoped key with `misc` (search/bundles), `instance_write` (create-instance), and `instance_read` (verify with `GET /api/v1/instances/` or `vastai show instances-v1 --raw`). These three categories are the minimum for search → rent → verify. See [Authentication](/api-reference/authentication) and [Client SLA scoped-key recipe](/api-reference/permissions#client-sla-scoped-key-recipe).
 
@@ -271,7 +271,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/asks/OFFER_ID/" \
 | REST search (`POST /api/v0/bundles/`) | 8 GB | `allocated_storage` | GB |
 | CLI (`vastai search offers`) | 5 GiB | `--storage` | GiB |
 
-**Match disk size when comparing prices.** Defaults differ by channel. When chaining CLI search → REST rent, use the **same integer** on both sides (for example `--storage 50` then `"disk": 50`) — the platform treats that number identically even though REST fields are labeled GB and CLI help says GiB. REST create-instance `disk` must be ≥ **8** when you pass it; do not assume the CLI default of 5 is rentable via REST.
+**Match disk size when comparing prices.** Defaults differ by channel. When you rent with REST after a CLI search, pass the same number you searched with (for example `--storage 50` then `"disk": 50`). REST create-instance `disk` must be ≥ **8** when you pass it. The CLI search default of 5 is below that REST minimum. CLI help labels `--storage` as GiB and REST labels `disk` as GB. Confirm the rent price still matches the quote, or rent can fail with `invalid_price`.
 
 ## What happens after you rent
 
