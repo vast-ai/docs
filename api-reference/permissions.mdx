@@ -78,18 +78,66 @@ You can create scoped keys using:
 
 ### SLA workflows (scoped keys)
 
-**Console-only users** do not need a scoped API key to rent or list with an SLA. These recipes are for REST and CLI automation.
+**Console-only users** do not need a scoped API key to rent or list with an SLA. Copy only the JSON in this section. You do not need the endpoint lists later on this page.
 
-| Role | Recipe |
-| --- | --- |
-| Renter automating search, rent, and verify | [Client SLA recipe](#client-sla-scoped-key-recipe) |
-| Host automating list, backtest, and earnings | [Host SLA recipe](#host-sla-scoped-key-recipe) |
+<a id="client-sla-scoped-key-recipe"></a>
 
-**Renters (clients):** Open the [client SLA recipe](#client-sla-scoped-key-recipe) for the JSON and task table. Use `misc` for search, `instance_write` for rent, and `instance_read` for verification. Do not copy the host recipe. You do not need a scoped API key to rent with an SLA in the web console.
+**Renter — search and REST rent.** Skip this JSON if you rent in the web console. Create the key via [Create API Key](/api-reference/accounts/create-api-key). Do not copy the host recipe.
 
-**Hosts (providers):** Use every category in the [host SLA recipe](#host-sla-scoped-key-recipe) (the full task table is under `machine_write`). `machine_write` by itself is not enough. Add `misc` if you verify the listing with search offers. Start with [SLA in plain language](/host/sla-offers#sla-in-plain-language). Do not copy the client recipe. Skip that JSON if you only use **Set Pricing → SLA** in the console.
+- **Search:** `misc` is the category for `POST /api/v0/bundles/` and CLI `search offers`. There is no search-only permission. `misc` also covers other routes, such as serverless. Use a dedicated key if this automation should not include those routes.
+- **Rent:** `instance_write` on `PUT /api/v0/asks/{id}/` with `target_reliability`.
+- **Verify:** `instance_read` with `GET /api/v1/instances/` or `vastai show instances-v1 --raw`. On a running instance, the SLA fee is `instance.slaPremiumPerHour`. Search-context fields on that same payload use `search.slaPremiumPerHour`.
 
-On this page, **client** means renter and **provider** means host.
+```json
+{
+  "api": {
+    "misc": {},
+    "instance_write": {},
+    "instance_read": {}
+  }
+}
+```
+
+This is the minimum for search, REST rent, and verification. Add `user_read` if the flow loads templates or account profile data, and `user_write` if it creates SSH keys or templates.
+
+| Task | Category | Console fallback |
+| --- | --- | --- |
+| Search SLA offers | `misc` | **Search** |
+| Rent with an SLA | `instance_write` | Console **RENT** |
+| Verify `target_reliability` | `instance_read` | **Instances** |
+
+**Service credits:** Use the web console (**Account → Billing**) to view SLA credits. The Charges API (`GET /api/v0/charges/`) does not yet include SLA settlement line items; `items[].type` is limited to `gpu`, `disk`, `bwd`, and `bwu`.
+
+<Note title="API integrators">
+OpenAPI lists charge `type` values only (`gpu`, `disk`, `bwd`, `bwu`). Do not use that endpoint alone to reconcile SLA credits.
+</Note>
+
+<a id="host-sla-scoped-key-recipe"></a>
+
+**Host — list, backtest, and earnings.** Skip this JSON if you only use **Set Pricing → SLA** in the console. Create the key via [Create API Key](/api-reference/accounts/create-api-key). Do not copy the renter recipe. `machine_write` by itself cannot backtest, list, and read earnings.
+
+```json
+{
+  "api": {
+    "machine_read": {},
+    "machine_write": {},
+    "billing_read": {},
+    "misc": {}
+  }
+}
+```
+
+`misc` is required for `vastai search offers` / `POST /api/v0/bundles/`. It is broader than search. Omit it if you only check the listing in the console. You cannot limit `misc` to search only. Use a separate key for SLA scripts.
+
+| Task | Permission | Console fallback |
+| --- | --- | --- |
+| List or update an SLA offer (`PUT /api/v0/machines/create_asks/`) | `machine_write` | **Set Pricing → SLA**, then **LIST** |
+| SLA backtester | `machine_read` | Console SLA preview |
+| Schedule / cancel maintenance | `machine_write` | [Set a maintenance window](/host/set-maintenance-window) (Host → Machines → Settings → Machine Maintenances), or CLI/REST. SLA service-credit rules: [Scheduled maintenance](/host/sla-offers#scheduled-maintenance). |
+| Monitor `sla_earn` | `billing_read` | Host → Billing / Earnings |
+| Verify the listing in search | `misc` | **Host → Machines** (no API key) |
+
+Earnings URLs look like `/api/v0/users/{user_id}/machine-earnings/`. Copy `{user_id}` from **Account → Profile**. If `vastai show user` is denied on this key, add `user_read`. Start with [SLA in plain language](/host/sla-offers#sla-in-plain-language).
 
 ## Custom Roles
 
@@ -150,10 +198,7 @@ You can also use **wildcards** in `params` to represent placeholder values, usef
 
 ## Endpoint Reference by Category
 
-**Automators:** copy the scoped key for your role before you scan the endpoint lists. Console users: use the [table at the top of this page](#you-are-here-if).
-
-- Renters: [client SLA scoped-key recipe](#client-sla-scoped-key-recipe) (in **misc** below)
-- Hosts: [host SLA scoped-key recipe](#host-sla-scoped-key-recipe) (in **machine_write** below)
+**If you use the API or CLI with scoped keys:** copy the JSON from [SLA workflows](#sla-workflows-scoped-keys) before you scan the endpoint lists. Console users: use the [table at the top of this page](#you-are-here-if).
 
 Below is the complete mapping of which endpoints each permission category controls.
 
@@ -228,7 +273,7 @@ Below is the complete mapping of which endpoints each permission category contro
 
 - [Show Machines](/api-reference/machines/show-machines)
 - [Show Reports](/api-reference/machines/show-reports)
-- [SLA Backtest](/api-reference/host/sla-backtest) — API-only (hosts): replay historical earnings through SLA math. Requires `machine_read`. See [SLA Backtester](/host/sla-backtester). Console hosts should use the **Set Pricing → SLA** preview instead. Host SLA automation also requires `machine_write` and `billing_read`; see the [host SLA recipe](#host-sla-scoped-key-recipe) under `machine_write`.
+- [SLA Backtest](/api-reference/host/sla-backtest) — API-only (hosts): replay historical earnings through SLA math. Requires `machine_read`. See [SLA Backtester](/host/sla-backtester). Console hosts should use the **Set Pricing → SLA** preview instead. Host SLA automation also requires `machine_write` and `billing_read`; see the [host SLA recipe](#host-sla-scoped-key-recipe).
 
 ### machine\_write
 
@@ -242,32 +287,7 @@ Below is the complete mapping of which endpoints each permission category contro
 - [Unlist Machine](/api-reference/machines/unlist-machine)
 - [Unlist Volume](/api-reference/volumes/unlist-volume)
 
-<a id="host-sla-scoped-key-recipe"></a>
-
-**Host only — minimum SLA API key.** Skip this JSON if you only use **Set Pricing → SLA** in the console. Create via [Create API Key](/api-reference/accounts/create-api-key). See [Creating Scoped Keys](#creating-scoped-keys) for the required `api` wrapper. Enable every category in the JSON below. `machine_write` by itself cannot backtest, list, and read earnings. The **`misc`** category is broader than search: it also covers other routes such as serverless groups. You cannot limit `misc` to search only. Use a separate key for SLA scripts.
-
-```json
-{
-  "api": {
-    "machine_read": {},
-    "machine_write": {},
-    "billing_read": {},
-    "misc": {}
-  }
-}
-```
-
-`misc` is required for `vastai search offers` / `POST /api/v0/bundles/`. Omit it if you only check the listing in the console.
-
-| Task | Permission | Console fallback |
-| --- | --- | --- |
-| List or update an SLA offer (`PUT /api/v0/machines/create_asks/`) | `machine_write` | **Set Pricing → SLA**, then **LIST** |
-| SLA backtester | `machine_read` | Console SLA preview |
-| Schedule / cancel maintenance | `machine_write` | [Set a maintenance window](/host/set-maintenance-window) (Host → Machines → Settings → Machine Maintenances), or CLI/REST. SLA service-credit rules: [Scheduled maintenance](/host/sla-offers#scheduled-maintenance). |
-| Monitor `sla_earn` | `billing_read` | Host → Billing / Earnings |
-| Verify the listing in search | `misc` | **Host → Machines** (no API key) |
-
-Earnings URLs look like `/api/v0/users/{user_id}/machine-earnings/`. Copy `{user_id}` from **Account → Profile**. If `vastai show user` is denied on this key, add `user_read`.
+Host SLA keys: [Host SLA recipe](#host-sla-scoped-key-recipe).
 
 ### misc
 
@@ -282,37 +302,7 @@ Earnings URLs look like `/api/v0/users/{user_id}/machine-earnings/`. Copy `{user
 - [Search Offers](/api-reference/search/search-offers)
 - [Search Volumes](/api-reference/volumes/search-volumes)
 
-<a id="client-sla-scoped-key-recipe"></a>
-
-**Client (renter) only — search and REST rent.** You do not need this JSON to rent in the web console. Create the key via [Create API Key](/api-reference/accounts/create-api-key). Hosts should use the [host SLA recipe](#host-sla-scoped-key-recipe), not this one.
-
-- **Search:** `misc` for `POST /api/v0/bundles/` and CLI `search offers`. There is no search-only permission. `misc` also covers other routes, such as serverless. Use a dedicated key if you do not want SLA automation to include those routes.
-- **Rent:** `instance_write` on `PUT /api/v0/asks/{id}/` with `target_reliability`.
-- **Verify:** `instance_read` with `GET /api/v1/instances/` or `vastai show instances-v1 --raw`. On a running instance, the SLA fee is `instance.slaPremiumPerHour`. Search-context fields on that same payload use `search.slaPremiumPerHour`.
-
-```json
-{
-  "api": {
-    "misc": {},
-    "instance_write": {},
-    "instance_read": {}
-  }
-}
-```
-
-This is the minimum for search, REST rent, and verification. Add `user_read` if the flow loads templates or account profile data, and `user_write` if it creates SSH keys or templates. See the instance-management example under [Creating Scoped Keys](#creating-scoped-keys).
-
-| Task | Category | Console fallback |
-| --- | --- | --- |
-| Search SLA offers | `misc` | **Search** |
-| Rent with an SLA | `instance_write` | Console **RENT** |
-| Verify `target_reliability` | `instance_read` | **Instances** |
-
-**Service credits:** Use the web console (**Account → Billing**) to view SLA credits. The Charges API (`GET /api/v0/charges/`) does not yet include SLA settlement line items; `items[].type` is limited to `gpu`, `disk`, `bwd`, and `bwu`.
-
-<Note title="API integrators">
-OpenAPI documents charge `type` values only; do not use this endpoint alone to reconcile SLA credits.
-</Note>
+Renter SLA keys: [Renter SLA recipe](#client-sla-scoped-key-recipe).
 
 ### team\_read
 
