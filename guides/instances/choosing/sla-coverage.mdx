@@ -248,7 +248,16 @@ curl -s -X PUT "https://console.vast.ai/api/v0/asks/OFFER_ID/" \
 
 **API key permissions:** create a scoped key with `misc` (search/bundles), `instance_write` (create-instance), and `instance_read` (verify with `GET /api/v1/instances/` or `vastai show instances-v1 --raw`). These three categories are the minimum for search → rent → verify. See [Authentication](/api-reference/authentication) and [Client SLA scoped-key recipe](/api-reference/permissions#client-sla-scoped-key-recipe).
 
-**3. Verify.** Save `new_contract` from the rent response. Look up that contract with `GET /api/v1/instances/?select_filters={"id":{"eq":NEW_CONTRACT}}`. OpenAPI lists `id` as a filterable column. Or use `vastai show instances-v1 --raw`. Confirm `target_reliability` and `instance.slaPremiumPerHour` on that row. Search-context snapshots use `search.slaPremiumPerHour`. Requires `instance_read`. If the filter returns no row, page with `after_token` until you find `new_contract`. Do not use `select_filters` alone to detect an SLA (`has_sla` is not a filterable column).
+**3. Verify.** Save `new_contract` from the rent response. Look that contract up with URL-encoded `select_filters` (`id` is a filterable column):
+
+```bash
+curl -G "https://console.vast.ai/api/v1/instances/" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  --data-urlencode 'select_filters={"id":{"eq":NEW_CONTRACT}}' \
+  --data-urlencode "limit=25"
+```
+
+Replace `NEW_CONTRACT` with the id from the rent response. Confirm `target_reliability` and `instance.slaPremiumPerHour` on that row. Search-context snapshots use `search.slaPremiumPerHour`. Requires `instance_read`. You can also read the same fields with `vastai show instances-v1 --raw`. If the filter returns no row, page with `after_token`. Do not use `select_filters` alone to detect an SLA (`has_sla` is not a filterable column).
 
 - **REST** (`GET /api/v1/instances/`): pass an explicit `limit` and page with `after_token` (the response `next_token`). The server default `limit` can be as low as **5** (maximum **25**).
 - **CLI** (`vastai show instances-v1`): use `--limit` and `--next-token`. The CLI default `--limit` is **25** unless you set it.
