@@ -92,6 +92,8 @@ You do not need a scoped API key to use SLA in the web console. Hosts: configure
 
 **Renter — search and REST rent.** Skip this JSON if you rent in the web console. Create the key via [Create API Key](/api-reference/accounts/create-api-key). Do not copy the host recipe.
 
+**Minimum story:** Search → REST rent with `target_reliability` → verify on v1 instances; SLA credits only in the console.
+
 - Create a **dedicated** key for this workflow only. `misc` is required for search (`POST /api/v0/bundles/`, CLI `search offers`) but is broader than bundles—it also covers other routes such as serverless. Constraints cannot limit `misc` to search only today. Treat a `misc` key as a high-impact secret. Do not reuse a full-access key. Console rent needs no API key.
 - **Search:** `misc` (no search-only permission exists).
 - **Rent:** `instance_write` on `PUT /api/v0/asks/{id}/` with `target_reliability`.
@@ -129,6 +131,10 @@ OpenAPI lists charge `type` values only (`gpu`, `disk`, `bwd`, `bwu`). Do not us
 
 **Host — list, backtest, and earnings.** If you only list and monitor in the console (**Set Pricing → SLA**), you do not need this JSON. Create the key via [Create API Key](/api-reference/accounts/create-api-key). Do not copy the renter recipe. `machine_write` alone lists and updates an offer. It does not backtest or read earnings. Add `machine_read` and `billing_read` for those tasks.
 
+**Minimum story:** Backtest (optional) → `create_asks` with SLA fields → monitor earnings; host-side settlement is separate from marketplace score.
+
+`misc` also enables serverless and other routes—not bundles search alone. Host SLA automation keys are account-wide today for listing and `misc` routes; use dedicated keys, rotation, and monitoring for fleet scripts (machine-ID constraints on `machine_write` are not documented for SLA listing).
+
 ```json
 {
   "api": {
@@ -140,7 +146,7 @@ OpenAPI lists charge `type` values only (`gpu`, `disk`, `bwd`, `bwu`). Do not us
 }
 ```
 
-`misc` is required for `vastai search offers` / `POST /api/v0/bundles/`. It is broader than search. Omit it if you only check the listing in the console. You cannot limit `misc` to search only. Use a separate key for SLA scripts.
+`misc` is required for `vastai search offers` / `POST /api/v0/bundles/`. Omit it if you only check the listing in the console. You cannot limit `misc` to search only. Use a separate key for SLA scripts.
 
 | Task | Permission | Console fallback |
 | --- | --- | --- |

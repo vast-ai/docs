@@ -45,10 +45,10 @@ Search quotes an SLA; rent enables it (console or REST). `vastai create instance
 | --- | --- |
 | Understand what SLA is | [SLA in plain language](#sla-in-plain-language) |
 | Rent with SLA in the console | [Finding SLA offers → In the web console](#in-the-web-console) |
-| I use only the CLI today | Search can quote an SLA. Enabling it requires the console or [API automation](#api-automation). `vastai create instance` does not set `target_reliability`. |
+| I use only the CLI today | [CLI search](#finding-sla-offers) → [API automation](#api-automation) to enable SLA at rent |
 | Understand charges and credits | [How pricing works](#how-pricing-works) → [What happens after you rent](#what-happens-after-you-rent) |
-| Automate search → rent → verify | [API automation](#api-automation) (REST). **Billing reconciliation:** service credits appear in **Account → Billing** today — not in `GET /api/v0/charges/`, `GET /api/v1/invoices/`, or client webhooks |
-| View service credits | **Console only** today (**Account → Billing**). The Charges and Invoices APIs do not include SLA credit lines, and there are no SLA credit webhooks. |
+| Automate search → rent → verify | [API automation](#api-automation) |
+| View service credits | **Account → Billing** (console only today) |
 
 **Console renters (web only).** You do not need an API key. Follow the steps in [In the web console](#in-the-web-console), then stop unless you automate. [API automation](#api-automation) is for API keys.
 
@@ -175,9 +175,15 @@ When you search with an SLA target, reserved-instance discounts may not apply to
 
 Always compare **`dph_total`**, not just GPU price, when SLA matters. Sort by `dph_total` to compare total quoted cost.
 
+**Console-only readers:** You can stop after [In the web console](#in-the-web-console). SLA in the browser does not require an API key. For automation, continue to [API automation](#api-automation).
+
 ### API automation
 
 **Console renters can stop after [In the web console](#in-the-web-console).** This section is for API keys.
+
+<Note title="Automation limits (read once)">
+Search quotes SLA; renting with SLA requires REST (or the console) with `target_reliability`. The CLI and published SDK cannot enable SLA on rent. SLA service credits appear only in the web console billing UI—not in Charges, Invoices, or credit webhooks.
+</Note>
 
 <Warning>
 **Before you use this section:** Create an API key under **Account → API Keys**, and be comfortable with REST and JSON. For a scoped key, see [Authentication](/api-reference/authentication) and the [renter SLA recipe](/api-reference/permissions#client-sla-scoped-key-recipe). If you prefer the UI, use [In the web console](#in-the-web-console) instead.
@@ -192,15 +198,13 @@ Always compare **`dph_total`**, not just GPU price, when SLA matters. Sort by `d
 
 **Prerequisites:** Happy path: search with `has_sla` and your storage size, rent with `PUT` and the same `target_reliability`, then confirm the SLA on the instance.
 
-CLI and SDK `create instance` cannot set `target_reliability`. After a CLI/SDK search, complete the rental in the console (set Reliability target, then confirm an SLA charge line) or use the REST example below. If the instance has no SLA charge line, you do not have an SLA.
+For details on CLI/SDK rent limits and billing reconciliation, see [Automation limits (read once)](#api-automation) above.
 
 For repeated search calls, `POST /api/v0/bundles/` is rate-limited. On HTTP 429, wait and retry. See [Rate Limits and Errors](/api-reference/rate-limits-and-errors).
 
 Renters set **`target_reliability`** on search and on REST rent. **`sla_r_target`** is a stored field name in some instance filters — do not send it in the rent body.
 
-**Billing reconciliation:** service credits appear in the console billing UI today. They are not included in `GET /api/v0/charges/` and client webhooks for SLA credits are not available — plan manual console reconciliation after UTC settlement (see [FAQ](#where-do-i-see-historical-sla-credits)).
-
-**1. Search** (prices `dph_total` at your target — include storage explicitly so quotes are comparable):
+**1. Search** (prices `dph_total` at your target — include storage explicitly so quotes are comparable). Raise `limit` within API bounds when you need more rows. The bundles search body documents **`limit` only**—there is no offset or page token—so one response is the full result set for that query. For safe retry loops on HTTP 429, see [Rate Limits and Errors](/api-reference/rate-limits-and-errors).
 
 ```bash
 curl -s -X POST "https://console.vast.ai/api/v0/bundles/" \
@@ -285,7 +289,9 @@ Replace `NEW_CONTRACT` with the id from the rent response. Confirm `target_relia
 | REST search (`POST /api/v0/bundles/`) | 8 GB | `allocated_storage` | GB |
 | CLI (`vastai search offers`) | 5 GiB | `--storage` | GiB |
 
-**Match disk size when comparing prices.** Defaults differ by channel. When you rent with REST after a CLI search, pass the same number you searched with (for example `--storage 50` then `"disk": 50`). REST create-instance `disk` must be ≥ **8** when you pass it. The CLI search default of 5 is below that REST minimum. CLI help labels `--storage` as GiB and REST labels `disk` as GB. Confirm the rent price still matches the quote, or rent can fail with `invalid_price`.
+**Match disk size when comparing prices.** Defaults differ by channel. When you rent with REST after a CLI search, pass the same number you searched with (for example `--storage 50` then `"disk": 50`). REST create-instance `disk` must be ≥ **8** when you pass it. The CLI search default of 5 is below that REST minimum. CLI help labels `--storage` as GiB and REST labels `disk` as GB.
+
+**Quoting rule:** Use the same disk number end-to-end for the channel you rent through (console slider, REST `disk` / `allocated_storage`, or CLI `--storage`). If you mix channels, set disk explicitly on every search and rent step. Treat the same integer as one quote across CLI GiB and REST GB labels unless the API returns a mismatch error (`invalid_price`).
 
 ## What happens after you rent
 
