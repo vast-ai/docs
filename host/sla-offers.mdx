@@ -319,6 +319,8 @@ Omitted non-SLA fields retain their current listing values; only fields present 
 vastai show machines --raw | jq '.machines[] | select(.id == 12345 or .id == "12345") | {id, sla_r_claim, sla_sigma_x, price_gpu, end_date}'
 ```
 
+REST equivalent: `GET /api/v0/machines?user_id={user_id}` (`user_id` is required). Get `user_id` from **Account → Profile** or `vastai show user`. The CLI supplies `user_id` for you.
+
 Machine `id` may be a string in raw JSON. The response is wrapped in a `machines` array.
 
 Then `PUT /api/v0/machines/create_asks/` with the merged body (read → merge → PUT). `vastai list machine` and the Python SDK listing helpers cannot set SLA fields; start from this REST pattern (or the console) when you move an existing CLI listing to SLA.
@@ -335,8 +337,13 @@ This loop does not turn an SLA on for new machines. Enable an SLA on each machin
 `create_asks` defaults `sla_sigma_x` to `0.5` when you omit it on a write. This guide does **not** treat a missing `sla_sigma_x` in `show machines --raw` as that default—the raw payload may omit the field even when you intend Normal confidence. The loop **skips and logs** those IDs so it never silently writes `0.5`. Set **Confidence** in the console (or PUT `sla_sigma_x` for that machine), then re-run. A skip is not “SLA-ready.”
 
 <Warning>
-`PUT /api/v0/machines/create_asks/` **publishes a live listing** (same as **LIST**). A `sla_r_claim > 0` filter is **not** a listed-status check—running with `DRY_RUN=0` can put intentionally unlisted or paused machines back on the market. Before you apply, confirm each machine is **Listed** (or that you intend to re-list it) on **Host → Machines**. There is no documented `show machines --raw` field for listed vs unlisted in this guide; gate in the console or your own inventory before applying.
+`PUT /api/v0/machines/create_asks/` **publishes a live listing** (same as **LIST**). A `sla_r_claim > 0` filter is **not** a listed-status check—running with `DRY_RUN=0` can put intentionally unlisted or paused machines back on the market. Before you apply, confirm each machine is **Listed** on **Host → Machines**. There is no documented `show machines --raw` listed flag; keep an allowlist (CSV: `machine_id`, `intended_listed`) and only automate IDs with `intended_listed=true`.
 </Warning>
+
+**Fleet operators only.** Do not run the loop unless you manage a fleet.
+
+<AccordionGroup>
+<Accordion title="Fleet operators only — re-list bash loop">
 
 Validate `price_gpu`, `end_date`, and `min_chunk` before each PUT. Prefer reading existing SLA fields from each machine rather than hardcoding reliability commitment and confidence. Skip incomplete machines.
 
@@ -359,9 +366,14 @@ See [Fleet workflow](/host/sla-backtester#fleet-workflow) in the backtester for 
 export VAST_API_KEY="YOUR_API_KEY"
 # Leave DRY_RUN=1 until you confirm each machine is **Listed** (or on your allowlist).
 # Set DRY_RUN=0 to apply.
+# Only IDs in ALLOWLIST (intended_listed=true). Empty = skip all applies.
+ALLOWLIST="${ALLOWLIST:-}"
 DRY_RUN="${DRY_RUN:-1}"
 machines=$(vastai show machines --raw)
 for id in $(echo "$machines" | jq -r '.machines[].id'); do
+  if [ -n "$ALLOWLIST" ] && ! echo "$ALLOWLIST" | grep -qw "$id"; then
+    echo "skip $id: not in ALLOWLIST"; continue
+  fi
   machine=$(echo "$machines" | jq -c --arg id "$id" \
     '.machines[] | select((.id|tostring) == $id)')
   price=$(echo "$machine" | jq -r '.price_gpu // empty')
@@ -393,6 +405,9 @@ done
 ```
 
 Fetch the fleet once before the loop — do not call `show machines --raw` inside the loop. On fleets of 20+ machines, expect several minutes; back off on HTTP 429. Configure reliability commitment and confidence per machine (console or single-machine `create_asks`) before running with `DRY_RUN=0` — the loop only updates machines that already have a positive `sla_r_claim`.
+
+</Accordion>
+</AccordionGroup>
 
 **SLA-only update (existing ask only)** — include `machine` plus SLA fields; omit unrelated offer fields you intend to keep. Do **not** use this body for a first listing.
 
