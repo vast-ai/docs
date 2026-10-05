@@ -228,7 +228,7 @@ curl -s -X POST "https://console.vast.ai/api/v0/bundles/" \
   }'
 ```
 
-CLI search defaults are `external=false rentable=true verified=true` (see [search offers](/cli/reference/search-offers)). The body above matches those filters; add `"rented": {"eq": false}` only when you intentionally exclude rented slots.
+CLI search defaults are `external=false rentable=true verified=true` (see [search offers](/cli/reference/search-offers)). The body above matches those three filters. REST `POST /api/v0/bundles/` may default omitted `rented` to `{"eq": false}` per [Search Offers OpenAPI](/api-reference/search/search-offers)—that is **not** the same as the CLI default query (which does not send `rented`). Pass `rented` explicitly when you need a specific filter; do not assume omitted `rented` on REST matches CLI.
 
 **2. Rent** the chosen offer. Use `offers[].id` from the search response as `{id}` in `PUT /api/v0/asks/{id}/`. Prefer `id` over `ask_contract_id` when both appear. Never use `bundle_id`. Save `new_contract` from the rent response. Pass the **same** reliability target you searched with:
 
@@ -290,6 +290,8 @@ Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `ta
 | Ask cannot start now (`cancel_unavail`) | HTTP 410, error `no_such_ask` | Search for a new offer; this is not a transient glitch to retry on the same id |
 | Price mismatch after stale quote | HTTP 400 `invalid_price` | Re-search with the same `target_reliability` and storage (`allocated_storage` / `--storage`), then rent again |
 | Too many requests | HTTP 429 | Wait and back off. Before retrying the same `PUT`, confirm with `GET /api/v1/instances/` whether the contract already exists. If retry returns `invalid_price`, `no_such_ask`, 404, or 410, re-search with the same `target_reliability` and storage, then rent a fresh offer id. |
+| Missing SSH key for the VM | HTTP 400 `no_ssh_key_for_vm` (or similar) | Add an SSH key on your account before renting, then retry with a current offer id. |
+| Forbidden / wrong account | HTTP 403 | Rent with a **renter** account API key, not the host listing key (see [Hosting Overview](/host/hosting-overview) self-test note). |
 | SLA with a bid or interruptible offer | Rent does not turn on an SLA | Search with `"type": "ondemand"`. Do not send `price` or `bid_price` when you want an SLA. |
 
 | Channel | Default storage | Field | Units (label) |
@@ -431,7 +433,7 @@ No. Verification is a platform quality signal (see [Machine Tiers](/guides/insta
 
 **Console:** After UTC settlement, open **Account → Billing** and look for **service credit** or SLA credit line items (wording can vary)—not in the instance price panel. Credits are not available via the Charges API, invoices, or billing exports today.
 
-**API:** Prefer **Account → Billing** for service credit reconciliation. Published OpenAPI for `GET /api/v0/charges/` documents charge `type` values `gpu`, `disk`, `bwd`, and `bwu` — not a dedicated SLA settlement type. `GET /api/v1/invoices/` covers payment transactions (top-ups, transfers, payouts), not SLA service-credit line items. Client webhooks for SLA credits are not available. Host-side settlement visibility uses [machine earnings](/api-reference/billing/show-earnings) (`sla_earn`) — that path is for hosts, not renters.
+**API integrators:** Prefer **Account → Billing** for service credit reconciliation. There is no renter API for SLA credits. Published OpenAPI for `GET /api/v0/charges/` documents charge `type` values `gpu`, `disk`, `bwd`, and `bwu` — not a dedicated SLA settlement type. `GET /api/v1/invoices/` covers payment transactions (top-ups, transfers, payouts), not SLA service-credit line items. Client webhooks for SLA credits are not available. Host-side settlement visibility uses [machine earnings](/api-reference/billing/show-earnings) (`sla_earn`) — that path is for hosts, not renters.
 
 ## Related documentation
 
