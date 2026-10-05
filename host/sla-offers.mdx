@@ -6,6 +6,8 @@ description: "Offer an SLA on your machines: set a reliability commitment and co
 
 Vast.ai lets hosts attach a **Service Level Agreement (SLA)** to a machine listing. An SLA is a reliability guarantee: clients who choose an SLA pay a small hourly **SLA charge** included in **`dph_total`** (dollars per hour total in search — base compute plus SLA charge), and if measured reliability falls short of their chosen target, they receive a service credit funded from your earnings.
 
+**New to SLA?** Read [SLA in plain language](#sla-in-plain-language) first, then return here for economics and API detail.
+
 This page explains how SLA offers work from the host side — what you set, how clients choose an SLA, and what happens when uptime is good or bad.
 
 <Note title="For hosts">
@@ -40,7 +42,7 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 4. Confirm SLA account access (**Set Pricing → SLA** panel visible; if missing, contact support).
 5. Preview economics (console SLA panel or [backtester](/host/sla-backtester)), then set the reliability commitment/confidence. Before your first SLA rental, read [Billing vs settlement](#billing-vs-settlement-important) and [Risk scenarios](#risk-scenarios)—GPU billing can continue during outages and SLA credits can exceed many days of SLA fees.
 6. Read [Scheduled maintenance](#scheduled-maintenance) before your first SLA rental (24-hour notice for planned work).
-7. Enable SLA listing: **Save** pricing, then click **LIST** on a first publish. If the machine is already listed, **Save** alone updates the live offer. **Console verify:** confirm **Listed** on **Host → Machines** and reopen **Set Pricing → SLA**. **Optional CLI/API:** search with `--storage` matching how renters quote (for example `vastai search offers 'machine_id=12345 has_sla=true expected_reliability>=0.99 target_reliability=0.95' --storage 10`).
+7. Enable SLA listing: **Save** pricing, then click **LIST** on a first publish. If the machine is already listed, **Save** alone updates the live offer. **Console verify:** confirm **Listed** on **Host → Machines** and reopen **Set Pricing → SLA**. **Optional CLI/API:** search with `--storage` matching how renters quote. If you search your own machine and see no rows, add `verified=any` (for example `vastai search offers 'machine_id=12345 verified=any has_sla=true expected_reliability>=0.99 target_reliability=0.95' --storage 10`).
 
 ## Before you enable SLA
 
@@ -357,10 +359,12 @@ For multiple machines, loop sequentially — do not parallelize without backoff:
 
 1. Skip machines missing base pricing fields.
 2. `PUT /api/v0/machines/create_asks/` with `machine` plus SLA fields (preserve existing reliability commitment and confidence when set).
-3. On `429`, sleep and retry with exponential backoff.
+3. Space requests (`sleep 2` in the example). At fleet scale, detect HTTP **429** and retry that machine with backoff before treating it as failed—do not rerun the whole loop with `DRY_RUN=0` until transient rate limits clear.
 4. On `invalid_sla_params`, `sla_not_approved`, `sla_daemon_outdated`, or `machine_locked`, log the machine ID and continue or abort per your rollout policy.
 
 See [Fleet workflow](/host/sla-backtester#fleet-workflow) in the backtester for a similar sequential pattern.
+
+This example is illustrative: it sleeps between machines and logs success/error from JSON, but does not implement full HTTP 429 retry. Add status checks and backoff before production fleet rollouts.
 
 ```bash
 export VAST_API_KEY="YOUR_API_KEY"
@@ -683,6 +687,8 @@ When you pass `machid`, use `per_machine[].sla_earn` for that machine's SLA sett
 
 **Quick rules:**
 - **One machine, one UTC day:** For exact prior-UTC-day reconciliation (for example vs backtester `worst_day_loss`), use `sday`/`eday` with `day = floor(unix_epoch_seconds / 86400)`, or CLI `--start_date` / `--end_date` for that calendar day. Example: `2026-07-24` 00:00 UTC is unix `1784851200` → `sday=eday=20658`. Use `last_days=1` with `machid` only for coarse polling after UTC rollover—not as a strict match to one settled UTC calendar day.
+
+Replace `{user_id}` below with your account ID from **Account → Profile**, or set `USER_ID=$(vastai show user --raw | jq -r '.id')` and substitute `$USER_ID` in the URL.
 
 ```bash
 # Exact UTC day 2026-07-24 for machine 12345 (sday/eday = 20658)
