@@ -318,8 +318,8 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
   if [ -z "$r" ]; then
     r=$(echo "$machine" | jq -r '.sla_r_claim // empty')
   fi
-  if ! jq -n --arg r "$r" '($r | tonumber?) > 0' >/dev/null 2>&1; then
-    echo "skip $id: set Claim in console (**Set Pricing → SLA**) or export R=0.99"; continue
+  if ! jq -e -n --arg r "$r" 'try (($r | tonumber) > 0) catch false' >/dev/null 2>&1; then
+    echo "skip $id: set Claim (reliability commitment, sla_r_claim) in console (**Set Pricing → SLA**) or export R=0.99"; continue
   fi
   if ! echo "$machine" | jq -e '.sla_sigma_x != null' >/dev/null; then
     echo "skip $id: set Confidence in console or PUT sla_sigma_x before backtest"; continue
