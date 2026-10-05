@@ -260,8 +260,10 @@ SLA listing via CLI/SDK is not available yet — use the REST API below (or cons
 4. To enable SLA today, use `PUT /api/v0/machines/create_asks/` or **Set Pricing → SLA** in the console. The listing body field is `machine` (same ID as backtester `machine_id` and earnings `machid`).
 5. For the full request/response schema, see [List Machine](/api-reference/machines/list-machine).
 
+#### Update SLA on an existing ask (partial body)
+
 <Warning>
-**Not a first listing.** The curl below adds SLA fields to a machine that already has base pricing. A first `create_asks` must also include `min_chunk` and typical disk and bandwidth prices. See [Hosting overview](/host/hosting-overview#offers-and-rental-contracts).
+**Not a first listing.** The curl below adds SLA fields to a machine that already has base pricing. For a **first publish**, use a full `create_asks` body from [List Machine](/api-reference/machines/list-machine) (include at least `min_chunk`, disk/bandwidth prices, and `end_date`) or **Set Pricing → SLA** in the console. See [Hosting overview](/host/hosting-overview#offers-and-rental-contracts).
 </Warning>
 
 ```bash
@@ -369,7 +371,7 @@ done
 
 Fetch the fleet once before the loop — do not call `show machines --raw` inside the loop. On fleets of 20+ machines, expect several minutes; back off on HTTP 429. Configure reliability commitment and confidence per machine (console or single-machine `create_asks`) before running with `DRY_RUN=0` — the loop only updates machines that already have a positive `sla_r_claim`.
 
-**SLA-only update** — include `machine` plus SLA fields; omit unrelated offer fields you intend to keep:
+**SLA-only update (existing ask only)** — include `machine` plus SLA fields; omit unrelated offer fields you intend to keep. Do **not** use this body for a first listing.
 
 ```bash
 curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
