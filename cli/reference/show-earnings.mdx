@@ -6,7 +6,7 @@ sidebarTitle: "show earnings"
 Get machine earning history reports.
 
 <Note>
-Host settlement command. `sla_earn` is host SLA settlement, not renter credits. Renters: [Account → Billing](https://cloud.vast.ai/billing/) — see [SLA credits](/guides/instances/choosing/sla-coverage#faq).
+Host settlement command. `sla_earn` is host SLA settlement, not renter credits. Renters: [Account → Billing](https://cloud.vast.ai/billing/) — see [Where do I see historical SLA credits?](/guides/instances/choosing/sla-coverage#where-do-i-see-historical-sla-credits).
 </Note>
 
 ## Usage
@@ -26,20 +26,23 @@ vastai show earnings [OPTIONS]
 </ParamField>
 
 <ParamField path="-e" type="string">
-  end date and time for report. Many formats accepted  (alias: `--end_date`)
+  end date and time for report. Many formats accepted (alias: `--end_date`)
 </ParamField>
 
 <ParamField path="-m" type="integer">
   Machine id (optional) (alias: `--machine_id`)
 </ParamField>
 
-`--raw` is the same JSON as [Show Earnings](/api-reference/billing/show-earnings). Host SLA settlement is `per_machine[].sla_earn` (field `machine_id`, not query param `machid`; not fleet-wide `per_day[].sla_earn`). See [Monitoring SLA after listing](/host/sla-offers#monitoring-sla-after-listing).
+`--raw` is the same JSON as [Show Earnings](/api-reference/billing/show-earnings). Host SLA settlement is `per_machine[].sla_earn` (field `machine_id`, not query param `machid`; not fleet-wide `per_day[].sla_earn`). For one machine / one UTC day, see [Monitoring SLA after listing](/host/sla-offers#monitoring-sla-after-listing).
 
 ## Examples
 
 ```bash
 vastai show earnings
 vastai show earnings --raw | jq '.per_machine[] | {machine_id, sla_earn}'
+# One machine (prefer --machine_id for SLA settlement checks)
+vastai show earnings --machine_id 12345 --start_date $(date -u -d 'yesterday' +%F) --end_date $(date -u -d 'yesterday' +%F) --raw \
+  | jq '.per_machine[] | select(.machine_id == 12345 or .machine_id == "12345") | {machine_id, sla_earn}'
 ```
 
 ## Global Options
