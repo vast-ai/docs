@@ -665,7 +665,7 @@ Positive `sla_earn` = net SLA charge you kept that period; negative = net credit
 
 `GET /api/v0/users/{user_id}/machine-earnings/` returns SLA fields alongside compute earnings. Requires a **`billing_read`** API key. See [`show earnings`](/api-reference/billing/show-earnings).
 
-This endpoint is rate-limited — see [Rate Limits and Errors](/api-reference/rate-limits-and-errors). Poll at most about once every two seconds per IP; back off on HTTP 429.
+This endpoint is rate-limited. Poll `GET /api/v0/users/{user_id}/machine-earnings/` at most about once every two seconds for this route (OpenAPI `x-rate-limit` threshold `2.0` per request; see [Show Earnings](/api-reference/billing/show-earnings)). On HTTP 429, back off and retry. For daily SLA settlement, one pull with `last_days=1` after UTC rollover is usually enough.
 
 **Automation pattern:** There is no host webhook for SLA settlement. Poll `machine-earnings` with `last_days=1` and `machid`, alert on `per_machine[].sla_earn` thresholds, and call machines sequentially with backoff on 429. Do not use `per_day[].sla_earn` for a single machine.
 
