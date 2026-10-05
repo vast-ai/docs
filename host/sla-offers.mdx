@@ -4,7 +4,7 @@ description: "Offer an SLA on your machines: set a reliability commitment and co
 "canonical": "/host/sla-offers"
 ---
 
-Vast.ai lets hosts attach a **Service Level Agreement (SLA)** to a machine listing. An SLA is a reliability guarantee: clients who choose an SLA pay a small hourly **SLA charge** included in **`dph_total`** (dollars per hour total in search — base compute plus SLA charge), and if measured reliability falls short of their chosen target, they receive a service credit funded from your earnings.
+Vast.ai lets hosts attach a **Service Level Agreement (SLA)** to a machine listing. An SLA is a reliability guarantee: clients who choose an SLA pay a small hourly **SLA charge** included in **`dph_total`** (dollars per hour total in search — GPU + storage + SLA charge), and if measured reliability falls short of their chosen target, they receive a service credit funded from your earnings.
 
 **New to SLA?** Read [SLA in plain language](#sla-in-plain-language) first, then return here for economics and API detail.
 
@@ -36,13 +36,15 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 
 ## SLA host checklist
 
-1. Complete [Account setup and hosting agreement](/host/hosting-overview#account-setup-and-hosting-agreement) on a **dedicated host account** (do not host from a renter-only account), then [host setup](https://cloud.vast.ai/host/setup/) and confirm the machine appears on **Host → Machines** (healthy, priced). If you want SLA from the first rental, finish **Set Pricing → SLA** before your first **LIST** (see [Web console](#web-console)).
+1. Complete [Account setup and hosting agreement](/host/hosting-overview#account-setup-and-hosting-agreement) on a **dedicated host account** (do not host from a renter-only account), then [host setup](https://cloud.vast.ai/host/setup/) and confirm the machine appears on **Host → Machines** (healthy, priced). Configure **Set Pricing → SLA** (reliability commitment, confidence, and related fields) if you want SLA from the first rental—but do **not** press **LIST** to go live until you complete steps 2–6; step 7 is your first publish and verify.
 2. Test on a [separate client account](/host/hosting-overview#testing-your-own-machine) (billed like any rental).
 3. Install the [CLI](/cli/hello-world) if you schedule maintenance or read earnings from the CLI. The console [Set a maintenance window](/host/set-maintenance-window) page can notify renters without the CLI.
 4. Confirm SLA account access (**Set Pricing → SLA** panel visible; if missing, contact support).
 5. Preview economics (console SLA panel or [backtester](/host/sla-backtester)), then set the reliability commitment/confidence. Before your first SLA rental, read [Billing vs settlement](#billing-vs-settlement-important) and [Risk scenarios](#risk-scenarios)—GPU billing can continue during outages and SLA credits can exceed many days of SLA fees.
 6. Read [Scheduled maintenance](#scheduled-maintenance) before your first SLA rental (24-hour notice for planned work).
-7. Enable SLA listing: **Save** pricing, then click **LIST** on a first publish. If the machine is already listed, **Save** alone updates the live offer. **Console verify:** confirm **Listed** on **Host → Machines** and reopen **Set Pricing → SLA**. **Optional CLI/API:** search with `--storage` matching how renters quote. If you search your own machine and see no rows, add `verified=any` (for example `vastai search offers 'machine_id=12345 verified=any has_sla=true expected_reliability>=0.99 target_reliability=0.95' --storage 10`). On sliced machines, search may return multiple rows (bid vs on-demand, different `num_gpus`); filter on-demand offers with the jq example in [Search / client-visible fields](#search--client-visible-fields).
+7. **First publish and verify:** **Save** pricing, then click **LIST** (first publish only). If the machine is already listed, **Save** alone updates the live offer.
+   - **Console verify:** confirm **Listed** on **Host → Machines** and reopen **Set Pricing → SLA**.
+   - **Optional CLI/API:** search with `--storage` matching how renters quote; add `verified=any` if you search your own machine and see no rows (for example `vastai search offers 'machine_id=12345 verified=any has_sla=true expected_reliability>=0.99 target_reliability=0.95' --storage 10`). On sliced machines, filter on-demand rows with the jq example in [Search / client-visible fields](#search--client-visible-fields).
 
 ## Before you enable SLA
 
@@ -726,7 +728,7 @@ Do **not** compare `last_days=7` totals to single-day `worst_day_loss` from the 
 | `per_machine[].sla_earn` | Positive (SLA charge kept) | Negative (credit you owe) |
 | Fleet `per_day[].sla_earn` | Positive (SLA charge kept) | Negative (credit you owe) |
 
-- `{user_id}` — Replace with your account ID from **Account → Profile** in the console, or `vastai show user` (do not leave the curly-brace placeholder in the URL).
+- `{user_id}` — Use your account ID from **Account → Profile** (recommended). Use `vastai show user` only if your API key includes `user_read`; `billing_read`-only keys cannot call it. Do not leave a curly-brace placeholder in the URL.
 - Settlement is evaluated on UTC day boundaries. Rows typically update within a few hours after UTC midnight.
 
 ## Tips for competitive SLA offers
