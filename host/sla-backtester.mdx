@@ -77,7 +77,7 @@ The backtester is available through the REST API only. You must own the machine 
 </Note>
 
 ```
-GET /api/v0/host/sla_backtest/
+GET /api/v0/host/sla_backtest
 ```
 
 Requires Bearer authentication. This endpoint is rate-limited like other host API endpoints — see [Rate Limits and Errors](/api-reference/rate-limits-and-errors) for retry guidance.
@@ -109,7 +109,7 @@ Minimal baseline (default 90-day lookback — no custom dates required):
 
 ```bash
 curl -s -H "Authorization: Bearer YOUR_API_KEY" \
-  "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=12345&r=0.95&p=0.6667"
+  "https://console.vast.ai/api/v0/host/sla_backtest?machine_id=12345&r=0.95&p=0.6667"
 ```
 
 Custom date range (optional — relative UTC window):
@@ -121,7 +121,7 @@ Custom date range (optional — relative UTC window):
 start=$(date -u -d '90 days ago' +%s)
 end=$(date -u +%s)
 curl -s -H "Authorization: Bearer YOUR_API_KEY" \
-  "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=12345&r=0.95&p=0.6667&start_date=$start&end_date=$end"
+  "https://console.vast.ai/api/v0/host/sla_backtest?machine_id=12345&r=0.95&p=0.6667&start_date=$start&end_date=$end"
 ```
 
 Compare two confidence levels on the same history:
@@ -129,18 +129,18 @@ Compare two confidence levels on the same history:
 ```bash
 # Normal confidence (~67%, default 0.6667)
 curl -s -H "Authorization: Bearer YOUR_API_KEY" \
-  "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=12345&r=0.99&p=0.6667"
+  "https://console.vast.ai/api/v0/host/sla_backtest?machine_id=12345&r=0.99&p=0.6667"
 
 # Tight (~83%) — tighter spread, lower simulated SLA charges
 curl -s -H "Authorization: Bearer YOUR_API_KEY" \
-  "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=12345&r=0.99&p=0.83"
+  "https://console.vast.ai/api/v0/host/sla_backtest?machine_id=12345&r=0.99&p=0.83"
 ```
 
 Stress-test with flat 90% uptime:
 
 ```bash
 curl -s -H "Authorization: Bearer YOUR_API_KEY" \
-  "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=12345&r=0.99&p=0.6667&reliability=0.90"
+  "https://console.vast.ai/api/v0/host/sla_backtest?machine_id=12345&r=0.99&p=0.6667&reliability=0.90"
 ```
 
 ## Reading the response
@@ -332,7 +332,7 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
   out="$BT_DIR/sla_bt_$id.json"
   http=$(curl -s -o "$out" -w "%{http_code}" \
     -H "Authorization: Bearer $VAST_API_KEY" \
-    "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=$id&r=$r&p=$p")
+    "https://console.vast.ai/api/v0/host/sla_backtest?machine_id=$id&r=$r&p=$p")
   if [ "$http" != "200" ] || ! jq -e '.success == true' "$out" >/dev/null 2>&1; then
     echo "machine_id=$id failed http=$http body=$(jq -c '{success,error,msg}' "$out" 2>/dev/null)"
     sleep 2; continue
