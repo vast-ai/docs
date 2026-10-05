@@ -286,7 +286,7 @@ Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `ta
 | Offer not found or not available | HTTP 404 `invalid_args` (`msg` may include `no_such_ask`) | Do not retry that id; search again and rent a current offer |
 | Ask cannot start now (`cancel_unavail`) | HTTP 410, error `no_such_ask` | Search for a new offer; this is not a transient glitch to retry on the same id |
 | Price mismatch after stale quote | HTTP 400 `invalid_price` | Re-search with the same `target_reliability` and storage (`allocated_storage` / `--storage`), then rent again |
-| Too many requests | HTTP 429 | Wait and retry the same rent. The API may return `API requests too frequent` |
+| Too many requests | HTTP 429 | Wait and back off. Before retrying the same `PUT`, confirm with `GET /api/v1/instances/` whether the contract already exists. If retry returns `invalid_price`, `no_such_ask`, 404, or 410, re-search with the same `target_reliability` and storage, then rent a fresh offer id. |
 | SLA with a bid or interruptible offer | Rent does not turn on an SLA | Search with `"type": "ondemand"`. Do not send `price` or `bid_price` when you want an SLA. |
 
 | Channel | Default storage | Field | Units (label) |

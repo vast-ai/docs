@@ -571,15 +571,15 @@ Notify renters in the console ([Set a maintenance window](/host/set-maintenance-
 **CLI `--sdate` uses Unix epoch seconds (UTC)**; the REST body uses ISO 8601 UTC. **CLI `--duration` is in hours.** Schedule maintenance **sequentially** across a fleet. On HTTP 429, wait and retry with backoff (for example, `sleep 2` between machines). See [Rate Limits and Errors](/api-reference/rate-limits-and-errors).
 
 ```bash
-# Planned window: 2026-08-01 02:00:00 UTC (≥24 hours ahead when you run this)
-# Prefer computing the epoch so the comment and value stay in sync:
+# Planned window ≥24 hours ahead (Linux GNU date). Example: day after tomorrow 02:00 UTC.
+# macOS: date -u -j -v+2d -v2H -v0M -v0S +%s
 vastai schedule maint MACHINE_ID \
-  --sdate "$(date -u -d '2026-08-01 02:00:00' +%s)" \
+  --sdate "$(date -u -d '2 days 02:00:00' +%s)" \
   --duration 2 \
   --maintenance_category software
 ```
 
-REST equivalent: `PUT /api/v0/machines/{machine_id}/dnotify` with `"sdate": "2026-08-01T02:00:00Z"` (optional `"maintenance_reason": "OS kernel upgrade"`) — see [Schedule Maintenance](/api-reference/machines/schedule-maint).
+REST equivalent: `PUT /api/v0/machines/{machine_id}/dnotify` with `"sdate"` as ISO 8601 UTC at least 24 hours ahead (optional `"maintenance_reason": "OS kernel upgrade"`) — see [Schedule Maintenance](/api-reference/machines/schedule-maint).
 
 **Cancel or reschedule:** To cancel a window, use [`vastai cancel maint`](/host/cli/cancel-maint) (requires `machine_write`) or the [REST cancel-maintenance API](/api-reference/machines/cancel-maint). To reschedule, cancel the existing window, then run `schedule maint` with a new `--sdate` (still ≥24 hours ahead for planned SLA maintenance).
 
