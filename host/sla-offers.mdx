@@ -332,6 +332,8 @@ Then `PUT /api/v0/machines/create_asks/` with the merged body (read → merge �
 
 This loop does not turn an SLA on for new machines. Enable an SLA on each machine first (console **Set Pricing → SLA**, or a per-machine `PUT /api/v0/machines/create_asks/` with `sla_r_claim` and `sla_sigma_x`). The loop only considers machines that already have `sla_r_claim > 0`.
 
+`create_asks` defaults `sla_sigma_x` to `0.5` when you omit it on a write. This guide does **not** treat a missing `sla_sigma_x` in `show machines --raw` as that default—the raw payload may omit the field even when you intend Normal confidence. The loop **skips and logs** those IDs so it never silently writes `0.5`. Set **Confidence** in the console (or PUT `sla_sigma_x` for that machine), then re-run. A skip is not “SLA-ready.”
+
 <Warning>
 `PUT /api/v0/machines/create_asks/` **publishes a live listing** (same as **LIST**). A `sla_r_claim > 0` filter is **not** a listed-status check—running with `DRY_RUN=0` can put intentionally unlisted or paused machines back on the market. Before you apply, confirm each machine is **Listed** (or that you intend to re-list it) on **Host → Machines**. There is no documented `show machines --raw` field for listed vs unlisted in this guide; gate in the console or your own inventory before applying.
 </Warning>
@@ -373,7 +375,7 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
     echo "skip $id: no positive sla_r_claim (enable SLA per machine first)"; continue
   fi
   if ! echo "$machine" | jq -e '.sla_sigma_x != null' >/dev/null; then
-    echo "skip $id: sla_sigma_x missing in raw JSON (preserve confidence; do not default to 0.5)"; continue
+    echo "skip $id: sla_sigma_x missing in raw JSON (not SLA-ready; set Confidence / PUT sla_sigma_x, then re-run — do not assume 0.5)"; continue
   fi
   body=$(echo "$machine" | jq -c \
     '{machine: (.id|tonumber), price_gpu, end_date, min_chunk,
