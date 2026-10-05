@@ -33,13 +33,15 @@ Hosts who want the same idea from the listing side can read [SLA in plain langua
 **SLA is opt-in.** In the console, set a reliability target in Search before you rent. Via the **REST API**, pass `target_reliability` on **create-instance** (`PUT /api/v0/asks/{id}/`). Renting without a target means **no SLA charge and no SLA credits**, even on offers where the host has enabled SLA.
 </Note>
 
-**Web console only (start here):** Set **Reliability target** on search, confirm an **SLA fee** (or **SLA charge**) line in the price breakdown, rent on-demand, then verify under **Instances** and credits under **Account → Billing**. Full steps: [In the web console](#in-the-web-console). CLI and API paths are under [Choose your path](#choose-your-path).
+**Console quick start (no API key):**
+
+1. Open [Search](https://cloud.vast.ai/create/) with **On-demand** selected.
+2. Set **Reliability target**, confirm an **SLA fee** line, then **RENT**.
+3. Verify under **Instances**; after UTC settlement, check credits in **Account → Billing**.
+
+Full steps: [In the web console](#in-the-web-console). CLI/API limits for automation are under [API automation](#api-automation).
 
 ## Choose your path
-
-<Warning title="Before you enable SLA">
-Search quotes an SLA; rent enables it (console or REST). `vastai create instance` and SDK `create_instance()` do not. Billing continues during outages; service credits settle later in **Account → Billing**. Details: [Finding SLA offers](#finding-sla-offers).
-</Warning>
 
 | Goal | Start here |
 | --- | --- |
@@ -210,7 +212,7 @@ For repeated search calls, `POST /api/v0/bundles/` is rate-limited. On HTTP 429,
 
 Renters set **`target_reliability`** on search and on REST rent. **`sla_r_target`** is a stored field name in some instance filters — do not send it in the rent body.
 
-**1. Search** (prices `dph_total` at your target — include storage explicitly so quotes are comparable). Raise `limit` within API bounds when you need more rows. The bundles search body documents **`limit` only**—there is no offset or page token—so one response is the full result set for that query. For safe retry loops on HTTP 429, see [Rate Limits and Errors](/api-reference/rate-limits-and-errors).
+**1. Search** (prices `dph_total` at your target — include storage explicitly so quotes are comparable). Set `limit` explicitly when you compare many offers. Bundles search has **no pagination** (no offset or page token)—one response returns at most `limit` rows for that query. OpenAPI does not document a maximum `limit`; do not assume a single call walks the full market. To scan a broader SLA market, shard queries with filters such as `gpu_name`, `geolocation`, or `machine_id`, and back off on HTTP 429. See [Rate Limits and Errors](/api-reference/rate-limits-and-errors).
 
 ```bash
 curl -s -X POST "https://console.vast.ai/api/v0/bundles/" \
