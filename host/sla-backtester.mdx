@@ -301,29 +301,37 @@ export VAST_API_KEY="YOUR_API_KEY"
 2. Run backtests **sequentially** (one machine at a time). Set `r` to each machine’s **candidate** reliability commitment (the `sla_r_claim` you plan to list)—do not assume a fleet-wide `0.95` if you intend to list at `0.99` or another value:
 
 ```bash
-# Prefer each machine's planned sla_r_claim from show machines --raw.
-# Uniform fleet override: export R=0.99 before the loop.
-# This sample uses Normal confidence only (p=0.6667). For Tight/Wide listings,
-# map each machine's sla_sigma_x → p via the confidence table before calling the API.
+# Prefer each machine's planned sla_r_claim / sla_sigma_x from show machines --raw.
+# Uniform r override: export R=0.99. Map sla_sigma_x → p via Confidence values table.
 machines=$(vastai show machines --raw)
 for id in $(echo "$machines" | jq -r '.machines[].id'); do
   r="${R:-}"
+  machine=$(echo "$machines" | jq -c --arg id "$id" \
+    '.machines[] | select((.id|tostring) == $id)')
   if [ -z "$r" ]; then
-    r=$(echo "$machines" | jq -r --arg id "$id" \
-      '.machines[] | select((.id|tostring) == $id) | .sla_r_claim // empty')
+    r=$(echo "$machine" | jq -r '.sla_r_claim // empty')
   fi
   if ! echo "$r" | jq -e '. > 0' >/dev/null 2>&1; then
     echo "skip $id: set candidate sla_r_claim (or export R=0.99 for a uniform fleet)"; continue
   fi
+  if ! echo "$machine" | jq -e '.sla_sigma_x != null' >/dev/null; then
+    echo "skip $id: sla_sigma_x missing (set Confidence / PUT sla_sigma_x before backtest)"; continue
+  fi
+  # Approx bands from Confidence values (p): Tight≈0.2 → 0.83, Normal≈0.5 → 0.6667, Wide≈1.0 → 0.50
+  p=$(echo "$machine" | jq -r '
+    .sla_sigma_x as $s
+    | if $s <= 0.35 then 0.83
+      elif $s <= 0.75 then 0.6667
+      else 0.50 end')
   http=$(curl -s -o /tmp/sla_bt_$id.json -w "%{http_code}" \
     -H "Authorization: Bearer $VAST_API_KEY" \
-    "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=$id&r=$r&p=0.6667")
+    "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=$id&r=$r&p=$p")
   if [ "$http" != "200" ] || ! jq -e '.success == true' /tmp/sla_bt_$id.json >/dev/null 2>&1; then
     echo "machine_id=$id failed http=$http body=$(jq -c '{success,error,msg}' /tmp/sla_bt_$id.json 2>/dev/null)"
     sleep 2; continue
   fi
-  jq -c --arg id "$id" --argjson r "$r" \
-    '{machine_id: $id, r: $r, worst_day_loss: .summary.worst_day_loss, total_sla: .summary.total_sla, has_data: .has_data}' \
+  jq -c --arg id "$id" --argjson r "$r" --argjson p "$p" \
+    '{machine_id: $id, r: $r, p: $p, worst_day_loss: .summary.worst_day_loss, total_sla: .summary.total_sla, has_data: .has_data}' \
     /tmp/sla_bt_$id.json
   sleep 2
 done

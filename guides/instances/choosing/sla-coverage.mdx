@@ -215,6 +215,8 @@ curl -s -X POST "https://console.vast.ai/api/v0/bundles/" \
     "type": "ondemand",
     "verified": {"eq": true},
     "rentable": {"eq": true},
+    "external": {"eq": false},
+    "rented": {"eq": false},
     "allocated_storage": 50,
     "order": [["dph_total", "asc"]],
     "target_reliability": {"eq": 0.95},
@@ -222,6 +224,8 @@ curl -s -X POST "https://console.vast.ai/api/v0/bundles/" \
     "expected_reliability": {"gte": 0.99}
   }'
 ```
+
+CLI search defaults include `external=false` and `rented=false`; include those keys on REST so quotes match CLI.
 
 **2. Rent** the chosen offer. Use `offers[].id` from the search response as `{id}` in `PUT /api/v0/asks/{id}/`. Prefer `id` over `ask_contract_id` when both appear. Never use `bundle_id`. Save `new_contract` from the rent response. Pass the **same** reliability target you searched with:
 
@@ -235,6 +239,8 @@ curl -s -X PUT "https://console.vast.ai/api/v0/asks/OFFER_ID/" \
     "target_reliability": 0.95
   }'
 ```
+
+On-demand REST rent with default `cancel_unavail` may return **HTTP 410** if the offer cannot start immediately. Re-search and pick a new ask—do not backoff-retry the same id (see the error table below).
 
 See [Create Instance](/api-reference/instances/create-instance) and [Search Offers](/api-reference/search/search-offers).
 
