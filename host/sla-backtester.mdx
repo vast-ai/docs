@@ -311,13 +311,14 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
   if [ -z "$r" ]; then
     r=$(echo "$machine" | jq -r '.sla_r_claim // empty')
   fi
-  if ! echo "$r" | jq -e '. > 0' >/dev/null 2>&1; then
-    echo "skip $id: set candidate sla_r_claim (or export R=0.99 for a uniform fleet)"; continue
+  if ! jq -n --arg r "$r" '($r | tonumber?) > 0' >/dev/null 2>&1; then
+    echo "skip $id: set Claim in console (**Set Pricing → SLA**) or export R=0.99"; continue
   fi
   if ! echo "$machine" | jq -e '.sla_sigma_x != null' >/dev/null; then
-    echo "skip $id: sla_sigma_x missing (set Confidence / PUT sla_sigma_x before backtest)"; continue
+    echo "skip $id: set Confidence in console or PUT sla_sigma_x before backtest"; continue
   fi
-  # Approx bands from Confidence values (p): Tight≈0.2 → 0.83, Normal≈0.5 → 0.6667, Wide≈1.0 → 0.50
+  # Approx bands from Confidence values (p): Tight≈0.2 → 0.83, Normal≈0.5 → 0.6667, Wide≈1.0 → 0.50.
+  # Non-table sla_sigma_x values map to the nearest band; for custom spreads, pass p explicitly.
   p=$(echo "$machine" | jq -r '
     .sla_sigma_x as $s
     | if $s <= 0.35 then 0.83
