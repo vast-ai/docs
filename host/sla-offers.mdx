@@ -40,7 +40,7 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 4. Confirm SLA account access (**Set Pricing → SLA** panel visible; if missing, contact support).
 5. Preview economics (console SLA panel or [backtester](/host/sla-backtester)), then set the reliability commitment/confidence. Before your first SLA rental, read [Billing vs settlement](#billing-vs-settlement-important) and [Risk scenarios](#risk-scenarios)—GPU billing can continue during outages and SLA credits can exceed many days of SLA fees.
 6. Read [Scheduled maintenance](#scheduled-maintenance) before your first SLA rental (24-hour notice for planned work).
-7. Enable SLA listing: **Save** pricing, then click **LIST** on a first publish. If the machine is already listed, **Save** alone updates the live offer. **Console verify:** confirm **Listed** on **Host → Machines** and reopen **Set Pricing → SLA**. **Optional CLI/API:** search with `has_sla=true`, your commitment as `expected_reliability`, and a sample `target_reliability` (for example `machine_id=12345 has_sla=true expected_reliability>=0.99 target_reliability=0.95`).
+7. Enable SLA listing: **Save** pricing, then click **LIST** on a first publish. If the machine is already listed, **Save** alone updates the live offer. **Console verify:** confirm **Listed** on **Host → Machines** and reopen **Set Pricing → SLA**. **Optional CLI/API:** search with `--storage` matching how renters quote (for example `vastai search offers 'machine_id=12345 has_sla=true expected_reliability>=0.99 target_reliability=0.95' --storage 10`).
 
 ## Before you enable SLA
 
@@ -498,10 +498,10 @@ When SLA is enabled on an offer, clients see:
 
 **Filter vs response field:** In search queries, the `reliability` filter uses the machine's historical reliability score — not the reliability commitment. The published reliability commitment appears in responses as `expected_reliability`. To select SLA-listed offers programmatically, use `has_sla=true` or filter on `expected_reliability > 0`; do not use the `reliability` filter as an SLA selector.
 
-Verify after listing — filter the offer you care about; sliced machines often return multiple rows (different `num_gpus`, bid vs on-demand):
+Verify after listing — filter the offer you care about; sliced machines often return multiple rows (different `num_gpus`, bid vs on-demand). Match disk allocation before comparing `dph_total` across channels (CLI default is often 5 GiB; console Search is typically 10 GB; REST examples often use 8 GB `allocated_storage`):
 
 ```bash
-vastai search offers 'machine_id=12345 verified=any has_sla=true target_reliability=0.95' --raw \
+vastai search offers 'machine_id=12345 verified=any has_sla=true target_reliability=0.95' --storage 10 --raw \
   | jq '[.offers[] | select(.is_bid == false) | {id, num_gpus, dph_total, expected_reliability, reliability}]'
 ```
 
