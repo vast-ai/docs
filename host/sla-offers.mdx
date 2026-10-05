@@ -34,7 +34,7 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 
 ## SLA host checklist
 
-1. Complete [host setup](https://cloud.vast.ai/host/setup/) and list your machine.
+1. Complete [host setup](https://cloud.vast.ai/host/setup/) and confirm the machine appears on **Host → Machines** (healthy, priced). If you want SLA from the first rental, finish **Set Pricing → SLA** before your first **LIST** (see [Web console](#web-console)).
 2. Test on a [separate client account](/host/hosting-overview#testing-your-own-machine) (billed like any rental).
 3. Install the [CLI](/cli/hello-world) if you schedule maintenance or read earnings from the CLI. The console [Set a maintenance window](/host/set-maintenance-window) page can notify renters without the CLI.
 4. Confirm SLA account access (**Set Pricing → SLA** panel visible; if missing, contact support).
@@ -665,7 +665,7 @@ Positive `sla_earn` = net SLA charge you kept that period; negative = net credit
 
 `GET /api/v0/users/{user_id}/machine-earnings/` returns SLA fields alongside compute earnings. Requires a **`billing_read`** API key. See [`show earnings`](/api-reference/billing/show-earnings).
 
-This endpoint is rate-limited. Poll `GET /api/v0/users/{user_id}/machine-earnings/` at most about once every two seconds for this route (OpenAPI `x-rate-limit` threshold `2.0` per request; see [Show Earnings](/api-reference/billing/show-earnings)). On HTTP 429, back off and retry. For daily SLA settlement, one pull with `last_days=1` after UTC rollover is usually enough.
+This endpoint is rate-limited. Poll `GET /api/v0/users/{user_id}/machine-earnings/` at most about once every two seconds as a safe default (OpenAPI `x-rate-limit` threshold `2.0` on [Show Earnings](/api-reference/billing/show-earnings)). On HTTP 429, back off and retry per [Rate Limits and Errors](/api-reference/rate-limits-and-errors). For daily SLA settlement, one pull with `last_days=1` after UTC rollover is usually enough.
 
 **Automation pattern:** There is no host webhook for SLA settlement. Poll `machine-earnings` with `last_days=1` and `machid`, alert on `per_machine[].sla_earn` thresholds, and call machines sequentially with backoff on 429. Do not use `per_day[].sla_earn` for a single machine.
 
