@@ -185,6 +185,8 @@ Always compare **`dph_total`**, not just GPU price, when SLA matters. Sort by `d
 
 **Console renters can stop after [In the web console](#in-the-web-console).** This section is for API keys.
 
+<a id="automation-limits"></a>
+
 <Note title="Automation limits (read once)">
 Search quotes SLA; renting with SLA requires REST (or the console) with `target_reliability`. The CLI and published SDK cannot enable SLA on rent. SLA service credits appear only in the web console billing UI—not in Charges, Invoices, or credit webhooks.
 </Note>
@@ -200,9 +202,9 @@ Search quotes SLA; renting with SLA requires REST (or the console) with `target_
 | Verify the SLA on an instance | Yes | Yes (`GET /api/v1/instances/`) |
 | SLA service credits | **Account → Billing** | Not in `GET /api/v0/charges/`, `GET /api/v1/invoices/`, or client webhooks |
 
-**Prerequisites:** Happy path: search with `has_sla` and your storage size, rent with `PUT` and the same `target_reliability`, then confirm the SLA on the instance.
+**Prerequisites (happy path):** Search with `has_sla` and your storage size, rent with `PUT` and the same `target_reliability`, then confirm the SLA on the instance. Console users can skip this section.
 
-For details on CLI/SDK rent limits and billing reconciliation, see [Automation limits (read once)](#api-automation) above.
+See the [Automation limits](#automation-limits) note in this section before you script search → rent → verify.
 
 For repeated search calls, `POST /api/v0/bundles/` is rate-limited. On HTTP 429, wait and retry. See [Rate Limits and Errors](/api-reference/rate-limits-and-errors).
 
@@ -268,7 +270,7 @@ curl -G "https://console.vast.ai/api/v1/instances/" \
   --data-urlencode "limit=25"
 ```
 
-Replace `NEW_CONTRACT` with the id from the rent response. Confirm `target_reliability` and `instance.slaPremiumPerHour` on that row. Search-context snapshots use `search.slaPremiumPerHour`. Requires `instance_read`. You can also read the same fields with `vastai show instances-v1 --raw`. If the filter returns no row, page with `after_token`. Do not use `select_filters` alone to detect an SLA (`has_sla` is not a filterable column).
+Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `target_reliability` on that row. For the SLA fee: if the instance is not yet **running**, use `search.slaPremiumPerHour` (search-context pricing); once **running**, also check `instance.slaPremiumPerHour`. A missing `instance.slaPremiumPerHour` before startup is not a failed SLA rent. Requires `instance_read`. You can also read the same fields with `vastai show instances-v1 --raw`. If the filter returns no row, page with `after_token`. Do not use `select_filters` alone to detect an SLA (`has_sla` is not a filterable column).
 
 - **REST** (`GET /api/v1/instances/`): pass an explicit `limit` and page with `after_token` (the response `next_token`). The server default `limit` can be as low as **5** (maximum **25**).
 - **CLI** (`vastai show instances-v1`): use `--limit` and `--next-token`. The CLI default `--limit` is **25** unless you set it.
