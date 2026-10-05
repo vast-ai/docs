@@ -67,7 +67,7 @@ On outage days you may still bill clients for **intended** compute **and** owe s
 </Warning>
 
 <Warning>
-**Rental types:** The SLA applies to **on-demand rentals only**. It does not apply to interruptible/bid instances or reserved/prepay rentals. Interruptible rentals are not covered by the SLA, even on machines that offer SLA on on-demand. On-demand contracts on the same machine can have an SLA. Reserved or prepay attempts on an offer with an SLA are not supported — use on-demand to rent with an SLA.
+**Rental types:** The SLA applies to **on-demand rentals only**. It does not apply to interruptible/bid instances or reserved/prepay rentals. Interruptible rentals are not covered by the SLA, even on machines that offer an SLA for on-demand rentals. On-demand contracts on the same machine can have an SLA. Reserved or prepay attempts on an offer with an SLA are not supported — use on-demand to rent with an SLA.
 </Warning>
 
 - Optional: run the [backtester](/host/sla-backtester) after you have weeks of history; otherwise use the web console SLA preview and the economics walkthrough on this page.
@@ -686,24 +686,28 @@ When you pass `machid`, use `per_machine[].sla_earn` for that machine's SLA sett
 
 **Quick rules:**
 - **One machine, one UTC day:** For exact prior-UTC-day reconciliation (for example vs backtester `worst_day_loss`), use `sday`/`eday` with `day = floor(unix_epoch_seconds / 86400)`, or CLI `--start_date` / `--end_date` for that calendar day. Example: `2026-07-24` 00:00 UTC is unix `1784851200` → `sday=eday=20658`. Use `last_days=1` with `machid` only for coarse polling after UTC rollover—not as a strict match to one settled UTC calendar day.
+- **Fleet snapshot (coarse / recent window only):** one request without `machid` returns all machines in `per_machine[]` for the window.
+</Warning>
 
-Replace `{user_id}` below with your account ID from **Account → Profile**, or set `USER_ID=$(vastai show user --raw | jq -r '.id')` and substitute `$USER_ID` in the URL.
+Replace `{user_id}` / use `USER_ID` from **Account → Profile**, or:
+
+```bash
+USER_ID=$(vastai show user --raw | jq -r '.id')
+```
 
 ```bash
 # Exact UTC day 2026-07-24 for machine 12345 (sday/eday = 20658)
 curl -s -H "Authorization: Bearer $VAST_API_KEY" \
-  "https://console.vast.ai/api/v0/users/{user_id}/machine-earnings/?machid=12345&sday=20658&eday=20658" \
+  "https://console.vast.ai/api/v0/users/${USER_ID}/machine-earnings/?machid=12345&sday=20658&eday=20658" \
   | jq '.per_machine[] | select(.machine_id == 12345 or .machine_id == "12345") | {machine_id, sla_earn}'
 ```
 
-- **Fleet snapshot (coarse / recent window only):** one request without `machid` returns all machines in `per_machine[]` for the window:
-
 ```bash
+# Fleet snapshot (last_days=1 — coarse, not a settled calendar day)
 curl -s -H "Authorization: Bearer $VAST_API_KEY" \
-  "https://console.vast.ai/api/v0/users/{user_id}/machine-earnings/?last_days=1" \
+  "https://console.vast.ai/api/v0/users/${USER_ID}/machine-earnings/?last_days=1" \
   | jq '.per_machine[] | {machine_id, sla_earn}'
 ```
-</Warning>
 
 **Machine-scoped coarse poll (`last_days=1`, not a settled calendar day):**
 
