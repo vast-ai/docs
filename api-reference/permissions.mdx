@@ -3,13 +3,11 @@ title: "Permissions"
 sidebarTitle: "Permissions"
 ---
 
-Console renters and hosts: you do not need this page to use SLA in the web console. Renters: [In the web console](/guides/instances/choosing/sla-coverage#in-the-web-console). Hosts: [Listing an SLA offer (console)](/host/sla-offers#web-console).
-
 <a id="you-are-here-if"></a>
 
 ## You are here if…
 
-**Console SLA: no API key** — use [SLA coverage](/guides/instances/choosing/sla-coverage) (renters) or [SLA Offers](/host/sla-offers) (hosts).
+Console renters and hosts: you do not need this page to use SLA in the web console. Renters: [In the web console](/guides/instances/choosing/sla-coverage#in-the-web-console). Hosts: [Listing an SLA offer (console)](/host/sla-offers#web-console).
 
 | If you… | Start here | API key needed? |
 | --- | --- | --- |
@@ -17,7 +15,7 @@ Console renters and hosts: you do not need this page to use SLA in the web conso
 | List SLA offers in the **Host** console | [SLA Offers](/host/sla-offers#web-console) — then leave this page | No |
 | Automate search, rent, or host listing | [Renter SLA recipe](#client-sla-scoped-key-recipe) or [Host SLA recipe](#host-sla-scoped-key-recipe) on this page | Yes |
 
-On this page, **renter** means client and **host** means provider. API names may still say client or provider. Console SLA users: follow the links above and stop—do not create API keys or read **Endpoint Reference by Category**.
+On this page, **renter** means client and **host** means provider. API names may still say client or provider.
 
 Every API key has a set of permissions that control which endpoints it can access. This page is the reference for permission categories, how they map to API routes, and how to build scoped keys. Everything under **Automation only** is for scripted search, listing, and earnings.
 
@@ -42,10 +40,6 @@ Permissions are organized into categories. When you create a scoped API key, you
 | `team_write` | Inviting/removing team members, managing roles |
 
 ## Creating Scoped Keys
-
-<Note>
-Renting or listing with an SLA in the web console does not require a scoped API key. Renters start at [SLA](/guides/instances/choosing/sla-coverage#in-the-web-console). Hosts start at [SLA Offers](/host/sla-offers#web-console).
-</Note>
 
 Define permissions as a JSON object and pass it when creating a key. The top-level key is always `"api"`, containing the categories you want to grant.
 
@@ -86,29 +80,23 @@ You can create scoped keys using:
 
 #### Automation only
 
-Recipes below are for scripted search, listing, backtester, and earnings—not for console-only SLA.
-
-<Note title="Console hosts and renters">
-You do not need a scoped API key to use SLA in the web console. Hosts: configure SLA under **Set Pricing → SLA** ([SLA Offers → Web console](/host/sla-offers#web-console)). Renters: use **RENT** with a reliability target ([SLA coverage → In the web console](/guides/instances/choosing/sla-coverage#in-the-web-console)).
+<Note>
+**Console users: stop here.** Recipes below are for scripted search, listing, backtester, and earnings. Console SLA: [renter](/guides/instances/choosing/sla-coverage#in-the-web-console) · [host](/host/sla-offers#web-console).
 </Note>
 
 **For API automation:** Copy only the JSON in the renter or host recipe below. You do not need the endpoint lists later on this page.
 
-**If you automate:** Search with `has_sla` → rent with `target_reliability` → confirm an SLA fee on the instance → view service credits in **Account → Billing**. Console deep links: [renter](/guides/instances/choosing/sla-coverage#in-the-web-console), [host](/host/sla-offers#web-console).
+**If you automate:** Search with `has_sla` → rent with `target_reliability` → confirm an SLA fee on the instance → view service credits in **Account → Billing**.
 
 <a id="client-sla-scoped-key-recipe"></a>
 
 **Renter — search and REST rent.**
 
-<Note>
-**Console-only:** You do not need this recipe — use [Rent with SLA (console)](/guides/instances/choosing/sla-coverage#in-the-web-console).
-</Note>
-
 Create the key via [Create API Key](/api-reference/accounts/create-api-key). Do not copy the host recipe.
 
-**Workflow summary:** Search → REST rent with `target_reliability` → verify on v1 instances; SLA credits only in the console.
+**Workflow summary:** Search, then REST rent with `target_reliability`, then verify on v1 instances. SLA credits appear only in the console.
 
-- Create a **dedicated** key for this workflow only. `misc` covers bundle search and other bundled routes—not only search (including serverless). Constraints cannot limit `misc` to search only today. Treat a `misc` key as a high-impact secret. Do not reuse a full-access key. Console rent needs no API key.
+- Create a **dedicated** key for this workflow only. `misc` covers bundle search and other bundled routes—not only search (including serverless). Constraints cannot limit `misc` to search only today. Treat a `misc` key as a high-impact secret. Do not reuse a full-access key.
 - **Search:** `misc` (no search-only permission exists). Search automation is rate-limited—see [Rate Limits and Errors](/api-reference/rate-limits-and-errors) and [API automation](/guides/instances/choosing/sla-coverage#api-automation) before production search loops.
 - **Rent:** `instance_write` on `PUT /api/v0/asks/{id}/` with `target_reliability`.
 - **Verify:** `instance_read` with `GET /api/v1/instances/` or `vastai show instances-v1 --raw` (v0 `show instances` omits SLA fields). On a running instance, the SLA fee is `instance.slaPremiumPerHour`; before running, use `search.slaPremiumPerHour`.
@@ -141,11 +129,7 @@ OpenAPI lists charge `type` values only (`gpu`, `disk`, `bwd`, `bwu`). Do not us
 
 **Host — list, backtest, and earnings.**
 
-<Note>
-**Console-only:** You do not need this recipe — use [List with SLA (console)](/host/sla-offers#web-console).
-</Note>
-
-Console listing and billing checks need no API key. The JSON below is only if you automate search, `create_asks`, backtest, or `machine-earnings`. Create the key via [Create API Key](/api-reference/accounts/create-api-key). Do not copy the renter recipe.
+Create the key via [Create API Key](/api-reference/accounts/create-api-key). Do not copy the renter recipe. `machine_write` alone lists and updates an offer. It does not backtest or read earnings. Add `machine_read` and `billing_read` for those tasks.
 
 **Workflow summary:** Backtest (optional) → `create_asks` with SLA fields → monitor earnings; host-side settlement is separate from marketplace score.
 
@@ -182,8 +166,6 @@ Console listing and billing checks need no API key. The JSON below is only if yo
 | Verify the listing in search | `misc` (separate key) | **Host → Machines** (no API key) |
 
 Earnings URLs look like `/api/v0/users/{user_id}/machine-earnings/`. Copy `{user_id}` from **Account → Profile**. If `vastai show user` is denied on this key, add `user_read`. Start with [SLA in plain language](/host/sla-offers#sla-in-plain-language).
-
-**Console-only?** Stop here—[Host SLA offers](/host/sla-offers) · [Renter SLA coverage](/guides/instances/choosing/sla-coverage#in-the-web-console).
 
 ## Custom Roles
 
@@ -244,11 +226,7 @@ You can also use **wildcards** in `params` to represent placeholder values, usef
 
 ## Endpoint Reference by Category
 
-<Note title="Console SLA users">
-If you rent or list with an SLA only in the web console, you do not need API keys or the endpoint lists below. Stop after the [renter SLA recipe](#client-sla-scoped-key-recipe) or [host SLA recipe](#host-sla-scoped-key-recipe). Hosts who automate listing or earnings can stop after the host recipe unless they need unrelated permissions.
-</Note>
-
-**If you use the API or CLI with scoped keys:** copy the JSON from [SLA workflows](#sla-workflows-scoped-keys) before you scan the endpoint lists. Console users: use the [table at the top of this page](#you-are-here-if).
+Copy the JSON from [SLA workflows](#sla-workflows-scoped-keys) before you scan the endpoint lists.
 
 Below is the complete mapping of which endpoints each permission category controls.
 
@@ -325,7 +303,7 @@ SLA checks use `GET /api/v1/instances/` or `vastai show instances-v1 --raw` for 
 
 - [Show Machines](/api-reference/machines/show-machines)
 - [Show Reports](/api-reference/machines/show-reports)
-- [SLA Backtest](/api-reference/host/sla-backtest) — API-only (hosts): replay historical earnings through SLA math. Requires `machine_read`. See [SLA Backtester](/host/sla-backtester). Console hosts should use the **Set Pricing → SLA** preview instead. Host SLA automation also requires `machine_write` and `billing_read`; see the [host SLA recipe](#host-sla-scoped-key-recipe).
+- [SLA Backtest](/api-reference/host/sla-backtest) — API-only (hosts): replay historical earnings through SLA math. Requires `machine_read`. See [SLA Backtester](/host/sla-backtester). Host SLA automation also requires `machine_write` and `billing_read`; see the [host SLA recipe](#host-sla-scoped-key-recipe).
 
 ### machine\_write
 
