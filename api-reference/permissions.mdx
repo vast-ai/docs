@@ -3,6 +3,8 @@ title: "Permissions"
 sidebarTitle: "Permissions"
 ---
 
+Console renters and hosts: you do not need this page to use SLA in the web console. Renters: [In the web console](/guides/instances/choosing/sla-coverage#in-the-web-console). Hosts: [Listing an SLA offer (console)](/host/sla-offers#web-console).
+
 <a id="you-are-here-if"></a>
 
 ## You are here if…
@@ -104,16 +106,12 @@ You do not need a scoped API key to use SLA in the web console. Hosts: configure
 
 Create the key via [Create API Key](/api-reference/accounts/create-api-key). Do not copy the host recipe.
 
-**Minimum story:** Search → REST rent with `target_reliability` → verify on v1 instances; SLA credits only in the console.
+**Workflow summary:** Search → REST rent with `target_reliability` → verify on v1 instances; SLA credits only in the console.
 
-- Create a **dedicated** key for this workflow only. `misc` is required for search (`POST /api/v0/bundles/`, CLI `search offers`) but is broader than bundles—it also covers other routes such as serverless. Constraints cannot limit `misc` to search only today. Treat a `misc` key as a high-impact secret. Do not reuse a full-access key. Console rent needs no API key.
-- **Search:** `misc` (no search-only permission exists).
+- Create a **dedicated** key for this workflow only. `misc` covers bundle search and other bundled routes—not only search (including serverless). Constraints cannot limit `misc` to search only today. Treat a `misc` key as a high-impact secret. Do not reuse a full-access key. Console rent needs no API key.
+- **Search:** `misc` (no search-only permission exists). Search automation is rate-limited—see [Rate Limits and Errors](/api-reference/rate-limits-and-errors) and [API automation](/guides/instances/choosing/sla-coverage#api-automation) before production search loops.
 - **Rent:** `instance_write` on `PUT /api/v0/asks/{id}/` with `target_reliability`.
-- **Verify:** `instance_read` with `GET /api/v1/instances/` or `vastai show instances-v1 --raw`. On a running instance, the SLA fee is `instance.slaPremiumPerHour`. Search-context fields on that same payload use `search.slaPremiumPerHour`.
-
-<Warning>
-**Common mistake:** `vastai show instances` (v0) and the v0 Show Instance endpoint do not include SLA fields. Verify with `GET /api/v1/instances/` or `vastai show instances-v1 --raw`.
-</Warning>
+- **Verify:** `instance_read` with `GET /api/v1/instances/` or `vastai show instances-v1 --raw` (v0 `show instances` omits SLA fields). On a running instance, the SLA fee is `instance.slaPremiumPerHour`; before running, use `search.slaPremiumPerHour`.
 
 ```json
 {
@@ -147,26 +145,33 @@ OpenAPI lists charge `type` values only (`gpu`, `disk`, `bwd`, `bwu`). Do not us
 **Console-only:** You do not need this recipe — use [List with SLA (console)](/host/sla-offers#web-console).
 </Note>
 
-If you only list and monitor in the console (**Set Pricing → SLA**), you do not need this JSON. Create the key via [Create API Key](/api-reference/accounts/create-api-key). Do not copy the renter recipe. `machine_write` alone lists and updates an offer. It does not backtest or read earnings. Add `machine_read` and `billing_read` for those tasks.
+Console listing and billing checks need no API key. The JSON below is only if you automate search, `create_asks`, backtest, or `machine-earnings`. Create the key via [Create API Key](/api-reference/accounts/create-api-key). Do not copy the renter recipe.
 
-**Minimum story:** Backtest (optional) → `create_asks` with SLA fields → monitor earnings; host-side settlement is separate from marketplace score.
-
-`misc` covers bundle search and other routes (including serverless)—not bundle search only.
+**Workflow summary:** Backtest (optional) → `create_asks` with SLA fields → monitor earnings; host-side settlement is separate from marketplace score.
 
 **Host SLA automation keys:** `machine_write` and related host scopes apply account-wide today. Use dedicated keys with rotation and monitoring for fleet jobs; do not assume per-machine key scoping for `create_asks` or maintenance unless documented under [Constraints](#constraints).
+
+**Listing + earnings only** (no search)—prefer this for fleet cron jobs:
 
 ```json
 {
   "api": {
     "machine_read": {},
     "machine_write": {},
-    "billing_read": {},
-    "misc": {}
+    "billing_read": {}
   }
 }
 ```
 
-`misc` is required for `vastai search offers` / `POST /api/v0/bundles/`. Omit it if you only check the listing in the console. You cannot limit `misc` to search only. Use a separate key for SLA scripts.
+**Verify offers in search** — add `misc` on a **separate**, narrowly scoped key (`misc` also covers serverless and other routes—not search only):
+
+```json
+{
+  "api": {
+    "misc": {}
+  }
+}
+```
 
 | Task | Permission | Console fallback |
 | --- | --- | --- |
@@ -174,7 +179,7 @@ If you only list and monitor in the console (**Set Pricing → SLA**), you do no
 | SLA backtester | `machine_read` | Console SLA preview |
 | Schedule / cancel maintenance | `machine_write` | [Set a maintenance window](/host/set-maintenance-window) (Host → Machines → Settings → Machine Maintenances), or CLI/REST. SLA service-credit rules: [Scheduled maintenance](/host/sla-offers#scheduled-maintenance). |
 | Monitor `sla_earn` | `billing_read` | Host → Billing / Earnings |
-| Verify the listing in search | `misc` | **Host → Machines** (no API key) |
+| Verify the listing in search | `misc` (separate key) | **Host → Machines** (no API key) |
 
 Earnings URLs look like `/api/v0/users/{user_id}/machine-earnings/`. Copy `{user_id}` from **Account → Profile**. If `vastai show user` is denied on this key, add `user_read`. Start with [SLA in plain language](/host/sla-offers#sla-in-plain-language).
 
@@ -251,7 +256,7 @@ Below is the complete mapping of which endpoints each permission category contro
 
 SLA checks use `GET /api/v1/instances/` or `vastai show instances-v1 --raw` for `target_reliability` and `instance.slaPremiumPerHour`. See the [renter SLA recipe](#client-sla-scoped-key-recipe).
 
-- [Show Instance](/api-reference/instances/show-instance) — not for SLA verification. That path is `GET /api/v0/instances/{id}/` and does not return SLA fields. Use [Show Instances](/api-reference/instances/show-instances) (`GET /api/v1/instances/`) or [`vastai show instances-v1 --raw`](/cli/reference/show-instances-v1). **Common mistake:** `vastai show instances` (v0) also omits SLA fields.
+- [Show Instance](/api-reference/instances/show-instance) — v0 path; not for SLA verification (use Show Instances v1 / `show instances-v1` as in the renter recipe).
 - [Show Instances](/api-reference/instances/show-instances) — this page is `GET /api/v1/instances/`. For SLA fields (`target_reliability`, `instance.slaPremiumPerHour`), use that API or [`vastai show instances-v1 --raw`](/cli/reference/show-instances-v1). Do not use `vastai show instances` for SLA checks.
 - [Show Logs](/api-reference/instances/show-logs)
 - [Show SSH Keys](/api-reference/instances/show-ssh-keys)

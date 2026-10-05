@@ -298,17 +298,19 @@ export VAST_API_KEY="YOUR_API_KEY"
 ```
 
 1. List machine IDs: `vastai show machines -q` (numeric IDs only) or `vastai show machines --raw | jq -r '.machines[].id'`.
-2. Run backtests **sequentially** (one machine at a time):
+2. Run backtests **sequentially** (one machine at a time). Set `r` to each machine’s **candidate** reliability commitment (the `sla_r_claim` you plan to list)—do not assume a fleet-wide `0.95` if you intend to list at `0.99` or another value:
 
 ```bash
+# Example uses R=0.99; change per machine or read from your inventory CSV.
+R="${R:-0.99}"
 for id in $(vastai show machines -q); do
   resp=$(curl -s -H "Authorization: Bearer $VAST_API_KEY" \
-    "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=$id&r=0.95&p=0.6667" \
+    "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=$id&r=$R&p=0.6667" \
     || echo '{"error":"request_failed"}')
   if echo "$resp" | jq -e '.error' >/dev/null 2>&1; then
     echo "machine_id=$id error: $(echo "$resp" | jq -r '.error')"
   else
-    echo "$resp" | jq '{machine_id: '"$id"', worst_day_loss: .summary.worst_day_loss, total_sla: .summary.total_sla, has_data: .has_data}'
+    echo "$resp" | jq '{machine_id: '"$id"', r: '"$R"', worst_day_loss: .summary.worst_day_loss, total_sla: .summary.total_sla, has_data: .has_data}'
   fi
   sleep 2
 done
@@ -316,8 +318,8 @@ done
 
 Expect roughly two seconds per machine minimum (`sleep 2` plus request time). For 50 machines, budget at least a few minutes. Run off-peak before a fleet SLA rollout. On `429`, back off per [Rate Limits and Errors](/api-reference/rate-limits-and-errors). Parallel requests are not recommended unless you implement backoff.
 
-3. Compare `worst_day_loss` and `total_sla` across machines.
-4. Apply `sla_r_claim` / `sla_sigma_x` when listing via the API (see [SLA Offers](/host/sla-offers#api-for-automation)).
+3. Compare `worst_day_loss` and `total_sla` across machines at the same `r` you will list.
+4. Apply matching `sla_r_claim` / `sla_sigma_x` when listing via the API (see [SLA Offers](/host/sla-offers#api-for-automation)).
 
 ## When stuck
 
