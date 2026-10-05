@@ -146,7 +146,7 @@ curl -s -H "Authorization: Bearer YOUR_API_KEY" \
 
 **If you only read three fields:** Check `has_data` (widen dates if `false`), then `summary.worst_day_loss`, then `summary.total_sla`.
 
-A successful response looks like this (fields abbreviated):
+A successful response looks like this (fields abbreviated; counts are illustrative—`covered_days` and `skipped_days` need not be equal):
 
 ```json
 {
@@ -155,8 +155,8 @@ A successful response looks like this (fields abbreviated):
   "has_data": true,
   "start_day": 19723,
   "end_day": 19812,
-  "covered_days": 45,
-  "skipped_days": 45,
+  "covered_days": 60,
+  "skipped_days": 30,
   "reliability": 0.998500,
   "fleet_reliability": 0.991200,
   "params": {
@@ -293,16 +293,20 @@ For missing or invalid API keys and permission denials (`machine_read`), see [Au
 
 Optional. Skip this section unless you automate many machines. Console hosts can use **Set Pricing → SLA** and a single request instead of the loop below.
 
+**Prerequisites:** [CLI hello world](/cli/hello-world) and an API key with `machine_read` (see [API permissions](/api-reference/permissions)).
+
 ```bash
 export VAST_API_KEY="YOUR_API_KEY"
 ```
 
 1. List machine IDs: `vastai show machines -q` (numeric IDs only) or `vastai show machines --raw | jq -r '.machines[].id'`.
-2. Run backtests **sequentially** (one machine at a time). Set `r` to each machine’s **candidate** reliability commitment (the `sla_r_claim` you plan to list)—do not assume a fleet-wide `0.95` if you intend to list at `0.99` or another value:
+2. Run backtests **sequentially** (one machine at a time). Set `r` to each machine’s **candidate** reliability commitment (the `sla_r_claim` you plan to list)—do not assume a fleet-wide `0.95` if you intend to list at `0.99` or another value. Write responses under a private temp dir (not world-readable `/tmp` paths on shared hosts) and delete them when done:
 
 ```bash
 # Prefer each machine's planned sla_r_claim / sla_sigma_x from show machines --raw.
 # Uniform r override: export R=0.99. Map sla_sigma_x → p via Confidence values table.
+BT_DIR=$(mktemp -d)
+trap 'rm -rf "$BT_DIR"' EXIT
 machines=$(vastai show machines --raw)
 for id in $(echo "$machines" | jq -r '.machines[].id'); do
   r="${R:-}"
@@ -324,16 +328,17 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
     | if $s <= 0.35 then 0.83
       elif $s <= 0.75 then 0.6667
       else 0.50 end')
-  http=$(curl -s -o /tmp/sla_bt_$id.json -w "%{http_code}" \
+  out="$BT_DIR/sla_bt_$id.json"
+  http=$(curl -s -o "$out" -w "%{http_code}" \
     -H "Authorization: Bearer $VAST_API_KEY" \
     "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=$id&r=$r&p=$p")
-  if [ "$http" != "200" ] || ! jq -e '.success == true' /tmp/sla_bt_$id.json >/dev/null 2>&1; then
-    echo "machine_id=$id failed http=$http body=$(jq -c '{success,error,msg}' /tmp/sla_bt_$id.json 2>/dev/null)"
+  if [ "$http" != "200" ] || ! jq -e '.success == true' "$out" >/dev/null 2>&1; then
+    echo "machine_id=$id failed http=$http body=$(jq -c '{success,error,msg}' "$out" 2>/dev/null)"
     sleep 2; continue
   fi
   jq -c --arg id "$id" --argjson r "$r" --argjson p "$p" \
     '{machine_id: $id, r: $r, p: $p, worst_day_loss: .summary.worst_day_loss, total_sla: .summary.total_sla, has_data: .has_data}' \
-    /tmp/sla_bt_$id.json
+    "$out"
   sleep 2
 done
 ```
@@ -353,5 +358,5 @@ Expect roughly two seconds per machine minimum (`sleep 2` plus request time). Fo
 
 - [SLA Backtest API](/api-reference/host/sla-backtest) — formal API reference for this endpoint
 - [SLA Offers](/host/sla-offers) — listing parameters, economics, and risk scenarios
-- [SLA (clients)](/guides/instances/choosing/sla-coverage) — how renters choose targets and read `dph_total`
+- [SLA (renters)](/guides/instances/choosing/sla-coverage) — how renters (clients) choose targets and read `dph_total`
 - [API permissions](/api-reference/permissions) — `machine_read` scope required

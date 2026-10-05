@@ -9,7 +9,7 @@ Vast.ai lets hosts attach a **Service Level Agreement (SLA)** to a machine listi
 This page explains how SLA offers work from the host side — what you set, how clients choose an SLA, and what happens when uptime is good or bad.
 
 <Note title="For hosts">
-SLA settlement is **asymmetric by design**: when reliability is strong relative to the client's target, you keep the SLA charge; when it falls short, client credits can exceed the charge you collected that day. Charges and credits settle on a daily cadence. Preview economics with the [SLA backtester](/host/sla-backtester) (API, requires rental history) or the web console SLA preview (**Set Pricing → SLA**).
+SLA settlement is **asymmetric by design**: on strong days you keep the SLA fee; on bad days, service credits can exceed the fees you collected. Charges and credits settle on a daily cadence. Preview economics with the [SLA backtester](/host/sla-backtester) (API, requires rental history) or the web console SLA preview (**Set Pricing → SLA**).
 </Note>
 
 <Note title="This page is for hosts">
@@ -40,7 +40,7 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 4. Confirm SLA account access (**Set Pricing → SLA** panel visible; if missing, contact support).
 5. Preview economics (console SLA panel or [backtester](/host/sla-backtester)), then set the reliability commitment/confidence.
 6. Read [Scheduled maintenance](#scheduled-maintenance) before your first SLA rental (24-hour notice for planned work).
-7. Enable SLA listing: **Save** pricing, then click **LIST** on a first publish. If the machine is already listed, **Save** alone updates the live offer. Verify in search (`machine_id=` filter).
+7. Enable SLA listing: **Save** pricing, then click **LIST** on a first publish. If the machine is already listed, **Save** alone updates the live offer. Verify in search with `has_sla=true`, your commitment as `expected_reliability`, and a sample `target_reliability` (for example `machine_id=12345 has_sla=true expected_reliability>=0.99 target_reliability=0.95`).
 
 ## Before you enable SLA
 
@@ -345,7 +345,7 @@ This loop does not turn an SLA on for new machines. Enable an SLA on each machin
 <AccordionGroup>
 <Accordion title="Fleet operators only — re-list bash loop">
 
-Validate `price_gpu`, `end_date`, and `min_chunk` before each PUT. Prefer reading existing SLA fields from each machine rather than hardcoding reliability commitment and confidence. Skip incomplete machines.
+Validate `price_gpu`, `end_date`, and `min_chunk` before each PUT. Prefer reading existing SLA fields from each machine rather than hardcoding reliability commitment and confidence. Skip incomplete machines. Expired offers (past `end_date`) are skipped so a re-list run does not unpublish live SLA listings.
 
 **Before fleet SLA rollout:**
 
@@ -385,6 +385,10 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
   if [ -z "$price" ] || [ -z "$end" ] || [ -z "$chunk" ]; then
     echo "skip $id: missing price_gpu/end_date/min_chunk"; continue
   fi
+  now=$(date -u +%s)
+  if ! jq -n --argjson end "$end" --argjson now "$now" '$end > $now' >/dev/null 2>&1; then
+    echo "skip machine_id=$id: end_date expired"; continue
+  fi
   # Opt-in only: skip machines with no positive reliability commitment (do not invent 0.99)
   if ! echo "$machine" | jq -e '(.sla_r_claim // 0) > 0' >/dev/null; then
     echo "skip $id: no positive sla_r_claim (enable SLA per machine first)"; continue
@@ -402,7 +406,12 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
     -H "Authorization: Bearer $VAST_API_KEY" \
     -H "Content-Type: application/json" \
     -d "$body")
-  echo "machine_id=$id response: $resp"
+  ok=$(echo "$resp" | jq -r '.success // empty')
+  if [ "$ok" = "true" ]; then
+    echo "machine_id=$id ok"
+  else
+    echo "machine_id=$id error: $(echo "$resp" | jq -c '{success,error,msg}' 2>/dev/null || echo "$resp")"
+  fi
   sleep 2
 done
 ```
@@ -708,7 +717,7 @@ Do **not** compare `last_days=7` totals to single-day `worst_day_loss` from the 
 | `per_machine[].sla_earn` | Positive (SLA charge kept) | Negative (credit you owe) |
 | Fleet `per_day[].sla_earn` | Positive (SLA charge kept) | Negative (credit you owe) |
 
-- `{user_id}` — Your account ID (from **Account → Profile** in the console, or `vastai show user`).
+- `{user_id}` — Replace with your account ID from **Account → Profile** in the console, or `vastai show user` (do not leave the curly-brace placeholder in the URL).
 - Settlement is evaluated on UTC day boundaries. Rows typically update within a few hours after UTC midnight.
 
 ## Tips for competitive SLA offers

@@ -35,7 +35,7 @@ Before you start: ensure [Account → Billing](https://cloud.vast.ai/billing/) h
 
 1. Open [Search](https://cloud.vast.ai/create/) with **On-demand** selected.
 2. In **Search filters** (left bar), set **Reliability target**, confirm an **SLA fee** line in the price breakdown, set instance disk on the slider, then **RENT**. Console default disk is 10 GB; if you quoted via CLI/REST, match that disk number or rent can fail with `invalid_price`.
-3. Verify under **Instances**; after UTC settlement, check credits in **Account → Billing**.
+3. Verify under **Instances**: open **price details** and confirm an **SLA charge** line and your reliability target (see [Viewing SLA on active instances](#in-the-web-console)). After UTC settlement, check credits in **Account → Billing**.
 
 **If you used the CLI to search:** set **Reliability target** again in the console **Search filters** (left bar) before you click **RENT**. CLI filters do not carry over.
 
@@ -126,9 +126,11 @@ Search **quotes** SLA pricing. The SLA starts only when you set **Reliability ta
 **Console-only:** You can stop here. SLA rental in the web console does not require CLI or API keys. Continue below only if you automate search or rent.
 </Note>
 
-### Search filters
+### Search filters (console and programmatic search)
 
-| Filter | Meaning | Example |
+Console controls use the same concepts; they do not accept CLI query strings. Use the left **Search filters** bar for console rentals. The **Example (CLI / API)** column is for `vastai search offers` and REST only.
+
+| Filter | Meaning | Example (CLI / API) |
 | --- | --- | --- |
 | `target_reliability` | Your desired reliability level. Also drives SLA charge calculation and ranking. | `target_reliability=0.95` |
 | `has_sla` | Restrict to offers with (or without) SLA enabled. | `has_sla=true` |
@@ -225,7 +227,7 @@ curl -s -X POST "https://console.vast.ai/api/v0/bundles/" \
   }'
 ```
 
-CLI search defaults include `external=false` and `rented=false`; include those keys on REST so quotes match CLI.
+CLI search defaults are `external=false rentable=true verified=true` (see [search offers](/cli/reference/search-offers)). Include those keys on REST so quotes match CLI. Add `rented=false` only when you want to exclude rented machines (not part of the CLI default query string).
 
 **2. Rent** the chosen offer. Use `offers[].id` from the search response as `{id}` in `PUT /api/v0/asks/{id}/`. Prefer `id` over `ask_contract_id` when both appear. Never use `bundle_id`. Save `new_contract` from the rent response. Pass the **same** reliability target you searched with:
 
@@ -305,7 +307,7 @@ If you quoted with the CLI (default `--storage` 5), set `--storage` ≥ **8** be
 
 When you rent an SLA-backed offer **with a target set**:
 
-1. **Contract terms lock in** — your reliability target, the host's reliability commitment, and host confidence (how the host priced SLA around their reliability commitment) are fixed for that rental. When comparing offers, use the SLA charge line or `dph_total`. Host confidence is not shown in the client UI and is not a setting you control.
+1. **Contract terms lock in** — your reliability target, the host's reliability commitment, and host confidence (how the host priced SLA around their reliability commitment) are fixed for that rental. When comparing offers, use the SLA charge line or `dph_total`. Host confidence is not shown in the web console and is not a setting you control.
 2. **Daily billing** — you pay compute plus the SLA charge each day.
 3. **Daily settlement** — Vast measures reliability across multiple timescales and calculates any SLA credit.
 4. **Credits appear in billing** — service credits improve your balance; strong days mean you paid the SLA charge with no credit.
