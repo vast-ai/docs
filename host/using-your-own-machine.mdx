@@ -1,0 +1,141 @@
+---
+title: "Using Your Own Machine"
+sidebarTitle: "Using Your Own Machine"
+description: "Run your own workloads on your machines as a host: default jobs fill idle time, and self-rentals give you the machine on demand."
+"canonical": "/host/using-your-own-machine"
+---
+
+As a host, you can run your own workloads on your machines in two ways. Pick the one that matches what you need:
+
+| | **Default job** | **Renting your own machine** |
+| --- | --- | --- |
+| **Use it for** | Filling **idle time** with background work | Taking the machine **for yourself, on demand**, for a while |
+| **When it runs** | Only when clients aren't using the GPUs | As soon as you create it, until you destroy it |
+| **Clients can rent the GPUs?** | Yes. Your job pauses to make room | No, not the GPUs you're using, until you destroy the instance |
+| **Interrupted by clients?** | Yes, by any on-demand rental or by a higher bid | No (on-demand) |
+| **Access** | Runs your image and arguments. No SSH or Jupyter | Works like any client instance: SSH, Jupyter, templates |
+| **Cost** | Not billed | Not billed |
+| **Set up from** | **Create Job** page or `vastai set defjob` | Search for your machine's offer and create an instance |
+
+<Note>
+Neither option earns rental income. Your machine earns only when clients rent it. A default job never gets in the way of that. A self-rental does, for as long as it runs.
+</Note>
+
+## Default jobs: use idle time
+
+A default job (also called a background job) is a low-priority workload that you attach to a machine. It runs whenever the machine's GPUs aren't being used by clients, so the hardware stays busy between rentals.
+
+### How default jobs behave
+
+- **One instance per GPU.** When you set a default job on a machine, the same image runs as a separate single-GPU instance on each of the machine's GPUs.
+- **Clients always come first.** Your job is paused automatically when a client either starts an on-demand rental, or places an interruptible bid higher than the price you set for the job.
+- **It resumes on its own.** When the client's rental ends and the GPUs are free again, your job starts back up. There's nothing to restart by hand.
+- **One job per machine.** Setting a new default job replaces the existing one on that machine.
+
+Because your job can be stopped at any time, design it to tolerate interruptions. For example, save checkpoints regularly and resume from the latest one on start.
+
+### Choosing a price
+
+The price on a default job is a priority level, not a charge. You aren't billed for it. It sets which client bids your job yields to:
+
+- A client bid **above** your price pauses your job.
+- A client bid **below** your price doesn't.
+- On-demand rentals pause your job **regardless** of price.
+
+The console recommends setting the price to roughly the income you expect the job to bring you. That way, a client only displaces your job when renting the GPU is worth more to you than your own work.
+
+<Warning>
+Your job's price must be **at or above the machine's minimum bid price**. Otherwise the job will not start. The machine also needs to be listed. Listing a machine sets a minimum bid price if it doesn't already have one. You can change it with [`vastai set min-bid`](/host/cli/set-min-bid).
+</Warning>
+
+### Set a default job in the console
+
+1. In the [console](https://cloud.vast.ai/host/create/), open **Create Job** from the hosting section of the sidebar. Each of your machines is listed with its **Current job** and price per GPU.
+2. Under **Job to Set**, choose the Docker image to run, plus any arguments and environment variables. Default jobs use the args launch mode: the container runs its entrypoint with your arguments. SSH and Jupyter aren't available.
+3. On the machine you want, click **Set job...**.
+4. Enter the **Rental Per GPU** price in $/hr and click **Set Job**.
+
+### Set a default job with the CLI
+
+```bash
+vastai set defjob <MACHINE_ID> --price_gpu <PRICE_PER_GPU_HOUR> --image <IMAGE> [--args ...]
+```
+
+For example, to run an image on every GPU of machine `12345`, yielding to client bids above $0.20/GPU/hour:
+
+```bash
+vastai set defjob 12345 --price_gpu 0.20 --image myrepo/my-worker:latest --args --resume-from-checkpoint --epochs 10
+```
+
+- `--args` must come last. Everything after it is passed to the container's entrypoint.
+- Don't put quotes around the whole argument list. Each word is sent as a separate argument, and quoting the list turns it into one argument with spaces in it, which most programs reject. Quote a single argument only if it contains spaces itself, for example `--args --prompt "a red car"`.
+- `--price_inetu` and `--price_inetd` are accepted but have no effect, because default jobs aren't billed.
+
+See [`set defjob`](/host/cli/set-defjob) in the CLI reference, or the [Set Default Job](/api-reference/machines/set-defjob) API endpoint.
+
+### Remove a default job
+
+```bash
+vastai remove defjob <MACHINE_ID>
+```
+
+This stops and deletes the default job's instances on that machine. See [`remove defjob`](/host/cli/remove-defjob) or the [Remove Default Job](/api-reference/machines/remove-defjob) API endpoint.
+
+## Renting your own machine: take it on demand
+
+When you want the machine for yourself for a while, rent it the same way a client would. For example, you might run an experiment, test a template, or check that SSH and ports work. An on-demand self-rental:
+
+- **Isn't billed.** That includes GPU time and storage, and you don't need credit on your account.
+- **Isn't interrupted.** Other clients can't take over GPUs you've rented on demand.
+- **Blocks clients from those GPUs** until you destroy the instance, so you won't earn on them while it runs.
+- **Pauses your default job** on the GPUs it uses. The default job resumes after you destroy the instance.
+
+<Note>
+Your machine must be listed with an active offer before you can rent it. If you unlist the machine or its offer expires, you can't create new instances on it, including your own.
+</Note>
+
+### Rent your own machine with the CLI
+
+1. Find your machine ID:
+
+   ```bash
+   vastai show machines
+   ```
+
+2. Search for your machine's offers. Include `verified=any` so unverified machines also show up:
+
+   ```bash
+   vastai search offers 'machine_id=12345 verified=any'
+   ```
+
+   Each row is an offer for a different number of GPUs on the machine. Note the ID in the first column of the offer you want.
+
+3. Create an instance on that offer:
+
+   ```bash
+   vastai create instance <OFFER_ID> --image pytorch/pytorch:latest --ssh --direct --disk 32
+   ```
+
+   Don't pass `--bid_price`. That creates an interruptible instance, which a higher client bid or any on-demand rental can stop. The same rules apply to a default job.
+
+4. When you're done, destroy the instance so clients can rent the GPUs again:
+
+   ```bash
+   vastai destroy instance <INSTANCE_ID>
+   ```
+
+### Rent your own machine in the console
+
+You can also find your machine on the [search page](https://cloud.vast.ai/create/) and click **Rent**, as you would for any other machine. No credit is required for your own machines. The CLI is usually faster, because `machine_id=` takes you straight to your machine's offers.
+
+<Note>
+If your account is a host account, you can only rent your own machines. To rent other hosts' machines, use a separate client account.
+</Note>
+
+## Related
+
+- [Hosting overview](/host/hosting-overview): listing, pricing, and testing your machine
+- [How to self-test](/host/how-to-self-test): run the machine self-test before verification
+- Host CLI reference: [`set defjob`](/host/cli/set-defjob), [`remove defjob`](/host/cli/remove-defjob), [`set min-bid`](/host/cli/set-min-bid), [`show machines`](/host/cli/show-machines)
+- Client CLI reference: [`search offers`](/cli/reference/search-offers), [`create instance`](/cli/reference/create-instance), [`destroy instance`](/cli/reference/destroy-instance)
+- Python SDK: [`set_defjob`](/host/sdk/set-defjob), [`remove_defjob`](/host/sdk/remove-defjob)
