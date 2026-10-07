@@ -13,9 +13,7 @@ Two-factor authentication (2FA) adds a second layer of security to your account.
 | --- | --- |
 | **Authenticator App (TOTP)** | Time-based one-time passwords from apps like Google Authenticator, Authy, or Microsoft Authenticator |
 | **SMS** | A 6-digit code sent to your mobile phone |
-| **Email** | A 6-digit code sent to your registered email address (used as the verification channel when setting up your *first* 2FA method) |
-
----
+| **Email** | Always available as a verification channel via your account email; cannot be added or removed as a method the way TOTP/SMS can. Used to authorize adding your *first* method (`tfa auth-new`), and also accepted as a `--method-type` for `auth-new`, `login`, `delete`, and `regen-codes` once you have 2FA set up |
 
 ## Setting Up 2FA
 
@@ -77,7 +75,7 @@ vastai tfa activate --method-type sms --secret <SECRET> --phone-number +12345678
 vastai tfa activate --method-type totp --secret <SECRET> --label "Work Authenticator" <CODE>
 ```
 
-After activating your **first** 2FA method, backup codes are generated and displayed. **Save these backup codes in a secure location** — they are the only way to recover access if you lose your 2FA device.
+After activating your **first** 2FA method, backup codes are generated and you're prompted to choose how to save them: to a default file under `~/Downloads`, to a custom path, or printed to the screen (the CLI warns this option is visible to onlookers). **Save these backup codes in a secure location** — they are the only way to recover access if you lose your 2FA device. The default file-save options write an unencrypted text file, so treat the resulting file the same as the codes themselves.
 
 ---
 
@@ -99,7 +97,7 @@ vastai tfa login --method-type email --code 123456 --secret <SECRET>
 vastai tfa login --backup-code ABCD-EFGH-IJKL
 ```
 
-On success, the session key is saved to `~/.config/vastai/vast_tfa_key`. The CLI uses this session key for subsequent authenticated requests. If this file is deleted or the session expires (returns a 404), run `tfa login` again.
+On success, the session key is saved to `~/.config/vastai/vast_tfa_key`. The CLI uses this session key for subsequent authenticated requests. If the session expires, the CLI doesn't just fail — it deletes the stale session key and automatically retries using your plain API key instead, printing a message like "Your 2FA session has expired... Trying again with your normal API Key". Run `tfa login` again only when you actually need a fresh 2FA session for a later command.
 
 ---
 
@@ -138,7 +136,11 @@ vastai tfa delete --id-to-delete 123 --backup-code ABCD-EFGH-IJKL
 vastai tfa delete --id-to-delete 123 --method-type sms --secret <SECRET> --code 456789
 ```
 
-**Warning:** Deleting your last 2FA method fully disables 2FA and invalidates all backup codes.
+The CLI asks you to confirm (`y`/`n`) before deleting, since this invalidates the method's own codes.
+
+<Warning>
+Deleting your last 2FA method fully disables 2FA and invalidates all backup codes.
+</Warning>
 
 ---
 
@@ -156,13 +158,17 @@ vastai tfa regen-codes --code 123456 --method-type totp
 vastai tfa regen-codes --backup-code ABCD-EFGH-IJKL
 ```
 
-**Warning:** Regenerating codes invalidates all existing backup codes immediately. Save the new codes in a secure location — they are not shown again.
+Same interactive save prompt as the initial activation (default file under `~/Downloads`, a custom path, or print to screen).
+
+<Warning>
+Regenerating codes invalidates all existing backup codes immediately. Save the new codes in a secure location — they are not shown again.
+</Warning>
 
 ---
 
 ## Session Key Lifecycle
 
-After a successful `tfa login`, a session key is saved to `~/.config/vastai/vast_tfa_key` (or `$XDG_CONFIG_HOME/vastai/vast_tfa_key` if `XDG_CONFIG_HOME` is set). The CLI automatically uses this key for authenticated requests. The session key expires after inactivity. When it expires, affected CLI commands return a 404 error. Run `vastai tfa login` to get a new session key.
+After a successful `tfa login`, a session key is saved to `~/.config/vastai/vast_tfa_key` (or `$XDG_CONFIG_HOME/vastai/vast_tfa_key` if `XDG_CONFIG_HOME` is set). The CLI automatically uses this key for authenticated requests. The session key expires after inactivity. When a command hits an expired session, the CLI deletes the stale key and automatically retries using your plain API key instead — you don't need to do anything for that fallback to happen. Run `vastai tfa login` again only when you actually need a 2FA session for a subsequent command.
 
 ---
 
@@ -175,9 +181,8 @@ After a successful `tfa login`, a session key is saved to `~/.config/vastai/vast
 | `2fa_expired` | SMS or email code has expired | For SMS, run `vastai tfa send-sms` again; for email, run `vastai tfa send-email` again |
 | `authorization_required` | Tried to add a new 2FA method without prior authorization | Run `vastai tfa auth-new` first, then retry |
 
----
-
 ## See Also
 
 - [API Reference: Two-Factor Authentication endpoints](/api-reference/two-factor-authentication-endpoints) — REST API 2FA documentation
 - [Authentication](/cli/authentication) — API key setup and management
+- [Console: Two-Factor Authentication](/guides/reference/two-factor-authentication) — managing 2FA from the web console
