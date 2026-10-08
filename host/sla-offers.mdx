@@ -75,7 +75,7 @@ On outage days you may still bill clients for **intended** compute **and** owe s
 </Warning>
 
 - Optional: run the [backtester](/host/sla-backtester) after you have weeks of history; otherwise use the web console SLA preview and the economics walkthrough on this page.
-- **New or low-history machines:** If the backtester returns `has_data: false`, rely on the web console SLA preview. Wait for rental history before trusting `worst_day_loss`. Consider wider confidence or a more conservative reliability commitment until you have a few weeks of data.
+- **New or low-history machines:** If the backtester returns `has_data: false`, rely on the web console SLA preview. Wait for rental history before trusting backtester results. Consider wider confidence or a more conservative reliability commitment until you have a few weeks of data.
 
 ## SLA in plain language
 
@@ -122,7 +122,7 @@ When a client rents an on-demand instance on your SLA-listed offer with a chosen
 - **Strong reliability relative to the client's target** → you keep the SLA charge for that day.
 - **Shortfalls** → credits flow to the client from your earnings (bounded by that day's covered compute).
 
-Over many strong days, SLA charges can offset occasional credits, but a single bad day can exceed months of collected charges — see [Risk scenarios](#risk-scenarios) and `worst_day_loss` before you commit.
+Over many strong days, SLA charges can offset occasional credits, but a single bad day can exceed months of collected charges — see [Risk scenarios](#risk-scenarios) and the backtester's [largest single-day credit](/host/sla-backtester#summarize-with-jq) before you commit.
 
 ### How reliability is measured
 
@@ -145,7 +145,7 @@ When you list or update a machine, set SLA fields via the host console or `PUT /
 
 | Parameter | API field | Backtester alias | What it means |
 | --- | --- | --- | --- |
-| Reliability commitment | `sla_r_claim` | `r` (backtester sets the reliability commitment = target = `r`) | Your advertised belief about machine reliability. Set above `0` to enable SLA. Values are greater than 0 and at most **0.9999** (for example, `0.99` = 99%). Exactly `1.0` is rejected. Set to `0` to disable SLA on new rentals. |
+| Reliability commitment | `sla_r_claim` | `r_claim` (the simulated renter target `r_target` defaults to it) | Your advertised belief about machine reliability. Set above `0` to enable SLA. Values are greater than 0 and at most **0.9999** (for example, `0.99` = 99%). Exactly `1.0` is rejected. Set to `0` to disable SLA on new rentals. |
 | Confidence spread | `sla_sigma_x` | `p` (different scale — see [backtester](/host/sla-backtester#confidence-values-p)) | How wide your belief is around the reliability commitment. Lower = more confident (lower SLA charges for clients at a given target). Defaults to `0.5` if omitted. |
 
 ### Advanced: `sla_max_beta` (optional)
@@ -161,9 +161,9 @@ When you list or update a machine, set SLA fields via the host console or `PUT /
 <Note title="Terminology">
 | Concept | Console | Listing API | Backtester | Client sees / sets |
 | --- | --- | --- | --- | --- |
-| Reliability commitment | Claim | `sla_r_claim` | `r` (claim = target in sim) | `expected_reliability` |
+| Reliability commitment | Claim | `sla_r_claim` | `r_claim` | `expected_reliability` |
 | Confidence | Confidence / spread | `sla_sigma_x` | `p` (different scale) | — |
-| Reliability target | — (client-chosen) | — (not on asks) | `r` (same as claim in sim) | `target_reliability` in search |
+| Reliability target | — (client-chosen) | — (not on asks) | `r_target` (optional; defaults to `r_claim`) | `target_reliability` in search |
 | All-in hourly price | — | — | — | `dph_total` (compute plus SLA charge when enabled) |
 
 **Confidence is not an uptime target.** It controls how aggressively SLA charges are priced around your reliability commitment.
@@ -176,7 +176,7 @@ The **reliability score** on the Host Machines page reflects connection and inst
 Do not assume the dashboard score equals SLA reliability. Before choosing `sla_r_claim`:
 
 1. Open **Host → Machines** → **Set Pricing → SLA** and review the console SLA charge preview at candidate reliability commitments.
-2. If you have rental history, run the [backtester](/host/sla-backtester) and check top-level `reliability` in the response.
+2. If you have rental history, run the [backtester](/host/sla-backtester) and compare `r_eff` (effective reliability) with `r_be` (break-even reliability) in the response.
 3. Set **reliability commitment** at a level you can sustain; clients who pick targets below your reliability commitment see lower SLA charges.
 
 ### Confidence values
@@ -191,7 +191,7 @@ Do not assume the dashboard score equals SLA reliability. Before choosing `sla_r
 
 **Never copy backtester `p` into `sla_sigma_x` — the scales are inverted.** See the full mapping on the [backtester page](/host/sla-backtester#confidence-values-p).
 
-**Tighter confidence** (tighter spread; console label **Tight**) → lower client SLA charges (more competitive `dph_total`). **Wider confidence** (console label **Wide**) → higher client SLA charges. Confidence does **not** change the credit formula when a target is missed — use `worst_day_loss` and stress-test with the backtester `reliability=` override for tail-risk planning.
+**Tighter confidence** (tighter spread; console label **Tight**) → lower client SLA charges (more competitive `dph_total`). **Wider confidence** (console label **Wide**) → higher client SLA charges. Confidence does **not** change the credit formula when a target is missed — use the backtester's [largest single-day credit](/host/sla-backtester#summarize-with-jq) and `r_target` what-ifs for tail-risk planning.
 
 ### Validation rules
 
@@ -209,9 +209,9 @@ If listing is rejected with `error: "invalid_sla_params"`, check the `msg` field
 
 SLA settlement applies per rental contract. If your machine has multiple GPU slices rented by different clients (GPU slicing — see **Min GPU** in [Hosting Overview](/host/hosting-overview)), each contract's SLA is settled independently based on the reliability experienced by that instance.
 
-The backtester replays **machine-level** daily earnings (total compute across all active rentals on that machine). `worst_day_loss` in `summary` reflects the worst simulated day for the whole machine in the replay window — not a single GPU slice in isolation.
+The backtester replays **machine-level** daily earnings (total compute across all active rentals on that machine). Its largest single-day credit reflects the worst simulated day for the whole machine in the replay window — not a single GPU slice in isolation.
 
-If multiple on-demand SLA contracts can be active on one machine at once, a single outage may trigger service credits **per contract**. The backtester’s `worst_day_loss` reflects machine-level replay for one simulated day—it may not equal the sum of worst-case credits across concurrent SLA renters. For sliced hosts, stress-test with your expected concurrent SLA contract count or treat `worst_day_loss` as a **lower bound** until you confirm aggregation with support. Do **not** naively multiply `worst_day_loss` by contract count as a substitute for that check—the backtester already models machine-level compute for the replay window, but live per-contract settlement can still stack differently than one simulated day.
+If multiple on-demand SLA contracts can be active on one machine at once, a single outage may trigger service credits **per contract**. The backtester’s largest single-day credit reflects a machine-level replay as one contract—it may not equal the sum of worst-case credits across concurrent SLA renters. For sliced hosts, treat it as a **lower bound** until you confirm aggregation with support. Do **not** naively multiply it by contract count as a substitute for that check—the backtester already models machine-level compute for the replay window, but live per-contract settlement can still stack differently than one simulated day.
 
 ### SLA on extended contracts
 
@@ -487,12 +487,12 @@ SLA field updates apply to the **offer** and to **new** rentals only. Existing r
 | Daily compute (`C`) | ~$84/day ($3.50 × 24 hr GPU only — simplified) |
 | SLA charge (client pays) | ~**$0.008/hr** (~$0.20/day at 24 hr) |
 
-SLA credits are capped relative to that UTC day's covered compute — GPU, storage, and bandwidth combined — not GPU compute alone. The simplified example below uses GPU-only math for readability; treat `worst_day_loss` from the [SLA backtester](/host/sla-backtester) as the authoritative tail-risk figure before you list.
+SLA credits are capped relative to that UTC day's covered compute — GPU, storage, and bandwidth combined — not GPU compute alone. The simplified example below uses GPU-only math for readability; treat the [largest single-day credit](/host/sla-backtester#summarize-with-jq) from the SLA backtester as the authoritative tail-risk figure before you list.
 
-SLA charge sizing uses internal SLA math. Use the [SLA backtester](/host/sla-backtester) to preview worst single-day credit exposure (`worst_day_loss`), not exact client SLA charges. For authoritative client-visible charges, use **Set Pricing → SLA** in the console or **`dph_total`** in search offers at a chosen `target_reliability` — not backtester `total_sla` when clients will rent below your reliability commitment.
+SLA charge sizing uses internal SLA math. Use the [SLA backtester](/host/sla-backtester) to preview single-day credit exposure (largest single-day credit) and break-even reliability (`r_be`), not exact client SLA charges. For authoritative client-visible charges, use **Set Pricing → SLA** in the console or **`dph_total`** in search offers at a chosen `target_reliability`.
 
 <Note>
-The backtester sets the reliability commitment equal to target (`r`), which is a **conservative** what-if (as if every client targeted your reliability commitment). Live clients who choose targets **below** your reliability commitment usually see lower SLA charges than the backtester's simulated charges. Use `worst_day_loss` from the backtester as your worst single-day credit reference, then verify visible charges in **Set Pricing → SLA** (or `dph_total` in search) before listing.
+If you omit `r_target`, the backtester sets the renter target equal to your reliability commitment (`r_claim`), which is a **conservative** what-if (as if every client targeted your reliability commitment). Pass `r_target` to model clients who choose lower targets; they usually see lower SLA charges. Use the backtester's largest single-day credit as your worst single-day credit reference, then verify visible charges in **Set Pricing → SLA** (or `dph_total` in search) before listing.
 </Note>
 
 ### Search / client-visible fields
@@ -616,7 +616,7 @@ Use the [SLA Earnings Backtester](/host/sla-backtester) (API-only; requires a `m
 - **Listing rejected (`invalid_sla_params`)** — Re-check the reliability commitment and `sla_sigma_x` against [validation rules](#validation-rules).
 - **`sla_not_approved`** — Contact support; you can keep a non-SLA listing while approval is pending.
 - **`sla_daemon_outdated`** — Update the host daemon from the [host setup guide](https://cloud.vast.ai/host/setup/), confirm the machine reconnects on **Host → Machines**, then retry LIST / `create_asks`. If the error persists, contact support with the machine ID.
-- **Unexpected credit** — Review reliability; re-run the backtester with a low `reliability` stress value (for example `0.01`).
+- **Unexpected credit** — Review reliability; re-run the backtester over the affected dates and check `escrow_to_client_balance` and `reliability` on those days.
 - **Severe outage (active SLA contracts):**
   1. Notify renters now: `echo y | vastai schedule maint MACHINE_ID --sdate "$(date -u +%s)" --duration HOURS`.
   2. Stop new SLA rentals. The fastest way is `vastai unlist machine MACHINE_ID`, which publishes nothing. Alternatively, set the reliability commitment to `0` in **Set Pricing → SLA** (or API `sla_r_claim=0`), but only on machines that are currently listed, because `create_asks` publishes a live listing.
@@ -628,7 +628,7 @@ Use the [SLA Earnings Backtester](/host/sla-backtester) (API-only; requires a `m
 
 After you enable SLA, charges and credits settle on UTC (Coordinated Universal Time) day boundaries. SLA earnings rows typically appear in **Host → Billing** within a few hours after UTC midnight (exact timing can vary).
 
-When you poll the API, use **`per_machine[].sla_earn`** for a single machine. **`per_day[].sla_earn` is always fleet-wide**—even if you pass `machid`. Do not compare `per_day` totals to one machine’s backtester `worst_day_loss`.
+When you poll the API, use **`per_machine[].sla_earn`** for a single machine. **`per_day[].sla_earn` is always fleet-wide**—even if you pass `machid`. Do not compare `per_day` totals to one machine’s backtester largest single-day credit.
 
 ### Console (recommended for day-to-day checks)
 
@@ -636,7 +636,7 @@ When you poll the API, use **`per_machine[].sla_earn`** for a single machine. **
 2. Set the date range to include the UTC day you want to review.
 3. Filter by machine ID if available.
 4. Look for **SLA** entries in the earnings breakdown — positive amounts are SLA charges you kept; negative amounts are credits you owed the client.
-5. After downtime, compare the affected UTC day(s) to your `worst_day_loss` backtest estimate.
+5. After downtime, compare the affected UTC day(s) to your backtester largest single-day credit.
 
 **If you don't see SLA rows:** widen the date range (settlement uses UTC day boundaries), confirm the machine had an active on-demand rental that day, and confirm SLA was enabled and the offer was **listed** (not just saved).
 
@@ -660,7 +660,7 @@ vastai show earnings --machine_id <id> --start_date "$(date -u -v-7d +%F)T00:00:
 
 Keep the `T00:00:00Z` suffix: the CLI parses bare dates such as `2026-07-24` in your machine's local time, so append `T00:00:00Z` for an exact UTC day. On Windows, use WSL or the API example below. See [`show earnings`](/cli/reference/show-earnings) for all options.
 
-**Linux (GNU date) — one UTC day (compare to `worst_day_loss`):**
+**Linux (GNU date) — one UTC day (compare to the backtester largest single-day credit):**
 
 ```bash
 # Replace 12345 with your machine ID.
@@ -694,7 +694,7 @@ This endpoint is rate-limited. Poll `GET /api/v0/users/{user_id}/machine-earning
 When you pass `machid`, use `per_machine[].sla_earn` for that machine's SLA settlement in the window. Do **not** read `per_day[].sla_earn` for single-machine checks — `per_day[]` is always fleet-wide, even with `?machid=`.
 
 **Quick rules:**
-- **One machine, one UTC day:** For exact prior-UTC-day reconciliation (for example vs backtester `worst_day_loss`), use `sday`/`eday` with `day = floor(unix_epoch_seconds / 86400)`, or CLI `--start_date` / `--end_date` with an explicit UTC time (`YYYY-MM-DDT00:00:00Z`; bare dates are parsed in local time). Example: `2026-07-24` 00:00 UTC is unix `1784851200` → `sday=eday=20658`. Use `last_days=1` with `machid` only for coarse polling after UTC rollover—not as a strict match to one settled UTC calendar day.
+- **One machine, one UTC day:** For exact prior-UTC-day reconciliation (for example vs the backtester largest single-day credit), use `sday`/`eday` with `day = floor(unix_epoch_seconds / 86400)`, or CLI `--start_date` / `--end_date` with an explicit UTC time (`YYYY-MM-DDT00:00:00Z`; bare dates are parsed in local time). Example: `2026-07-24` 00:00 UTC is unix `1784851200` → `sday=eday=20658`. Use `last_days=1` with `machid` only for coarse polling after UTC rollover—not as a strict match to one settled UTC calendar day.
 - **Fleet snapshot (coarse / recent window only):** one request without `machid` returns all machines in `per_machine[]` for the window.
 </Warning>
 
@@ -726,9 +726,9 @@ curl -s -H "Authorization: Bearer $VAST_API_KEY" \
   | jq '.per_machine[] | select(.machine_id == 12345 or .machine_id == "12345") | {machine_id, sla_earn}'
 ```
 
-Do **not** compare `last_days=7` totals to single-day `worst_day_loss` from the backtester.
+Do **not** compare `last_days=7` totals to the backtester's largest single-day credit.
 
-**Sign convention** (same as backtester `sla` / `historical_sla`):
+**Sign convention:**
 
 | Field | Strong day (meet client target) | Weak day (miss client target) |
 | --- | --- | --- |

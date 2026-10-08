@@ -9269,18 +9269,24 @@ paths:
     get:
       summary: sla backtest
       operationId: slaBacktest
-      description: 'Replays a machine''s historical compute earnings and uptime through
-        SLA settlement math
+      description: 'Host only. Replays one machine''s historical compute earnings
+        and uptime through production
 
-        to preview SLA charges and credits before listing with SLA. The maximum date
-        range is
+        SLA settlement under what-if SLA terms, and returns a per-day ledger of the
+        money that moved
 
-        366 days (inclusive); the default lookback is 90 days when custom dates are
-        omitted.
+        between the renter, the SLA escrow, and the host. The maximum date range is
+        366 days
+
+        (inclusive); the default lookback is 90 days when custom dates are omitted.
+        Unknown query
+
+        parameters are rejected with `400 bad_request`.
 
 
-        Requires `machine_read` permission. See [SLA Earnings Backtester](/host/sla-backtester)
-        for usage guide.'
+        Requires `machine_read` permission and ownership of the machine. See
+
+        [SLA Earnings Backtester](/host/sla-backtester) for the usage guide.'
       security:
       - BearerAuth: []
       parameters:
@@ -9289,8 +9295,9 @@ paths:
         required: true
         schema:
           type: integer
+          minimum: 1
         description: ID of your machine.
-      - name: r
+      - name: r_claim
         in: query
         required: true
         schema:
@@ -9298,9 +9305,9 @@ paths:
           format: float
           minimum: 0
           exclusiveMinimum: true
-          maximum: 0.9999
-        description: Reliability level to simulate (greater than 0 and at most 0.9999).
-          Used as both claim and client target in the simulation. Exactly 1.0 is rejected.
+          maximum: 0.99999
+        description: Host reliability commitment to simulate (the `sla_r_claim` you
+          plan to list).
       - name: p
         in: query
         schema:
@@ -9308,41 +9315,36 @@ paths:
           format: float
           minimum: 0
           exclusiveMinimum: true
-          exclusiveMaximum: true
           maximum: 1
+          exclusiveMaximum: true
           default: 0.6667
-        description: Host confidence (greater than 0 and less than 1). Maps to sla_sigma_x
-          when listing. Default 0.6667 (normal).
-      - name: start_date
-        in: query
-        schema:
-          type: integer
-        description: Range start as Unix epoch seconds. Default is 90 days before
-          end_date.
-      - name: end_date
-        in: query
-        schema:
-          type: integer
-        description: Range end as Unix epoch seconds. Default is now.
-      - name: reliability
+        description: 'Host confidence. Uses a different scale from listing `sla_sigma_x`
+
+          (`p = 1 / (1 + sla_sigma_x)`; Tight 0.83, Normal 0.6667, Wide 0.50). Default
+          0.6667 (Normal).
+
+          '
+      - name: r_target
         in: query
         schema:
           type: number
           format: float
           minimum: 0
           exclusiveMinimum: true
-          maximum: 1
-        description: Optional flat uptime override (greater than 0 and at most 1)
-          for all replayed days. Exactly 0 is rejected.
-      - name: beta
+          maximum: 0.99999
+        description: Renter reliability target to simulate. Must not exceed `r_claim`.
+          Defaults to `r_claim`.
+      - name: start_date
         in: query
         schema:
           type: number
-          format: float
-        description: "Timescale mix used in settlement simulation. Not user-configurable\
-          \ for host API keys \u2014\nthe API derives weighting from `r` (recent vs\
-          \ longer-term uptime). Omit this parameter.\nThe response `params.beta`\
-          \ echoes the derived value.\n"
+        description: Range start as Unix epoch seconds. Default is 90 days before
+          end_date.
+      - name: end_date
+        in: query
+        schema:
+          type: number
+        description: Range end as Unix epoch seconds. Default is now.
       responses:
         '200':
           description: Successful response
@@ -9357,99 +9359,107 @@ paths:
                     type: integer
                   has_data:
                     type: boolean
-                    description: false when no days in the range had earnings to replay.
+                    description: false when no day in the range had rental earnings
+                      to replay.
                   start_day:
                     type: integer
-                    description: UTC day index (days since 1970-01-01).
+                    description: UTC day index (floor(epoch_seconds / 86400)).
                   end_day:
                     type: integer
-                    description: UTC day index (days since 1970-01-01).
-                  covered_days:
-                    type: integer
-                  skipped_days:
-                    type: integer
-                  reliability:
+                    description: UTC day index (floor(epoch_seconds / 86400)).
+                  r_eff:
                     type:
                     - number
                     - 'null'
                     format: float
-                  fleet_reliability:
+                    description: 'Effective reliability: the constant reliability
+                      that would have produced the
+
+                      service credits paid in the window. null when the window had
+                      no deposits.
+
+                      '
+                  r_be:
                     type: number
                     format: float
-                    description: Average reliability across your machines (including
-                      this one). Context only.
-                  params:
-                    type: object
-                    properties:
-                      r:
-                        type: number
-                        format: float
-                      p:
-                        type: number
-                        format: float
-                      sigma_x:
-                        type: number
-                        format: float
-                      reliability:
-                        type:
-                        - number
-                        - 'null'
-                        format: float
-                      beta:
-                        type: number
-                        format: float
-                  daily_results:
+                    description: 'Break-even reliability: where SLA fees and service
+                      credits cancel out. If r_eff
+
+                      is above r_be, SLA was net positive for the host over the window.
+
+                      '
+                  days:
                     type: array
+                    description: One row per UTC day from start_day to end_day. All
+                      flows are non-negative dollar amounts moved that day.
                     items:
                       type: object
                       properties:
                         day:
                           type: integer
-                        gpu:
+                        client_compute_to_escrow:
                           type: number
                           format: float
-                        storage:
+                          description: Renter compute payment for the day held in
+                            SLA escrow (host net of platform fee).
+                        client_premium_to_escrow:
                           type: number
                           format: float
-                        bandwidth:
+                          description: SLA fee paid in for the day.
+                        escrow_to_client_balance:
                           type: number
                           format: float
-                        uptime:
+                          description: Service credits paid to the renter that day.
+                        escrow_to_host_balance:
                           type: number
                           format: float
-                        sla:
-                          type: number
+                          description: Amount released from escrow to the host that
+                            day.
+                        reliability:
+                          type:
+                          - number
+                          - 'null'
                           format: float
-                        historical_sla:
-                          type: number
-                          format: float
-                  summary:
+                          description: Measured uptime fraction for the day (0-1);
+                            null when the machine had no rental data that day.
+                  params:
                     type: object
+                    description: SLA terms the replay used, after defaulting.
                     properties:
-                      total_gpu:
+                      r_claim:
                         type: number
                         format: float
-                      total_storage:
+                      r_target:
                         type: number
                         format: float
-                      total_bandwidth:
+                      p:
                         type: number
                         format: float
-                      total_sla:
+                      beta:
                         type: number
                         format: float
-                      total_earnings:
-                        type: number
-                        format: float
-                      total_historical_sla:
-                        type: number
-                        format: float
-                      worst_day_loss:
-                        type: number
-                        format: float
-                      reserve:
-                        type: number
-                        format: float
+                        description: Recent vs long-term uptime weighting, derived
+                          automatically from r_target. Not a host setting.
+              example:
+                success: true
+                machine_id: 12345
+                has_data: true
+                start_day: 20568
+                end_day: 20657
+                r_eff: 0.9987
+                r_be: 0.9712
+                days:
+                - day: 20568
+                  client_compute_to_escrow: 78.12
+                  client_premium_to_escrow: 0.19
+                  escrow_to_client_balance: 0.0
+                  escrow_to_host_balance: 76.4
+                  reliability: 1.0
+                params:
+                  r_claim: 0.99
+                  r_target: 0.99
+                  beta: 0.5
+                  p: 0.6667
         '400':
           description: Bad Request
           content:
@@ -9457,25 +9467,48 @@ paths:
               schema:
                 type: object
                 properties:
+                  success:
+                    type: boolean
+                    example: false
                   error:
                     type: string
                     enum:
-                    - invalid_range
-                    - range_too_large
                     - bad_request
                     - invalid_params
+                    - invalid_range
+                    - range_too_large
+                    description: 'bad_request: missing, out-of-range, or unknown parameter.
+
+                      invalid_params: SLA terms don''t combine (for example r_target
+                      > r_claim).
+
+                      invalid_range: start_date after end_date. range_too_large: more
+                      than 366 days.
+
+                      '
                   msg:
                     type: string
+        '401':
+          description: "Unauthorized \u2014 missing or invalid API key, or missing\
+            \ machine_read permission"
         '403':
-          description: "Forbidden \u2014 not machine owner"
+          description: "Forbidden \u2014 not the machine owner, or SLA is not currently\
+            \ enabled on the platform"
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  success:
+                    type: boolean
+                    example: false
                   error:
                     type: string
-                    example: not_owner
+                    enum:
+                    - not_owner
+                    - sla_disabled
+                  msg:
+                    type: string
         '404':
           description: Machine not found
           content:
@@ -9483,6 +9516,9 @@ paths:
               schema:
                 type: object
                 properties:
+                  success:
+                    type: boolean
+                    example: false
                   error:
                     type: string
                     example: machine_not_found
