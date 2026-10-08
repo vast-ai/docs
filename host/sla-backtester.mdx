@@ -274,7 +274,7 @@ Optional, for API automation only. To check one machine, use the single-machine 
 
 **Prerequisites:** [CLI hello world](/cli/hello-world) and an API key with `machine_read` (see [API permissions](/api-reference/permissions)).
 
-1. Run backtests **sequentially**, one machine at a time. The loop reads each machine's `sla_r_claim` and `sla_sigma_x`. For machines that don't have SLA yet, set `R` (commitment) and `P` (confidence `p`) to backtest them before you enable SLA. Machines with neither are skipped and logged.
+1. Run backtests **sequentially**, one machine at a time. The loop reads each machine's `sla_reliability_claim` and `sla_confidence` label from `show machines`. For machines that don't have SLA yet, set `R` (commitment) and `P` (confidence `p`) to backtest them before you enable SLA. Machines with neither are skipped and logged. The confidence label is a band, so a custom `sla_sigma_x` is backtested at the nearest band's `p`; set `P` to test an exact value.
 2. Responses are written to a private temp directory that is deleted when the loop exits.
 
 ```bash
@@ -286,18 +286,19 @@ machines=$(vastai show machines --raw)
 for id in $(echo "$machines" | jq -r '.machines[].id'); do
   machine=$(echo "$machines" | jq -c --arg id "$id" \
     '.machines[] | select((.id|tostring) == $id)')
-  r="${R:-$(echo "$machine" | jq -r '.sla_r_claim // empty')}"
+  r="${R:-$(echo "$machine" | jq -r '.sla_reliability_claim // empty')}"
   if ! jq -e -n --arg r "$r" 'try (($r | tonumber) > 0) catch false' >/dev/null 2>&1; then
-    echo "skip $id: no sla_r_claim; set R=0.99 (or your planned commitment) to backtest before enabling SLA"; continue
+    echo "skip $id: no sla_reliability_claim; set R=0.99 (or your planned commitment) to backtest before enabling SLA"; continue
   fi
   p="${P:-}"
   if [ -z "$p" ]; then
-    if ! echo "$machine" | jq -e '.sla_sigma_x != null' >/dev/null; then
-      echo "skip $id: no sla_sigma_x; set P=0.6667 (Normal) to backtest before enabling SLA"; continue
-    fi
-    # Map sla_sigma_x to the nearest p band: Tight 0.2 -> 0.83, Normal 0.5 -> 0.6667, Wide 1.0 -> 0.50.
-    p=$(echo "$machine" | jq -r '.sla_sigma_x as $s
-      | if $s <= 0.35 then 0.83 elif $s <= 0.75 then 0.6667 else 0.50 end')
+    # show machines returns confidence as a label: high = Tight, medium = Normal, low = Wide.
+    case "$(echo "$machine" | jq -r '.sla_confidence // empty')" in
+      high)   p=0.83 ;;
+      medium) p=0.6667 ;;
+      low)    p=0.50 ;;
+      *) echo "skip $id: no sla_confidence; set P=0.6667 (Normal) to backtest before enabling SLA"; continue ;;
+    esac
   fi
   out="$BT_DIR/sla_bt_$id.json"
   http=$(curl -s -o "$out" -w "%{http_code}" \

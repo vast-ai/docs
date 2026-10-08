@@ -45,7 +45,7 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 7. Read [Scheduled maintenance](#scheduled-maintenance) before your first SLA rental (24-hour notice for planned work).
 8. **First publish and verify:** **Save** pricing, then click **LIST** (first publish only). If the machine is already listed, **Save** alone updates the live offer.
    - **Console verify:** confirm **Listed** on **Host → Machines** and reopen **Set Pricing → SLA**.
-   - **Optional CLI/API:** search with `--storage` matching how renters quote; add `verified=any` if you search your own machine and see no rows (for example `vastai search offers 'machine_id=12345 verified=any has_sla=true expected_reliability>=0.99 target_reliability=0.95' --storage 10`). On sliced machines, filter on-demand rows with the jq example in [Search / client-visible fields](#search--client-visible-fields).
+   - **Optional CLI/API:** search with `--storage` matching how renters quote; add `verified=any` if you search your own machine and see no rows (for example `vastai search offers 'machine_id=12345 verified=any has_sla=true expected_reliability>=0.99' --storage 10`). On sliced machines, filter on-demand rows with the jq example in [Search / client-visible fields](#search--client-visible-fields).
 9. **Self-test (after LIST):** With the separate client account from step 2, search by `machine_id`, rent with a **Reliability target**, and verify the SLA (billed like any rental)—see [Testing your own machine](/host/hosting-overview#testing-your-own-machine).
 
 ## Before you enable SLA
@@ -322,12 +322,12 @@ Partial updates are supported when editing an existing listing. If you change on
 Omitted non-SLA fields retain their current listing values; only fields present in the request body are updated. Read current listing fields from `vastai show machines --raw`:
 
 ```bash
-vastai show machines --raw | jq '.machines[] | select(.id == 12345 or .id == "12345") | {id, sla_r_claim, sla_sigma_x, price_gpu, end_date}'
+vastai show machines --raw | jq '.machines[] | select(.id == 12345 or .id == "12345") | {id, listed, sla_reliability_claim, sla_confidence, listed_gpu_cost, listed_min_gpu_count, end_date}'
 ```
 
 REST equivalent: `GET /api/v0/machines/?user_id={user_id}` (`user_id` is required). Get `user_id` from **Account → Profile** or `vastai show user`. The CLI supplies `user_id` for you.
 
-Machine `id` may be a string in raw JSON. The response is wrapped in a `machines` array.
+Machine `id` may be a string in raw JSON. The response is wrapped in a `machines` array. Read-side names differ from the `create_asks` body: `listed_gpu_cost` → `price_gpu`, `listed_min_gpu_count` → `min_chunk`, `sla_reliability_claim` → `sla_r_claim`. Confidence is returned as a label, `sla_confidence` (`high` = Tight, `medium` = Normal, `low` = Wide), not as `sla_sigma_x`. The SLA fields are `null` unless the machine is listed with SLA terms. Pricing fields and `end_date` are `null` when the machine is not listed.
 
 Then `PUT /api/v0/machines/create_asks/` with the merged body (read → merge → PUT). `vastai list machine` and the Python SDK listing helpers cannot set SLA fields; start from this REST pattern (or the console) when you move an existing CLI listing to SLA.
 </Note>
@@ -338,12 +338,12 @@ Then `PUT /api/v0/machines/create_asks/` with the merged body (read → merge �
 **Console hosts:** skip this section. Enable an SLA with [Web console](#web-console) and check settlement in [Console (recommended for day-to-day checks)](#console-recommended-for-day-to-day-checks).
 </Note>
 
-Use this loop to republish SLA terms across a fleet, for example after a daemon update. It does not turn an SLA on for new machines. Enable an SLA on each machine first (console **Set Pricing → SLA**, or a per-machine `PUT /api/v0/machines/create_asks/` with `sla_r_claim` and `sla_sigma_x`). The loop only considers machines that already have `sla_r_claim > 0`.
+Use this loop to republish SLA terms across a fleet, for example after a daemon update. It does not turn an SLA on for new machines. Enable an SLA on each machine first (console **Set Pricing → SLA**, or a per-machine `PUT /api/v0/machines/create_asks/` with `sla_r_claim` and `sla_sigma_x`). The loop only considers machines that are `listed` and already have `sla_reliability_claim > 0`.
 
-`create_asks` defaults `sla_sigma_x` to `0.5` when you omit it on a write. This guide does **not** treat a missing `sla_sigma_x` in `show machines --raw` as that default—the raw payload may omit the field even when you intend Normal confidence. The loop **skips and logs** those IDs so it never silently writes `0.5`. Set **Confidence** in the console (or PUT `sla_sigma_x` for that machine), then re-run. A skip is not “SLA-ready.”
+`show machines` returns confidence only as a label, so the loop does **not** send `sla_sigma_x`. On an existing SLA ask, `create_asks` keeps the current confidence when `sla_sigma_x` is omitted, so each machine keeps its exact value. Set a new confidence per machine in the console (or PUT `sla_sigma_x` for that machine) if you want to change it.
 
 <Warning>
-`PUT /api/v0/machines/create_asks/` **publishes a live listing** (same as **LIST**). A `sla_r_claim > 0` filter is **not** a listed-status check—running with `DRY_RUN=0` can put intentionally unlisted or paused machines back on the market. Before you apply, confirm each machine is **Listed** on **Host → Machines**. There is no documented `show machines --raw` listed flag; keep an allowlist (CSV: `machine_id`, `intended_listed`) and only automate IDs with `intended_listed=true`.
+`PUT /api/v0/machines/create_asks/` **publishes a live listing** (same as **LIST**). The loop skips machines whose `listed` field is not `true`, so it does not republish machines you unlisted. Still keep an `ALLOWLIST` of the machine IDs you intend to automate, and confirm them on **Host → Machines** before you run with `DRY_RUN=0`.
 </Warning>
 
 **Fleet operators only.** Do not run the loop unless you manage a fleet.
@@ -351,7 +351,7 @@ Use this loop to republish SLA terms across a fleet, for example after a daemon 
 <AccordionGroup>
 <Accordion title="Fleet operators only — re-list bash loop">
 
-Validate `price_gpu`, `end_date`, and `min_chunk` before each PUT. Prefer reading existing SLA fields from each machine rather than hardcoding reliability commitment and confidence. Skip incomplete machines. Expired offers (past `end_date`) are skipped so a re-list run does not unpublish live SLA listings.
+Validate the listed price (`listed_gpu_cost`), `end_date`, and minimum GPU count (`listed_min_gpu_count`) before each PUT. Prefer reading existing SLA fields from each machine rather than hardcoding reliability commitment and confidence. Skip incomplete machines. Expired offers (past `end_date`) are skipped so a re-list run does not unpublish live SLA listings.
 
 **Before fleet SLA rollout:**
 
@@ -387,26 +387,27 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
   fi
   machine=$(echo "$machines" | jq -c --arg id "$id" \
     '.machines[] | select((.id|tostring) == $id)')
-  price=$(echo "$machine" | jq -r '.price_gpu // empty')
+  if ! echo "$machine" | jq -e '.listed == true' >/dev/null; then
+    echo "skip $id: not listed (this loop never republishes unlisted machines)"; continue
+  fi
+  price=$(echo "$machine" | jq -r '.listed_gpu_cost // empty')
   end=$(echo "$machine" | jq -r '.end_date // empty')
-  chunk=$(echo "$machine" | jq -r '.min_chunk // empty')
+  chunk=$(echo "$machine" | jq -r '.listed_min_gpu_count // empty')
   if [ -z "$price" ] || [ -z "$end" ] || [ -z "$chunk" ]; then
-    echo "skip $id: missing price_gpu/end_date/min_chunk"; continue
+    echo "skip $id: missing listed_gpu_cost/end_date/listed_min_gpu_count"; continue
   fi
   now=$(date -u +%s)
   if ! jq -e -n --argjson end "$end" --argjson now "$now" '$end > $now' >/dev/null 2>&1; then
     echo "skip machine_id=$id: end_date expired"; continue
   fi
   # Opt-in only: skip machines with no positive reliability commitment (do not invent 0.99)
-  if ! echo "$machine" | jq -e '(.sla_r_claim // 0) > 0' >/dev/null; then
-    echo "skip $id: no positive sla_r_claim (enable SLA per machine first)"; continue
+  if ! echo "$machine" | jq -e '(.sla_reliability_claim // 0) > 0' >/dev/null; then
+    echo "skip $id: no positive sla_reliability_claim (enable SLA per machine first)"; continue
   fi
-  if ! echo "$machine" | jq -e '.sla_sigma_x != null' >/dev/null; then
-    echo "skip $id: sla_sigma_x missing in raw JSON (not SLA-ready; set Confidence / PUT sla_sigma_x, then re-run — do not assume 0.5)"; continue
-  fi
+  # sla_sigma_x is omitted on purpose: create_asks keeps each machine's current confidence.
   body=$(echo "$machine" | jq -c \
-    '{machine: (.id|tonumber), price_gpu, end_date, min_chunk,
-      sla_r_claim, sla_sigma_x}')
+    '{machine: (.id|tonumber), price_gpu: .listed_gpu_cost, end_date,
+      min_chunk: .listed_min_gpu_count, sla_r_claim: .sla_reliability_claim}')
   if [ "$DRY_RUN" != "0" ]; then
     echo "dry-run machine_id=$id payload: $body"; continue
   fi
@@ -508,7 +509,7 @@ When SLA is enabled on an offer, clients see:
 Verify after listing — filter the offer you care about; sliced machines often return multiple rows (different `num_gpus`, bid vs on-demand). Match disk allocation before comparing `dph_total` across channels (CLI default is often 5 GiB; console Search is typically 10 GB; REST examples often use 8 GB `allocated_storage`):
 
 ```bash
-vastai search offers 'machine_id=12345 verified=any has_sla=true target_reliability=0.95' --storage 10 --raw \
+vastai search offers 'machine_id=12345 verified=any has_sla=true' --storage 10 --raw \
   | jq '[.[] | select(.is_bid == false) | {id, num_gpus, dph_total, expected_reliability, reliability}]'
 ```
 
@@ -618,7 +619,7 @@ Use the [SLA Earnings Backtester](/host/sla-backtester) (API-only; requires a `m
 - **`sla_daemon_outdated`** — Update the host daemon from the [host setup guide](https://cloud.vast.ai/host/setup/), confirm the machine reconnects on **Host → Machines**, then retry LIST / `create_asks`. If the error persists, contact support with the machine ID.
 - **Unexpected credit** — Review reliability; re-run the backtester over the affected dates and check `escrow_to_client_balance` and `reliability` on those days.
 - **Severe outage (active SLA contracts):**
-  1. Notify renters now: `echo y | vastai schedule maint MACHINE_ID --sdate "$(date -u +%s)" --duration HOURS`.
+  1. Notify renters now: `echo y | vastai schedule maint MACHINE_ID --sdate "$(date -u +%s)" --duration HOURS --maintenance_category other`.
   2. Stop new SLA rentals. The fastest way is `vastai unlist machine MACHINE_ID`, which publishes nothing. Alternatively, set the reliability commitment to `0` in **Set Pricing → SLA** (or API `sla_r_claim=0`), but only on machines that are currently listed, because `create_asks` publishes a live listing.
   3. Fix the machine. Existing SLA contracts keep their terms and settle against each renter's target; unlisting or setting the commitment to `0` does not change that.
   4. After the next UTC midnight, check `sla_earn` for the affected day.

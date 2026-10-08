@@ -6661,13 +6661,14 @@ paths:
                   description: 'Historical machine reliability score (0-1), not the
                     host reliability commitment. Example: {"gte": 0.99}'
                 target_reliability:
-                  type: object
+                  type: number
                   description: "Reliability target for an SLA. Value must be greater\
                     \ than 0 and less than 1 (exclusive bounds \u2014\nsame as create-instance).\
                     \ When set, search prices include the SLA fee in dph_total and\n\
                     returns search.slaPremiumPerHour (the API name for that fee).\
                     \ Pass the same target again on PUT /api/v0/asks/{id}/ to\nenable\
-                    \ the SLA. Example: {\"eq\": 0.95}\n"
+                    \ the SLA. Send a plain number (for example 0.95); an operator\
+                    \ object such as {\"eq\": 0.95} is rejected with 400 bad_request.\n"
                 has_sla:
                   type: object
                   description: 'Restrict to offers with SLA enabled (true) or without
@@ -8985,38 +8986,64 @@ paths:
                         name:
                           type: string
                           description: The name of the machine.
-                        price_gpu:
-                          type: number
-                          description: GPU rental price in $/hour (when present in
-                            raw listing output).
+                        listed:
+                          type: boolean
+                          description: true when the machine currently has a published
+                            offer.
+                        listed_gpu_cost:
+                          type:
+                          - number
+                          - 'null'
+                          description: Listed GPU price in $/hour (`price_gpu` on
+                            create_asks). null when not listed.
                         end_date:
-                          type: number
-                          description: Offer expiration as Unix timestamp (when present
-                            in raw listing output).
-                        min_chunk:
-                          type: integer
-                          description: Minimum GPUs rented together (GPU slicing).
-                        sla_r_claim:
-                          type: number
-                          description: Host reliability claim. Values above 0 mean
-                            SLA is enabled on the ask.
-                        sla_sigma_x:
-                          type: number
-                          description: SLA confidence spread around the claim.
-                        sla_max_beta:
-                          type: number
-                          description: "Optional cap on client-derived \u03B2 for\
-                            \ this ask (support-directed). Hosts do not\nset \u03B2\
-                            ; leave unset for uncapped.\n"
+                          type:
+                          - number
+                          - 'null'
+                          description: Offer expiration as Unix timestamp. null when
+                            not listed.
+                        listed_min_gpu_count:
+                          type:
+                          - integer
+                          - 'null'
+                          description: Minimum GPUs rented together (`min_chunk` on
+                            create_asks).
+                        sla_reliability_claim:
+                          type:
+                          - number
+                          - 'null'
+                          description: 'Host reliability commitment (`sla_r_claim`
+                            on create_asks). Values above 0 mean SLA
+
+                            is enabled. null unless the machine is listed with SLA
+                            terms.
+
+                            '
+                        sla_confidence:
+                          type:
+                          - string
+                          - 'null'
+                          enum:
+                          - high
+                          - medium
+                          - low
+                          description: 'Confidence band for the ask''s `sla_sigma_x`:
+                            high = Tight (sigma_x <= 0.32),
+
+                            medium = Normal (<= 0.71), low = Wide. null unless the
+                            machine is listed with SLA terms.
+
+                            '
               example:
                 machines:
                 - id: '12345'
                   name: my-h100
-                  price_gpu: 3.5
+                  listed: true
+                  listed_gpu_cost: 3.5
                   end_date: 1735689600
-                  min_chunk: 1
-                  sla_r_claim: 0.99
-                  sla_sigma_x: 0.5
+                  listed_min_gpu_count: 1
+                  sla_reliability_claim: 0.99
+                  sla_confidence: medium
         '401':
           description: Unauthorized - User authentication failed
         '429':

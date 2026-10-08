@@ -136,7 +136,7 @@ Console controls use the same concepts; they do not accept CLI query strings. Us
 
 | Filter | Meaning | Example (CLI / API) |
 | --- | --- | --- |
-| `target_reliability` | Your desired reliability level. Also drives SLA charge calculation and ranking. | `target_reliability=0.95` |
+| `target_reliability` | Your desired reliability level. Also drives SLA charge calculation and ranking. REST and console only (see the Warning below). | REST: `"target_reliability": 0.95` (plain number, not `{"eq": …}`) |
 | `has_sla` | Restrict to offers with (or without) SLA enabled. | `has_sla=true` |
 | `expected_reliability` | Filter by the host's advertised reliability commitment. | `expected_reliability>=0.99` |
 
@@ -146,13 +146,14 @@ Console controls use the same concepts; they do not accept CLI query strings. Us
 
 **CLI examples:**
 
+<Warning>
+The current CLI cannot quote an SLA fee: it sends `target_reliability=0.95` as `{"eq": 0.95}`, which search rejects with `400 target_reliability: Input should be a valid number`. Use the CLI to find SLA offers (`has_sla`, `expected_reliability`), then get the SLA-inclusive `dph_total` from the console or REST (`"target_reliability": 0.95` as a plain number).
+</Warning>
+
 ```bash
 # SLA offers where the host's reliability commitment is at least 99%
 # Set --storage to match the disk you will rent (console often 10; REST often 8+)
-vastai search offers 'has_sla=true expected_reliability>=0.99 target_reliability=0.95' --storage 10
-
-# Compare total cost including SLA charge
-vastai search offers 'has_sla=true target_reliability=0.95 num_gpus=1' --storage 10 --order dph_total
+vastai search offers 'has_sla=true expected_reliability>=0.99' --storage 10
 ```
 
 When you set `target_reliability`, search results include:
@@ -225,7 +226,7 @@ curl -s -X POST "https://console.vast.ai/api/v0/bundles/" \
     "external": {"eq": false},
     "allocated_storage": 50,
     "order": [["dph_total", "asc"]],
-    "target_reliability": {"eq": 0.95},
+    "target_reliability": 0.95,
     "has_sla": {"eq": true},
     "expected_reliability": {"gte": 0.99}
   }'

@@ -83,10 +83,14 @@ Filter examples (including SLA quotes) are under [Examples](#examples). Query sy
 # rented=false (excludes slots you already rent) is already in the CLI default query; shown here explicitly
 vastai search offers 'reliability > 0.98 num_gpus=1 gpu_name=RTX_3090 rented=false'
 
-# SLA search quote (enable the SLA at rent via console/REST — see SLA)
+# Find SLA offers (the CLI cannot quote the SLA fee today; see the Warning below)
 # Always set --storage explicitly when comparing dph_total (CLI default 5 GiB ≠ REST 8 GB).
-vastai search offers 'has_sla=true expected_reliability>=0.99 target_reliability=0.95' --storage 50 --order dph_total
+vastai search offers 'has_sla=true expected_reliability>=0.99' --storage 50 --order dph_total
 ```
+
+<Warning>
+The current CLI cannot quote an SLA fee: it sends `target_reliability=0.95` as `{"eq": 0.95}`, which search rejects with `400 target_reliability: Input should be a valid number`. Use the CLI to find SLA offers (`has_sla`, `expected_reliability`), then get the SLA-inclusive `dph_total` from the console or REST (`"target_reliability": 0.95` as a plain number).
+</Warning>
 
 <a id="next-step-for-sla"></a>
 
@@ -194,7 +198,7 @@ bool       = True | False
 <Note>
 SLA query keys (`has_sla`, `expected_reliability`, `target_reliability`) are accepted by search. Search quotes SLA pricing only. Setting `target_reliability` in search does not enable the SLA at rent time; use console **Search filters → Reliability target** then **RENT**, or REST `PUT /api/v0/asks/{id}/` (not `vastai create instance`) as in [SLA](/guides/instances/choosing/sla-coverage). With `--raw`, the SLA fee for that quote is `search.slaPremiumPerHour`.
 
-The same filters on `POST /api/v0/bundles/` use JSON operators. Match this shape from [SLA → API automation](/guides/instances/choosing/sla-coverage#api-automation): `"has_sla": {"eq": true}`, `"expected_reliability": {"gte": 0.99}`, `"target_reliability": {"eq": 0.95}`. In that example `allocated_storage` is a number, not an operator object. The current CLI prints `Warning: Unrecognized field` for `has_sla`, `target_reliability`, and `expected_reliability`. The warning is harmless: the fields are still sent. To self-check, run `--raw | jq 'all(.[]; .expected_reliability > 0)'` (CLI `--raw` prints a bare array of offers, not an `offers` object).
+The same filters on `POST /api/v0/bundles/` use JSON operators. Match this shape from [SLA → API automation](/guides/instances/choosing/sla-coverage#api-automation): `"has_sla": {"eq": true}`, `"expected_reliability": {"gte": 0.99}`, `"target_reliability": 0.95` (a plain number; `{"eq": 0.95}` is rejected with 400). In that example `allocated_storage` is a number, not an operator object. The current CLI prints `Warning: Unrecognized field` for `has_sla`, `target_reliability`, and `expected_reliability`. The warning is harmless: the fields are still sent. To self-check, run `--raw | jq 'all(.[]; .expected_reliability > 0)'` (CLI `--raw` prints a bare array of offers, not an `offers` object).
 </Note>
 
 ## Global Options

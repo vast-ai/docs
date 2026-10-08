@@ -39,35 +39,44 @@ paths:
                         name:
                           type: string
                           description: The name of the machine.
-                        price_gpu:
+                        listed:
+                          type: boolean
+                          description: true when the machine currently has a published offer.
+                        listed_gpu_cost:
                           type: number
-                          description: GPU rental price in $/hour (when present in raw listing output).
+                          nullable: true
+                          description: Listed GPU price in $/hour (`price_gpu` on create_asks). null when not listed.
                         end_date:
                           type: number
-                          description: Offer expiration as Unix timestamp (when present in raw listing output).
-                        min_chunk:
+                          nullable: true
+                          description: Offer expiration as Unix timestamp. null when not listed.
+                        listed_min_gpu_count:
                           type: integer
-                          description: Minimum GPUs rented together (GPU slicing).
-                        sla_r_claim:
+                          nullable: true
+                          description: Minimum GPUs rented together (`min_chunk` on create_asks).
+                        sla_reliability_claim:
                           type: number
-                          description: Host reliability claim. Values above 0 mean SLA is enabled on the ask.
-                        sla_sigma_x:
-                          type: number
-                          description: SLA confidence spread around the claim.
-                        sla_max_beta:
-                          type: number
+                          nullable: true
                           description: |
-                            Optional cap on client-derived β for this ask (support-directed). Hosts do not
-                            set β; leave unset for uncapped.
+                            Host reliability commitment (`sla_r_claim` on create_asks). Values above 0 mean SLA
+                            is enabled. null unless the machine is listed with SLA terms.
+                        sla_confidence:
+                          type: string
+                          nullable: true
+                          enum: [high, medium, low]
+                          description: |
+                            Confidence band for the ask's `sla_sigma_x`: high = Tight (sigma_x <= 0.32),
+                            medium = Normal (<= 0.71), low = Wide. null unless the machine is listed with SLA terms.
               example:
                 machines:
                   - id: "12345"
                     name: my-h100
-                    price_gpu: 3.5
+                    listed: true
+                    listed_gpu_cost: 3.5
                     end_date: 1735689600
-                    min_chunk: 1
-                    sla_r_claim: 0.99
-                    sla_sigma_x: 0.5
+                    listed_min_gpu_count: 1
+                    sla_reliability_claim: 0.99
+                    sla_confidence: medium
         '401':
           description: Unauthorized - User authentication failed
         '429':
