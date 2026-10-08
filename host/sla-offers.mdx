@@ -113,7 +113,7 @@ Think of an SLA offer as two host ideas plus one client choice:
 
 1. **Your reliability commitment** — what you believe your machine will deliver (`sla_r_claim`). Setting this above `0` enables SLA on the offer.
 2. **Your confidence** — how wide your belief is around that reliability commitment (`sla_sigma_x`). Tighter confidence → lower SLA charges for clients at a given target; wider confidence → higher charges.
-3. **Client reliability target** — chosen by the renter via search (`target_reliability`). Settlement and SLA charge sizing use this target. Clients typically pick a target **at or below** your reliability commitment.
+3. **Client reliability target** — chosen by the renter via search (`target_reliability`). Settlement and SLA fee sizing use this target. A renter's target must be **at or below** your reliability commitment. Search hides offers whose commitment is below the target, and rent rejects that combination.
 
 When a client rents an on-demand instance on your SLA-listed offer with a chosen target:
 
@@ -325,7 +325,7 @@ Omitted non-SLA fields retain their current listing values; only fields present 
 vastai show machines --raw | jq '.machines[] | select(.id == 12345 or .id == "12345") | {id, listed, sla_reliability_claim, sla_confidence, listed_gpu_cost, listed_min_gpu_count, end_date}'
 ```
 
-REST equivalent: `GET /api/v0/machines/?user_id={user_id}` (`user_id` is required). Get `user_id` from **Account → Profile** or `vastai show user`. The CLI supplies `user_id` for you.
+REST equivalent: `GET /api/v0/machines/` (the CLI sends `?owner=me`). The account is the API key owner; a `?user_id=` query is ignored.
 
 Machine `id` may be a string in raw JSON. The response is wrapped in a `machines` array. Read-side names differ from the `create_asks` body: `listed_gpu_cost` → `price_gpu`, `listed_min_gpu_count` → `min_chunk`, `sla_reliability_claim` → `sla_r_claim`. Confidence is returned as a label, `sla_confidence` (`high` = Tight, `medium` = Normal, `low` = Wide), not as `sla_sigma_x`. The SLA fields are `null` unless the machine is listed with SLA terms. Pricing fields and `end_date` are `null` when the machine is not listed.
 
@@ -405,9 +405,10 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
     echo "skip $id: no positive sla_reliability_claim (enable SLA per machine first)"; continue
   fi
   # sla_sigma_x is omitted on purpose: create_asks keeps each machine's current confidence.
+  # price_disk is sent: omitting it resets storage price to 0.10.
   body=$(echo "$machine" | jq -c \
-    '{machine: (.id|tonumber), price_gpu: .listed_gpu_cost, end_date,
-      min_chunk: .listed_min_gpu_count, sla_r_claim: .sla_reliability_claim}')
+    '{machine: (.id|tonumber), price_gpu: .listed_gpu_cost, price_disk: .listed_storage_cost,
+      end_date, min_chunk: .listed_min_gpu_count, sla_r_claim: .sla_reliability_claim}')
   if [ "$DRY_RUN" != "0" ]; then
     echo "dry-run machine_id=$id payload: $body"; continue
   fi
@@ -583,7 +584,7 @@ Notify renters in the console ([Set a maintenance window](/host/set-maintenance-
 
 **Or use CLI/REST below.** A service credit is not guaranteed either way.
 
-**Planned SLA maintenance (renters may qualify for a service credit — not guaranteed):** Schedule at least 24 hours in advance with [`vastai schedule maint`](/host/cli/schedule-maint) (or the [REST schedule-maintenance API](/api-reference/machines/schedule-maint)). Include `--sdate` and `--duration`. Advance notice (not the category value) is what makes maintenance “planned” for service-credit review. Valid `--maintenance_category` values: `power`, `internet`, `disk`, `gpu`, `software`, `other`. Renters should check **Instances** for status. Credited maintenance is not a separate field on instance webhooks or `GET /api/v0/charges/`. The CLI does not send `maintenance_reason`; the REST body can. Credit eligibility is evaluated on a case-by-case basis.
+**Planned SLA maintenance (renters may qualify for a service credit — not guaranteed):** Schedule at least 24 hours in advance with [`vastai schedule maint`](/host/cli/schedule-maint) (or the [REST schedule-maintenance API](/api-reference/machines/schedule-maint)). Include `--sdate`, `--duration`, and `--maintenance_category`. The CLI always sends a category; its default `"not provided"` is rejected with `invalid_args`. Use one of `power`, `internet`, `disk`, `gpu`, `software`, or `other`. Advance notice (not the category value) is what maintenance forgiveness uses. Scheduling earlier counts more of the window as uptime; a longer window counts less. Rescheduling resets the notice clock. Forgiven downtime is not a cash credit to the renter. Renters should check **Instances** for status. It is not a separate field on instance webhooks or `GET /api/v0/charges/`. The CLI does not send `maintenance_reason`; the REST body can.
 
 **`sdate` is Unix epoch seconds (UTC)** for both CLI `--sdate` and the REST body. **`--duration` is in hours.** The CLI asks `Continue? [y/n]` before it sends the request; in scripts or cron, pipe the answer (`echo y | vastai schedule maint …`) or call REST directly. Schedule maintenance **sequentially** across a fleet, at least 3 seconds apart (`sleep 3` between machines; the Schedule Maintenance OpenAPI `x-rate-limit` threshold is `2.5`). If you still get HTTP 429, wait longer and retry. See [Rate Limits and Errors](/api-reference/rate-limits-and-errors).
 
@@ -685,9 +686,9 @@ Positive `sla_earn` = net SLA charge you kept that period; negative = net credit
 | List or update SLA on an offer | `machine_write` |
 | Post-listing SLA earnings | `billing_read` |
 
-`GET /api/v0/users/{user_id}/machine-earnings/` returns SLA fields alongside compute earnings. Requires a **`billing_read`** API key. See [`show earnings`](/api-reference/billing/show-earnings).
+`GET /api/v0/users/me/machine-earnings/` returns SLA fields alongside compute earnings. The path user id is ignored; the account is the API key owner, so a **`billing_read`** key is enough (you do not need `user_read`). See [`show earnings`](/api-reference/billing/show-earnings).
 
-This endpoint is rate-limited. Poll `GET /api/v0/users/{user_id}/machine-earnings/` at most about once every two seconds as a safe default (OpenAPI `x-rate-limit` threshold `2.0` on [Show Earnings](/api-reference/billing/show-earnings)). On HTTP 429, back off and retry per [Rate Limits and Errors](/api-reference/rate-limits-and-errors). For daily SLA settlement, one pull with `last_days=1` after UTC rollover is usually enough.
+This endpoint is rate-limited. Poll `GET /api/v0/users/me/machine-earnings/` at most about once every two seconds as a safe default (OpenAPI `x-rate-limit` threshold `2.0` on [Show Earnings](/api-reference/billing/show-earnings)). On HTTP 429, back off and retry per [Rate Limits and Errors](/api-reference/rate-limits-and-errors). For daily SLA settlement, one pull with `last_days=1` after UTC rollover is usually enough.
 
 **Automation pattern:** There is no host webhook for SLA settlement. Poll `machine-earnings` with `last_days=1` and `machid`, alert on `per_machine[].sla_earn` thresholds, and call machines sequentially with backoff on 429. Do not use `per_day[].sla_earn` for a single machine.
 
@@ -699,23 +700,17 @@ When you pass `machid`, use `per_machine[].sla_earn` for that machine's SLA sett
 - **Fleet snapshot (coarse / recent window only):** one request without `machid` returns all machines in `per_machine[]` for the window.
 </Warning>
 
-Replace `{user_id}` with your account ID from **Account → Profile** (preferred for `billing_read`-only keys). Optional CLI: `USER_ID=$(vastai show user --raw | jq -r '.id')` — that needs `user_read` if `show user` is denied; see [Host SLA scoped-key recipe](/api-reference/permissions#host-sla-scoped-key-recipe).
-
-```bash
-USER_ID=YOUR_USER_ID   # from Account → Profile
-```
-
 ```bash
 # Exact UTC day 2026-07-24 for machine 12345 (sday/eday = 20658)
 curl -s -H "Authorization: Bearer $VAST_API_KEY" \
-  "https://console.vast.ai/api/v0/users/${USER_ID}/machine-earnings/?machid=12345&sday=20658&eday=20658" \
+  "https://console.vast.ai/api/v0/users/me/machine-earnings/?machid=12345&sday=20658&eday=20658" \
   | jq '.per_machine[] | select(.machine_id == 12345 or .machine_id == "12345") | {machine_id, sla_earn}'
 ```
 
 ```bash
 # Fleet snapshot (last_days=1 — coarse, not a settled calendar day)
 curl -s -H "Authorization: Bearer $VAST_API_KEY" \
-  "https://console.vast.ai/api/v0/users/${USER_ID}/machine-earnings/?last_days=1" \
+  "https://console.vast.ai/api/v0/users/me/machine-earnings/?last_days=1" \
   | jq '.per_machine[] | {machine_id, sla_earn}'
 ```
 
@@ -723,7 +718,7 @@ curl -s -H "Authorization: Bearer $VAST_API_KEY" \
 
 ```bash
 curl -s -H "Authorization: Bearer $VAST_API_KEY" \
-  "https://console.vast.ai/api/v0/users/${USER_ID}/machine-earnings/?machid=12345&last_days=1" \
+  "https://console.vast.ai/api/v0/users/me/machine-earnings/?machid=12345&last_days=1" \
   | jq '.per_machine[] | select(.machine_id == 12345 or .machine_id == "12345") | {machine_id, sla_earn}'
 ```
 
@@ -736,7 +731,6 @@ Do **not** compare `last_days=7` totals to the backtester's largest single-day c
 | `per_machine[].sla_earn` | Positive (SLA charge kept) | Negative (credit you owe) |
 | Fleet `per_day[].sla_earn` | Positive (SLA charge kept) | Negative (credit you owe) |
 
-- `{user_id}` — Use your account ID from **Account → Profile** (recommended). Use `vastai show user` only if your API key includes `user_read`; `billing_read`-only keys cannot call it. Do not leave a curly-brace placeholder in the URL.
 - Settlement is evaluated on UTC day boundaries. Rows typically update within a few hours after UTC midnight.
 
 ## Tips for competitive SLA offers

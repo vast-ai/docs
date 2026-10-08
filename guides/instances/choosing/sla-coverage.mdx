@@ -98,7 +98,7 @@ Bandwidth is billed separately from usage (`inet_*` rates) and is **not** includ
 | Host reliability commitment | Maximum reliability the host advertises on the listing (`expected_reliability`). Higher commitment → lower SLA fee at a given reliability target |
 | Host confidence | Host-side pricing setting that affects SLA charge size. **You do not set this** — the host chooses it, and it is **not shown on offer cards**. Compare offers using `dph_total` or the SLA charge line in the price breakdown |
 
-**Rule of thumb:** pick a reliability target **at or below** the host's reliability commitment for the best value. Asking for a 99% reliability target on a host whose reliability commitment is only 95% costs much more than asking for 95% on a host whose reliability commitment is 99%. In search results, the host reliability commitment appears as **expected reliability** on the offer (API: `expected_reliability`) — not the Reliability Score on the card.
+**Rule of thumb:** your reliability target must be **at or below** the host's reliability commitment. Offers whose commitment is below your target are not shown in search and cannot be rented. At the same target, a host with a higher commitment charges a lower SLA fee. In search results, the host reliability commitment appears as **expected reliability** on the offer (API: `expected_reliability`) — not the Reliability Score on the card.
 
 ### Example: H100 at $3.50/hr GPU
 
@@ -210,8 +210,6 @@ Web app: [cloud.vast.ai](https://cloud.vast.ai). REST examples use `https://cons
 
 For repeated search calls, `POST /api/v0/bundles/` is rate-limited. On HTTP 429, wait and retry. See [Rate Limits and Errors](/api-reference/rate-limits-and-errors).
 
-Renters set **`target_reliability`** on search and on REST rent. Do not send **`sla_r_target`** or **`sla_r_claim`** in the rent body.
-
 **1. Search** (prices `dph_total` at your target — include storage explicitly so quotes are comparable). Set `limit` explicitly when you compare many offers. Bundles search has **no pagination** (no offset or page token)—one response returns at most `limit` rows for that query. OpenAPI does not document a maximum `limit`; do not assume a single call walks the full market. To scan a broader SLA market, shard queries with filters such as `gpu_name`, `geolocation`, or `machine_id`, and back off on HTTP 429. See [Rate Limits and Errors](/api-reference/rate-limits-and-errors).
 
 ```bash
@@ -288,16 +286,15 @@ Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `ta
 
 | Symptom | Typical response | What to do |
 | --- | --- | --- |
-| Target on a non-SLA offer | HTTP 400 `invalid_args` | Search with `has_sla=true`; confirm `expected_reliability` |
-| Target out of range / invalid | HTTP 400 `invalid_args` | Use `0 < target_reliability < 1`; stay at or below a realistic host reliability commitment |
-| Offer not found or not available | HTTP 404 `invalid_args` (`msg` may include `no_such_ask`) | Do not retry that id; search again and rent a current offer |
+| Offer has no SLA, target is above the host commitment, target is out of range, or the SLA fee would exceed 1× compute | HTTP 400 `invalid_sla_params` (body includes `ask_id`; message may say "SLA Fee would be N.NNx compute") | Lower the target, or pick an offer with a higher commitment |
+| SLA not enabled for the account or region | HTTP 403 `sla_disabled` | Contact support |
+| Offer no longer exists | HTTP 400 `invalid_args`, message `no_such_ask` | Re-search and use a fresh offer ID |
 | Ask cannot start now (`cancel_unavail`) | HTTP 410, error `no_such_ask` | Search for a new offer; this is not a transient glitch to retry on the same id |
-| Price mismatch after stale quote | HTTP 400 `invalid_price` | Re-search with the same `target_reliability` and storage (`allocated_storage` / `--storage`), then rent again |
+| `price` (bid) sent together with `target_reliability` | HTTP 400 "Cannot combine interruptible instances with SLAs" | Remove `price`. SLA rentals are on-demand only |
 | Timeout, dropped connection, or HTTP 5xx | Outcome unknown — the rental may already exist | Before sending the same `PUT` again, check `GET /api/v1/instances/` for a new contract. There is no idempotency key, so a blind retry can create a second paid rental. |
 | Too many requests | HTTP 429 | Wait and back off. Before retrying the same `PUT`, confirm with `GET /api/v1/instances/` whether the contract already exists. If retry returns `invalid_price`, `no_such_ask`, 404, or 410, re-search with the same `target_reliability` and storage, then rent a fresh offer id. |
 | Missing SSH key for the VM | HTTP 400 `no_ssh_key_for_vm` (or similar) | Add an SSH key on your account before renting, then retry with a current offer id. |
-| Forbidden / wrong account | HTTP 403 | Rent with a **renter** account API key, not the host listing key (see [Hosting Overview](/host/hosting-overview) self-test note). |
-| SLA with a bid or interruptible offer | Rent does not turn on an SLA | Search with `"type": "ondemand"`. Do not send `price` or `bid_price` when you want an SLA. |
+| Forbidden / wrong account | HTTP 400 `invalid_args` from a host account | Rent with a **renter** account API key, not the host listing key (see [Hosting Overview](/host/hosting-overview) self-test note). |
 
 | Channel | Default storage | Field | Units (label) |
 | --- | --- | --- | --- |
@@ -338,7 +335,7 @@ Each day, the platform tracks how long your instance was online. Settlement cons
 - A pattern of unreliable uptime produces larger credits over time.
 - One strong day after a weak week does not instantly reset everything.
 
-Scheduled maintenance with adequate advance notice (typically 24+ hours) may be credited toward reliability on a case-by-case basis. Check **Instances** status and any client notifications during downtime to distinguish planned maintenance from an unexpected outage. Credited maintenance is not a separate field on instance webhooks or `GET /api/v0/charges/`. Unplanned outages count fully.
+When a host schedules maintenance in advance, part of that downtime is counted as uptime for the host. More of the window is forgiven the earlier they give notice, and less is forgiven the longer the window lasts. Forgiven downtime does not earn you a service credit. Check **Instances** status and any notifications to distinguish planned maintenance from an unexpected outage. Unplanned outages count fully.
 
 ### Credit scenarios (simplified)
 
@@ -346,11 +343,11 @@ Using the H100 example ($84/day compute, ~$0.20/day SLA charge, target 95%, host
 
 | Scenario | Approx. SLA charge | Approx. service credit | Net vs no SLA (approx.) |
 | --- | --- | --- | --- |
-| Above target (excellent / good day) | ~$0.20/day | $0 (often) | **−$0.20** (you paid the SLA charge) |
-| Near / below target on blended measure (~95%) | ~$0.20/day | ~$42 | **+$41.80** (net credit after SLA charge) |
+| Above target (excellent / good day) | ~$0.20/day | $0 | **−$0.20** (you paid the SLA fee) |
+| Below target (~93–94% for the day) | ~$0.20/day | ~$42 | **+$41.80** (net credit after SLA fee) |
 | Severe shortfall (~90% or less) | ~$0.20/day | ~$84 | **+$83.80** |
 
-**How to read “Net vs no SLA”:** negative = you paid more than without SLA; positive = you received a net credit versus renting the same offer without the SLA.
+**How to read “Net vs no SLA”:** negative = you paid more than without SLA; positive = you received a net credit versus renting the same offer without the SLA. Credits are graduated. A day close to your target can pay a small credit, and the further below target the day falls, the larger the credit. A day that meets the target does not pay a credit.
 
 Production settlement can issue credits even when a single daily snapshot looks close to your target, because measurement uses the blended daily reliability calculation.
 
