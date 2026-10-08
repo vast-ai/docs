@@ -37,14 +37,15 @@ vastai show earnings [OPTIONS]
   Machine id (optional) (alias: `--machine_id`)
 </ParamField>
 
-`--raw` is the same JSON as [Show Earnings](/api-reference/billing/show-earnings). Host SLA settlement is `per_machine[].sla_earn` (field `machine_id`, not query param `machid`; not fleet-wide `per_day[].sla_earn`). CLI `--start_date` / `--end_date` are calendar convenience: the CLI parses bare dates such as `2026-07-24` in your machine's local time, so append `T00:00:00Z` for an exact UTC day; for REST-only query params `last_days`, `sday`, and `eday` (for example `last_days=1` polling or exact UTC day index), see [Monitoring SLA after listing](/host/sla-offers#monitoring-sla-after-listing) or [Show Earnings](/api-reference/billing/show-earnings).
+`--raw` is the same JSON as [Show Earnings](/api-reference/billing/show-earnings). Host SLA settlement is `per_machine[].sla_earn` (field `machine_id`, not query param `machid`; not fleet-wide `per_day[].sla_earn`). `--start_date` and `--end_date` are convenience options. The CLI parses bare dates such as `2026-07-24` in your machine's local time, so append `T00:00:00Z` for an exact UTC day. For REST-only query params `last_days`, `sday`, and `eday` (for example `last_days=1` polling or exact UTC day index), see [Monitoring SLA after listing](/host/sla-offers#monitoring-sla-after-listing) or [Show Earnings](/api-reference/billing/show-earnings).
 
 ## Examples
 
 ```bash
 vastai show earnings
 vastai show earnings --raw | jq '.per_machine[] | {machine_id, sla_earn}'
-# One machine (prefer --machine_id for SLA settlement checks)
+# One machine, one UTC day (prefer --machine_id for SLA settlement checks). Linux (GNU date);
+# on macOS (BSD date) use $(date -u -v-1d +%F) for yesterday.
 vastai show earnings --machine_id 12345 --start_date "$(date -u -d 'yesterday' +%F)T00:00:00Z" --end_date "$(date -u -d 'yesterday' +%F)T00:00:00Z" --raw \
   | jq '.per_machine[] | select(.machine_id == 12345 or .machine_id == "12345") | {machine_id, sla_earn}'
 ```

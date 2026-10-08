@@ -338,7 +338,7 @@ Then `PUT /api/v0/machines/create_asks/` with the merged body (read → merge �
 **Console hosts:** skip this section. Enable an SLA with [Web console](#web-console) and check settlement in [Console (recommended for day-to-day checks)](#console-recommended-for-day-to-day-checks).
 </Note>
 
-This loop does not turn an SLA on for new machines. Enable an SLA on each machine first (console **Set Pricing → SLA**, or a per-machine `PUT /api/v0/machines/create_asks/` with `sla_r_claim` and `sla_sigma_x`). The loop only considers machines that already have `sla_r_claim > 0`.
+Use this loop to republish SLA terms across a fleet, for example after a daemon update. It does not turn an SLA on for new machines. Enable an SLA on each machine first (console **Set Pricing → SLA**, or a per-machine `PUT /api/v0/machines/create_asks/` with `sla_r_claim` and `sla_sigma_x`). The loop only considers machines that already have `sla_r_claim > 0`.
 
 `create_asks` defaults `sla_sigma_x` to `0.5` when you omit it on a write. This guide does **not** treat a missing `sla_sigma_x` in `show machines --raw` as that default—the raw payload may omit the field even when you intend Normal confidence. The loop **skips and logs** those IDs so it never silently writes `0.5`. Set **Confidence** in the console (or PUT `sla_sigma_x` for that machine), then re-run. A skip is not “SLA-ready.”
 
@@ -438,7 +438,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
   -d '{"machine": 12345, "sla_r_claim": 0.995, "sla_sigma_x": 0.2}'
 ```
 
-**Disable SLA on new rentals** — set `sla_r_claim` to `0` (active contracts keep their terms).
+**Disable SLA on new rentals** — set `sla_r_claim` to `0` (active contracts keep their terms). This request publishes a live listing (same as **LIST**), so don't run it on machines you have unlisted.
 
 #### Common errors
 
@@ -446,10 +446,10 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
 | --- | --- | --- |
 | 401 | `success: false` + `msg` (+ optional `error`) | Missing `machine_write` or other required permission |
 | 403 | `machine_locked` | Machine is decommissioned or migration-locked |
+| 403 | `sla_not_approved` | Host account is not approved to create SLA asks |
+| 403 | `sla_daemon_outdated` | Machine daemon build is too old for SLA listing |
 | 400 | `invalid_args` | Machine ID not found for your account, or malformed / incompatible request body |
 | 400 | `invalid_sla_params` | SLA parameters failed validation |
-| 400 | `sla_not_approved` | Host account is not approved to create SLA asks |
-| 400 | `sla_daemon_outdated` | Machine daemon build is too old for SLA listing |
 
 **`machine_locked`:** Returned when a machine is decommissioned or migration-locked. If you are migrating hardware, finish or cancel active rentals first, remove or update the listing as needed, and contact support if the machine remains locked. Existing SLA terms on active contracts remain in force until those contracts end.
 
@@ -509,7 +509,7 @@ Verify after listing — filter the offer you care about; sliced machines often 
 
 ```bash
 vastai search offers 'machine_id=12345 verified=any has_sla=true target_reliability=0.95' --storage 10 --raw \
-  | jq '[.offers[] | select(.is_bid == false) | {id, num_gpus, dph_total, expected_reliability, reliability}]'
+  | jq '[.[] | select(.is_bid == false) | {id, num_gpus, dph_total, expected_reliability, reliability}]'
 ```
 
 ### If reliability is strong relative to the client's target
@@ -617,7 +617,12 @@ Use the [SLA Earnings Backtester](/host/sla-backtester) (API-only; requires a `m
 - **`sla_not_approved`** — Contact support; you can keep a non-SLA listing while approval is pending.
 - **`sla_daemon_outdated`** — Update the host daemon from the [host setup guide](https://cloud.vast.ai/host/setup/), confirm the machine reconnects on **Host → Machines**, then retry LIST / `create_asks`. If the error persists, contact support with the machine ID.
 - **Unexpected credit** — Review reliability; re-run the backtester with a low `reliability` stress value (for example `0.01`).
-- **Severe outage** — Disable SLA on new contracts: open **Host → Machines** → **Set Pricing → SLA**, set the reliability commitment to `0` (or use API `sla_r_claim=0`); contact [Discord](https://discord.gg/hSuEbSQ4X8) before relisting.
+- **Severe outage (active SLA contracts):**
+  1. Notify renters now: `echo y | vastai schedule maint MACHINE_ID --sdate "$(date -u +%s)" --duration HOURS`.
+  2. Stop new SLA rentals. The fastest way is `vastai unlist machine MACHINE_ID`, which publishes nothing. Alternatively, set the reliability commitment to `0` in **Set Pricing → SLA** (or API `sla_r_claim=0`), but only on machines that are currently listed, because `create_asks` publishes a live listing.
+  3. Fix the machine. Existing SLA contracts keep their terms and settle against each renter's target; unlisting or setting the commitment to `0` does not change that.
+  4. After the next UTC midnight, check `sla_earn` for the affected day.
+  5. Contact [Discord](https://discord.gg/hSuEbSQ4X8) before relisting.
 
 ## Monitoring SLA after listing
 
