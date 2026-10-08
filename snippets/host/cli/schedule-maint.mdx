@@ -10,6 +10,8 @@ vastai schedule maint id [--sdate START_DATE --duration DURATION --maintenance_c
 
 <Note>`schedule maintenance` is an alias for `schedule maint` if your CLI build supports both spellings. Prefer `maint`. Requires `machine_write` on scoped API keys — see [Permissions](/api-reference/permissions).</Note>
 
+<Note>The CLI prints the window and asks `Continue? [y/n]` before it sends the request. In scripts or cron, pipe the answer (`echo y | vastai schedule maint …`) or call the [REST endpoint](/api-reference/machines/schedule-maint) directly.</Note>
+
 ## Arguments
 
 <ParamField path="id" type="integer" required>
@@ -19,7 +21,7 @@ vastai schedule maint id [--sdate START_DATE --duration DURATION --maintenance_c
 ## Options
 
 <ParamField path="--sdate" type="number">
-  Maintenance start time as Unix epoch seconds (UTC). Example: `1677562671`. The API receives an ISO 8601 UTC datetime after conversion.
+  Maintenance start time as Unix epoch seconds (UTC). Example: `1677562671`. The CLI sends this value to the API unchanged (REST `sdate` is also epoch seconds).
 </ParamField>
 
 <ParamField path="--duration" type="number">
@@ -62,7 +64,7 @@ If the machine must go offline without adequate notice, still run `schedule main
 vastai schedule maint MACHINE_ID --sdate "$(date -u +%s)" --duration 1 --maintenance_category power
 ```
 
-To cancel a scheduled window, use [`vastai cancel maint`](/host/cli/cancel-maint). To reschedule, cancel first, then schedule a new window (≥24 hours ahead for planned SLA credit review). Across many machines, schedule sequentially and back off on HTTP 429.
+To cancel a scheduled window, use [`vastai cancel maint`](/host/cli/cancel-maint). To reschedule, cancel first, then schedule a new window (≥24 hours ahead for planned SLA credit review). Across many machines, schedule sequentially at least 3 seconds apart (`sleep 3`; the endpoint's `x-rate-limit` threshold is `2.5`). If you still get HTTP 429, wait longer and retry.
 
 ## Examples
 

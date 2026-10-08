@@ -197,8 +197,12 @@ response = requests.put(
     },
     timeout=60,
 )
-response.raise_for_status()
+if not response.ok:
+    print(response.status_code, response.text)  # body contains error / msg
+    response.raise_for_status()
 print(response.json())  # new_contract is the rental instance ID
+# On a timeout, dropped connection, 429, or 5xx the rental may already exist:
+# check GET /api/v1/instances/ before sending the same PUT again.
 ```
 
 The same call with curl:

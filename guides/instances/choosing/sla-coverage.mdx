@@ -16,7 +16,7 @@ An SLA is an optional reliability promise on an **on-demand** GPU rental. You do
 2. **You** choose a **reliability target**: how much uptime you want. A higher target costs more.
 3. You pay an **SLA fee** (a service level fee) on top of the GPU price.
 4. Each day, Vast checks how long your instance was actually up.
-5. If uptime met your reliability target, the host keeps the SLA fee.
+5. If uptime met your reliability target, the host keeps the SLA fee. "Met" is judged on Vast's blended reliability measure (recent and longer-term uptime), not on a single day's raw uptime. Settlement is graduated: a day that looks close to the target can still produce a partial credit.
 6. If uptime missed your reliability target, you receive a **service credit**. That credit can be larger than the SLA fee you paid that day.
 
 A few things people mix up:
@@ -37,7 +37,7 @@ Before you start: ensure [Account → Billing](https://cloud.vast.ai/billing/) h
 2. In **Search filters** (left bar), set **Reliability target**, confirm an **SLA fee** line in the price breakdown, set instance disk on the slider, then **RENT**. Before **RENT**, add an SSH key under **Account → Keys** (or choose a Jupyter/notebook template that does not require SSH)—see [Keys](/guides/reference/keys). Console default disk is 10 GB; if you quoted via CLI/REST, match that disk number or rent can fail with `invalid_price`.
 3. Right after **RENT**, verify under **Instances**: open **price details** and confirm an **SLA charge** line and your reliability target (see [Viewing SLA on active instances](#viewing-sla-on-active-instances)).
 4. After the prior UTC day has settled (credits usually appear hours after UTC midnight; see [Settlement timing](#settlement-timing)), check credits in **Account → Billing**.
-5. When you are finished, **Destroy** the instance (not only **Stop**) to end ongoing charges—see [If your instance goes down](#if-your-instance-goes-down).
+5. When you are finished, **Destroy** the instance (not only **Stop**) to end ongoing charges—see [If your instance goes down](#if-your-instance-goes-down). Destroy permanently deletes the instance and its disk, so copy off anything you need first.
 
 **If you used the CLI to search:** set **Reliability target** again in the console **Search filters** (left bar) before you click **RENT**. CLI filters do not carry over.
 
@@ -229,7 +229,7 @@ curl -s -X POST "https://console.vast.ai/api/v0/bundles/" \
   }'
 ```
 
-CLI search defaults are `external=false rentable=true verified=true` (see [search offers](/cli/reference/search-offers)). The body above matches those three filters. REST `POST /api/v0/bundles/` may default omitted `rented` to `{"eq": false}` per [Search Offers OpenAPI](/api-reference/search/search-offers)—that is **not** the same as the CLI default query (which does not send `rented`). Pass `rented` explicitly when you need a specific filter; do not assume omitted `rented` on REST matches CLI.
+The CLI default query sends `external=false rentable=true verified=true rented=false` (the `--help` text omits `rented`; see [search offers](/cli/reference/search-offers)). The body above matches the first three filters, and REST `POST /api/v0/bundles/` may default omitted `rented` to `{"eq": false}` per [Search Offers OpenAPI](/api-reference/search/search-offers). Pass `rented` explicitly when you need different behavior.
 
 **2. Rent** the chosen offer. Use `offers[].id` from the search response as `{id}` in `PUT /api/v0/asks/{id}/`. Prefer `id` over `ask_contract_id` when both appear. Never use `bundle_id`. Save `new_contract` from the rent response. Pass the **same** reliability target you searched with:
 
@@ -274,7 +274,7 @@ curl -G "https://console.vast.ai/api/v1/instances/" \
   --data-urlencode "limit=25"
 ```
 
-Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `target_reliability` on that row. For the SLA fee: if the instance is not yet **running**, use `search.slaPremiumPerHour` (search-context pricing); once **running**, also check `instance.slaPremiumPerHour`. A missing `instance.slaPremiumPerHour` before startup is not a failed SLA rent. Requires `instance_read`. You can also read the same fields with `vastai show instances-v1 --raw`. If the filter returns no row, page with `after_token`. Do not use `select_filters` alone to detect an SLA (`has_sla` is not a filterable column).
+Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `target_reliability` on that row. For the SLA fee: if the instance is not yet **running**, use `search.slaPremiumPerHour` (search-context pricing); once **running**, also check `instance.slaPremiumPerHour`. A missing `instance.slaPremiumPerHour` before startup is not a failed SLA rent. Requires `instance_read`. You can also read the same fields with `vastai show instances-v1 --raw`. If the filter returns no row, confirm you used `new_contract` (not the offer id), then retry after a short delay, no more than about once per second (`show_instances` `x-rate-limit` threshold `1.0`). Use `after_token` paging only when listing without an `id` filter. Do not use `select_filters` alone to detect an SLA (`has_sla` is not a filterable column).
 
 - **REST** (`GET /api/v1/instances/`): pass an explicit `limit` and page with `after_token` (the response `next_token`). The server default `limit` can be as low as **5** (maximum **25**).
 - **CLI** (`vastai show instances-v1`): use `--limit` and `--next-token`. The CLI default `--limit` is **25** unless you set it.
@@ -290,6 +290,7 @@ Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `ta
 | Offer not found or not available | HTTP 404 `invalid_args` (`msg` may include `no_such_ask`) | Do not retry that id; search again and rent a current offer |
 | Ask cannot start now (`cancel_unavail`) | HTTP 410, error `no_such_ask` | Search for a new offer; this is not a transient glitch to retry on the same id |
 | Price mismatch after stale quote | HTTP 400 `invalid_price` | Re-search with the same `target_reliability` and storage (`allocated_storage` / `--storage`), then rent again |
+| Timeout, dropped connection, or HTTP 5xx | Outcome unknown — the rental may already exist | Before sending the same `PUT` again, check `GET /api/v1/instances/` for a new contract. There is no idempotency key, so a blind retry can create a second paid rental. |
 | Too many requests | HTTP 429 | Wait and back off. Before retrying the same `PUT`, confirm with `GET /api/v1/instances/` whether the contract already exists. If retry returns `invalid_price`, `no_such_ask`, 404, or 410, re-search with the same `target_reliability` and storage, then rent a fresh offer id. |
 | Missing SSH key for the VM | HTTP 400 `no_ssh_key_for_vm` (or similar) | Add an SSH key on your account before renting, then retry with a current offer id. |
 | Forbidden / wrong account | HTTP 403 | Rent with a **renter** account API key, not the host listing key (see [Hosting Overview](/host/hosting-overview) self-test note). |
@@ -363,8 +364,8 @@ Production settlement uses the multi-window reliability blend described above, n
 ## If your instance goes down
 
 1. Save work and check **Instances** for host/maintenance status.
-2. Remember: compute and SLA charges continue until settlement; credits apply to the **previous UTC day**, not the current hour.
-3. **Console:** Open **Instances**, select the instance, then **Destroy** to stop future charges. Stopping alone may not end billing for a broken instance—see [Stop vs destroy](#what-you-pay-during-an-outage).
+2. Remember: compute, storage, and SLA charges continue until you destroy the instance. Credits are calculated at the next UTC settlement and apply to the **previous UTC day**, not the current hour.
+3. **Console:** Open **Instances**, select the instance, then **Destroy** to stop future charges. Stopping alone may not end billing for a broken instance—see [Stop vs destroy](#what-you-pay-during-an-outage). Destroy permanently deletes the instance and its disk, so copy off anything you need first.
 4. After settlement, check **Account → Billing** in the console for SLA line items (not `GET /api/v0/charges/`).
 5. If credits still look wrong **48 hours** after the outage day, contact support via [Discord](https://discord.gg/hSuEbSQ4X8) or [contact@vast.ai](mailto:contact@vast.ai).
 
