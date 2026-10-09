@@ -48,7 +48,7 @@ Read [SLA in plain language](#sla-in-plain-language) before this list.
 5. Preview economics only if the machine already has rental history (console SLA panel or [backtester](/host/sla-backtester)). On a new machine, neither can show a number yet. Start at **Low** confidence, use the [economics walkthrough](#economics-walkthrough) as your estimate, and confirm the real fee in step 8 after you save. Read [Billing vs settlement](#billing-vs-settlement-important) and [Risk scenarios](#risk-scenarios). GPU billing can continue during outages, and SLA credits can exceed many days of SLA fees.
    - **All hosts:** After you enable SLA, GPU earnings in **Host → Billing** can drop. That compute is paid out later as SLA earnings, and much of it can stay held until the contract ends. A lower total is not by itself a credit.
    - **API users:** Read the held amount as `sla_earn`. See [Monitoring SLA after listing](#monitoring-sla-after-listing).
-6. Read [Scheduled maintenance](#scheduled-maintenance) before you turn SLA on. Turn on **Host → Notification Settings** for `host:machine_offline` and `host:machine_error` ([Host Notifications](/host/notifications)) so you hear about downtime before next-day settlement. Schedule planned work as far ahead as you can. Some hosts assume 24 hours of notice fully forgives the downtime. It does not, and forgiveness is not guaranteed.
+6. Read [Scheduled maintenance](#scheduled-maintenance) before you turn SLA on. Turn on **Account Settings → Notification Settings** (Host group) for `host:machine_offline` and `host:machine_error` ([Host Notifications](/host/notifications)) so you hear about downtime before next-day settlement. Schedule planned work as far ahead as you can. Some hosts assume 24 hours of notice fully forgives the downtime. It does not, and forgiveness is not guaranteed.
 7. **Enable SLA.**
    - **Do this:** In **Set Pricing → SLA**, enter **Reliability Commitment** as a percent (the field ends with `%`; type `99` for 99%). Set **Confidence**. Start at **Low** unless you have rental history. Then click **Save**.
    - **What Save also does:** On a machine that is already listed, **Save** publishes immediately and extends every shorter rental to the listing end date. See [SLA on extended contracts](#sla-on-extended-contracts).
@@ -152,7 +152,7 @@ On sliced machines, SLA settles **per rental contract**. If one GPU slice fails 
 
 For SLA-covered on-demand contracts, the renter is still charged the normal hourly rate during an outage. Vast does not zero that day's compute bill. Compensation is a service credit.
 
-**Where SLA money goes.** On an SLA rental, the renter's compute payment and SLA fee are held by Vast (escrow) instead of being paid to you right away. Service credits are paid from that held money, and the rest is released to you over the following days. Those earnings show up as **SLA** earnings (`sla_earn`), not GPU earnings. See [How SLA money moves](/host/sla-backtester#how-sla-money-moves).
+**Where SLA money goes.** On an SLA rental, the renter's compute payment and SLA fee are held by Vast (escrow) instead of being paid to you right away. Service credits are paid from that held money, and the rest is released over time. Some of it can stay held until the contract ends. Those earnings show up as **SLA** earnings (`sla_earn`), not GPU earnings. See [How SLA money moves](/host/sla-backtester#how-sla-money-moves).
 
 ## SLA parameters
 
@@ -413,7 +413,7 @@ Then `PUT /api/v0/machines/create_asks/` with the merged body (read → merge �
 
 ### Fleet SLA re-list (machines that already have an SLA)
 
-Use this loop only to restore SLA offers that no longer appear in search on machines with **zero** rentals. It does not change prices or SLA terms. To change terms, use [Update SLA on an existing ask](#update-sla-on-an-existing-ask-partial-body). `current_rentals_resident`, `credit_discount_max`, and `min_bid_price` are on `GET /api/v0/machines/` but are not all in the Show Machines OpenAPI schema yet. A typed client that drops `current_rentals_resident` will skip every machine.
+Use this loop only to restore SLA offers that no longer appear in search on machines with **zero** rentals. It does not change prices or SLA terms. To change terms, use [Update SLA on an existing ask](#update-sla-on-an-existing-ask-partial-body). `current_rentals_resident`, `credit_discount_max`, and `min_bid_price` are on `GET /api/v0/machines/` and in the Show Machines schema. A client that drops `current_rentals_resident` will skip every machine.
 
 <Warning>
 "Missing from search" also matches every **hidden** listing (hidden listings are not shown in search) and every **offline** machine (`create_asks` returns HTTP 402 until the machine is online). Any hidden machine not listed in `HIDDEN_IDS` becomes **public** on a live run. The loop skips machines in `HIDDEN_IDS` unless you set `RELIST_HIDDEN=1`. Set `HIDDEN_IDS` before `DRY_RUN=0` (space-separated IDs, or `HIDDEN_IDS=none` if you have no hidden listings).
@@ -884,9 +884,9 @@ SLA approval, settlement questions, credit disputes, and locked machines are sep
      b. **Relist without SLA.** In **Set Pricing**, leave the SLA controls closed, click **Save**, then **LIST**.
 
      c. **Run the self-test** (`vastai self-test machine MACHINE_ID`; see [Self-test](/host/upgrade-docker-and-packages#self-test)).
-        - Last line is `Test completed successfully.` Go to step d.
-        - It refuses to start (`currently_rented`, `zero_active_offers`, or offer reliability at or below 0.90). Stay listed without SLA and try again later. Do not pass `--ignore-requirements`. That flag skips those checks. Contact [Discord](https://discord.gg/hSuEbSQ4X8) or contact@vast.ai with the machine ID if you need SLA on before the test can run.
-        - It runs and fails a check. Unlist, then fix the machine using [How to self-test](/host/how-to-self-test).
+        - **If the last line is `Test completed successfully.`**, go to step d.
+        - **If it refuses to start** (`currently_rented`, `zero_active_offers`, or offer reliability at or below 0.90), stay listed without SLA. `currently_rented` stays until that rental ends. A **Save** that just extended it can push the end date out by days or weeks, and a machine listed without SLA can be rented again before you test. Do not pass `--ignore-requirements`. That flag skips these checks. If you need SLA on before the test can run, contact [Discord](https://discord.gg/hSuEbSQ4X8) or contact@vast.ai with the machine ID.
+        - **If it runs and fails a check**, unlist, fix the machine using [How to self-test](/host/how-to-self-test), and repeat from step a.
 
      d. **Re-enable SLA.** Re-enter the SLA terms and click **Save**. This second **Save** sends the end date or auto-renew duration again, so it can extend shorter rentals a second time. Check the date in step a before you click it.
 
@@ -917,7 +917,7 @@ SLA approval, settlement questions, credit disputes, and locked machines are sep
 
      a. **First PUT, without SLA.** Relisting creates a new ask, so stored values do not carry over. Send `price_gpu`, `price_disk`, `price_inetu`, `price_inetd`, `min_chunk`, `end_date` or `duration` (not both; `duration` as an integer), `hidden_listing`, `credit_discount_max`, `price_min_bid`, `"vol_size": 0` unless you want a volume offer, and `"sla_r_claim": 0`. An omitted `credit_discount_max` becomes `0.4`. No documented API shows each rental's end date. Check **Host → Machines** before you choose `end_date` or `duration`. Sending either extends every active rental that ends sooner. If the machine stays locked, contact [Discord](https://discord.gg/hSuEbSQ4X8) or contact@vast.ai before you relist.
 
-     b. **Self-test.** Run `vastai self-test machine MACHINE_ID`. Use the same three outcomes as the console step: pass, refuses to start, or fails a check. If it will not start, leave SLA off.
+     b. **Self-test.** Run `vastai self-test machine MACHINE_ID`. Use the same three outcomes as the console step. If it refuses to start, leave SLA off until the rental ends or the reliability score recovers. That wait can last as long as the extended contract.
 
      c. **Second PUT, with SLA.** Only after the last line is `Test completed successfully.`, send the full body from [Update SLA on an existing ask](#update-sla-on-an-existing-ask-partial-body): `price_disk`, `price_inetu`, `price_inetd`, `credit_discount_max`, `min_chunk`, `hidden_listing`, `"vol_size": 0`, plus `sla_r_claim` and `sla_sigma_x` from your notes. Omitting those listing fields resets them (`price_disk` goes back to $0.10, a hidden listing becomes public, and a missing `vol_size` can create a volume offer). On a fixed end date, omit `end_date` and `duration` so no rental is extended again. On a rolling listing, omitting `duration` turns auto-renew off. Resend the same integer `duration` if you want auto-renew to stay on. That duration is measured from now, so this second request can extend shorter rentals a bit further than the first.
 
