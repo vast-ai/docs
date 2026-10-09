@@ -85,7 +85,7 @@ On outage days you may still bill clients for **intended** compute **and** owe s
 SLA is an optional reliability promise on **on-demand** rentals. You do not have to offer it.
 
 1. **You (the host)** state a **reliability commitment**: how often you expect the machine to be up. The API field is `sla_r_claim`. The console may still label this **Claim**.
-2. You also set **confidence**: how wide the SLA fee is around your commitment. **Tight** means a smaller fee. See [Confidence values](#confidence-values).
+2. You also set **Confidence**: how much pricing margin is built into the SLA fee around your commitment. **Tight** means a smaller fee. **Wide** means a larger fee. Confidence never changes the credit you owe. See [Confidence values](#confidence-values).
 3. The **renter** picks a **reliability target**. You do not set their target.
 4. The renter pays an **SLA fee** (a service level fee) on top of the GPU price.
 5. Each day, Vast checks how long that rental was actually up.
@@ -107,7 +107,7 @@ The field names for the reliability commitment (`sla_r_claim`), confidence, and 
 In **Host → Machines → Set Pricing → SLA** you set host knobs only:
 
 - **Reliability commitment** — how often you expect the machine to be up (shown to clients as `expected_reliability`; API field `sla_r_claim`; the console may still label this Claim).
-- **Confidence** — how wide the SLA fee is around your commitment (`sla_sigma_x`; lower = tighter and a smaller fee). See [Confidence values](#confidence-values).
+- **Confidence** — how much pricing margin is built into the SLA fee around your commitment. **Tight** means a smaller fee. **Wide** means a larger fee. Confidence never changes the credit you owe. See [Confidence values](#confidence-values).
 
 Clients choose their own **reliability target** at search and rent time. You do **not** set the client target on the listing.
 </Note>
@@ -115,7 +115,7 @@ Clients choose their own **reliability target** at search and rent time. You do 
 Think of an SLA offer as two host ideas plus one client choice:
 
 1. **Your reliability commitment** — what you believe your machine will deliver (`sla_r_claim`). Setting this above `0` enables SLA on the offer.
-2. **Your confidence** — how wide the SLA fee is around that commitment. **Tight** means a smaller fee. See [Confidence values](#confidence-values).
+2. **Your confidence** — how much pricing margin is built into the SLA fee around that commitment. **Tight** means a smaller fee. **Wide** means a larger fee. Confidence never changes the credit you owe. See [Confidence values](#confidence-values).
 3. **Client reliability target** — chosen by the renter via search (`target_reliability`). Settlement and SLA fee sizing use this target. A renter's target must be **at or below** your reliability commitment. Search hides offers whose commitment is below the target, and rent rejects that combination.
 
 When a client rents an on-demand instance on your SLA-listed offer with a chosen target:
@@ -230,7 +230,7 @@ For planning, assume a worst-case day costs up to one full day of covered comput
 
 On a listed machine, moving the offer end date later extends every shorter active SLA rental and your credit exposure. To avoid that, unlist instead of extending. Auto-renew (`duration` or `vastai list machine -l`) keeps moving that end date forward and extends active SLA rentals with it. See the warning under [Full listing update](#full-listing-update-existing-ask).
 
-When a rental contract is extended (by moving the offer end date forward at the same or lower price), the original SLA parameters remain in effect for the extended period. Changing SLA parameters on the offer does not alter SLA terms on existing contracts — only new rental contracts pick up updated SLA settings. Hosts do not set the SLA fee directly. It changes when you change **Claim** or **Confidence** (a wider Confidence raises the fee at a given target). Any `end_date` you send extends every active rental that ends before that timestamp, SLA rentals included, under their original terms. You cannot see each contract's end date. To avoid extending SLA rentals, unlist. If you do send an `end_date`, assume shorter rentals will be extended, and read `upd_contracts` afterwards. Some contracts are extended a few minutes after the response and do not appear in `upd_contracts`. A GPU, disk, or bandwidth price increase blocks both the immediate extension and that later one. A Claim or Confidence change that only raises the SLA fee skips only the immediate extension; the later job can still extend the contract under its original SLA terms.
+When a rental contract is extended (by moving the offer end date forward at the same or lower price), the original SLA parameters remain in effect for the extended period. Changing SLA parameters on the offer does not alter SLA terms on existing contracts — only new rental contracts pick up updated SLA settings. Hosts do not set the SLA fee directly. It changes when you change **Claim** or **Confidence** (a wider Confidence raises the fee at a given target). Any `end_date` you send extends every active rental that ends before that timestamp, SLA rentals included, under their original terms. You cannot see each contract's end date. To avoid extending SLA rentals, unlist. If you do send an `end_date`, assume shorter rentals will be extended, and read `upd_contracts` afterwards. Some contracts are extended a few minutes after the response and do not appear in `upd_contracts`. A GPU, disk, or bandwidth price increase blocks extension. A Claim or Confidence change alone does not. Assume any shorter active rental may still be extended under its original SLA terms, even if it does not appear in `upd_contracts`.
 
 Disabling SLA on the offer (setting `sla_r_claim` to `0`) prevents new SLA-covered contracts but does not terminate SLA on existing active contracts — they continue under their original SLA terms until their rental end date.
 
@@ -768,7 +768,7 @@ SLA approval, settlement questions, credit disputes, and locked machines are sep
   3. Unlist the machine.
   4. Fix the problem.
   5. After the next UTC midnight, check **Host → Billing** for that day's SLA earnings.
-  6. Re-enter the terms from step 2, confirm the SLA fee preview, **Save**, then **LIST**.
+  6. Re-enter the terms from step 2, confirm the SLA fee preview, **Save**, then **LIST**. Re-entering an end date later than a rental's current end extends that rental, including SLA rentals from this outage. You cannot see each rental's end date. To avoid extending them, wait until those rentals end before you relist.
 
   **API**
 
