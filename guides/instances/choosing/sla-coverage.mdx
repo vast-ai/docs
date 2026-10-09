@@ -313,6 +313,16 @@ curl -s -G "https://console.vast.ai/api/v0/charges/" \
 
 **Automation limitations:** SLA credits are not sent as webhooks and do not appear on invoices. Read Charges after settlement (see [Settlement timing](#settlement-timing)). After the UTC day boundary (wait up to about 48 hours if a line is missing), check that row or contact support. Verify an active SLA on instances with `GET /api/v1/instances/`. Confirm `target_reliability > 0`. A present but zero value means the rental has no SLA. Also check `instance.slaPremiumPerHour` once the instance is running. Show-instances uses OpenAPI threshold `1.0` (about one request per second).
 
+#### If the rent outcome is unknown
+
+A timeout, a dropped connection, or HTTP 5xx means the rental may already exist. There is no idempotency key.
+
+1. Do not send the PUT again yet.
+2. Look up your unique `label` with `GET /api/v1/instances/` (`curl -G --data-urlencode 'select_filters={"label":{"eq":"YOUR_LABEL"}}'`), a few times about a second apart (Show Instances threshold `1.0`).
+3. If an instance has that label, use it. Do not rent again.
+4. If none appears, re-search, then rent with a fresh offer id and a **new** `label`.
+5. After any retry, keep checking for the original label. If it appears later, destroy whichever instance you do not want.
+
 | Symptom | Typical response | What to do |
 | --- | --- | --- |
 | Target outside `[0, 1)` (negative, or 1 or above) | HTTP 400 `invalid_args` ("target reliability must be greater than or equal to 0 and less than 1") | SLA requires `0 < target_reliability < 1`. Sending `0` or omitting the field rents **without** an SLA (HTTP 200, no error). |
@@ -321,7 +331,7 @@ curl -s -G "https://console.vast.ai/api/v0/charges/" \
 | Offer no longer exists | HTTP 400 `invalid_args` (`msg` may contain `error 404/3603`), HTTP 404 `no_such_ask` (`msg` may contain `error 404/3659` if the offer was taken mid-request), or HTTP 410 | Re-search and use a fresh offer ID. Do not retry the same ID. |
 | Ask cannot start now (`cancel_unavail`) | HTTP 410, error `no_such_ask` | Search for a new offer; this is not a transient glitch to retry on the same id |
 | `price` (bid) sent together with `target_reliability` | HTTP 400 "Cannot combine interruptible instances with SLAs" | Remove `price`. SLA rentals are on-demand only |
-| Timeout, dropped connection, or HTTP 5xx | Outcome unknown — the rental may already exist | There is no idempotency key. Put a unique `label` on the rent body. Look it up with URL-encoded `select_filters` (`curl -G --data-urlencode 'select_filters={"label":{"eq":"YOUR_LABEL"}}'`) a few times, about a second apart (Show Instances threshold `1.0`). If any lookup returns a row, do not PUT again. If none do, re-search and retry with a fresh offer id and a **new** `label`. After any retry, keep checking for the original label on your next few polls. If it appears later, destroy whichever instance you do not want. |
+| Timeout, dropped connection, or HTTP 5xx | Outcome unknown — the rental may already exist | See [If the rent outcome is unknown](#if-the-rent-outcome-is-unknown). |
 | Too many requests | HTTP 429. Search returns JSON. `error` is `HTTPTooManyRequests` for a short limit, or `search_quota_exceeded` when the daily row quota is used up. Rent 429s are not that JSON shape (usually an HTML page). Both include `Retry-After`. | If `error` is `search_quota_exceeded`, stop until `Retry-After` (it can be hours). Otherwise honor `Retry-After`. Keep search to about 10 requests per minute for the account, not per key. Space rent calls at least 5 seconds apart. After a rent 429, look up the same `label` before you PUT again. The CLI and SDK do not read `Retry-After`. |
 | CLI or SDK retried a rent on its own | The CLI and SDK retry connection errors, timeouts, and HTTP 429, 502, 503, and 504. They do not read `Retry-After`. They cannot set `target_reliability`. | For an SLA rent you send yourself, set a unique `label` and look up that label before you PUT again. See [Rate limits](/cli/rate-limits). |
 | Daily search row quota | HTTP 429 with `error: "search_quota_exceeded"`. `Retry-After` points at the quota reset and can be hours away. Not every account is capped the same way. | Stop scanning. Honor `Retry-After`. Do not retry in a loop, and do not shard the same search to get around it. |
