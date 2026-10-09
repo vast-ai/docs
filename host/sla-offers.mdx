@@ -48,7 +48,7 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
    - **API users:** send `sla_r_claim` as a fraction (`0.99`, not `99`). After **Save**, run the confidence check in [Validation rules](#validation-rules).
 8. **Verify now.** From the client account, include unverified machines in Search filters (the default hides them; new machines usually are unverified) and set **Reliability target** at or below your commitment. Confirm an **SLA Fee** line. If that line is missing on every offer, SLA may be off platform-wide. Contact support before you change the listing. Optionally rent that offer briefly, then **Destroy** the test instance. See [Testing your own machine](/host/hosting-overview#testing-your-own-machine).
    - **Console verify:** confirm **Listed** on **Host → Machines** and reopen **Set Pricing → SLA**.
-   - **API users:** search with `verified=any` and confirm `expected_reliability` (for example `vastai search offers 'machine_id=12345 verified=any has_sla=true expected_reliability>=0.99' --storage 10`). The CLI may print `Warning: Unrecognized field` for `has_sla` and `expected_reliability`. That warning is harmless: the filter is still sent. On sliced machines, filter on-demand rows with the jq example in [Search / client-visible fields](#search--client-visible-fields).
+   - **API users:** search with `verified=any` and `has_sla=true` (for example `vastai search offers 'machine_id=12345 verified=any has_sla=true' --storage 10 --raw`). Confirm `expected_reliability` in `jq`. Do not add `expected_reliability>=…` to that CLI query: the CLI sends the number as text, and combining it with `has_sla=true` errors on the server. The CLI may print `Warning: Unrecognized field` for `has_sla`. That warning is harmless: the filter is still sent. On sliced machines, filter on-demand rows with the jq example in [Search / client-visible fields](#search--client-visible-fields).
 
 ## Before you enable SLA
 
@@ -79,7 +79,7 @@ On an outage day the renter is still charged the normal hourly rate, and you may
 </Warning>
 
 - Optional: run the [backtester](/host/sla-backtester) after you have weeks of history; otherwise use the web console SLA preview and the economics walkthrough on this page.
-- **New or low-history machines:** If the backtester returns `has_data: false`, rely on the web console SLA preview. Wait for rental history before trusting backtester results. Start **Confidence** at **Low** (wider margin, larger fee) or use a more conservative reliability commitment until you have a few weeks of data.
+- **New or low-history machines:** If the backtester returns `has_data: false`, there is no history to replay. Start **Confidence** at **Low** (wider margin, larger fee) or use a more conservative reliability commitment until you have a few weeks of data. Confirm the SLA fee renters see in search before you rely on a console preview. The **SLA** section under **Set Pricing** is not shown on every account.
 
 ## SLA in plain language
 
@@ -276,7 +276,7 @@ In the web console, **Set Pricing → Save** stores SLA settings; clicking **LIS
 
 #### Web console SLA preview
 
-In the host console, open **Host Machines** → select your machine → **Set Pricing** → **SLA**. The preview shows estimated SLA fee and service-credit exposure for the parameters you enter. It is a forward-looking quote, not a historical replay — use the [SLA Backtester](/host/sla-backtester) for history-based simulation.
+In the host console, open **Host Machines** → select your machine → **Set Pricing** → **SLA**, if that section is shown on your account. It is a forward-looking quote, not a historical replay — use the [SLA Backtester](/host/sla-backtester) when you have rental history. If you do not see **SLA**, set the commitment with the API and confirm the fee renters see in search.
 
 ### API (for automation)
 
@@ -777,7 +777,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/${MACHINE_ID}/dnotify" \
   -d '{"sdate": START_UNIX_UTC, "duration": 2, "maintenance_category": "software"}'
 ```
 
-`sdate` is Unix epoch seconds (UTC). Use a future time, as far ahead as you can. `duration` is whole hours. `maintenance_category` is one of `power`, `internet`, `disk`, `gpu`, `software`, or `other`. The server stores `maintenance_reason` as empty, so do not rely on that field. There is no public REST endpoint for reading maintenance windows. Even if you schedule or cancel over REST, confirm the result with `vastai show maints --ids 'MACHINE_ID' --raw` or on the console **Maintenance** tab. Each planned downtime should have exactly one window. A machine may have several windows for different downtimes. Retries must not create a duplicate of the same one. See [Schedule Maintenance](/api-reference/machines/schedule-maint).
+`sdate` is Unix epoch seconds (UTC). Use a future time, as far ahead as you can. `duration` is whole hours. `maintenance_category` is one of `power`, `internet`, `disk`, `gpu`, `software`, or `other`. The server stores `maintenance_reason` as empty, so do not rely on that field. There is no public REST endpoint for reading maintenance windows. Even if you schedule or cancel over REST, confirm the result with `vastai show maints --ids 'MACHINE_ID' --raw`, or in the console under **Machine Maintenances** (redesigned page) or **Scheduled Maintenances** (classic page). Each planned downtime should have exactly one window. A machine may have several windows for different downtimes. Retries must not create a duplicate of the same one. See [Schedule Maintenance](/api-reference/machines/schedule-maint).
 
 **Cancel or reschedule:** [`vastai cancel maint`](/host/cli/cancel-maint) cancels **every** window you scheduled on that machine, not one window. It also asks `Continue? [y/n]`. In scripts, use `echo y | vastai cancel maint MACHINE_ID`, or call `PUT /api/v0/machines/{id}/cancel_maint/` directly. Confirm the cancel succeeded before you schedule the replacement. Check with `vastai show maints --ids 'MACHINE_ID' --raw` ([show maints](/host/cli/show-maints)), not only the console. In scripts, pass `--retry 1` on `schedule maint` and `cancel maint`. A retried PUT can create a second window if the first one was stored and the response was lost. Confirm exactly one window before you schedule the next machine. Otherwise a failed cancel plus a new window leaves duplicates. Maintenance windows that Vast scheduled are not cancelled. They stay listed as `admin_locked`. In the console, **✕** on a row cancels that one window. With the CLI or REST, `cancel maint` removes every window on the machine. To change one window from the CLI, cancel all of them, then create again each window you still want. A new window starts its notice clock over. Confirm under **Machine Maintenances** (redesigned page) or **Scheduled Maintenances** (classic page).
 
@@ -851,7 +851,7 @@ After you enable SLA, charges and credits settle on UTC (Coordinated Universal T
 - The backtester under-counts days that already had SLA rentals, so it cannot confirm a past credit. See [Simulation limits](/host/sla-backtester#simulation-limits).
 - SLA-contract compute is not included in `gpu_earn`, `sto_earn`, or bandwidth earnings. `sla_earn` is negative only when a prior day is corrected.
 - `per_day[].sla_earn` is fleet-wide even when you pass a machine ID. Use `per_machine[].sla_earn` for one machine.
-- `summary.total_sla` adds up `sla_earn` for the window (from `per_day` when that list is present, otherwise from `per_machine`). Like `sla_earn`, it is escrow released to you, not fees minus credits.
+- `summary.total_sla` is the sum of `per_machine[].sla_earn` when those rows are present, and uses `per_day` only when they are not. With a machine id, `total_sla` is that machine. `per_day[].sla_earn` stays fleet-wide. Like `sla_earn`, this is escrow released to you, not fees minus credits.
 
 ### Console (fleet totals only)
 

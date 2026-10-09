@@ -6,7 +6,7 @@ description: "Safely upgrade Docker, containerd, the NVIDIA stack, and other sys
 
 <Danger>
 
-If the machine has any rental, running or stopped, [schedule a maintenance window](/host/set-maintenance-window) before you start, as far ahead as you can. 48 hours is a courtesy, not an SLA forgiveness cutoff. See [Scheduled maintenance](/host/sla-offers#scheduled-maintenance). Downtime outside a window counts against your reliability and, on an SLA rental, can lead to service credits. If nothing is rented, go to step 1.
+If the machine has any rental, running or stopped, [schedule a maintenance window](/host/set-maintenance-window) before you start, as far ahead as you can. A 48-hour lead is a courtesy to renters, not an SLA forgiveness cutoff. See [Scheduled maintenance](/host/sla-offers#scheduled-maintenance). Downtime outside a window counts against your reliability and, on an SLA rental, can lead to service credits. If nothing is rented, go to step 1.
 
 You are responsible for the maintenance and any resulting interruption.
 
@@ -427,8 +427,7 @@ cat /etc/docker/daemon.json
 
 The `runtimes.nvidia.path` must still point at `kaalia_docker_shim`. Do not run
 `nvidia-ctk runtime configure` on a Vast machine: it replaces that path with
-NVIDIA's default runtime and client instances stop working. If the file differs
-from the above, restore it to this content and `sudo systemctl restart docker`.
+NVIDIA's default runtime and client instances stop working. Check that `runtimes.nvidia` still has its `path` and that your `registry-mirrors` are still there. Keep any other keys the installer wrote, including `"exec-opts": ["native.cgroupdriver=cgroupfs"]` and `"live-restore": true`. Removing `live-restore` means a Docker restart stops every running container. Do not replace the whole file with the sample above.
 
 ### Images and containers
 
@@ -495,6 +494,8 @@ restarting or the console stays Offline after 5 minutes, follow the
 [Offline Machine](/host/machine-offline) page from its step 2.
 
 ### Self-test
+
+`vastai self-test machine` searches for a live offer first. If the machine is still unlisted it fails with no valid offers. Relist in the next section, then run:
 
 ```bash
 vastai self-test machine <machine_id>

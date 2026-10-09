@@ -83,13 +83,17 @@ The CLI can find SLA offers but cannot price them. Treat `dph_total` as SLA-incl
 # neither the CLI nor the server filters on rented; drop .rented == true yourself if you need to
 vastai search offers 'reliability > 0.98 num_gpus=1 gpu_name=RTX_3090' --raw | jq '[.[] | select(.rented != true)]'
 
-# Find SLA offers. dph_total here excludes the SLA fee (see the Warning below).
+# Find SLA offers, then keep commitments of at least 99% in jq.
+# Do not put has_sla and expected_reliability in one CLI query: the CLI sends
+# the number as text and that pair fails on the server.
+# dph_total here excludes the SLA fee (see the Warning below).
 # Always set --storage explicitly when comparing dph_total (CLI default 5 GiB ≠ REST 8 GB).
-vastai search offers 'has_sla=true expected_reliability>=0.99' --storage 50 --order dph_total
+vastai search offers 'has_sla=true' --storage 50 --order dph_total --raw \
+  | jq '[.[] | select((.expected_reliability // 0) >= 0.99)]'
 ```
 
 <Warning>
-The CLI can find SLA offers (`has_sla`, `expected_reliability`) but cannot price them. `vastai search offers 'target_reliability=0.95'` is sent as `{"eq": 0.95}` and fails with HTTP 400 (`target_reliability: Input should be a valid number`). Treat `dph_total` as SLA-inclusive only when the search set `target_reliability` in the console or REST. From the CLI, `--order dph_total` sorts by price without the SLA fee.
+The CLI can find SLA offers with `has_sla=true`. Filter `expected_reliability` in `jq`, not in the same query string. The CLI cannot price an SLA. `vastai search offers 'target_reliability=0.95'` is sent as `{"eq": 0.95}` and fails with HTTP 400 (`target_reliability: Input should be a valid number`). Treat `dph_total` as SLA-inclusive only when the search set `target_reliability` in the console or REST. From the CLI, `--order dph_total` sorts by price without the SLA fee.
 </Warning>
 
 <a id="next-step-for-sla"></a>

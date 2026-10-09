@@ -38,7 +38,7 @@ Before you start: ensure [Account → Billing](https://cloud.vast.ai/billing/) h
 3. Set the instance disk size on the slider (console default is 10 GB). If you are comparing against a CLI or REST quote, use the same disk size so the prices match.
 4. Hover over the offer's price and confirm an **SLA Fee** line in the breakdown. Write down **SLA Fee/hr**. You need it later to check credits, and the line is hidden while the instance is loading, stopped, or offline. Then click **RENT**.
 5. Once the instance shows **running**, open **Instances** → **price details** and confirm an **SLA Fee** line. The line is hidden while the instance is loading, stopped, or offline.
-6. After the prior UTC day has settled (credits usually appear hours after UTC midnight; see [Settlement timing](#settlement-timing)), check credits in **Account → Billing → Charges** (not Invoices). Expand the instance row. **Service Credit** is a positive amount (`+$`). **SLA Fee** is a negative amount (`−$`). A partial credit is an **SLA Fee** row closer to zero than your SLA Fee/hr times the hours the contract existed that UTC day. The first and last days of a rental are partial, so a row closer to zero on those days is not by itself a credit. On a day that includes a Stop, a reboot, or a long Loading period, contact support before you treat the difference as a credit.
+6. After the prior UTC day has settled (credits usually appear hours after UTC midnight; see [Settlement timing](#settlement-timing)), check **Account → Billing → Charges** (not Invoices). Expand the instance row. A **Service Credit** row (`+$`) means you were credited. An **SLA Fee** row (`−$`) is the fee. Do not compare that row to SLA Fee/hr times hours: the day's charge is not that product. If the row looks wrong, contact support with the contract ID and the UTC date.
 7. When you are done, **Destroy** the instance to end the rental. Destroy deletes the disk. Do not assume **Stop** ends SLA charges. See [Stop vs destroy](#what-you-pay-during-an-outage).
 
 **If you used the CLI to search:** set **Reliability target** again in the console **Search filters** (left bar) before you click **RENT**. CLI filters do not carry over.
@@ -148,13 +148,14 @@ Console controls use the same concepts; they do not accept CLI query strings. Us
 **CLI examples:**
 
 <Warning>
-The current CLI cannot quote an SLA fee: it sends `target_reliability=0.95` as `{"eq": 0.95}`, which search rejects with `400 target_reliability: Input should be a valid number`. Use the CLI to find SLA offers (`has_sla`, `expected_reliability`), then get the SLA-inclusive `dph_total` from the console or REST (`"target_reliability": 0.95` as a plain number).
+The current CLI cannot quote an SLA fee: it sends `target_reliability=0.95` as `{"eq": 0.95}`, which search rejects with `400 target_reliability: Input should be a valid number`. Use `has_sla=true` to find SLA offers, then filter `expected_reliability` with `jq`. Do not combine `has_sla=true` and `expected_reliability>=…` in one CLI query: the CLI sends that number as text and the server errors on the pair. Get the SLA-inclusive `dph_total` from the console or REST (`"target_reliability": 0.95` as a plain number).
 </Warning>
 
 ```bash
-# SLA offers where the host's reliability commitment is at least 99%
+# SLA offers, then keep host commitments of at least 99%.
 # Set --storage to match the disk you will rent (console often 10; REST often 8+)
-vastai search offers 'has_sla=true expected_reliability>=0.99' --storage 10
+vastai search offers 'has_sla=true' --storage 10 --raw \
+  | jq '[.[] | select((.expected_reliability // 0) >= 0.99)]'
 ```
 
 When you set `target_reliability`, search results include:
@@ -293,12 +294,14 @@ Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `ta
 
 **4. Tear down.** Destroy the instance to end compute, storage, and SLA fee charges. On an SLA rental, see [Stop vs destroy](#what-you-pay-during-an-outage). Use [Delete Instance](/api-reference/instances/destroy-instance) or `vastai destroy instance NEW_CONTRACT`. Destroying deletes the instance disk. The `instance_write` permission covers this call.
 
+<a id="billing-reconciliation"></a>
+
 **Billing reconciliation:** Verifying the SLA on an instance does not show settlement. Store the hourly SLA fee when the rent succeeds: `search.slaPremiumPerHour` on the `GET /api/v1/instances/` row for that contract. `instance.slaPremiumPerHour` reads `0` until the instance is running, and also while it is stopped or offline, so do not use it as the stored rate.
 
 1. Call Show Charges for one UTC day. `day.gte` and `day.lte` are both required (unix seconds). Set `day.lte` to `day.gte + 86399`.
 2. Page with `after_token` / `next_token` until `next_token` is `null`. Space calls about one second apart.
 3. Find the row whose `source` is `instance-` plus the contract id from `new_contract`, then the `items[]` entry with `type: "sla"`.
-4. Compare that amount with the stored hourly fee times every hour the contract existed that UTC day, including downtime. The SLA fee keeps billing during outages, so do not count only running hours. A smaller or negative amount usually means a credit was applied. On a day that includes a Stop, a reboot, or a long Loading period, contact support before you treat the difference as a credit. How the console labels the row is in [Settlement timing](#settlement-timing).
+4. Read the sign of that `amount`. Positive is a net SLA fee. Negative is a net service credit. Do not expect the amount to equal `slaPremiumPerHour` times the hours the contract existed. On a day that includes a Stop, a reboot, or a long Loading period, contact support before you treat the row as a credit. How the console labels the row is in [Settlement timing](#settlement-timing).
 
 The contract row can appear before settlement. Its `sla` item is absent until that day settles, so a window that includes the current UTC day has no SLA item yet. If `next_token` is not `null`, repeat the request with `after_token` set to that value before you treat a missing `sla` item as unsettled. `limit` defaults to 100, so a busy account can put the contract on a later page.
 
@@ -489,7 +492,7 @@ No. Verification is a platform quality signal (see [Machine Tiers](/guides/insta
 
 ### Where do I see historical SLA credits?
 
-**Console:** After UTC settlement, open **Account → Billing → Charges**. **Service Credit** is a positive amount (`+$`). **SLA Fee** is a negative amount (`−$`). A partial credit is an **SLA Fee** row closer to zero than your SLA Fee/hr times the hours the contract existed that UTC day. The first and last days are partial, so a row closer to zero on those days is not by itself a credit. On a day that includes a Stop, a reboot, or a long Loading period, contact support before you treat the difference as a credit. The Charges API returns the same row with the opposite sign. Invoices do not. You cannot see the measured reliability for that day in the console or the API.
+**Console:** After UTC settlement, open **Account → Billing → Charges**. A **Service Credit** row (`+$`) means you were credited. An **SLA Fee** row (`−$`) is the fee. Do not compare that row to SLA Fee/hr times hours. The Charges API returns the same row with the opposite sign: a negative `amount` is a net credit. Invoices do not show these rows. You cannot see the measured reliability for that day in the console or the API.
 
 **API integrators:** Use the same Charges row as [Settlement timing](#settlement-timing). The call requires `day.gte` and `day.lte` (unix seconds). Send `next_token` back as `after_token`, and stop when `next_token` is `null`. A row below the fee you expected means a credit was applied. `GET /api/v1/invoices/` covers payment transactions, not SLA credits. Client webhooks for SLA credits are not available. Host-side settlement uses [machine earnings](/api-reference/billing/show-earnings) (`sla_earn`).
 
