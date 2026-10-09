@@ -39,7 +39,7 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 ## SLA host checklist
 
 1. Complete [Account setup and hosting agreement](/host/hosting-overview#account-setup-and-hosting-agreement) on a **dedicated host account**, then [host setup](https://cloud.vast.ai/host/setup/). Confirm the machine appears on **Host → Machines** (healthy; GPU price and offer end date saved under **Set Pricing**). Listing happens in step 2.
-2. Publish once **without** SLA. In **Set Pricing**, leave **Claim** at `0`, **Save**, then click **LIST**. Test ports, SSH, and Jupyter from a separate client account (see [Testing your own machine](/host/hosting-overview#testing-your-own-machine)). Do not turn SLA on until that test passes.
+2. Publish once **without** SLA. In **Set Pricing**, leave **Claim** at `0`, **Save**, then click **LIST**. If you do not see an SLA or Claim section, list without it. Step 4 is where you check SLA access. Test ports, SSH, and Jupyter from a separate client account (see [Testing your own machine](/host/hosting-overview#testing-your-own-machine)). Do not turn SLA on until that test passes.
 3. Install the [CLI](/cli/hello-world) if you schedule maintenance or read earnings from the CLI. The console [Set a maintenance window](/host/set-maintenance-window) page can notify renters without the CLI.
 4. Confirm SLA account access: open **Set Pricing → SLA** and confirm the panel is visible (do **not** Save final commitment/confidence yet). If the panel is missing, contact support.
 5. Preview economics (console SLA panel or [backtester](/host/sla-backtester)). Read [Billing vs settlement](#billing-vs-settlement-important) and [Risk scenarios](#risk-scenarios)—GPU billing can continue during outages and SLA credits can exceed many days of SLA fees.
@@ -227,6 +227,8 @@ For planning, assume a worst-case day costs up to one full day of covered comput
 
 ### SLA on extended contracts
 
+On a listed machine, moving the offer end date later extends every shorter active SLA rental and your credit exposure. To avoid that, unlist instead of extending.
+
 When a rental contract is extended (by moving the offer end date forward at the same or lower price), the original SLA parameters remain in effect for the extended period. Changing SLA parameters on the offer does not alter SLA terms on existing contracts — only new rental contracts pick up updated SLA settings. Hosts do not set the SLA fee directly. It changes when you change **Claim** or **Confidence** (a wider Confidence raises the fee at a given target). Any `end_date` you send extends every active rental that ends before that timestamp, SLA rentals included, under their original terms. You cannot see each contract's end date. To avoid extending SLA rentals, unlist. If you do send an `end_date`, assume shorter rentals will be extended, and read `upd_contracts` afterwards. Some contracts are extended a few minutes after the response and do not appear in `upd_contracts`. A GPU, disk, or bandwidth price increase blocks both the immediate extension and that later one. Raising the SLA fee skips only the immediate extension; the later job can still extend the contract under its original SLA terms.
 
 Disabling SLA on the offer (setting `sla_r_claim` to `0`) prevents new SLA-covered contracts but does not terminate SLA on existing active contracts — they continue under their original SLA terms until their rental end date.
@@ -240,7 +242,7 @@ Disabling SLA on the offer (setting `sla_r_claim` to `0`) prevents new SLA-cover
 **New machine?** Complete [SLA host checklist](#sla-host-checklist) steps 1–2 first (list and test **without** SLA). Then set SLA here.
 
 1. Open your machine on the [Host Machines page](https://cloud.vast.ai/host/machines) → **Set Pricing**.
-2. Set base listing fields first (GPU price, offer end date, rental types) if this is a new listing.
+2. Set base listing fields first (GPU price, offer end date, rental types) if this is a new listing. On a machine that already has rentals, moving the offer end date later extends every shorter SLA rental and your credit exposure. To avoid that, unlist instead of extending. See [SLA on extended contracts](#sla-on-extended-contracts).
 3. Expand **SLA**.
 4. Set your **reliability commitment** (the console control is **Claim**; the API field is `sla_r_claim`). Renters see it as expected reliability on the offer. Set **Confidence** too. For a new or volatile machine, start with **Wide**. Wider confidence charges a higher SLA fee, which is a cushion against credits; it does not reduce what you owe when a day misses the target. Move to **Normal** (`sla_sigma_x ≈ 0.5`) once uptime is stable. See [Confidence values](#confidence-values).
 5. Confirm the SLA fee preview, then click **Save**. On an already-listed machine, **Save** publishes SLA immediately.
