@@ -339,7 +339,7 @@ done
 
 Expect about three seconds per machine (`sleep 3` plus request time), so budget a few minutes for 50 machines. The example logs a failure and moves on after one attempt. On HTTP **429**, wait and retry that machine before treating it as failed. Don't run requests in parallel unless you implement backoff. See [Rate Limits and Errors](/api-reference/rate-limits-and-errors).
 
-3. Compare `r_eff`, `r_be`, `net_sla`, and `largest_day_credit` across machines. Skip and failure messages go to stderr, so stdout is one JSON object per machine. Save the script as `bt.sh`, pass any fallbacks on the same line, and sort the results: `R=0.99 P=0.6667 ./bt.sh > results.jsonl && jq -s 'sort_by(.net_sla)' results.jsonl`.
+3. Compare `r_eff`, `r_be`, `net_sla`, and `largest_day_credit` across machines. Skip and failure messages go to stderr, so stdout is one JSON object per machine. Save the script as `bt.sh`, pass any fallbacks on the same line, and sort the results: `R=0.99 P=0.6667 bash bt.sh > results.jsonl && jq -s 'map(select(.has_data)) | sort_by(.net_sla)' results.jsonl`. Rows with `has_data: false` are left out of that sort. For machines that already have SLA on, the default window under-counts risk. See [Simulation limits](#simulation-limits).
 4. Apply matching `sla_r_claim` / `sla_sigma_x` when listing via the API (see [SLA Offers](/host/sla-offers#api-for-automation)).
 
 ## When stuck

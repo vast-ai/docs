@@ -199,13 +199,16 @@ body = {
 }
 
 def instances_for_label():
-    found = requests.get(
-        "https://console.vast.ai/api/v1/instances/",
-        params={"select_filters": json.dumps({"label": {"eq": label}})},
-        headers=headers,
-        timeout=30,
-    )
-    found.raise_for_status()
+    try:
+        found = requests.get(
+            "https://console.vast.ai/api/v1/instances/",
+            params={"select_filters": json.dumps({"label": {"eq": label}})},
+            headers=headers,
+            timeout=30,
+        )
+        found.raise_for_status()
+    except requests.RequestException:
+        return []
     return found.json().get("instances") or []
 
 try:
@@ -219,6 +222,10 @@ try:
     contract_id = response.json().get("new_contract")
 except requests.HTTPError as exc:
     status = exc.response.status_code if exc.response is not None else 0
+    if status in (400, 404, 410):
+        raise RuntimeError(
+            "Offer is gone or cannot start. Re-search and retry with a new offer id and a new label. Do not retry this offer id."
+        )
     if status != 429 and 400 <= status < 500:
         raise
     contract_id = None
