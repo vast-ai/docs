@@ -44,7 +44,7 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 4. Confirm SLA account access: open **Set Pricing → SLA** and confirm the panel is visible (do **not** Save final commitment/confidence yet). If the panel is missing, contact support.
 5. Preview economics (console SLA panel or [backtester](/host/sla-backtester)). Read [Billing vs settlement](#billing-vs-settlement-important) and [Risk scenarios](#risk-scenarios)—GPU billing can continue during outages and SLA credits can exceed many days of SLA fees.
 6. Read [Scheduled maintenance](#scheduled-maintenance) before you turn SLA on (24-hour notice for planned work).
-7. Set your reliability commitment and Confidence, confirm the SLA fee preview, then click **Save**. If the machine is already listed from step 2, **Save** publishes SLA immediately.
+7. Review the SLA fee preview. The machine is already listed from step 2, so **Save** publishes SLA to live renters immediately. Press **Save** only after you accept the preview.
 8. **Verify:** the machine shows **Listed** on **Host → Machines**. If it was never listed, click **LIST** once.
    - **Console verify:** confirm **Listed** on **Host → Machines** and reopen **Set Pricing → SLA**.
    - **Optional CLI/API:** search with `--storage` matching how renters quote; add `verified=any` if you search your own machine and see no rows (for example `vastai search offers 'machine_id=12345 verified=any has_sla=true expected_reliability>=0.99' --storage 10`). On sliced machines, filter on-demand rows with the jq example in [Search / client-visible fields](#search--client-visible-fields).
@@ -221,7 +221,7 @@ For planning, assume a worst-case day costs up to one full day of covered comput
 
 ### SLA on extended contracts
 
-When a rental contract is extended (by moving the offer end date forward at the same or lower price), the original SLA parameters remain in effect for the extended period. Changing SLA parameters on the offer does not alter SLA terms on existing contracts — only new rental contracts pick up updated SLA settings. Any `end_date` you send, including the offer's current one, extends every active rental that ends sooner, SLA rentals included, under their original terms. The only reliable way to avoid that is to send no `end_date` later than every active rental's end date, or to unlist. Some contracts are extended a few minutes after the response and do not appear in `upd_contracts`. A GPU, disk, or bandwidth price increase blocks that later extension.
+When a rental contract is extended (by moving the offer end date forward at the same or lower price), the original SLA parameters remain in effect for the extended period. Changing SLA parameters on the offer does not alter SLA terms on existing contracts — only new rental contracts pick up updated SLA settings. Any `end_date` you send extends every active rental that ends before that timestamp, SLA rentals included, under their original terms. To avoid extending contracts, send an `end_date` no later than the **earliest** active rental end date, or unlist. Some contracts are extended a few minutes after the response and do not appear in `upd_contracts`. A GPU, disk, or bandwidth price increase blocks both the immediate extension and that later one. Raising the SLA fee skips only the immediate extension; the later job can still extend the contract under its original SLA terms.
 
 Disabling SLA on the offer (setting `sla_r_claim` to `0`) prevents new SLA-covered contracts but does not terminate SLA on existing active contracts — they continue under their original SLA terms until their rental end date.
 
@@ -235,7 +235,7 @@ Disabling SLA on the offer (setting `sla_r_claim` to `0`) prevents new SLA-cover
 2. Set base listing fields first (GPU price, offer end date, rental types) if this is a new listing.
 3. Expand **SLA**.
 4. Set your **reliability commitment** (the console control is **Claim**; the API field is `sla_r_claim`). Renters see it as expected reliability on the offer. Set **Confidence** too. For a new or volatile machine, start with **Wide**. Wider confidence charges a higher SLA fee, which is a cushion against credits; it does not reduce what you owe when a day misses the target. Move to **Normal** (`sla_sigma_x ≈ 0.5`) once uptime is stable. See [Confidence values](#confidence-values).
-5. Save and confirm the SLA fee preview before listing.
+5. Confirm the SLA fee preview, then click **Save**. On an already-listed machine, **Save** publishes SLA immediately.
 6. After saving pricing, click **LIST** on the Host Machines page (or confirm the machine status changes to **listed**). Saving pricing alone stores your offer settings; listing publishes the offer to search.
 
 #### Updating SLA on an already-listed machine
@@ -698,7 +698,7 @@ Use the [SLA Earnings Backtester](/host/sla-backtester) (API-only; requires a `m
 - **Severe outage (active SLA contracts):**
   1. **Save your current terms before you unlist.** After unlist, `show machines` returns `null` for prices, `listed_min_gpu_count`, `end_date`, and SLA terms. The snapshot does not include confidence (`sla_sigma_x`; only the `sla_confidence` label) or hidden status (`hidden_listing`). Write both down either way.
 
-     **Console:** Before you unlist, open **Set Pricing** and write down the GPU price, storage price, upload and download bandwidth prices, min GPU, end date (or auto-renew duration), whether the listing is hidden, Claim, and Confidence (Tight, Normal, or Wide).
+     **Console:** Before you unlist, open **Set Pricing** and write down the GPU price, storage price, upload and download bandwidth prices, min GPU, end date (or auto-renew duration), whether the listing is hidden, Claim, Confidence (Tight, Normal, or Wide), the reserved discount, and the interruptible min bid. An omitted reserved discount on a new ask becomes `0.4`.
 
      ```bash
      vastai show machines --raw --api-key "$VAST_API_KEY" \
@@ -713,7 +713,7 @@ Use the [SLA Earnings Backtester](/host/sla-backtester) (API-only; requires a `m
   3. **Unlist** in the console (**Host → Machines**). Do not change SLA settings or relist during the outage. API users: `create_asks` returns HTTP 402 while the machine is offline, and resending `end_date` can extend shorter rentals. `vastai unlist machine MACHINE_ID` removes the listing and does not republish it.
   4. Fix the machine. Existing SLA contracts keep their terms and settle against each renter's target; unlisting or setting the commitment to `0` does not change that.
   5. **Check settlement** a few hours after the next UTC midnight. In the console, compare those days with a normal week in **Host → Billing**. Releases are spread over time, so one low day is not by itself a credit. To automate, read `per_machine[].sla_earn`. A backtester re-run is an estimate for one simulated contract, not the settlement record.
-  6. When you relist, use the terms you wrote down: GPU price (`price_gpu`), storage (`price_disk`), bandwidth (`price_inetu`, `price_inetd`), min GPU (`min_chunk`), end date or duration, `hidden_listing`, Claim (`sla_r_claim`), and Confidence (`sla_sigma_x`). Send `sla_sigma_x` explicitly; a new ask otherwise defaults to 0.5. Resending the old `end_date` extends any shorter active rental. If the machine stays locked, contact [Discord](https://discord.gg/hSuEbSQ4X8) or contact@vast.ai before you relist.
+  6. When you relist, use the terms you wrote down: GPU price (`price_gpu`), storage (`price_disk`), bandwidth (`price_inetu`, `price_inetd`), min GPU (`min_chunk`), end date or duration, `hidden_listing`, Claim (`sla_r_claim`), Confidence (`sla_sigma_x`), `credit_discount_max`, and `price_min_bid`. If the snapshot lacks the discount or min bid, use the console notes. Relisting creates a new ask, and an omitted `credit_discount_max` becomes `0.4`. Send `sla_sigma_x` explicitly; a new ask otherwise defaults to 0.5. Resending the old `end_date` extends any shorter active rental. If the machine stays locked, contact [Discord](https://discord.gg/hSuEbSQ4X8) or contact@vast.ai before you relist.
 
 ## Monitoring SLA after listing
 
