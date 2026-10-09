@@ -25,7 +25,7 @@ SLA settlement is **asymmetric by design**: on strong days you keep the SLA fee;
 Not listed yet? Finish [machine setup](/host/hosting-overview#machine-setup) and the [host setup guide](https://cloud.vast.ai/host/setup/) before you enable an SLA.
 
 <Note title="Console hosts (CLI still required for two steps)">
-You set SLA in the console. Two steps still need the CLI: `vastai self-test machine` after you unlist during an outage, and per-machine SLA earnings (`vastai show earnings`). Install the CLI before you enable SLA. If you stayed listed, your SLA terms did not change and there is nothing to turn back on. A full-access key covers this page. A scoped key needs `billing_read`, `machine_read`, `machine_write`, `instance_read`, and `misc` for the offer search the self-test runs. See the [host SLA recipe](/api-reference/permissions#host-sla-scoped-key-recipe).
+You set SLA in the console. Two steps still need the CLI: `vastai self-test machine` after you unlist during an outage, and per-machine SLA earnings (`vastai show earnings`). Install the CLI before you enable SLA. Outage recovery, including when to turn SLA back on, is in [Severe outage](#severe-outage). A full-access key covers this page. A scoped key needs `billing_read`, `machine_read`, `machine_write`, `instance_read`, and `misc` for the offer search the self-test runs. See the [host SLA recipe](/api-reference/permissions#host-sla-scoped-key-recipe).
 </Note>
 
 | Goal | Start here |
@@ -42,7 +42,7 @@ Read [SLA in plain language](#sla-in-plain-language) before this list.
 
 1. Complete [Account setup and hosting agreement](/host/hosting-overview#account-setup-and-hosting-agreement) on a **dedicated host account**, then [host setup](https://cloud.vast.ai/host/setup/). Confirm the machine appears on **Host → Machines** (healthy; GPU price and offer end date saved under **Set Pricing**). Listing happens in step 2. If the listing uses auto-renew, read [SLA on extended contracts](#sla-on-extended-contracts) before you enable SLA.
 2. Publish once **without** SLA. In **Set Pricing**, leave the SLA controls closed, click **Save**, then **LIST**. The console cannot set **Reliability Commitment** to `0`. If you do not see an SLA section, list without it. Step 4 is where you check SLA access. Test ports, SSH, and Jupyter from a separate client account (see [Testing your own machine](/host/hosting-overview#testing-your-own-machine)). **Destroy** that test instance before step 7. A running or stopped test rental is extended to the listing end date when you click **Save**. Do not turn SLA on until that test passes.
-3. Install the [CLI](/cli/hello-world) and create an API key before step 7, even if you manage the machine in the console. If you unlisted during an outage, do not turn SLA back on until `vastai self-test machine` prints `Test completed successfully.` The listing API does not check that for you. If you stayed listed, your SLA terms did not change. You also need the CLI for maintenance from the command line and for per-machine SLA earnings. **Host → Billing** is fleet-wide and has no per-machine SLA line. `vastai show earnings --machine_id ID` needs an API key with `billing_read`. The console [Set a maintenance window](/host/set-maintenance-window) page can notify renters without the CLI.
+3. Install the [CLI](/cli/hello-world) and create an API key before step 7, even if you manage the machine in the console. You need it for per-machine SLA earnings and, if you later unlist during an outage, for `vastai self-test machine`. **Host → Billing** is fleet-wide and has no per-machine SLA line. `vastai show earnings --machine_id ID` needs an API key with `billing_read`. The console [Set a maintenance window](/host/set-maintenance-window) page can notify renters without the CLI. Outage recovery is in [Severe outage](#severe-outage), not in this checklist.
 4. Confirm SLA account access: open **Set Pricing → SLA** and confirm the panel is visible (do **not** Save final commitment/confidence yet). If **Set Pricing** has no **SLA** section, contact support before you enable SLA. A missing section is not a fee preview.
    - **API users:** `PUT /api/v0/machines/create_asks/` returns 403 `sla_not_approved` when the host is not approved.
 5. Preview economics only if the machine already has rental history (console SLA panel or [backtester](/host/sla-backtester)). On a new machine, neither can show a number yet. Start at **Low** confidence, use the [economics walkthrough](#economics-walkthrough) as your estimate, and confirm the real fee in step 8 after you save. Read [Billing vs settlement](#billing-vs-settlement-important) and [Risk scenarios](#risk-scenarios). GPU billing can continue during outages, and SLA credits can exceed many days of SLA fees.
@@ -99,7 +99,7 @@ SLA is an optional reliability promise on **on-demand** rentals. You do not have
 3. The **renter** picks a **reliability target**. You do not set their target.
 4. The renter pays an **SLA fee** (a service level fee) on top of the GPU price.
 5. Each day, Vast checks how long that rental was actually up.
-6. Each day, Vast combines recent and longer-term uptime into a **blended reliability measure**. If it met the renter's target, you keep the SLA fee and no credit is paid. If it fell short, the renter receives a **service credit** from your earnings. Vast holds SLA rental pay and releases it over time, so a low earnings day is not by itself a credit. Details are in [Billing vs settlement](#billing-vs-settlement-important).
+6. Each day, Vast combines recent and longer-term uptime into a **blended reliability measure**. Settlement is a smooth curve around the renter's target, not a pass/fail line. Well above the target, the credit is small but can still exceed that day's SLA fee. At the target, the credit is about half of that day's covered compute. Further below, it approaches a full day of covered compute. The renter's **service credit** comes from your earnings. Vast holds SLA rental pay and releases it over time, so a low earnings day is not by itself a credit. Details are in [Billing vs settlement](#billing-vs-settlement-important).
 7. One bad day can cost more than many days of fees.
 
 What this is not:
@@ -310,7 +310,7 @@ SLA listing via CLI/SDK is not available yet — use the REST API below (or cons
 #### Update SLA on an existing ask (partial body)
 
 <Warning>
-**Not a first listing.** Use this SLA-only body when the machine already has base pricing. For a **first publish**, use a full `create_asks` body from [List Machine](/api-reference/machines/list-machine) (include at least `min_chunk`, disk/bandwidth prices, and `end_date`) or **Set Pricing → SLA** in the console. See [Hosting overview](/host/hosting-overview#offers-and-rental-contracts).
+**Not a first listing.** Use this SLA-only body when the machine already has base pricing. For a **first publish**, or a relist after unlist, use a full `create_asks` body from [List Machine](/api-reference/machines/list-machine) (include `price_gpu`, `min_chunk`, disk and bandwidth prices, and `end_date`). A new ask without `price_gpu` returns HTTP 400. or **Set Pricing → SLA** in the console. See [Hosting overview](/host/hosting-overview#offers-and-rental-contracts).
 </Warning>
 
 Some omitted fields reset to defaults (for example `price_disk`, `hidden_listing`, and `duration`). Read the warning under [Full listing update](#full-listing-update-existing-ask) before you copy a body. `"vol_size": 0` keeps a new volume offer from being created. It does not delete a volume offer you already have.
@@ -742,12 +742,12 @@ In the **You net** column, values follow host earnings sign conventions: positiv
 
 | Blended reliability vs the client's target | You net (per day) |
 | --- | --- |
-| Meets or exceeds the target (for example blended ~99% vs a 95% target) | +$0.97 (keep the full SLA fee) |
+| Well above the target (for example blended ~99% vs a 95% target) | A small credit, which can still exceed that day's SLA fee |
 
-When the blended measure meets the target, you keep the SLA fee. These rows are not raw uptime.
+These rows are not raw uptime. Meeting the target does not mean the credit is zero.
 
 <Note>
-Settlement uses a **blended** reliability measure (recent plus longer-term uptime), not the day's raw uptime alone. A day whose raw uptime is at or slightly above the target can still settle with a small partial credit if the blended measure falls below it. When the blended measure meets the target, no credit is paid.
+Settlement uses a **blended** reliability measure (recent plus longer-term uptime), not the day's raw uptime alone. Raw uptime and the blended measure are not the same number. A day at the target still settles with a credit of about half of that day's covered compute.
 </Note>
 
 ### What if measured reliability is between the client's target and my reliability commitment?
@@ -755,7 +755,7 @@ Settlement uses a **blended** reliability measure (recent plus longer-term uptim
 Example: you publish **reliability commitment 99%**, the client chose **target 95%**, and the **blended** measure is **~97%**.
 
 - **Credits** are evaluated against the client's **target** (95%), not your reliability commitment.
-- Because that blended 97% is above 95%, you **owe no SLA credit** for that day. Raw uptime alone does not decide this: a day with 97% raw uptime can still carry a partial credit if the blended measure falls below the target.
+- A blended 97% is above a 95% target, but that is not a zero-credit day. The credit can still be larger than the SLA fee. Raw uptime alone does not decide the result.
 - **SLA fees** are priced from your **reliability commitment**, confidence, and the client's target — a higher reliability commitment relative to the target generally means lower client charges.
 
 The **reliability commitment** is your belief and pricing knob. The client's **reliability target** is what drives service-credit eligibility.
@@ -763,17 +763,17 @@ The **reliability commitment** is your belief and pricing knob. The client's **r
 ### If the client's target is missed
 
 <Warning>
-A single bad day can wipe out weeks or months of SLA fees. In the example below, a day about 1–2 points below the client's target (~93–94% blended, not a day that exactly meets the target) costs about 44 days of collected SLA fees, and a full outage day costs about 88 days. These figures are illustrative. They do not come from the same pricing curve as the backtester sample. Use **Set Pricing → SLA** or the backtester for your machine's actual fee. Lower renter targets carry lower fees for a similar credit, so the ratio can be higher than this example. Review the economics below and run the [backtester](/host/sla-backtester) before enabling SLA.
+A single bad day can wipe out weeks or months of SLA fees. In this example, a day that lands on the renter's target costs about half of that day's covered compute (on the order of the −$42 row), not one day's SLA fee. A day a point or two below costs more than that. A full outage day is on the order of a full day of compute (the −$84 row). These figures are illustrative. Use **Set Pricing → SLA** or the backtester for your machine. Review the economics below before enabling SLA.
 </Warning>
 
-These scenarios show settlement when the blended measure falls **below** a 95% client target. They are illustrations, not typical strong days:
+These scenarios are illustrations for a 95% client target, not a quote:
 
 | Measured reliability (simplified) | You net (per day) |
 | --- | --- |
-| Blended measure ~93–94% (illustrative shortfall) | −$42 (credit you owe) |
+| About the target | −$42 (about half of that day's covered compute) |
 | Well below target (~90% or less) | −$84 (large credit owed) |
 
-To put the asymmetry in perspective: at about $0.97/day in SLA fees, it takes roughly 44 strong days to accumulate the $42 you could lose on a single day about 1–2 points below the target. A full outage day, about $84 of compute plus the ~$0.97 fee, is roughly 88 days of fees. The SLA fee is still a small fraction of daily compute. These figures use a 99% commitment, Medium confidence, a 95% target, and $84/day of GPU compute. Use the console preview or the backtester for your own machine.
+To put the asymmetry in perspective: at about $0.97/day in SLA fees, it takes roughly 44 strong days to accumulate the $42 you could lose on a single day that lands on the renter's target. A day a point or two below costs more than that. A full outage day, about $84 of compute plus the ~$0.97 fee, is roughly 88 days of fees. The SLA fee is still a small fraction of daily compute. These figures use a 99% commitment, Medium confidence, a 95% target, and $84/day of GPU compute. Use the console preview or the backtester for your own machine.
 
 Your SLA loss on a normal settlement day is tied to that day's covered compute **per SLA contract** (GPU, storage, and bandwidth). Vast does not publish whether the closing settlement on a contract's last day can exceed that. Use the backtester's largest simulated day as a planning figure, not a cap.
 
@@ -885,7 +885,7 @@ SLA approval, settlement questions, credit disputes, and locked machines are sep
 
      c. **Run the self-test** (`vastai self-test machine MACHINE_ID`; see [Self-test](/host/upgrade-docker-and-packages#self-test)).
         - **If the last line is `Test completed successfully.`**, go to step d.
-        - **If it refuses to start** (`currently_rented`, `zero_active_offers`, or offer reliability at or below 0.90), stay listed without SLA. `currently_rented` stays until that rental ends. A **Save** that just extended it can push the end date out by days or weeks, and a machine listed without SLA can be rented again before you test. Do not pass `--ignore-requirements`. That flag skips these checks. If you need SLA on before the test can run, contact [Discord](https://discord.gg/hSuEbSQ4X8) or contact@vast.ai with the machine ID.
+        - **If it refuses to start** (`currently_rented`, `zero_active_offers`, or offer reliability at or below 0.90), stay listed without SLA. `currently_rented` stays until that rental ends. A **Save** that just extended it can push the end date out by days or weeks, and a machine listed without SLA can be rented again before you test. Do not pass `--ignore-requirements`. It does not get past `currently_rented`, `zero_active_offers`, or `offline_or_not_listed`. It only skips later requirement checks, such as the reliability threshold. If you need SLA on before the test can run, contact [Discord](https://discord.gg/hSuEbSQ4X8) or contact@vast.ai with the machine ID.
         - **If it runs and fails a check**, unlist, fix the machine using [How to self-test](/host/how-to-self-test), and repeat from step a.
 
      d. **Re-enable SLA.** Re-enter the SLA terms and click **Save**. This second **Save** sends the end date or auto-renew duration again, so it can extend shorter rentals a second time. Check the date in step a before you click it.
@@ -995,8 +995,11 @@ This endpoint is rate-limited. Poll `GET /api/v0/users/me/machine-earnings/` at 
 ```bash
 day=$(( $(date -u +%s) / 86400 - 1 ))
 curl -s -H "Authorization: Bearer $VAST_API_KEY" \
-  "https://console.vast.ai/api/v0/users/me/machine-earnings/?sday=$day&eday=$day"
+  "https://console.vast.ai/api/v0/users/me/machine-earnings/?sday=$day&eday=$day" \
+  | jq '{summary, per_machine: [.per_machine[]? | {machine_id, sla_earn}]}'
 ```
+
+The full response also includes billing identity (name, email, address, tax info) and the account balance. In a cron job, keep only `per_machine`, `per_day`, and `summary`.
 
 **Automation pattern:** There is no host webhook for SLA settlement. One fleet call with `sday` and `eday` set to the same day index returns that UTC day for every machine in `per_machine[]`. Use `machid` only for a spot check. Do not use `per_day[].sla_earn` for a single machine. `last_days=1` is coarse: it covers yesterday and the current UTC day so far, not one settled day.
 
