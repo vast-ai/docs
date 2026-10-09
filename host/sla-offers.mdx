@@ -707,7 +707,7 @@ Use the [SLA Earnings Backtester](/host/sla-backtester) (API-only; requires a `m
        || echo "Snapshot is EMPTY: do not unlist yet" >&2
      ```
 
-     `show machines` leaves out machines that have been offline for more than about 10 hours. If the snapshot is empty, call `GET /api/v0/machines/?include_offline=true` with the same key, or use the console notes above. Do not unlist until you have the terms.
+     `show machines` leaves out machines that have been offline for more than about 10 hours. If the snapshot is empty, call `GET /api/v0/machines/?include_offline=true` with the same key (that covers machines offline up to about 3 days), or use the console notes above. Do not unlist until you have the terms.
   2. **Notify renters.** In the console: **Host → Machines → Settings → Machine Maintenances** (see [Set a maintenance window](/host/set-maintenance-window)). To automate: `echo y | vastai schedule maint MACHINE_ID --sdate "$(date -u +%s)" --duration HOURS --maintenance_category other`.
   3. **Unlist** in the console (**Host → Machines**). Do not change SLA settings or relist during the outage. API users: `create_asks` returns HTTP 402 while the machine is offline, and resending `end_date` can extend shorter rentals. `vastai unlist machine MACHINE_ID` removes the listing and does not republish it.
   4. Fix the machine. Existing SLA contracts keep their terms and settle against each renter's target; unlisting or setting the commitment to `0` does not change that.
@@ -780,7 +780,13 @@ Weekly aggregates are window totals, not daily series — use a one-day range ab
 
 `GET /api/v0/users/me/machine-earnings/` returns SLA fields alongside compute earnings. The path user id is ignored; the account is the API key owner, so a **`billing_read`** key is enough (you do not need `user_read`). See [`show earnings`](/api-reference/billing/show-earnings).
 
-This endpoint is rate-limited. Poll `GET /api/v0/users/me/machine-earnings/` at most about once every two seconds as a safe default (OpenAPI `x-rate-limit` threshold `2.0` on [Show Earnings](/api-reference/billing/show-earnings)). On HTTP 429, back off and retry per [Rate Limits and Errors](/api-reference/rate-limits-and-errors). For daily SLA settlement, one pull with `last_days=1` after UTC rollover is usually enough.
+This endpoint is rate-limited. Poll `GET /api/v0/users/me/machine-earnings/` at most about once every two seconds as a safe default (OpenAPI `x-rate-limit` threshold `2.0` on [Show Earnings](/api-reference/billing/show-earnings)). On HTTP 429, back off and retry per [Rate Limits and Errors](/api-reference/rate-limits-and-errors). For daily SLA settlement, pull one exact UTC day with `sday` and `eday` after UTC rollover. Do not use `last_days=1` for that job: it returns yesterday plus today so far. When a settled day stops changing is not documented; a later correction can change `sla_earn`.
+
+```bash
+day=$(( $(date -u +%s) / 86400 - 1 ))
+curl -s -H "Authorization: Bearer $VAST_API_KEY" \
+  "https://console.vast.ai/api/v0/users/me/machine-earnings/?sday=$day&eday=$day"
+```
 
 **Automation pattern:** There is no host webhook for SLA settlement. One fleet call with `sday` and `eday` set to the same day index returns that UTC day for every machine in `per_machine[]`. Use `machid` only for a spot check. Do not use `per_day[].sla_earn` for a single machine. `last_days=1` is coarse: it covers yesterday and the current UTC day so far, not one settled day.
 
