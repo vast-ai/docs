@@ -335,7 +335,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
   }'
 ```
 
-Replace `end_date` with the listing's current Unix timestamp from `show machines`, or with a new future timestamp only if you mean to change the offer end. Past dates expire the offer immediately. A later date at the same or lower price extends live contracts. See [Offer End Date](/host/hosting-overview#offer-end-date). Convert a calendar date to Unix seconds: `date -u -d '2030-01-01' +%s` (Linux) or `date -u -j -f '%Y-%m-%d' '2030-01-01' +%s` (macOS). The CLI also accepts `MM/DD/YYYY` via `-e` (parsed in the local time zone of the computer running the CLI, not UTC). Use a Unix timestamp for an exact UTC end.
+Replace `end_date` with the listing's current Unix timestamp from `show machines`, or with a new future timestamp only if you mean to change the offer end. Past dates expire the offer immediately. A later date at the same or lower price extends live contracts. See [Offer End Date](/host/hosting-overview#offer-end-date). Convert a calendar date to Unix seconds: `date -u -d '2030-01-01' +%s` (Linux) or `date -u -j -f '%Y-%m-%d' '2030-01-01' +%s` (macOS). The CLI also accepts `MM/DD/YYYY` via `-e`, read as 00:00 UTC on that date, not your local time zone. `vastai show earnings --start_date` and `--end_date` are different: bare dates there are parsed in the local time zone of the computer running the CLI.
 
 <Warning>Open-ended offers (no `end_date`) combined with SLA expose you to indefinite asymmetric service-credit risk. See [Offer End Date](/host/hosting-overview#offer-end-date).</Warning>
 
@@ -764,7 +764,7 @@ SLA approval, settlement questions, credit disputes, and locked machines are sep
   3. Unlist only if the machine is still online and you need to stop new rentals. If it is offline, `create_asks` returns HTTP 402 until the daemon reconnects, and unlisting drops the SLA ask you would then have to rebuild.
   4. Fix the problem.
   5. After the next UTC midnight, check **Host → Billing**. There is no separate SLA line on the normal host view, and the page shows fleet totals. Compare with a normal week. One low day can be release timing. For one machine, use `vastai show earnings`.
-  6. Re-enter the terms from step 2, confirm the SLA fee preview, **Save**, then **LIST**. **Host → Machines** shows the latest rental end date. Relisting before that date, with an end date after a shorter rental, extends that rental and its SLA exposure. To avoid any extension, wait until that date has passed, then relist. If you relist sooner, assume shorter rentals will be extended.
+  6. Relist only if you unlisted in step 3. Re-enter the terms from step 2, confirm the SLA fee preview, **Save**, then **LIST**. **Host → Machines** shows the latest rental end date. Relisting before that date, with an end date after a shorter rental, extends that rental and its SLA exposure. To avoid any extension, wait until that date has passed, then relist. If you relist sooner, assume shorter rentals will be extended.
 
   **API**
 
@@ -793,7 +793,7 @@ SLA approval, settlement questions, credit disputes, and locked machines are sep
 
 ## Monitoring SLA after listing
 
-After you enable SLA, charges and credits settle on UTC (Coordinated Universal Time) day boundaries. SLA earnings rows typically appear in **Host → Billing** within a few hours after UTC midnight (exact timing can vary).
+After you enable SLA, charges and credits settle on UTC (Coordinated Universal Time) day boundaries. **Host → Billing** does not show a separate SLA line. Fees you keep and credits you owe are folded into the daily earnings total, which usually updates within a few hours after UTC midnight. Compare a day with a normal week. For the SLA amount on one machine, use the CLI or API below (`sla_earn`).
 
 **Reading `sla_earn`**
 
@@ -811,7 +811,7 @@ After you enable SLA, charges and credits settle on UTC (Coordinated Universal T
 4. Look for the SLA settlement in the earnings breakdown. On an SLA rental, compute pay is released with the SLA fee (the same amount as `sla_earn` in the API), not as a separate GPU earnings line.
 5. After downtime, compare several days with a normal week. Much of the escrow can stay held until the contract ends, so a low `sla_earn` is not by itself a credit. Do not look for a negative SLA line, and do not match one day to the backtester's largest single-day credit.
 
-**If you don't see SLA rows:** widen the date range (settlement uses UTC day boundaries), confirm the machine had an active on-demand rental that day, and confirm SLA was enabled and the offer was **listed** (not just saved).
+**If the daily total looks wrong:** widen the date range (settlement uses UTC day boundaries), confirm the machine had an active on-demand rental that day, and confirm SLA was enabled and the offer was **listed** (not just saved). There is still no separate SLA row on the normal Host → Billing view.
 
 <Note>
 SLA settlement does not currently emit host webhooks. Monitor via console billing or poll `machine-earnings`; settlements align to UTC calendar days.
