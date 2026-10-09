@@ -21,7 +21,7 @@ vastai schedule maint id --sdate START_DATE --duration DURATION --maintenance_ca
 ## Options
 
 <ParamField path="--sdate" type="number" required>
-  Maintenance start time as Unix epoch seconds (UTC). Required. Omitting it crashes the CLI. Use a future time, for example `$(date -u -d '2 days 02:00:00' +%s)`. The server does not reject a past start. The CLI sends this value to the API unchanged (REST `sdate` is also epoch seconds).
+  Maintenance start time as Unix epoch seconds (UTC). Required. Use a future time, as far ahead as you can, for example `$(date -u -d '2 days 02:00:00' +%s)`. The CLI sends this value to the API unchanged (REST `sdate` is also epoch seconds).
 </ParamField>
 
 <ParamField path="--duration" type="number">
@@ -44,7 +44,7 @@ The same `schedule maint` command is used for both **planned** and **emergency**
 
 ### Planned SLA maintenance
 
-If SLA is enabled and you need planned downtime during an active rental, schedule at least 24 hours in advance. See [SLA Offers → Scheduled maintenance](/host/sla-offers#scheduled-maintenance).
+If SLA is enabled and you need planned downtime during an active rental, schedule as far ahead as you can. Twenty-four hours is not a forgiveness cutoff. See [SLA Offers → Scheduled maintenance](/host/sla-offers#scheduled-maintenance).
 
 ```bash
 # Replace MACHINE_ID; --sdate must be a future UTC epoch (≥24h ahead for planned forgiveness review)
@@ -64,7 +64,7 @@ If the machine must go offline without adequate notice, still run `schedule main
 vastai schedule maint MACHINE_ID --sdate "$(date -u +%s)" --duration 1 --maintenance_category power
 ```
 
-To cancel a scheduled window, use [`vastai cancel maint`](/host/cli/cancel-maint). That cancels **every** window you scheduled on the machine, and it asks `Continue? [y/n]`. In scripts, use `echo y | vastai cancel maint MACHINE_ID` and confirm the cancel succeeded before you recreate windows. To reschedule, cancel first, then recreate each window you still want (≥24 hours ahead for planned maintenance-forgiveness review). Across many machines, schedule sequentially at least 3 seconds apart (`sleep 3`; the endpoint's `x-rate-limit` threshold is `2.5`). If you still get HTTP 429, wait longer and retry.
+To cancel a scheduled window, use [`vastai cancel maint`](/host/cli/cancel-maint). That cancels **every** window you scheduled on the machine, and it asks `Continue? [y/n]`. In scripts, use `echo y | vastai cancel maint MACHINE_ID` and confirm the cancel succeeded before you recreate windows. To reschedule, cancel first, then recreate each window you still want, as far ahead as you can. Across many machines, schedule sequentially at least 3 seconds apart (`sleep 3`; the endpoint's `x-rate-limit` threshold is `2.5`). If you still get HTTP 429, wait longer and retry.
 
 ## Examples
 

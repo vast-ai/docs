@@ -108,7 +108,7 @@ Searching with a **reliability target of 95%** on an offer where the host's **re
 | --- | --- |
 | GPU compute | $3.50/hr |
 | Storage (at search allocation) | ~$0.01/hr |
-| SLA fee | ~$0.008/hr |
+| SLA fee | ~$0.04/hr |
 | **Total (`dph_total`)** | ~$3.52/hr |
 
 ## Finding SLA offers
@@ -174,7 +174,7 @@ When you search with an SLA target, the quote is the on-demand price. Reserved-i
 
 | Offer | GPU/hr | Host commitment | Your target | SLA fee/hr |
 | --- | --- | --- | --- | --- |
-| A | $3.50 | 99% | 95% | ~$0.008 |
+| A | $3.50 | 99% | 95% | ~$0.04 |
 | B | $3.50 | 95% | 95% | much higher |
 
 Always compare **`dph_total`**, not just GPU price, when SLA matters. Sort by `dph_total` to compare total quoted cost.
@@ -286,7 +286,7 @@ Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `ta
 
 **4. Tear down.** Destroy the instance to end compute, storage, and SLA fee charges. Stopping it is not guaranteed to end the GPU charge or the SLA fee. Use [Delete Instance](/api-reference/instances/destroy-instance) or `vastai destroy instance NEW_CONTRACT`. Destroying deletes the instance disk. The `instance_write` permission covers this call.
 
-**Billing reconciliation:** Verifying the SLA on an instance does not show settlement. Each Charges row is one contract. Match `source` to `instance-` plus the contract ID from `new_contract` (or `metadata.label` if you set a unique label at rent), then read the `sla` item in `items[]`. Store the hourly SLA fee when you rent (the **SLA Fee** line, or the first non-zero `instance.slaPremiumPerHour`). It reads `0` while the instance is stopped or offline even though the fee still accrues, so do not re-sample it later. Expected fee for a UTC day is about that rate times the hours the contract was active, including downtime. A `sla` row smaller than that, or negative, means a credit was applied. **Account → Billing → Charges** and `GET /api/v0/charges/` show the same net `type: "sla"` row (SLA fee minus any service credit). The console labels it **Service Credit** only when the amount is negative, and **SLA Fee** otherwise. The call requires `select_filters` with `day.gte` and `day.lte` (unix seconds). The row is omitted until the last day in the window has settled, so a window that includes the current UTC day has no SLA row yet. Each `items[]` entry is the total for that charge type over the whole query window. To see one UTC day, set `day.gte` to that day's start and `day.lte` to `day.gte + 86399`. Page with `after_token` / `next_token` (`limit` defaults to 100, maximum 500) and space calls about one second apart. Send the response `next_token` as `after_token`. Stop when `next_token` is `null`. Compare the row with the SLA fee you expected: a smaller or negative amount means a credit was applied.
+**Billing reconciliation:** Verifying the SLA on an instance does not show settlement. Each Charges row is one contract. Match `source` to `instance-` plus the contract ID from `new_contract` (or `metadata.label` if you set a unique label at rent), then read the `sla` item in `items[]`. Store the hourly SLA fee when the rent succeeds: `search.slaPremiumPerHour` on the `GET /api/v1/instances/` row for that contract. `instance.slaPremiumPerHour` reads `0` until the instance is running, and also while it is stopped or offline, so do not use it as the stored rate. Expected fee for a UTC day is about the stored rate times the hours the contract was active, including downtime. A `sla` row smaller than that, or negative, means a credit was applied. **Account → Billing → Charges** and `GET /api/v0/charges/` show the same net `type: "sla"` row (SLA fee minus any service credit). The console labels it **Service Credit** only when the amount is negative, and **SLA Fee** otherwise. The call requires `select_filters` with `day.gte` and `day.lte` (unix seconds). The row is omitted until the last day in the window has settled, so a window that includes the current UTC day has no SLA row yet. Each `items[]` entry is the total for that charge type over the whole query window. To see one UTC day, set `day.gte` to that day's start and `day.lte` to `day.gte + 86399`. Page with `after_token` / `next_token` (`limit` defaults to 100, maximum 500) and space calls about one second apart. Send the response `next_token` as `after_token`. Stop when `next_token` is `null`. Compare the row with the SLA fee you expected: a smaller or negative amount means a credit was applied.
 
 **Automation limitations:** SLA credits are not sent as webhooks and do not appear on invoices. Read the same net `type: "sla"` row from **Account → Billing → Charges** or `GET /api/v0/charges/` (see the billing reconciliation paragraph above). After the UTC day boundary (wait up to about 48 hours if a line is missing), check that row or contact support. Verify an active SLA on instances with `GET /api/v1/instances/`. Confirm `target_reliability > 0`. A present but zero value means the rental has no SLA. Also check `instance.slaPremiumPerHour` once the instance is running. Show-instances uses OpenAPI threshold `1.0` (about one request per second).
 
@@ -353,13 +353,13 @@ When a host schedules maintenance in advance, part of that downtime is counted a
 
 ### Credit scenarios (simplified)
 
-Using the H100 example ($84/day compute, ~$0.20/day SLA fee, target 95%, host reliability commitment 99%). A day's service credit is capped relative to that UTC day's covered compute (GPU, storage, and bandwidth combined). The dollar figures below use GPU cost only.
+Using the H100 example ($84/day compute, ~$0.97/day SLA fee, target 95%, host reliability commitment 99%). A day's service credit is capped relative to that UTC day's covered compute (GPU, storage, and bandwidth combined). The dollar figures below use GPU cost only.
 
 | Scenario | Approx. SLA fee | Approx. service credit | Credit minus SLA fee |
 | --- | --- | --- | --- |
-| Above target (excellent / good day) | ~$0.20/day | $0 | **−$0.20** (you paid the SLA fee) |
-| Below target (~93–94% for the day) | ~$0.20/day | ~$42 | **+$41.80** (credit after the SLA fee) |
-| Severe shortfall (~90% or less) | ~$0.20/day | ~$84 | **+$83.80** |
+| Above target (excellent / good day) | ~$0.97/day | $0 | **−$0.97** (you paid the SLA fee) |
+| Below target (~93–94% for the day) | ~$0.97/day | ~$42 | **+$41** (credit after the SLA fee) |
+| Severe shortfall (~90% or less) | ~$0.97/day | ~$84 | **+$83** |
 
 These rows assume the shortfall lasts long enough that the blended measure is that low. A single bad day after several good days usually pays less than the row, because the good days are still in the blend.
 
@@ -398,7 +398,7 @@ Production settlement uses the multi-window reliability blend described above, n
 Console users: open **Instances** → select your instance → **price details** to confirm the SLA fee and target. Skip the block below if you do not use the API.
 
 <Warning>
-**Common mistake:** `vastai show instances` (v0) and `GET /api/v0/instances/{id}/` do not return SLA fields. Verify with `GET /api/v1/instances/` or `vastai show instances-v1 --raw`. Enabling SLA still requires console or REST — see [Finding SLA offers](#finding-sla-offers).
+**Common mistake:** Prefer `GET /api/v1/instances/` for automation. `vastai show instances` already uses that v1 endpoint. Enabling SLA still requires the console or REST — see [Finding SLA offers](#finding-sla-offers).
 </Warning>
 
 <details>
