@@ -38,7 +38,7 @@ Before you start: ensure [Account → Billing](https://cloud.vast.ai/billing/) h
 3. Set the instance disk size on the slider (console default is 10 GB). If you are comparing against a CLI or REST quote, use the same disk size so the prices match.
 4. Hover over the offer's price and confirm an **SLA Fee** line in the breakdown. Write down **SLA Fee/hr**. You need it later to check credits, and the line is hidden while the instance is loading, stopped, or offline. Then click **RENT**.
 5. Once the instance shows **running**, open **Instances** → **price details** and confirm an **SLA Fee** line. The line is hidden while the instance is loading, stopped, or offline.
-6. After the prior UTC day has settled (credits usually appear hours after UTC midnight; see [Settlement timing](#settlement-timing)), check credits in **Account → Billing → Charges** (not Invoices). Expand the instance row. **Service Credit** is a positive amount (`+$`). **SLA Fee** is a negative amount (`−$`). A partial credit is an **SLA Fee** row closer to zero than your usual daily fee.
+6. After the prior UTC day has settled (credits usually appear hours after UTC midnight; see [Settlement timing](#settlement-timing)), check credits in **Account → Billing → Charges** (not Invoices). Expand the instance row. **Service Credit** is a positive amount (`+$`). **SLA Fee** is a negative amount (`−$`). A partial credit is an **SLA Fee** row smaller than your SLA Fee/hr times the hours the contract existed that UTC day. The first and last days of a rental are partial, so a smaller row on those days is not by itself a credit.
 7. When you are done, **Destroy** the instance to end the rental. Destroy deletes the disk. Do not assume **Stop** ends SLA charges. See [Stop vs destroy](#what-you-pay-during-an-outage).
 
 **If you used the CLI to search:** set **Reliability target** again in the console **Search filters** (left bar) before you click **RENT**. CLI filters do not carry over.
@@ -275,7 +275,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/asks/OFFER_ID/" \
 
 `template_hash_id` is the content hash of a saved template. Include `template_hash_id` to rent from the template. Add `image` only when you want to override the template image. A request needs at least one of those fields. A template rent can send `template_hash_id` alone. Request fields override template defaults. `disk` below 8 GB is raised to 8 GB with no error. Omitting `disk`, or sending `0`, rents 10 GB. A CLI quote at the 5 GiB default will not match the billed storage. Rent returns `invalid_price` when the offer's GPU price exceeds the platform maximum, not because `target_reliability` changed. Re-search and use a fresh offer ID. See [Create Instance](/api-reference/instances/create-instance).
 
-**API key permissions:** create a scoped key with `misc` (search/bundles), `instance_write` (create-instance), and `instance_read` (verify with `GET /api/v1/instances/` or `vastai show instances --raw`). These three categories are the minimum for search → rent → verify. See [Authentication](/api-reference/authentication) and [Renter SLA scoped-key recipe](/api-reference/permissions#renter-sla-scoped-key-recipe).
+**API key permissions:** create a scoped key with `misc` (search/bundles), `instance_write` (create-instance), and `instance_read` (verify with `GET /api/v1/instances/` or `vastai show instances --raw`). These three categories are the minimum for search → rent → verify. Add `billing_read` if you will reconcile SLA rows on Charges. The minimum key above cannot call `GET /api/v0/charges/`. See [Authentication](/api-reference/authentication) and [Renter SLA scoped-key recipe](/api-reference/permissions#renter-sla-scoped-key-recipe).
 
 **3. Verify.** Save `new_contract` from the rent response. Look that contract up with URL-encoded `select_filters` (`id` is a filterable column):
 
@@ -303,7 +303,7 @@ Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `ta
 The contract row can appear before settlement. Its `sla` item is absent until that day settles, so a window that includes the current UTC day has no SLA item yet. If `next_token` is not `null`, repeat the request with `after_token` set to that value before you treat a missing `sla` item as unsettled. `limit` defaults to 100, so a busy account can put the contract on a later page.
 
 ```bash
-# YOUR_API_KEY is the same key as the earlier steps. NEW_CONTRACT is the contract id from the rent response.
+# YOUR_API_KEY must also have billing_read. The minimum search → rent → verify key cannot call Charges. NEW_CONTRACT is the contract id from the rent response.
 curl -s -G "https://console.vast.ai/api/v0/charges/" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   --data-urlencode 'select_filters={"day":{"gte":1767225600,"lte":1767311999}}' \
@@ -489,7 +489,7 @@ No. Verification is a platform quality signal (see [Machine Tiers](/guides/insta
 
 ### Where do I see historical SLA credits?
 
-**Console:** After UTC settlement, open **Account → Billing → Charges**. **Service Credit** is a positive amount (`+$`). **SLA Fee** is a negative amount (`−$`). A partial credit is an **SLA Fee** row closer to zero than your usual daily fee. Compare the size of that row with the **SLA Fee/hr** you wrote down at rent (console quick start step 4) times every hour the contract existed that UTC day, including downtime. The Charges API returns the same row with the opposite sign. Invoices do not. You cannot see the measured reliability for that day in the console or the API.
+**Console:** After UTC settlement, open **Account → Billing → Charges**. **Service Credit** is a positive amount (`+$`). **SLA Fee** is a negative amount (`−$`). A partial credit is an **SLA Fee** row smaller than your SLA Fee/hr times the hours the contract existed that UTC day (console quick start step 4). The first and last days are partial, so a smaller row on those days is not by itself a credit. The Charges API returns the same row with the opposite sign. Invoices do not. You cannot see the measured reliability for that day in the console or the API.
 
 **API integrators:** Use the same Charges row as [Settlement timing](#settlement-timing). The call requires `day.gte` and `day.lte` (unix seconds). Send `next_token` back as `after_token`, and stop when `next_token` is `null`. A row below the fee you expected means a credit was applied. `GET /api/v1/invoices/` covers payment transactions, not SLA credits. Client webhooks for SLA credits are not available. Host-side settlement uses [machine earnings](/api-reference/billing/show-earnings) (`sla_earn`).
 
