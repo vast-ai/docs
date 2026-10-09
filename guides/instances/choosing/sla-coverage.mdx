@@ -262,7 +262,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/asks/OFFER_ID/" \
   }'
 ```
 
-`template_hash_id` is the content hash of a saved template. Include `template_hash_id` to rent from the template. Add `image` only when you want to override the template image. A request needs at least one of those fields. A template rent can send `template_hash_id` alone. Request fields override template defaults. `target_reliability` must match the value you searched with, and `disk` must meet the offer minimum, or rent can fail with `invalid_price`. See [Create Instance](/api-reference/instances/create-instance).
+`template_hash_id` is the content hash of a saved template. Include `template_hash_id` to rent from the template. Add `image` only when you want to override the template image. A request needs at least one of those fields. A template rent can send `template_hash_id` alone. Request fields override template defaults. `disk` below 8 GB is raised to 8 GB with no error, so a CLI quote at the 5 GiB default will not match the billed storage. Rent returns `invalid_price` when the offer's GPU price exceeds the platform maximum, not because `target_reliability` changed. Re-search and use a fresh offer ID. See [Create Instance](/api-reference/instances/create-instance).
 
 **API key permissions:** create a scoped key with `misc` (search/bundles), `instance_write` (create-instance), and `instance_read` (verify with `GET /api/v1/instances/` or `vastai show instances-v1 --raw`). These three categories are the minimum for search → rent → verify. See [Authentication](/api-reference/authentication) and [Renter SLA scoped-key recipe](/api-reference/permissions#renter-sla-scoped-key-recipe).
 
@@ -305,9 +305,7 @@ Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `ta
 
 If you quoted with the CLI (default `--storage` 5), set `--storage` ≥ **8** before REST rent, or match the **same integer** on the console disk slider and REST `"disk"`. Example: `vastai search offers --storage 50` → console slider **50** → `"disk": 50` on `PUT /api/v0/asks/{id}/`.
 
-**Match disk size when comparing prices.** Defaults differ by channel. When you rent with REST after a CLI search, pass the same number you searched with (for example `--storage 50` then `"disk": 50`). REST create-instance `disk` must be ≥ **8** when you pass it. The CLI search default of 5 is below that REST minimum. CLI help labels `--storage` as GiB and REST labels `disk` as GB.
-
-**Quoting rule:** Use the same disk number end-to-end for the channel you rent through (console slider, REST `disk` / `allocated_storage`, or CLI `--storage`). If you mix channels, set disk explicitly on every search and rent step. Treat the same integer as one quote across CLI GiB and REST GB labels unless the API returns a mismatch error (`invalid_price`).
+**Match disk size when comparing prices.** REST create-instance raises `disk` values below 8 GB to 8 GB without an error. Search and rent with the same number, 8 or more, so the quote matches the bill. CLI help labels `--storage` as GiB and REST labels `disk` as GB. Vast treats the same integer as the same quote.
 
 ## What happens after you rent
 
@@ -436,7 +434,7 @@ No. Verification is a platform quality signal (see [Machine Tiers](/guides/insta
 
 **Console:** After UTC settlement, open **Account → Billing** and look for **service credit** or SLA credit line items (wording can vary)—not in the instance price panel. Credits are not available via the Charges API, invoices, or billing exports today.
 
-**API integrators:** Prefer **Account → Billing** for service credit reconciliation. There is no renter API for SLA credits. Published OpenAPI for `GET /api/v0/charges/` documents charge `type` values `gpu`, `disk`, `bwd`, and `bwu` — not a dedicated SLA settlement type. `GET /api/v1/invoices/` covers payment transactions (top-ups, transfers, payouts), not SLA service-credit line items. Client webhooks for SLA credits are not available. Host-side settlement visibility uses [machine earnings](/api-reference/billing/show-earnings) (`sla_earn`) — that path is for hosts, not renters.
+**API integrators:** Prefer **Account → Billing** for service credit reconciliation. `GET /api/v0/charges/` can return `type: "sla"` with description **SLA Fee**. That amount is the SLA fee for the period, not an itemized service credit. `GET /api/v1/invoices/` covers payment transactions, not SLA credits. Client webhooks for SLA credits are not available. Host-side settlement uses [machine earnings](/api-reference/billing/show-earnings) (`sla_earn`).
 
 ## Related documentation
 
