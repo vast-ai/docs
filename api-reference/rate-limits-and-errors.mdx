@@ -34,7 +34,7 @@ The combined API reference does not always show each operation's `x-rate-limit` 
 | Endpoint | Safe pacing |
 | --- | --- |
 | Search offers (`POST /bundles/`) | about 10 requests per minute |
-| Rent (`PUT /asks/{id}/`) | one call every 4.5 seconds; space calls at least 5 seconds apart |
+| Rent (`PUT /asks/{id}/`) | At least 5 seconds between calls (server threshold 4.5 s) |
 | Show instances (v1) | one call per second |
 | Show charges | one call per second |
 | Show earnings and the SLA backtester | one call every 2 seconds |
@@ -45,10 +45,10 @@ The combined API reference does not always show each operation's `x-rate-limit` 
 
 When you hit a rate limit, you will receive **HTTP 429**. There are two families:
 
-- **Legacy endpoints** (rent `PUT /api/v0/asks/{id}/`, `GET /api/v1/instances/`): a plain-text body such as `API requests too frequent: endpoint threshold=…`, with no `Retry-After` header.
-- **Token-bucket endpoints** (search `POST /api/v0/bundles/`, charges `GET /api/v0/charges/`): JSON `{"error": "HTTPTooManyRequests", "msg": "API requests too frequent", "retry_after": …}` with a short `Retry-After` header. A daily search quota hit uses the same shape with `"error": "search_quota_exceeded"` and a `Retry-After` that can be hours.
+- **Legacy limiter** (plain text, no `Retry-After`): rent `PUT /api/v0/asks/{id}/`, `GET /api/v1/instances/`, and listing `PUT /api/v0/machines/create_asks/`. The body looks like `API requests too frequent: endpoint threshold=…`. The rent route does not apply a penalty on top of that threshold.
+- **Token-bucket limiter** (JSON plus a `Retry-After` header): search `POST /api/v0/bundles/`, charges `GET /api/v0/charges/`, earnings, schedule maintenance, and the SLA backtester. The body is `{"error": "HTTPTooManyRequests", "msg": "API requests too frequent", "retry_after": …}`. A daily search quota hit uses the same shape with `"error": "search_quota_exceeded"` and a `Retry-After` that can be hours.
 
-Honor `Retry-After` whenever it is present. If it is absent, back off yourself.
+Honor `Retry-After` whenever it is present. If it is absent, wait at least that endpoint's pacing interval before the next call.
 
 ### How to reduce rate limit errors
 

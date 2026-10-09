@@ -1889,15 +1889,13 @@ paths:
                     type: integer
                     example: 1234567
         '429':
-          description: Too Many Requests
+          description: Too Many Requests. Legacy limiter. Plain-text body, no Retry-After
+            header. `penalty` is not applied on this route.
           content:
-            application/json:
+            text/plain:
               schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    example: 'API requests too frequent: endpoint threshold=4.5*1'
+                type: string
+                example: 'API requests too frequent: endpoint threshold=4.5*1'
       operationId: createInstance
   /api/v0/ssh:
     post:
@@ -6495,15 +6493,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '429':
-          description: Too Many Requests
+          description: Too Many Requests. JSON body and a Retry-After header.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait.
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  detail:
+                  error:
                     type: string
-                    example: 'API requests too frequent: endpoint threshold=2.5*1'
+                    example: HTTPTooManyRequests
+                  msg:
+                    type: string
+                    example: API requests too frequent
+                  retry_after:
+                    type: integer
+                    example: 3
       tags:
       - Machines
       operationId: scheduleMaint
@@ -7076,15 +7085,17 @@ paths:
         '429':
           description: 'Too many requests, or the daily search row quota is exhausted.
 
-            `error: search_quota_exceeded` includes a `Retry-After` header (seconds
-            until the quota resets, which can be hours).
+            Both `HTTPTooManyRequests` and `search_quota_exceeded` include a `Retry-After`
+            header.
+
+            The quota error''s wait can be hours.
 
             '
           headers:
             Retry-After:
               schema:
                 type: integer
-              description: Seconds to wait. Present on `search_quota_exceeded`.
+              description: Seconds to wait. Present on both search 429s.
           content:
             application/json:
               schema:
@@ -7605,7 +7616,12 @@ paths:
                 error: auth_error
                 msg: Invalid user key
         '429':
-          description: Too Many Requests
+          description: Too Many Requests. JSON body and a Retry-After header.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait.
           content:
             application/json:
               schema:
@@ -8114,15 +8130,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '429':
-          description: Too Many Requests
+          description: Too Many Requests. JSON body and a Retry-After header.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait.
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  detail:
+                  error:
                     type: string
-                    example: 'API requests too frequent: endpoint threshold=2.0*1'
+                    example: HTTPTooManyRequests
+                  msg:
+                    type: string
+                    example: API requests too frequent
+                  retry_after:
+                    type: integer
+                    example: 2
       tags:
       - Billing
       operationId: showEarnings
@@ -8691,15 +8718,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '429':
-          description: Too Many Requests
+          description: Too Many Requests. Legacy limiter. Plain-text body, no Retry-After
+            header.
           content:
-            application/json:
+            text/plain:
               schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    example: 'API requests too frequent: endpoint threshold=1.0*1'
+                type: string
+                example: 'API requests too frequent: endpoint threshold=1.0*1'
       tags:
       - Instances
       operationId: showInstances
