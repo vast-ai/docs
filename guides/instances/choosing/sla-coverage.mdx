@@ -4,7 +4,7 @@ description: "Rent GPU instances with an SLA. Learn how the SLA fee, reliability
 "canonical": "/guides/instances/choosing/sla-coverage"
 ---
 
-Some Vast.ai offers include a **Service Level Agreement (SLA)** — an optional reliability promise on an **on-demand** rental. You pay a small hourly **SLA fee** only after you set a **reliability target** at rent time. If measured uptime falls short of that target, you receive a **service credit**. Search can quote the price; it does not turn the SLA on by itself.
+Some Vast.ai offers include a **Service Level Agreement (SLA)** — an optional reliability promise on an **on-demand** rental. You pay a small hourly **SLA fee** only after you set a **reliability target** at rent time. If measured uptime falls short of that target, you receive a **service credit**. The console shows that amount as the **SLA Fee** line. API fields call it a premium (for example `slaPremiumPerHour`). Search can show the price; it does not turn the SLA on by itself.
 
 This page explains SLA from the renter side: how to find SLA offers, how pricing works, and when you get credited.
 
@@ -67,7 +67,7 @@ SLA applies to **on-demand rentals only** — not interruptible/bid or reserved/
 </Note>
 
 <Note>
-You do not post escrow or collateral for SLA. You pay the SLA charge while your rental contract is active (including during outages, before service credits are applied). Settlement happens automatically on a daily UTC cadence.
+You do not post escrow or collateral for SLA. You pay the SLA fee while your rental contract is active (including during outages, before service credits are applied). Settlement happens automatically on a daily UTC cadence.
 </Note>
 
 ## What SLA protects
@@ -76,7 +76,7 @@ SLA is a **contractual, per-rental** reliability guarantee with automatic daily 
 
 For on-demand contracts with an SLA:
 
-- You are charged for **compute, storage, and the SLA charge** for the rental day, including periods when the instance is unavailable.
+- You are charged for **compute, storage, and the SLA fee** for the rental day, including periods when the instance is unavailable.
 - Offline time is tracked as an outage in reliability measurements.
 - If you qualify for compensation, a **service credit** posts after daily settlement (UTC) — typically within a few hours after UTC midnight for the prior day — not in the same hour as the outage.
 
@@ -87,16 +87,16 @@ SLA is most useful for **long-running production workloads** where unexpected do
 Quoted hourly cost with SLA in search (`dph_total`):
 
 ```
-dph_total ≈ GPU + storage + SLA charge
+dph_total ≈ GPU + storage + SLA fee
 ```
 
 Bandwidth is billed separately from usage (`inet_*` rates) and is **not** included in `dph_total`.
 
 | Factor | What it means for you |
 | --- | --- |
-| Your reliability target | Higher target → higher SLA charge |
+| Your reliability target | Higher target → higher SLA fee |
 | Host reliability commitment | Maximum reliability the host advertises on the listing (`expected_reliability`). Higher commitment → lower SLA fee at a given reliability target |
-| Host confidence | Host-side pricing setting that affects SLA charge size. **You do not set this** — the host chooses it, and it is **not shown on offer cards**. Compare offers using `dph_total` or the SLA charge line in the price breakdown |
+| Host confidence | Host-side pricing setting that affects SLA fee size. **You do not set this** — the host chooses it, and it is **not shown on offer cards**. Compare offers using `dph_total` or the SLA fee line in the price breakdown |
 
 **Rule of thumb:** your reliability target must be **at or below** the host's reliability commitment. Offers whose commitment is below your target are not shown in search and cannot be rented. At the same target, a host with a higher commitment charges a lower SLA fee. In search results, the host reliability commitment appears as **expected reliability** on the offer (API: `expected_reliability`) — not the Reliability Score on the card.
 
@@ -108,7 +108,7 @@ Searching with a **reliability target of 95%** on an offer where the host's **re
 | --- | --- |
 | GPU compute | $3.50/hr |
 | Storage (at search allocation) | ~$0.01/hr |
-| SLA charge | ~$0.008/hr |
+| SLA fee | ~$0.008/hr |
 | **Total (`dph_total`)** | ~$3.52/hr |
 
 ## Finding SLA offers
@@ -136,7 +136,7 @@ Console controls use the same concepts; they do not accept CLI query strings. Us
 
 | Filter | Meaning | Example (CLI / API) |
 | --- | --- | --- |
-| `target_reliability` | Your desired reliability level. Also drives SLA charge calculation and ranking. REST and console only (see the Warning below). | REST: `"target_reliability": 0.95` (plain number, not `{"eq": …}`) |
+| `target_reliability` | Your desired reliability level. Also drives SLA fee calculation and ranking. REST and console only (see the Warning below). | REST: `"target_reliability": 0.95` (plain number, not `{"eq": …}`) |
 | `has_sla` | Restrict to offers with (or without) SLA enabled. | `has_sla=true` |
 | `expected_reliability` | Filter by the host's advertised reliability commitment. | `expected_reliability>=0.99` |
 
@@ -160,19 +160,19 @@ When you set `target_reliability`, search results include:
 
 | Response field | Meaning |
 | --- | --- |
-| `search.slaPremiumPerHour` | SLA charge for this offer at your target (API field name) |
-| `dph_total` | Total hourly cost **including** the SLA charge |
+| `search.slaPremiumPerHour` | SLA fee for this offer at your target (API field name) |
+| `dph_total` | Total hourly cost **including** the SLA fee |
 | `expected_reliability` | Host's reliability commitment |
 
-Hover over the price breakdown on an offer card to see GPU, storage, bandwidth, and the SLA charge separately.
+Hover over the price breakdown on an offer card to see GPU, storage, bandwidth, and the SLA fee separately.
 
 <Note>
-When you search with an SLA target, reserved-instance discounts may not apply to the displayed total. Confirm in the console price breakdown. SLA charges are never discounted.
+When you search with an SLA target, reserved-instance discounts may not apply to the displayed total. Confirm in the console price breakdown. SLA fees are never discounted.
 </Note>
 
 ### Comparing offers
 
-| Offer | GPU/hr | Host commitment | Your target | SLA charge/hr |
+| Offer | GPU/hr | Host commitment | Your target | SLA fee/hr |
 | --- | --- | --- | --- | --- |
 | A | $3.50 | 99% | 95% | ~$0.008 |
 | B | $3.50 | 95% | 95% | much higher |
@@ -288,13 +288,13 @@ Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `ta
 | --- | --- | --- |
 | Offer has no SLA, target is above the host commitment, target is out of range, or the SLA fee would exceed 1× compute | HTTP 400 `invalid_sla_params` (body includes `ask_id`; message may say "SLA Fee would be N.NNx compute") | Lower the target, or pick an offer with a higher commitment |
 | SLA not enabled for the account or region | HTTP 403 `sla_disabled` | Contact support |
-| Offer no longer exists | HTTP 400 `invalid_args`, message `no_such_ask` | Re-search and use a fresh offer ID |
+| Offer no longer exists | HTTP 400 `invalid_args` / `no_such_ask`, HTTP 404, or HTTP 410 | Re-search and use a fresh offer ID |
 | Ask cannot start now (`cancel_unavail`) | HTTP 410, error `no_such_ask` | Search for a new offer; this is not a transient glitch to retry on the same id |
 | `price` (bid) sent together with `target_reliability` | HTTP 400 "Cannot combine interruptible instances with SLAs" | Remove `price`. SLA rentals are on-demand only |
 | Timeout, dropped connection, or HTTP 5xx | Outcome unknown — the rental may already exist | Before sending the same `PUT` again, check `GET /api/v1/instances/` for a new contract. There is no idempotency key, so a blind retry can create a second paid rental. |
-| Too many requests | HTTP 429 | Wait and back off. Before retrying the same `PUT`, confirm with `GET /api/v1/instances/` whether the contract already exists. If retry returns `invalid_price`, `no_such_ask`, 404, or 410, re-search with the same `target_reliability` and storage, then rent a fresh offer id. |
+| Too many requests | HTTP 429. Search is about 10 requests per minute. Rent uses `threshold` 4.5; the body is `{"detail": ...}`, not `{success, error, msg}`. | Back off, then confirm with `GET /api/v1/instances/` whether the contract already exists. If retry returns `invalid_price`, `no_such_ask`, 404, or 410, re-search and rent a fresh offer id. |
 | Missing SSH key for the VM | HTTP 400 `no_ssh_key_for_vm` (or similar) | Add an SSH key on your account before renting, then retry with a current offer id. |
-| Forbidden / wrong account | HTTP 400 `invalid_args` from a host account | Rent with a **renter** account API key, not the host listing key (see [Hosting Overview](/host/hosting-overview) self-test note). |
+| Forbidden / wrong account | HTTP 403 `invalid_args` ("Hosts can only rent their own machines.") | Rent with a **renter** account API key, not the host listing key (see [Hosting Overview](/host/hosting-overview) self-test note). |
 
 | Channel | Default storage | Field | Units (label) |
 | --- | --- | --- | --- |
@@ -312,15 +312,15 @@ If you quoted with the CLI (default `--storage` 5), set `--storage` ≥ **8** be
 
 When you rent an SLA-backed offer **with a target set**:
 
-1. **Contract terms lock in** — your reliability target, the host's reliability commitment, and host confidence (how the host priced SLA around their reliability commitment) are fixed for that rental. When comparing offers, use the SLA charge line or `dph_total`. Host confidence is not shown in the web console and is not a setting you control.
-2. **Daily billing** — you pay compute plus the SLA charge each day.
+1. **Contract terms lock in** — your reliability target, the host's reliability commitment, and host confidence (how the host priced SLA around their reliability commitment) are fixed for that rental. When comparing offers, use the SLA fee line or `dph_total`. Host confidence is not shown in the web console and is not a setting you control.
+2. **Daily billing** — you pay compute plus the SLA fee each day.
 3. **Daily settlement** — Vast measures reliability across multiple timescales and calculates any SLA credit.
-4. **Credits appear in billing** — service credits improve your balance; strong days mean you paid the SLA charge with no credit.
+4. **Credits appear in billing** — service credits improve your balance; strong days mean you paid the SLA fee with no credit.
 
 ### What you pay during an outage
 
 <Warning>
-Billing continues during downtime. You are still charged for **compute, storage, and the SLA charge** while the contract exists and the instance is unavailable. Leaving a broken instance running continues those charges until you destroy it.
+Billing continues during downtime. You are still charged for **compute, storage, and the SLA fee** while the contract exists and the instance is unavailable. Leaving a broken instance running continues those charges until you destroy it.
 </Warning>
 
 **Stop vs destroy:** Stopping pauses compute but storage and contract charges can continue. **Destroying the instance** ends future daily charges; final SLA settlement still posts when the contract closes. If you abandon a failed host, destroy only after saving any data you need.
@@ -339,9 +339,9 @@ When a host schedules maintenance in advance, part of that downtime is counted a
 
 ### Credit scenarios (simplified)
 
-Using the H100 example ($84/day compute, ~$0.20/day SLA charge, target 95%, host reliability commitment 99%):
+Using the H100 example ($84/day compute, ~$0.20/day SLA fee, target 95%, host reliability commitment 99%):
 
-| Scenario | Approx. SLA charge | Approx. service credit | Net vs no SLA (approx.) |
+| Scenario | Approx. SLA fee | Approx. service credit | Net vs no SLA (approx.) |
 | --- | --- | --- | --- |
 | Above target (excellent / good day) | ~$0.20/day | $0 | **−$0.20** (you paid the SLA fee) |
 | Below target (~93–94% for the day) | ~$0.20/day | ~$42 | **+$41.80** (net credit after SLA fee) |
@@ -364,7 +364,7 @@ Production settlement uses the multi-window reliability blend described above, n
 ## If your instance goes down
 
 1. Save work and check **Instances** for host/maintenance status.
-2. Remember: compute, storage, and SLA charges continue until you destroy the instance. Credits are calculated at the next UTC settlement and apply to the **previous UTC day**, not the current hour.
+2. Remember: compute, storage, and SLA fees continue until you destroy the instance. Credits are calculated at the next UTC settlement and apply to the **previous UTC day**, not the current hour.
 3. **Console:** Open **Instances**, select the instance, then **Destroy** to stop future charges. Stopping alone may not end billing for a broken instance—see [Stop vs destroy](#what-you-pay-during-an-outage). Destroy permanently deletes the instance and its disk, so copy off anything you need first.
 4. After settlement, check **Account → Billing** in the console for SLA line items (not `GET /api/v0/charges/`).
 5. If credits still look wrong **48 hours** after the outage day, contact support via [Discord](https://discord.gg/hSuEbSQ4X8) or [contact@vast.ai](mailto:contact@vast.ai).
@@ -375,11 +375,11 @@ Production settlement uses the multi-window reliability blend described above, n
 
 1. Open **Instances** and select your running instance.
 2. Open **price details** (or the instance billing panel) and confirm an **SLA Fee** line is present.
-3. If the UI shows your **reliability target**, confirm it matches what you selected at search time. If you do not see a target or SLA charge, you likely rented without the SLA.
+3. If the UI shows your **reliability target**, confirm it matches what you selected at search time. If you do not see a target or SLA fee, you likely rented without the SLA.
 
 ### API integrators
 
-Console users: open **Instances** → select your instance → **price details** to confirm the SLA charge and target. Skip the block below if you do not use the API.
+Console users: open **Instances** → select your instance → **price details** to confirm the SLA fee and target. Skip the block below if you do not use the API.
 
 <Warning>
 **Common mistake:** `vastai show instances` (v0) and `GET /api/v0/instances/{id}/` do not return SLA fields. Verify with `GET /api/v1/instances/` or `vastai show instances-v1 --raw`. Enabling SLA still requires console or REST — see [Finding SLA offers](#finding-sla-offers).
@@ -399,7 +399,7 @@ To find instances with an SLA, post-process the API response in your application
 | Concept | Search / bundles | After rent (`GET /api/v1/instances/`) |
 | --- | --- | --- |
 | Your reliability target | `target_reliability` (quote only until rent) | `target_reliability` |
-| SLA charge rate | `search.slaPremiumPerHour` | `instance.slaPremiumPerHour` |
+| SLA fee rate | `search.slaPremiumPerHour` | `instance.slaPremiumPerHour` |
 
 **Host-locked on contract (read-only)**
 
@@ -407,7 +407,7 @@ To find instances with an SLA, post-process the API response in your application
 | --- | --- | --- |
 | Host reliability commitment | `expected_reliability` | `sla_r_claim` |
 
-Host ask field `sla_r_claim` on listings is host-side; on active rentals the locked reliability commitment appears as `sla_r_claim` in show-instances. Host confidence is **not shown on offer cards** — compare offers using `dph_total` or the SLA charge line. Confirm field names against a live `--raw` response before building parsers.
+Host ask field `sla_r_claim` on listings is host-side; on active rentals the locked reliability commitment appears as `sla_r_claim` in show-instances. Host confidence is **not shown on offer cards** — compare offers using `dph_total` or the SLA fee line. Confirm field names against a live `--raw` response before building parsers.
 </details>
 
 ## When SLA is not available
