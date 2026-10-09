@@ -4518,10 +4518,11 @@ paths:
       summary: list machine
       description: "Creates or updates ask contracts for a machine to list it for\
         \ rent on the vast.ai platform.\nAllows setting offer pricing, rental types,\
-        \ end dates, discount rates, and SLA parameters.\nUnspecified fields keep\
-        \ their current listing values (partial update). For an SLA-only change, send\
-        \ the machine id plus SLA fields. Read the current offer with show machines\
-        \ before changing pricing or the end date.\n\nSLA request-body fields (`sla_r_claim`,\
+        \ end dates, discount rates, and SLA parameters.\nUnspecified fields generally\
+        \ keep their current values, except `price_disk` (defaults to 0.10), `duration`\
+        \ (cleared if omitted) and `hidden_listing` (defaults to false). Send those\
+        \ explicitly on every update. Read the current offer with show machines before\
+        \ changing pricing or the end date.\n\nSLA request-body fields (`sla_r_claim`,\
         \ `sla_sigma_x`, optional `sla_max_beta`) are supported on this REST endpoint.\
         \ SLA activates when `sla_r_claim > 0`. Host-sent `sla_r_target` / legacy\
         \ `sla_reliability` are ignored \u2014 clients choose a reliability target\
@@ -8006,8 +8007,11 @@ paths:
                           type: number
                         sla_earn:
                           type: number
-                          description: Net SLA earnings for this machine over the
-                            window.
+                          description: Escrow released to the host for this machine
+                            over the window (net compute plus SLA fee, minus service
+                            credits). SLA-contract compute is not included in gpu_earn
+                            or sto_earn. Normally positive; negative only when a prior
+                            day is corrected.
                   per_day:
                     type: array
                     items:
@@ -8025,9 +8029,9 @@ paths:
                           type: number
                         sla_earn:
                           type: number
-                          description: Net host SLA settlement for the UTC day. Positive
-                            when the host keeps the SLA charge; negative when the
-                            host credits the client.
+                          description: Fleet-wide escrow released to the host that
+                            UTC day (same meaning as per_machine sla_earn). Not fees-minus-credits,
+                            and not a per-machine figure.
         '400':
           description: Bad Request - Invalid input syntax
           content:
@@ -8940,17 +8944,23 @@ paths:
   /api/v0/machines:
     get:
       summary: show machines
-      description: "Fetches data for multiple machines associated with the authenticated\
-        \ user.\n\nThe `--raw` CLI output includes listing and SLA fields (`price_gpu`,\
-        \ `end_date`, `sla_r_claim`, `sla_sigma_x`, etc.) used for read-modify-write\
-        \ before partial SLA updates. See [SLA Offers \u2014 Partial updates](/host/sla-offers#api-for-automation).\n\
-        \nCLI Usage: `vastai show machines [--user_id <user_id>]`"
+      description: 'Fetches data for multiple machines associated with the authenticated
+        user.
+
+
+        `--raw` includes listing state for read-modify-write: `listed`, `listed_gpu_cost`
+        (send as `price_gpu`), `listed_storage_cost` (send as `price_disk`), `end_date`,
+        `duration`, `sla_reliability_claim` (send as `sla_r_claim`) and the `sla_confidence`
+        band label. `sla_sigma_x` is not returned. See [SLA Offers](/host/sla-offers#api-for-automation).
+
+
+        CLI Usage: `vastai show machines [--user_id <user_id>]`'
       operationId: getMachines
       parameters:
       - name: user_id
         in: query
-        required: true
-        description: The ID of the user whose machines are being requested.
+        required: false
+        description: Ignored. Results are scoped to the API key owner.
         schema:
           type: string
       responses:
@@ -8982,6 +8992,31 @@ paths:
                           - 'null'
                           description: Listed GPU price in $/hour (`price_gpu` on
                             create_asks). null when not listed.
+                        listed_storage_cost:
+                          type:
+                          - number
+                          - 'null'
+                          description: Listed storage price in $/GB/month (`price_disk`
+                            on create_asks). null when not listed. Omitting `price_disk`
+                            on update resets it to 0.10.
+                        listed_inet_up_cost:
+                          type:
+                          - number
+                          - 'null'
+                          description: Listed upload bandwidth price (`price_inetu`
+                            on create_asks).
+                        listed_inet_down_cost:
+                          type:
+                          - number
+                          - 'null'
+                          description: Listed download bandwidth price (`price_inetd`
+                            on create_asks).
+                        duration:
+                          type:
+                          - number
+                          - 'null'
+                          description: Auto-renew duration. Send it back on create_asks
+                            or the listing stops auto-renewing.
                         end_date:
                           type:
                           - number
@@ -9026,6 +9061,8 @@ paths:
                   name: my-h100
                   listed: true
                   listed_gpu_cost: 3.5
+                  listed_storage_cost: 0.15
+                  duration: null
                   end_date: 1735689600
                   listed_min_gpu_count: 1
                   sla_reliability_claim: 0.99

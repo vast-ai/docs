@@ -9,15 +9,15 @@ paths:
       description: |
         Fetches data for multiple machines associated with the authenticated user.
 
-        The `--raw` CLI output includes listing and SLA fields (`price_gpu`, `end_date`, `sla_r_claim`, `sla_sigma_x`, etc.) used for read-modify-write before partial SLA updates. See [SLA Offers — Partial updates](/host/sla-offers#api-for-automation).
+        `--raw` includes listing state for read-modify-write: `listed`, `listed_gpu_cost` (send as `price_gpu`), `listed_storage_cost` (send as `price_disk`), `end_date`, `duration`, `sla_reliability_claim` (send as `sla_r_claim`) and the `sla_confidence` band label. `sla_sigma_x` is not returned. See [SLA Offers](/host/sla-offers#api-for-automation).
 
         CLI Usage: `vastai show machines [--user_id <user_id>]`
       operationId: getMachines
       parameters:
       - name: user_id
         in: query
-        required: true
-        description: The ID of the user whose machines are being requested.
+        required: false
+        description: Ignored. Results are scoped to the API key owner.
         schema:
           type: string
       responses:
@@ -46,6 +46,22 @@ paths:
                           type: number
                           nullable: true
                           description: Listed GPU price in $/hour (`price_gpu` on create_asks). null when not listed.
+                        listed_storage_cost:
+                          type: number
+                          nullable: true
+                          description: Listed storage price in $/GB/month (`price_disk` on create_asks). null when not listed. Omitting `price_disk` on update resets it to 0.10.
+                        listed_inet_up_cost:
+                          type: number
+                          nullable: true
+                          description: Listed upload bandwidth price (`price_inetu` on create_asks).
+                        listed_inet_down_cost:
+                          type: number
+                          nullable: true
+                          description: Listed download bandwidth price (`price_inetd` on create_asks).
+                        duration:
+                          type: number
+                          nullable: true
+                          description: Auto-renew duration. Send it back on create_asks or the listing stops auto-renewing.
                         end_date:
                           type: number
                           nullable: true
@@ -73,6 +89,8 @@ paths:
                     name: my-h100
                     listed: true
                     listed_gpu_cost: 3.5
+                    listed_storage_cost: 0.15
+                    duration: null
                     end_date: 1735689600
                     listed_min_gpu_count: 1
                     sla_reliability_claim: 0.99

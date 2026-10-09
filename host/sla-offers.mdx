@@ -276,10 +276,10 @@ SLA listing via CLI/SDK is not available yet — use the REST API below (or cons
 curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"machine": 12345, "sla_r_claim": 0.99, "sla_sigma_x": 0.5}'
+  -d '{"machine": 12345, "price_disk": 0.15, "sla_r_claim": 0.99, "sla_sigma_x": 0.5}'
 ```
 
-Do not copy example `price_gpu` or `end_date` from docs into a first listing—read current values from `vastai show machines --raw`.
+Replace `price_disk` with the machine's current `listed_storage_cost` from `vastai show machines --raw`. Omitting it resets storage to **$0.10/GB/month**. Do not copy example prices or `end_date` into a first listing.
 
 #### Full listing update (existing ask)
 
@@ -292,6 +292,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
   -d '{
     "machine": 12345,
     "price_gpu": 3.50,
+    "price_disk": 0.15,
     "sla_r_claim": 0.99,
     "sla_sigma_x": 0.5,
     "end_date": 1893456000
@@ -308,6 +309,7 @@ SLA fields example (existing listing, same limit as the curl above):
 {
   "machine": 12345,
   "price_gpu": 3.50,
+  "price_disk": 0.15,
   "end_date": 1893456000,
   "sla_r_claim": 0.99,
   "sla_sigma_x": 0.5
@@ -316,13 +318,21 @@ SLA fields example (existing listing, same limit as the curl above):
 
 This creates an offer with a reliability commitment of `0.99` and confidence spread `0.5`. Clients who search with `target_reliability` below your reliability commitment see a lower SLA fee than clients who choose a reliability target near your reliability commitment.
 
-<Note>
-Partial updates are supported when editing an existing listing. If you change only one SLA field, the platform re-validates the merged parameters. Set `sla_r_claim` to `0` to disable SLA on an existing listing.
+<Warning>
+`create_asks` is not a pure partial update. If you change only SLA fields, the platform re-validates the merged SLA parameters. Set `sla_r_claim` to `0` to disable SLA on an existing listing. Other omitted fields are not all kept:
 
-Omitted non-SLA fields retain their current listing values; only fields present in the request body are updated. Read current listing fields from `vastai show machines --raw`:
+- `price_gpu` is kept if omitted.
+- `price_disk` resets to **$0.10/GB/month** if omitted or `null`.
+- `duration` is cleared if omitted (a listing created with `vastai list machine -l` stops auto-renewing).
+- `hidden_listing` resets to `false` if omitted (a hidden listing becomes visible). `show machines` does not return this flag, so send `true` when the listing should stay hidden.
+
+Always read the current listing and send `price_disk` and `duration` back. Map read-side names as follows: `listed_gpu_cost` → `price_gpu`, `listed_storage_cost` → `price_disk`, `end_date` → `end_date`, `duration` → `duration`.
+</Warning>
+
+Read current listing fields from `vastai show machines --raw`:
 
 ```bash
-vastai show machines --raw | jq '.machines[] | select(.id == 12345 or .id == "12345") | {id, listed, sla_reliability_claim, sla_confidence, listed_gpu_cost, listed_min_gpu_count, end_date}'
+vastai show machines --raw | jq '.machines[] | select(.id == 12345 or .id == "12345") | {id, listed, sla_reliability_claim, sla_confidence, listed_gpu_cost, listed_storage_cost, listed_min_gpu_count, end_date, duration}'
 ```
 
 REST equivalent: `GET /api/v0/machines/` (the CLI sends `?owner=me`). The account is the API key owner; a `?user_id=` query is ignored.
@@ -330,7 +340,6 @@ REST equivalent: `GET /api/v0/machines/` (the CLI sends `?owner=me`). The accoun
 Machine `id` may be a string in raw JSON. The response is wrapped in a `machines` array. Read-side names differ from the `create_asks` body: `listed_gpu_cost` → `price_gpu`, `listed_min_gpu_count` → `min_chunk`, `sla_reliability_claim` → `sla_r_claim`. Confidence is returned as a label, `sla_confidence` (`high` = Tight, `medium` = Normal, `low` = Wide), not as `sla_sigma_x`. The SLA fields are `null` unless the machine is listed with SLA terms. Pricing fields and `end_date` are `null` when the machine is not listed.
 
 Then `PUT /api/v0/machines/create_asks/` with the merged body (read → merge → PUT). `vastai list machine` and the Python SDK listing helpers cannot set SLA fields; start from this REST pattern (or the console) when you move an existing CLI listing to SLA.
-</Note>
 
 ### Fleet SLA re-list (machines that already have an SLA)
 
@@ -393,8 +402,9 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
   price=$(echo "$machine" | jq -r '.listed_gpu_cost // empty')
   end=$(echo "$machine" | jq -r '.end_date // empty')
   chunk=$(echo "$machine" | jq -r '.listed_min_gpu_count // empty')
-  if [ -z "$price" ] || [ -z "$end" ] || [ -z "$chunk" ]; then
-    echo "skip $id: missing listed_gpu_cost/end_date/listed_min_gpu_count"; continue
+  disk=$(echo "$machine" | jq -r '.listed_storage_cost // empty')
+  if [ -z "$price" ] || [ -z "$end" ] || [ -z "$chunk" ] || [ -z "$disk" ]; then
+    echo "skip $id: missing listed_gpu_cost/end_date/listed_min_gpu_count/listed_storage_cost"; continue
   fi
   now=$(date -u +%s)
   if ! jq -e -n --argjson end "$end" --argjson now "$now" '$end > $now' >/dev/null 2>&1; then
@@ -405,10 +415,12 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
     echo "skip $id: no positive sla_reliability_claim (enable SLA per machine first)"; continue
   fi
   # sla_sigma_x is omitted on purpose: create_asks keeps each machine's current confidence.
-  # price_disk is sent: omitting it resets storage price to 0.10.
+  # price_disk is required: null or omitted resets storage price to 0.10.
+  # duration is sent when set so an auto-renew listing is not cleared.
   body=$(echo "$machine" | jq -c \
     '{machine: (.id|tonumber), price_gpu: .listed_gpu_cost, price_disk: .listed_storage_cost,
-      end_date, min_chunk: .listed_min_gpu_count, sla_r_claim: .sla_reliability_claim}')
+      end_date, min_chunk: .listed_min_gpu_count, sla_r_claim: .sla_reliability_claim}
+     + (if .duration == null then {} else {duration} end)')
   if [ "$DRY_RUN" != "0" ]; then
     echo "dry-run machine_id=$id payload: $body"; continue
   fi
@@ -431,13 +443,13 @@ Fetch the fleet once before the loop — do not call `show machines --raw` insid
 </Accordion>
 </AccordionGroup>
 
-**SLA-only update (existing ask only)** — include `machine` plus SLA fields; omit unrelated offer fields you intend to keep. Do **not** use this body for a first listing.
+**SLA-only update (existing ask only)** — include `machine`, the current `price_disk`, and the SLA fields. Do **not** use this body for a first listing. Replace `0.15` with `listed_storage_cost`.
 
 ```bash
 curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"machine": 12345, "sla_r_claim": 0.995, "sla_sigma_x": 0.2}'
+  -d '{"machine": 12345, "price_disk": 0.15, "sla_r_claim": 0.995, "sla_sigma_x": 0.2}'
 ```
 
 **Disable SLA on new rentals** — set `sla_r_claim` to `0` (active contracts keep their terms). This request publishes a live listing (same as **LIST**), so don't run it on machines you have unlisted.
@@ -452,6 +464,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
 | 403 | `sla_daemon_outdated` | Machine daemon build is too old for SLA listing |
 | 400 | `invalid_args` | Machine ID not found for your account, or malformed / incompatible request body |
 | 400 | `invalid_sla_params` | SLA parameters failed validation |
+| 402 | `msg`: `can only create asks for an online machine` | The daemon has not checked in for more than 60 seconds. Wait until **Host → Machines** shows the machine online, then retry. If the machine is down, use `vastai unlist machine MACHINE_ID` instead. |
 
 **`machine_locked`:** Returned when a machine is decommissioned or migration-locked. If you are migrating hardware, finish or cancel active rentals first, remove or update the listing as needed, and contact support if the machine remains locked. Existing SLA terms on active contracts remain in force until those contracts end.
 
@@ -621,7 +634,7 @@ Use the [SLA Earnings Backtester](/host/sla-backtester) (API-only; requires a `m
 - **Unexpected credit** — Review reliability; re-run the backtester over the affected dates and check `escrow_to_client_balance` and `reliability` on those days.
 - **Severe outage (active SLA contracts):**
   1. Notify renters now: `echo y | vastai schedule maint MACHINE_ID --sdate "$(date -u +%s)" --duration HOURS --maintenance_category other`.
-  2. Stop new SLA rentals. The fastest way is `vastai unlist machine MACHINE_ID`, which publishes nothing. Alternatively, set the reliability commitment to `0` in **Set Pricing → SLA** (or API `sla_r_claim=0`), but only on machines that are currently listed, because `create_asks` publishes a live listing.
+  2. Stop new SLA rentals. The fastest way is `vastai unlist machine MACHINE_ID`, which publishes nothing. Setting the reliability commitment to `0` (`sla_r_claim=0`) only works while the machine is online. If it is down, `create_asks` returns HTTP 402 and `vastai unlist machine` is the path that works. Only change the commitment on machines that are currently listed, because `create_asks` publishes a live listing. Include the current `price_disk` on that update.
   3. Fix the machine. Existing SLA contracts keep their terms and settle against each renter's target; unlisting or setting the commitment to `0` does not change that.
   4. After the next UTC midnight, check `sla_earn` for the affected day.
   5. Contact [Discord](https://discord.gg/hSuEbSQ4X8) before relisting.
@@ -630,20 +643,22 @@ Use the [SLA Earnings Backtester](/host/sla-backtester) (API-only; requires a `m
 
 After you enable SLA, charges and credits settle on UTC (Coordinated Universal Time) day boundaries. SLA earnings rows typically appear in **Host → Billing** within a few hours after UTC midnight (exact timing can vary).
 
-When you poll the API, use **`per_machine[].sla_earn`** for a single machine. **`per_day[].sla_earn` is always fleet-wide**—even if you pass `machid`. Do not compare `per_day` totals to one machine’s backtester largest single-day credit.
+For SLA contracts, `sla_earn` is the escrow released to you that day: your net compute earnings plus the SLA fee, minus any service credits paid to the renter. It matches the backtester's `escrow_to_host_balance`. SLA-contract compute is **not** included in `gpu_earn`, `sto_earn`, or bandwidth earnings, so those fields stay near zero for SLA rentals. `sla_earn` is normally positive and is negative only when a prior day is corrected. Do not treat a smaller `sla_earn` as a negative credit, and do not compare it to the backtester's largest single-day credit.
+
+When you poll the API, use **`per_machine[].sla_earn`** for a single machine. **`per_day[].sla_earn` is always fleet-wide**—even if you pass `machid`.
 
 ### Console (recommended for day-to-day checks)
 
 1. Go to **Host → Billing** (or **Earnings** / **Reports**).
 2. Set the date range to include the UTC day you want to review.
 3. Filter by machine ID if available.
-4. Look for **SLA** entries in the earnings breakdown — positive amounts are SLA charges you kept; negative amounts are credits you owed the client.
-5. After downtime, compare the affected UTC day(s) to your backtester largest single-day credit.
+4. Look for the SLA settlement in the earnings breakdown. On an SLA rental, compute pay is released with the SLA fee (the same amount as `sla_earn` in the API), not as a separate GPU earnings line.
+5. After downtime, a smaller release than a normal day can mean a service credit was paid. Do not look for a negative SLA line, and do not match that amount to the backtester's largest single-day credit.
 
 **If you don't see SLA rows:** widen the date range (settlement uses UTC day boundaries), confirm the machine had an active on-demand rental that day, and confirm SLA was enabled and the offer was **listed** (not just saved).
 
 <Note>
-SLA daily settlement (SLA charge kept / credit owed) does not currently emit host webhooks. Monitor via console billing or poll `machine-earnings`; settlements align to UTC calendar days.
+SLA settlement does not currently emit host webhooks. Monitor via console billing or poll `machine-earnings`; settlements align to UTC calendar days.
 </Note>
 
 ### CLI
@@ -670,7 +685,7 @@ vastai show earnings --machine_id 12345 --start_date "$(date -u -d 'yesterday' +
   | jq '.per_machine[] | select(.machine_id == 12345 or .machine_id == "12345") | {machine_id, sla_earn}'
 ```
 
-Positive `sla_earn` = net SLA charge you kept that period; negative = net credit you owe. Weekly aggregates are window totals, not daily series — use a one-day range above for day-level checks.
+Weekly aggregates are window totals, not daily series — use a one-day range above for day-level checks.
 
 ### API (automation)
 
@@ -690,7 +705,7 @@ Positive `sla_earn` = net SLA charge you kept that period; negative = net credit
 
 This endpoint is rate-limited. Poll `GET /api/v0/users/me/machine-earnings/` at most about once every two seconds as a safe default (OpenAPI `x-rate-limit` threshold `2.0` on [Show Earnings](/api-reference/billing/show-earnings)). On HTTP 429, back off and retry per [Rate Limits and Errors](/api-reference/rate-limits-and-errors). For daily SLA settlement, one pull with `last_days=1` after UTC rollover is usually enough.
 
-**Automation pattern:** There is no host webhook for SLA settlement. Poll `machine-earnings` with `last_days=1` and `machid`, alert on `per_machine[].sla_earn` thresholds, and call machines sequentially with backoff on 429. Do not use `per_day[].sla_earn` for a single machine.
+**Automation pattern:** There is no host webhook for SLA settlement. Poll `machine-earnings` and read `per_machine[].sla_earn` (the escrow released that day, not a credit balance). Call machines sequentially with backoff on 429. Do not use `per_day[].sla_earn` for a single machine.
 
 <Warning>
 When you pass `machid`, use `per_machine[].sla_earn` for that machine's SLA settlement in the window. Do **not** read `per_day[].sla_earn` for single-machine checks — `per_day[]` is always fleet-wide, even with `?machid=`.
@@ -723,13 +738,6 @@ curl -s -H "Authorization: Bearer $VAST_API_KEY" \
 ```
 
 Do **not** compare `last_days=7` totals to the backtester's largest single-day credit.
-
-**Sign convention:**
-
-| Field | Strong day (meet client target) | Weak day (miss client target) |
-| --- | --- | --- |
-| `per_machine[].sla_earn` | Positive (SLA charge kept) | Negative (credit you owe) |
-| Fleet `per_day[].sla_earn` | Positive (SLA charge kept) | Negative (credit you owe) |
 
 - Settlement is evaluated on UTC day boundaries. Rows typically update within a few hours after UTC midnight.
 
