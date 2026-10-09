@@ -694,13 +694,19 @@ Use the [SLA Earnings Backtester](/host/sla-backtester) (API-only; requires a `m
 - **`sla_daemon_outdated`** — Update the host daemon from the [host setup guide](https://cloud.vast.ai/host/setup/), confirm the machine reconnects on **Host → Machines**, then retry LIST / `create_asks`. If the error persists, contact support with the machine ID.
 - **Unexpected credit** — Review reliability; re-run the backtester over the affected dates and check `escrow_to_client_balance` and `reliability` on those days.
 - **Severe outage (active SLA contracts):**
+  0. **Before you unlist, save your listing terms.** After unlist, `show machines` returns `null` for prices, `min_chunk`, `end_date`, and SLA terms. Confidence (`sla_sigma_x`) is never returned, so write down Tight, Normal, or Wide as well.
+     ```bash
+     vastai show machines --raw --api-key "$VAST_API_KEY" | jq '.machines[] | select(.id==MACHINE_ID)' > machine-MACHINE_ID-pre-outage.json
+     ```
   1. **Notify renters.** In the console: **Host → Machines → Settings → Machine Maintenances** (see [Set a maintenance window](/host/set-maintenance-window)). To automate: `echo y | vastai schedule maint MACHINE_ID --sdate "$(date -u +%s)" --duration HOURS --maintenance_category other`.
-  2. **Unlist the machine** in the console (**Host → Machines**), or run `vastai unlist machine MACHINE_ID`. This removes the listing and does not republish it. Do not send a `create_asks` update (for example `sla_r_claim=0`) during an outage: it fails with HTTP 402 while the machine is offline, and when it succeeds it resends `end_date`, which can extend active non-SLA rentals.
+  2. **Unlist** in the console (**Host → Machines**). Do not change SLA settings or relist during the outage. API users: `create_asks` returns HTTP 402 while the machine is offline, and resending `end_date` can extend shorter rentals. `vastai unlist machine MACHINE_ID` removes the listing and does not republish it.
   3. Fix the machine. Existing SLA contracts keep their terms and settle against each renter's target; unlisting or setting the commitment to `0` does not change that.
   4. **Check settlement** a few hours after the next UTC midnight. In the console, compare those days with a normal week in **Host → Billing**. Releases are spread over time, so one low day is not by itself a credit. To automate, read `per_machine[].sla_earn`, or re-run the backtester and read `days[].escrow_to_client_balance`.
-  5. Contact [Discord](https://discord.gg/hSuEbSQ4X8) before relisting.
+  5. When you relist, rebuild the listing from the snapshot (`price_disk`, `min_chunk`, `end_date` or `duration`, `hidden_listing`, `sla_r_claim`, `sla_sigma_x`). If the machine stays locked, contact [Discord](https://discord.gg/hSuEbSQ4X8) or contact@vast.ai before you relist.
 
 ## Monitoring SLA after listing
+
+On SLA rentals, compute pay and the SLA fee are released together as SLA earnings over several days. A single smaller release can be timing. By itself it is not proof of a credit.
 
 After you enable SLA, charges and credits settle on UTC (Coordinated Universal Time) day boundaries. SLA earnings rows typically appear in **Host → Billing** within a few hours after UTC midnight (exact timing can vary).
 
@@ -710,9 +716,9 @@ When you poll the API, use **`per_machine[].sla_earn`** for a single machine. **
 
 ### Console (recommended for day-to-day checks)
 
-1. Go to **Host → Billing** (or **Earnings** / **Reports**).
+1. Go to **Host → Billing**.
 2. Set the date range to include the UTC day you want to review.
-3. Filter by machine ID if available.
+3. Machine filtering is not available in the console. For one machine, use `vastai show earnings --machine_id ID`.
 4. Look for the SLA settlement in the earnings breakdown. On an SLA rental, compute pay is released with the SLA fee (the same amount as `sla_earn` in the API), not as a separate GPU earnings line.
 5. After downtime, compare several days with a normal week. A single smaller release can be timing, because escrow is released over time, not proof of a credit by itself. Do not look for a negative SLA line, and do not match one day to the backtester's largest single-day credit.
 
@@ -766,14 +772,15 @@ Weekly aggregates are window totals, not daily series — use a one-day range ab
 
 This endpoint is rate-limited. Poll `GET /api/v0/users/me/machine-earnings/` at most about once every two seconds as a safe default (OpenAPI `x-rate-limit` threshold `2.0` on [Show Earnings](/api-reference/billing/show-earnings)). On HTTP 429, back off and retry per [Rate Limits and Errors](/api-reference/rate-limits-and-errors). For daily SLA settlement, one pull with `last_days=1` after UTC rollover is usually enough.
 
-**Automation pattern:** There is no host webhook for SLA settlement. Poll `machine-earnings` and read `per_machine[].sla_earn` (the escrow released that day, not a credit balance). Call machines sequentially with backoff on 429. Do not use `per_day[].sla_earn` for a single machine.
+**Automation pattern:** There is no host webhook for SLA settlement. One fleet call with `sday` and `eday` set to the same day index returns that UTC day for every machine in `per_machine[]`. Use `machid` only for a spot check. Do not use `per_day[].sla_earn` for a single machine. `last_days=1` is coarse: it covers yesterday and the current UTC day so far, not one settled day.
 
 <Warning>
 When you pass `machid`, use `per_machine[].sla_earn` for that machine's SLA settlement in the window. Do **not** read `per_day[].sla_earn` for single-machine checks — `per_day[]` is always fleet-wide, even with `?machid=`.
 
 **Quick rules:**
 - **One machine, one UTC day:** Use `sday`/`eday` with `day = floor(unix_epoch_seconds / 86400)`, or CLI `--start_date` / `--end_date` with an explicit UTC time (`YYYY-MM-DDT00:00:00Z`; bare dates are parsed in local time). Example: `2026-07-24` 00:00 UTC is unix `1784851200` → `sday=eday=20658`. To cross-check the backtester, compare `sla_earn` with that day's `escrow_to_host_balance`. Never compare `sla_earn` with the largest single-day credit (`escrow_to_client_balance`). Use `last_days=1` with `machid` only for coarse polling after UTC rollover—not as a strict match to one settled UTC calendar day.
-- **Fleet snapshot (coarse / recent window only):** one request without `machid` returns all machines in `per_machine[]` for the window.
+- **Fleet, exact UTC day (one call):** omit `machid` and set `sday` and `eday` to the same day index. Read `per_machine[].sla_earn`.
+- **Recent window (`last_days`, coarse):** one request without `machid` returns all machines in `per_machine[]`. `last_days=1` spans yesterday and today-so-far.
 </Warning>
 
 ```bash
