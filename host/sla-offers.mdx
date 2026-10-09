@@ -39,7 +39,7 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 ## SLA host checklist
 
 1. Complete [Account setup and hosting agreement](/host/hosting-overview#account-setup-and-hosting-agreement) on a **dedicated host account**, then [host setup](https://cloud.vast.ai/host/setup/). Confirm the machine appears on **Host → Machines** (healthy; GPU price and offer end date saved under **Set Pricing**—listing not required yet).
-2. Create and fund a separate **client** account for later self-test (see [Testing your own machine](/host/hosting-overview#testing-your-own-machine) account setup)—do **not** rent your machine yet; listing comes in step 8.
+2. Publish once **without** SLA (leave Claim at `0`) and test ports, SSH, and Jupyter from a separate client account (see [Testing your own machine](/host/hosting-overview#testing-your-own-machine)). Do not turn SLA on until that test passes.
 3. Install the [CLI](/cli/hello-world) if you schedule maintenance or read earnings from the CLI. The console [Set a maintenance window](/host/set-maintenance-window) page can notify renters without the CLI.
 4. Confirm SLA account access: open **Set Pricing → SLA** and confirm the panel is visible (do **not** Save final commitment/confidence yet). If the panel is missing, contact support.
 5. Preview economics (console SLA panel or [backtester](/host/sla-backtester)). Read [Billing vs settlement](#billing-vs-settlement-important) and [Risk scenarios](#risk-scenarios)—GPU billing can continue during outages and SLA credits can exceed many days of SLA fees.
@@ -202,7 +202,7 @@ Do not assume the dashboard score equals SLA reliability. Before choosing `sla_r
 Offers with invalid combinations are rejected at listing time:
 
 - `sla_r_claim` must be `0` (disable) or greater than 0 and at most **0.99999**. Exactly `1.0` is rejected.
-- When the reliability commitment is positive, `sla_sigma_x` must be positive and at most `3.0`. It defaults to `0.5` only on a new ask. On an existing listing, send it explicitly the first time you enable SLA. If a value is already stored, omitting it keeps that value.
+- If you send `sla_sigma_x`, it must be positive and at most `3.0`. It defaults to `0.5` only on a new ask. If you enable SLA on an existing ask without sending it, the request is accepted and `show machines` can report `sla_confidence: null`. If a value is already stored, omitting it keeps that value. Send it explicitly the first time you enable SLA.
 - Optional `sla_max_beta` must be in `(0, 1)` and at least the default β derived at your reliability commitment. Hosts do not set β; this field only caps the client-derived β the offer accepts. Omit for uncapped.
 
 <Note>
@@ -221,7 +221,7 @@ For planning, assume a worst-case day costs up to one full day of covered comput
 
 ### SLA on extended contracts
 
-When a rental contract is extended (by moving the offer end date forward at the same or lower price), the original SLA parameters remain in effect for the extended period. Changing SLA parameters on the offer does not alter SLA terms on existing contracts — only new rental contracts pick up updated SLA settings. If the request that moves `end_date` later also changes SLA terms in a way that would raise an existing contract's SLA fee (a lower commitment, wider confidence, or `sla_r_claim` set to `0`), that contract is not extended, and the response does not say so.
+When a rental contract is extended (by moving the offer end date forward at the same or lower price), the original SLA parameters remain in effect for the extended period. Changing SLA parameters on the offer does not alter SLA terms on existing contracts — only new rental contracts pick up updated SLA settings. If the same request also raises an existing contract's SLA fee (a lower commitment, wider confidence, or `sla_r_claim` set to `0`), the immediate response skips that contract. A background job extends it shortly afterward anyway, under its original SLA terms. The only reliable way to avoid extending SLA rentals is to not move `end_date` later, or to unlist.
 
 Disabling SLA on the offer (setting `sla_r_claim` to `0`) prevents new SLA-covered contracts but does not terminate SLA on existing active contracts — they continue under their original SLA terms until their rental end date.
 
@@ -343,10 +343,11 @@ This creates an offer with a reliability commitment of `0.99` and confidence spr
 
 - `price_gpu` is kept if omitted.
 - `price_disk` resets to **$0.10/GB/month** if omitted or `null`.
-- `duration` is cleared if omitted (a listing created with `vastai list machine -l` stops auto-renewing).
+- `duration` is cleared if omitted (a listing created with `vastai list machine -l` stops auto-renewing). While `duration` is set, the offer end date moves forward on its own, and active SLA rentals are extended with it. Credit exposure continues for as long as that listing stays live.
 - `hidden_listing` resets to `false` if omitted (a hidden listing becomes visible). `show machines` does not return this flag, so send `true` when the listing should stay hidden.
 - `min_chunk` defaults to **1** when offers are created or re-created (first publish, or relisting after an unlist). On an already-listed machine, omitting it does not change the current minimum. Still send `listed_min_gpu_count` so a later relist does not slice the machine by accident.
 - `vol_size` omitted on a machine with no volume offer creates one sized at half the free disk. Send `"vol_size": 0` to keep that from happening. `0` does not delete a volume offer that already exists.
+- On a **new** ask (first publish, or a new offer after unlist), omitted `price_inetu` and `price_inetd` become `0` (free bandwidth) and omitted `credit_discount_max` becomes `0.4`. Updating an existing ask keeps those values when they are omitted. Send `listed_inet_up_cost`, `listed_inet_down_cost`, and `credit_discount_max` when you create the offer.
 - Send **either** `duration` (integer seconds; a float such as `2592000.0` returns 400 `Invalid duration`) **or** `end_date`, never both. Sending both returns `400` `Cannot set both duration and end_date`.
 
 Always read the current listing and send `price_disk` plus either `duration` or `end_date`. Map read-side names as follows: `listed_gpu_cost` → `price_gpu`, `listed_storage_cost` → `price_disk`.
@@ -707,7 +708,7 @@ Use the [SLA Earnings Backtester](/host/sla-backtester) (API-only; requires a `m
        || echo "Snapshot is EMPTY: do not unlist yet" >&2
      ```
 
-     `show machines` leaves out machines that have been offline for more than about 10 hours. If the snapshot is empty, call `GET /api/v0/machines/?include_offline=true` with the same key (that covers machines offline up to about 3 days), or use the console notes above. Do not unlist until you have the terms.
+     `show machines` leaves out machines that have been offline for more than about 10 hours. If the snapshot is empty, call `GET /api/v0/machines/?include_offline=true` with the same key (machines offline up to about 3 days). That query parameter works on the server but is not listed in the API reference yet. If it is still empty, use the console notes above. Do not unlist until you have the terms.
   2. **Notify renters.** In the console: **Host → Machines → Settings → Machine Maintenances** (see [Set a maintenance window](/host/set-maintenance-window)). To automate: `echo y | vastai schedule maint MACHINE_ID --sdate "$(date -u +%s)" --duration HOURS --maintenance_category other`.
   3. **Unlist** in the console (**Host → Machines**). Do not change SLA settings or relist during the outage. API users: `create_asks` returns HTTP 402 while the machine is offline, and resending `end_date` can extend shorter rentals. `vastai unlist machine MACHINE_ID` removes the listing and does not republish it.
   4. Fix the machine. Existing SLA contracts keep their terms and settle against each renter's target; unlisting or setting the commitment to `0` does not change that.

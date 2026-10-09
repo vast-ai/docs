@@ -193,7 +193,7 @@ This will automatically remove expired/deleted rental contracts from the machine
 
 ## Extending Rental Contracts
 
-To extend the current rental contracts for all clients on a given machine, change the offer end date to a later time with the same or lower pricing. Moving the end date later extends every shorter active rental, including its SLA exposure, to the new date. If the request that moves the end date later also changes SLA terms in a way that would raise an existing contract's SLA fee (a lower commitment, wider confidence, or turning SLA off), that contract is not extended. See [SLA on extended contracts](/host/sla-offers#sla-on-extended-contracts).
+To extend the current rental contracts for all clients on a given machine, change the offer end date to a later time with the same or lower pricing. Moving the end date later extends every shorter active rental, including its SLA exposure, to the new date. If that request would also raise an existing contract's SLA fee, the immediate response skips that contract. A background job extends it shortly afterward anyway, under its original SLA terms. Do not move the end date later if you need to avoid that. See [SLA on extended contracts](/host/sla-offers#sla-on-extended-contracts).
 
 If you have raised the pricing, you cannot extend the current rental contracts.
 
@@ -209,7 +209,7 @@ There are two supported ways to test your own machine. If you want to use the we
 
 The preferred method of testing your own machine is to run the [CLI](https://cloud.vast.ai/cli/). For Windows users, we suggest setting up [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) which will require you to install Ubuntu on your Windows machine and change your bios settings to allow virtualization. Then you can start an Ubuntu terminal and run the CLI.
 
-To rent your own machine you will need to first search the offers with your machine ID to find the ID and then create an instance using that ID. Use the **host** account key for `show machines` and a separate **client** account key for `search offers` and `create instance` (`--api-key`). Renting with the host key is rejected. The show machine command will show all your connected machines.
+To rent your own machine you will need to first search the offers with your machine ID to find the ID and then create an instance using that ID. Use the **host** account key for `show machines` and a separate **client** account key for `search offers` and `create instance` (`--api-key`). A host key can rent offers on your own machines. Every other offer returns HTTP 400 `invalid_args` (`error 403/3586`). Use the client key so the test matches a real renter. The show machine command will show all your connected machines.
 
 ```text Text
 ./vastai show machines
@@ -245,11 +245,14 @@ You can then look at your [instance tab](https://cloud.vast.ai/instances/) to ma
 
 ## Maintenance
 
-**Prerequisite:** Notify renters from the console ([Set a maintenance window](/host/set-maintenance-window)) or with the CLI/REST. Use one path per window.
+**If renters are active:** notify them from the console ([Set a maintenance window](/host/set-maintenance-window)) or with the CLI/REST before downtime. Use one path per window.
 
 Remember that a single machine may have multiple active rental contracts from different clients, each with its own rental end date. All rental contracts must be honored.
 
-Unlisting the offer prevents new rentals but does not end existing ones. If you have active contracts, you can set the offer end date to match the latest rental end date so new clients rent instances that end together. Once that date is reached, unlist and perform maintenance. Setting the offer end date later extends every active rental that ends earlier, and SLA rentals keep their credit exposure for the extra time. See [SLA on extended contracts](/host/sla-offers#sla-on-extended-contracts). If you host SLA rentals, unlist instead of moving the end date later.
+Unlisting the offer prevents new rentals but does not end existing ones.
+
+- **No SLA rentals:** you can set the offer end date to the latest rental end date so new rentals end together, then unlist and maintain.
+- **SLA rentals:** unlist instead. Moving the end date later extends every shorter SLA contract and its credit exposure. See [SLA on extended contracts](/host/sla-offers#sla-on-extended-contracts).
 
 Use these paths in order:
 

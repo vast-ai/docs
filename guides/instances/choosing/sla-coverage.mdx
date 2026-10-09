@@ -297,7 +297,7 @@ Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `ta
 | Timeout, dropped connection, or HTTP 5xx | Outcome unknown — the rental may already exist | There is no idempotency key. Put a unique `label` on the rent body. Look it up with URL-encoded `select_filters` (`curl -G --data-urlencode 'select_filters={"label":{"eq":"YOUR_LABEL"}}'`) a few times, about a second apart (Show Instances threshold `1.0`). If any lookup returns a row, do not PUT again. If none do, re-search and retry with a fresh offer id and a **new** `label`. |
 | Too many requests | HTTP 429. Stay at or below about 10 search requests per minute per IP (Search Offers `x-rate-limit`). Back off on HTTP 429 before sending more. Space rent calls about 5 seconds apart (the rent endpoint's rate-limit threshold is 4.5). The body is `{"detail": ...}`, not `{success, error, msg}`. | Wait, then look up the same `label` with `GET /api/v1/instances/` before you retry. If a row exists, do not PUT again. If retry returns `invalid_price`, `no_such_ask`, or 410, re-search and rent a fresh offer id. |
 | Missing SSH key for the VM | HTTP 400 `no_ssh_key_for_vm` (or similar) | Add an SSH key on your account before renting, then retry with a current offer id. |
-| Forbidden / wrong account | HTTP 400 `invalid_args`. The message text includes `error 403/3586` and "Hosts can only rent their own machines." The HTTP status is 400, not 403. | Rent with a **renter** account API key, not the host listing key (see [Hosting Overview](/host/hosting-overview) self-test note). |
+| Forbidden / wrong account | HTTP 400 `invalid_args`. The message includes `error 403/3586` ("Hosts can only rent their own machines"). The HTTP status is 400, not 403. A host-only key gets this for every offer that is not on its own machines, including a missing offer. | Switch to a renter account key, then re-search (see [Hosting Overview](/host/hosting-overview) self-test note). |
 
 | Channel | Default storage | Field | Units (label) |
 | --- | --- | --- | --- |
@@ -323,6 +323,8 @@ When you rent an SLA-backed offer **with a target set**:
 <Warning>
 Billing continues during downtime. You are still charged for **compute, storage, and the SLA fee** while the contract exists and the instance is unavailable. Leaving a broken instance running continues those charges until you destroy it.
 </Warning>
+
+**This is different from non-SLA rentals.** Normally you are not charged while a machine is offline (see [Billing](/guides/reference/billing)). On an SLA contract you are billed for the intended compute, and the service credit is the compensation for that downtime.
 
 **Stop vs destroy:** Stopping pauses compute but storage and contract charges can continue. **Destroying the instance** ends future daily charges; final SLA settlement still posts when the contract closes. If you abandon a failed host, destroy only after saving any data you need.
 
