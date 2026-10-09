@@ -4601,9 +4601,11 @@ paths:
                   type: number
                   format: float
                   description: "Host confidence spread \u2014 how wide your belief\
-                    \ is around the claim.\nMust be greater than 0 and at most 3.0.\
-                    \ Defaults to 0.5 when SLA is first enabled on an ask. Omitting\
-                    \ it on an existing SLA ask keeps the current value.\n"
+                    \ is around the claim.\nSLA confidence spread. Defaults to 0.5\
+                    \ when an ask is created with SLA. When enabling SLA on an existing\
+                    \ ask, send it explicitly; omitting it keeps the stored value,\
+                    \ which may be empty. In that case show machines returns sla_confidence\
+                    \ null.\n"
                 sla_max_beta:
                   type: number
                   format: float
@@ -9349,7 +9351,8 @@ paths:
         (inclusive); the default lookback is 90 days when custom dates are omitted.
         Unknown query
 
-        parameters are rejected with `400 bad_request`.
+        parameters are rejected with `400 bad_request`. Optional `beta` is accepted
+        and ignored for hosts.
 
 
         Requires `machine_read` permission and ownership of the machine. See
@@ -9413,6 +9416,16 @@ paths:
         schema:
           type: number
         description: Range end as Unix epoch seconds. Default is now.
+      - name: beta
+        in: query
+        required: false
+        deprecated: true
+        schema:
+          type: number
+          minimum: 0
+          maximum: 1
+        description: Not a host setting. Accepted for compatibility and ignored. The
+          value used is echoed in params.beta.
       responses:
         '200':
           description: Successful response
