@@ -95,7 +95,7 @@ You can create scoped keys using:
 
 Create the key via [Create API Key](/api-reference/accounts/create-api-key). Do not copy the host recipe.
 
-**Workflow summary:** Search, then REST rent with `target_reliability`, then verify on v1 instances. The itemized **Service Credit** line is only in the console. Charges `type: "sla"` is the SLA fee minus any service credit.
+**Workflow summary:** Search, then REST rent with `target_reliability`, then verify on v1 instances. Charges and **Account → Billing → Charges** show the same net `type: "sla"` row. The console labels it **Service Credit** only when the amount is negative.
 
 - Create a **dedicated** key for this workflow only. `misc` covers bundle search and other bundled routes—not only search (including serverless). Constraints cannot limit `misc` to search only today. Treat a `misc` key as a high-impact secret. Do not reuse a full-access key.
 - **Search:** `misc` (no search-only permission exists). Search automation is rate-limited—see [Rate Limits and Errors](/api-reference/rate-limits-and-errors) and [API automation](/guides/instances/choosing/sla-coverage#api-automation) before production search loops.
@@ -121,7 +121,7 @@ This is the minimum for search, REST rent, and verification. Add `user_read` if 
 | Rent with an SLA | `instance_write` | Console **RENT** |
 | Verify `target_reliability` | `instance_read` | **Instances** |
 
-**Service credits:** An itemized **Service Credit** line appears only in the web console (**Account → Billing**). `GET /api/v0/charges/` requires `select_filters` with both `day.gte` and `day.lte` (unix seconds, UTC). A call without that range returns HTTP 400. The response can include `results[].items[]` rows with `type: "sla"` (description still **SLA Fee**). Each row is the **net** SLA settlement for settled days in the window: SLA fee minus any service credit. On a day with a credit the amount is smaller and can be negative. The row is omitted until the last day in the window has settled. Page by sending `next_token` as `after_token`. Stop when `next_token` is `null`. Invoices (`GET /api/v1/invoices/`) are payment transactions, not SLA credits.
+**Service credits:** **Account → Billing → Charges** and `GET /api/v0/charges/` show the same net row. The call requires `select_filters` with both `day.gte` and `day.lte` (unix seconds, UTC). A call without that range returns HTTP 400. The response can include `results[].items[]` rows with `type: "sla"`. Each row is the SLA fee minus any service credit. The console labels a negative amount **Service Credit** and any other amount **SLA Fee**. A credit smaller than the fee is a smaller **SLA Fee** row, not a separate line. The row is omitted until the last day in the window has settled. Page by sending `next_token` as `after_token`. Stop when `next_token` is `null`. Invoices (`GET /api/v1/invoices/`) are payment transactions, not SLA credits.
 
 ```bash
 curl -G "https://console.vast.ai/api/v0/charges/" \
@@ -130,7 +130,7 @@ curl -G "https://console.vast.ai/api/v0/charges/" \
 ```
 
 <Note title="API integrators">
-Do not use the Charges API alone to reconcile service credits. The `sla` row is a net amount, not an itemized credit, and it is missing until the window has settled.
+To reconcile a credit, compare each day's net `sla` row with the SLA fee you expected. A smaller or negative amount means a credit was applied. The row is missing until the window has settled.
 </Note>
 
 <a id="host-sla-scoped-key-recipe"></a>
