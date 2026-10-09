@@ -178,7 +178,7 @@ When you search with an SLA target, the quote is the on-demand price. Reserved-i
 | A | $3.50 | 99% | 95% | ~$0.04 |
 | B | $3.50 | 95% | 95% | much higher |
 
-Always compare **`dph_total`**, not just GPU price, when SLA matters. Sort by `dph_total` to compare total quoted cost.
+Always compare the total hourly price: the offer **Price** in the console, whose hover breakdown includes an **SLA Fee** line (API: `dph_total`). In the console, sort by price after you set **Reliability target**.
 
 ### API automation
 
@@ -320,7 +320,7 @@ curl -s -G "https://console.vast.ai/api/v0/charges/" \
 | Offer no longer exists | HTTP 400 `invalid_args` (`msg` may contain `error 404/3603`), HTTP 404 `no_such_ask` (`msg` may contain `error 404/3659` if the offer was taken mid-request), or HTTP 410 | Re-search and use a fresh offer ID. Do not retry the same ID. |
 | Ask cannot start now (`cancel_unavail`) | HTTP 410, error `no_such_ask` | Search for a new offer; this is not a transient glitch to retry on the same id |
 | `price` (bid) sent together with `target_reliability` | HTTP 400 "Cannot combine interruptible instances with SLAs" | Remove `price`. SLA rentals are on-demand only |
-| Timeout, dropped connection, or HTTP 5xx | Outcome unknown — the rental may already exist | There is no idempotency key. Put a unique `label` on the rent body. Look it up with URL-encoded `select_filters` (`curl -G --data-urlencode 'select_filters={"label":{"eq":"YOUR_LABEL"}}'`) a few times, about a second apart (Show Instances threshold `1.0`). If any lookup returns a row, do not PUT again. If none do, re-search and retry with a fresh offer id and a **new** `label`. |
+| Timeout, dropped connection, or HTTP 5xx | Outcome unknown — the rental may already exist | There is no idempotency key. Put a unique `label` on the rent body. Look it up with URL-encoded `select_filters` (`curl -G --data-urlencode 'select_filters={"label":{"eq":"YOUR_LABEL"}}'`) a few times, about a second apart (Show Instances threshold `1.0`). If any lookup returns a row, do not PUT again. If none do, re-search and retry with a fresh offer id and a **new** `label`. After any retry, keep checking for the original label on your next few polls. If it appears later, destroy whichever instance you do not want. |
 | Too many requests | HTTP 429. Search returns JSON. `error` is `HTTPTooManyRequests` for a short limit, or `search_quota_exceeded` when the daily row quota is used up. | If `error` is `search_quota_exceeded`, stop until `Retry-After` (it can be hours). Otherwise honor the short `Retry-After`. Keep search to about 10 requests per minute for the account, not per key. Space rent calls at least 5 seconds apart. Rent 429s are plain text and have no `Retry-After`. After a rent 429, look up the same `label` before you PUT again. The CLI and SDK do not read `Retry-After`. |
 | CLI or SDK retried a rent on its own | The CLI and SDK retry connection errors, timeouts, and HTTP 429, 502, 503, and 504. They do not read `Retry-After`. They cannot set `target_reliability`. | For an SLA rent you send yourself, set a unique `label` and look up that label before you PUT again. See [Rate limits](/cli/rate-limits). |
 | Daily search row quota | HTTP 429 with `error: "search_quota_exceeded"`. `Retry-After` points at the quota reset and can be hours away. Not every account is capped the same way. | Stop scanning. Honor `Retry-After`. Do not retry in a loop, and do not shard the same search to get around it. |
