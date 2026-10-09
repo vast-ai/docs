@@ -70,13 +70,10 @@ paths:
                 rented:
                   type: object
                   description: |
-                    When set to true, include offers where the calling user already has rented GPUs.
-                    This is useful for finding offers on machines you're already renting.
+                    Not a server-side filter. The server drops this key. Each offer still includes a `rented` flag. The packaged CLI does not filter on it either.
                   properties:
                     eq:
                       type: boolean
-                  default:
-                    eq: false
                 gpu_name:
                   type: object
                   description: 'GPU model name. Example: {"eq": "RTX_4090"} or {"in": ["RTX_3090", "RTX_4090"]}'
@@ -88,7 +85,25 @@ paths:
                       example: ["RTX_3090", "RTX_4090"]
                 reliability:
                   type: object
-                  description: 'Machine reliability score (0-1). Example: {"gte": 0.99}'
+                  description: 'Historical machine reliability score (0-1), not the host reliability commitment. Example: {"gte": 0.99}'
+                target_reliability:
+                  type: number
+                  description: |
+                    Reliability target for an SLA. Value must be greater than 0 and less than 1 (exclusive bounds —
+                    same as create-instance). When set, search prices include the SLA fee in dph_total and
+                    returns search.slaPremiumPerHour (the API name for that fee). Pass the same target again on PUT /api/v0/asks/{id}/ to
+                    enable the SLA. Send a plain number (for example 0.95); an operator object such as {"eq": 0.95} is rejected with 400 bad_request.
+                has_sla:
+                  type: object
+                  description: |
+                    Restrict to offers with SLA enabled (true) or without (false). Example: {"eq": true}
+                  properties:
+                    eq:
+                      type: boolean
+                expected_reliability:
+                  type: object
+                  description: |
+                    Host SLA claim on the offer (0-1). Example: {"gte": 0.99}
                 num_gpus:
                   type: object
                   description: 'Number of GPUs. Example: {"gte": 4} or {"in": [1, 2, 4, 8]}'
@@ -256,23 +271,19 @@ paths:
                     type: array
                     items:
                       type: string
-                  minItems: 2
-                  maxItems: 2
+                    minItems: 2
+                    maxItems: 2
                 allocated_storage:
                   type: number
                   description: |
-                      Storage allocation size in GB for the instance.
-                      This sets the disk size when creating the instance and cannot be changed later.
-                      Default is 8GB.
+                      Storage size in GB used to price offers in this search only. It is not carried into rent. Send the same value as `disk` on `PUT /api/v0/asks/{id}/`. If `disk` is omitted or 0 at rent, 10 GB is allocated. Values below 8 are raised to 8. Disk size cannot be changed after the instance is created.
             example:
               limit: 100
-              type: on-demand
+              type: ondemand
               verified: 
                 eq: true
               rentable: 
                 eq: true
-              rented: 
-                eq: false
       responses:
         '200':
           description: Successful search response
@@ -286,114 +297,120 @@ paths:
                     items:
                       type: object
                       additionalProperties: true
+                  truncated:
+                    type: boolean
+                    description: |
+                      True when the server cut the result short of `limit`. Narrow the query instead of assuming you saw every offer.
               example:
                 offers:
-                  id: 12345678
-                  ask_contract_id: 12345678
-                  bundle_id: 987654321
-                  bundled_results: null
-                  bw_nvlink: 0
-                  compute_cap: 900
-                  cpu_arch: "amd64"
-                  cpu_cores: 64
-                  cpu_cores_effective: 32
-                  cpu_ghz: 2.99
-                  cpu_name: "QuantumX 128-Core Processor"
-                  cpu_ram: 65536
-                  credit_discount_max: 0.15
-                  cuda_max_good: 11.2
-                  direct_port_count: 42
-                  disk_bw: 1234.5
-                  disk_name: "HYPERDISK 8TB"
-                  disk_space: 2048.5
-                  dlperf: 222.22
-                  dlperf_per_dphtotal: 333.33
-                  dph_base: 0.123456
-                  dph_total: 0.234567
-                  driver_version: "999.99.99"
-                  driver_vers: 999999999
-                  duration: 1234567.89
-                  end_date: 1893456000
-                  external: null
-                  flops_per_dphtotal: 444.44
-                  geolocation: "Atlantis, AT"
-                  geolocode: 42424242
-                  gpu_arch: "nvidia"
-                  gpu_display_active: false
-                  gpu_frac: 0.75
-                  gpu_ids: [1111, 2222]
-                  gpu_lanes: 16
-                  gpu_mem_bw: 888.8
-                  gpu_name: "Imaginary RTX 9999"
-                  gpu_ram: 24576
-                  gpu_total_ram: 49152
-                  gpu_max_power: 450
-                  gpu_max_temp: 42
-                  has_avx: 1
-                  host_id: 55555
-                  hosting_type: 0
-                  hostname: null
-                  inet_down: 9876.5
-                  inet_down_cost: 0.00123
-                  inet_up: 8765.4
-                  inet_up_cost: 0.00456
-                  is_bid: false
-                  logo: "/static/logos/fake_logo.png"
-                  machine_id: 88888
-                  min_bid: 0.111111
-                  mobo_name: "FANTASY-MOBO-2025"
-                  num_gpus: 4
-                  os_version: "42.42"
-                  pci_gen: 6
-                  pcie_bw: 99.9
-                  public_ipaddr: "203.0.113.42"
-                  reliability: 0.9999
-                  reliability_mult: 0.8888
-                  rentable: true
-                  rented: false
-                  score: 1234.5678
-                  start_date: 1893450000.5
-                  static_ip: true
-                  storage_cost: 0.987654
-                  storage_total_cost: 0.123456
-                  total_flops: 999.99
-                  verification: "verified"
-                  vericode: 1
-                  vram_costperhour: 0.009876
-                  webpage: null
-                  vms_enabled: false
-                  expected_reliability: 0.5
-                  is_vm_deverified: false
-                  resource_type: "gpu"
-                  cluster_id: null
-                  avail_vol_ask_id: 333333
-                  avail_vol_dph: 0.000321
-                  avail_vol_size: 4096
-                  nw_disk_min_bw: null
-                  nw_disk_max_bw: null
-                  nw_disk_avg_bw: null
-                  rn: 1
-                  dph_total_adj: 0.345678
-                  reliability2: 0.9999
-                  discount_rate: 0.05
-                  discounted_hourly: 0.01
-                  discounted_dph_total: 0.224567
-                  search:
-                    gpuCostPerHour: 0.123456
-                    diskHour: 0.123456
-                    totalHour: 0.234567
-                    discountTotalHour: 0.01
-                    discountedTotalPerHour: 0.224567
-                  instance:
-                    gpuCostPerHour: 0.01
-                    diskHour: 0.02
-                    totalHour: 0.03
-                    discountTotalHour: 0.001
-                    discountedTotalPerHour: 0.029
-                  time_remaining: ""
-                  time_remaining_isbid: ""
-                  internet_up_cost_per_tb: 1.23
-                  internet_down_cost_per_tb: 4.56
+                  - id: 12345678
+                    ask_contract_id: 12345678
+                    bundle_id: 987654321
+                    bundled_results: null
+                    bw_nvlink: 0
+                    compute_cap: 900
+                    cpu_arch: "amd64"
+                    cpu_cores: 64
+                    cpu_cores_effective: 32
+                    cpu_ghz: 2.99
+                    cpu_name: "QuantumX 128-Core Processor"
+                    cpu_ram: 65536
+                    credit_discount_max: 0.15
+                    cuda_max_good: 11.2
+                    direct_port_count: 42
+                    disk_bw: 1234.5
+                    disk_name: "HYPERDISK 8TB"
+                    disk_space: 2048.5
+                    dlperf: 222.22
+                    dlperf_per_dphtotal: 333.33
+                    dph_base: 0.123456
+                    dph_total: 0.234567
+                    driver_version: "999.99.99"
+                    driver_vers: 999999999
+                    duration: 1234567.89
+                    end_date: 1893456000
+                    external: null
+                    flops_per_dphtotal: 444.44
+                    geolocation: "Atlantis, AT"
+                    geolocode: 42424242
+                    gpu_arch: "nvidia"
+                    gpu_display_active: false
+                    gpu_frac: 0.75
+                    gpu_ids: [1111, 2222]
+                    gpu_lanes: 16
+                    gpu_mem_bw: 888.8
+                    gpu_name: "Imaginary RTX 9999"
+                    gpu_ram: 24576
+                    gpu_total_ram: 49152
+                    gpu_max_power: 450
+                    gpu_max_temp: 42
+                    has_avx: 1
+                    host_id: 55555
+                    hosting_type: 0
+                    hostname: null
+                    inet_down: 9876.5
+                    inet_down_cost: 0.00123
+                    inet_up: 8765.4
+                    inet_up_cost: 0.00456
+                    is_bid: false
+                    logo: "/static/logos/fake_logo.png"
+                    machine_id: 88888
+                    min_bid: 0.111111
+                    mobo_name: "FANTASY-MOBO-2025"
+                    num_gpus: 4
+                    os_version: "42.42"
+                    pci_gen: 6
+                    pcie_bw: 99.9
+                    public_ipaddr: "203.0.113.42"
+                    reliability: 0.9999
+                    reliability_mult: 0.8888
+                    rentable: true
+                    rented: false
+                    score: 1234.5678
+                    start_date: 1893450000.5
+                    static_ip: true
+                    storage_cost: 0.987654
+                    storage_total_cost: 0.123456
+                    total_flops: 999.99
+                    verification: "verified"
+                    vericode: 1
+                    vram_costperhour: 0.009876
+                    webpage: null
+                    vms_enabled: false
+                    expected_reliability: 0.99
+                    is_vm_deverified: false
+                    resource_type: "gpu"
+                    cluster_id: null
+                    avail_vol_ask_id: 333333
+                    avail_vol_dph: 0.000321
+                    avail_vol_size: 4096
+                    nw_disk_min_bw: null
+                    nw_disk_max_bw: null
+                    nw_disk_avg_bw: null
+                    rn: 1
+                    dph_total_adj: 0.345678
+                    reliability2: 0.9999
+                    discount_rate: 0.05
+                    discounted_hourly: 0.01
+                    discounted_dph_total: 0.224567
+                    search:
+                      gpuCostPerHour: 0.123456
+                      diskHour: 0.123456
+                      slaPremiumPerHour: 0.008
+                      totalHour: 0.234567
+                      discountTotalHour: 0.01
+                      discountedTotalPerHour: 0.224567
+                    instance:
+                      gpuCostPerHour: 0.01
+                      diskHour: 0.02
+                      slaPremiumPerHour: 0.008
+                      totalHour: 0.03
+                      discountTotalHour: 0.001
+                      discountedTotalPerHour: 0.029
+                    time_remaining: ""
+                    time_remaining_isbid: ""
+                    internet_up_cost_per_tb: 1.23
+                    internet_down_cost_per_tb: 4.56
         '400':
           description: Bad request - invalid query parameters
           content:
@@ -420,6 +437,27 @@ paths:
                   msg:
                     type: string
                     example: Invalid user key
+        '429':
+          description: |
+            Too many requests, or the daily search row quota is exhausted.
+            Both `HTTPTooManyRequests` and `search_quota_exceeded` include a `Retry-After` header.
+            The quota error's wait can be hours.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait. Present on both search 429s.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: search_quota_exceeded
+                  msg:
+                    type: string
+                    example: Daily search row quota exhausted
       tags:
       - Search
 x-tags:
@@ -428,4 +466,4 @@ x-tags:
 x-rate-limit:
   requests: 10
   per: minute
-  description: Rate limit per IP address
+  description: Rate limit per account for a signed-in API key. Unauthenticated calls are limited per IP address.

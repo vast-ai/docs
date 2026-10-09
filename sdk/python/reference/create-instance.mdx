@@ -3,7 +3,11 @@ title: "VastAI.create_instance"
 sidebarTitle: "create_instance"
 ---
 
-Create a new instance from a contract offer ID.
+Create a new instance from an offer/ask ID returned by search.
+
+<Note>
+**SLA:** `target_reliability` is not available on `create_instance()` today. No **SLA Fee** line on the Search offer, or on a **running** instance, means you do **not** have an SLA, even if an earlier search returned SLA pricing. The line is hidden while the instance is loading, stopped, or offline. Use the web console or REST `PUT /api/v0/asks/{id}/` to enable the SLA — see [SLA](/guides/instances/choosing/sla-coverage#api-automation). Use the same storage number in search (`allocated_storage` or `--storage`) and in the rent body (`disk`).
+</Note>
 
 ## Signature
 
@@ -44,11 +48,11 @@ VastAI.create_instance(
 ## Parameters
 
 <ParamField path="id" type="int" required>
-  id of instance type to launch (returned from search offers)
+  Offer/ask ID from search offers (same value as CLI create-instance). This is not a running instance ID.
 </ParamField>
 
 <ParamField path="image" type="Optional[str]">
-  docker container image to launch
+  Docker container image to launch. Pass `image`, `template_hash`, or both. A template can supply the image.
 </ParamField>
 
 <ParamField path="disk" type="float" default="10">
@@ -60,7 +64,7 @@ VastAI.create_instance(
 </ParamField>
 
 <ParamField path="price" type="Optional[float]">
-  
+  Bid price per machine in $/hour for interruptible rentals only. For on-demand rentals—including SLA via REST `target_reliability`—omit both `price` and `bid_price`.
 </ParamField>
 
 <ParamField path="label" type="Optional[str]">
@@ -68,7 +72,7 @@ VastAI.create_instance(
 </ParamField>
 
 <ParamField path="extra" type="Optional[str]">
-  
+  Extra Docker create options, passed through as a string.
 </ParamField>
 
 <ParamField path="onstart_cmd" type="Optional[str]">
@@ -112,7 +116,7 @@ VastAI.create_instance(
 </ParamField>
 
 <ParamField path="runtype" type="Optional[str]">
-  
+  Launch mode. Other fields on this page use values such as `ssh` and `jupyter`.
 </ParamField>
 
 <ParamField path="args" type="Optional[list]">
@@ -120,11 +124,11 @@ VastAI.create_instance(
 </ParamField>
 
 <ParamField path="volume_info" type="Optional[dict]">
-  
+  Optional volume to attach when the instance is created. See the CLI flags `--create-volume` and `--link-volume`.
 </ParamField>
 
 <ParamField path="bid_price" type="Optional[float]">
-  (OPTIONAL) create an INTERRUPTIBLE instance with per machine bid price in $/hour
+  (OPTIONAL) create an INTERRUPTIBLE instance with per machine bid price in $/hour. An SLA does not apply to interruptible rentals.
 </ParamField>
 
 <ParamField path="ssh" type="bool">
@@ -161,7 +165,7 @@ VastAI.create_instance(
 
 ## Returns
 
-`dict`
+`dict`. On success, the response includes `new_contract` — the rental contract / instance ID to use with destroy and `GET /api/v1/instances/` (`vastai show instances --raw`). The `id` you pass to `create_instance()` is the offer/ask ID from search, not `new_contract`. `create_instance()` cannot set `target_reliability`; use REST for an SLA.
 
 ## Example
 
@@ -169,6 +173,165 @@ VastAI.create_instance(
 from vastai import VastAI
 
 client = VastAI(api_key="YOUR_API_KEY")
-result = client.create_instance(id=12345)
+result = client.create_instance(
+    id=12345,  # offer/ask ID from search, not a running instance ID
+    image="pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime",
+    disk=50,
+)
 print(result)
 ```
+
+**SLA via REST:** `create_instance()` cannot set `target_reliability`. If you only use Python, rent with REST and pass the same target you searched with:
+
+```python
+import json
+import time
+import requests
+
+offer_id = 12345  # path id: offer/ask ID from search, not a running instance ID
+label = "rent-YOUR-UUID"
+headers = {"Authorization": "Bearer YOUR_API_KEY"}
+body = {
+    "image": "pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime",
+    "disk": 50,
+    "target_reliability": 0.95,
+    "cancel_unavail": True,
+    "label": label,
+}
+
+def instances_for_label():
+    try:
+        found = requests.get(
+            "https://console.vast.ai/api/v1/instances/",
+            params={"select_filters": json.dumps({"label": {"eq": label}})},
+            headers=headers,
+            timeout=30,
+        )
+        found.raise_for_status()
+    except requests.RequestException:
+        return None
+    return found.json().get("instances") or []
+
+already = instances_for_label()
+if already is None or already:
+    raise SystemExit("Label lookup failed, or this label already has an instance. Do not PUT.")
+
+try:
+    response = requests.put(
+        f"https://console.vast.ai/api/v0/asks/{offer_id}/",
+        headers=headers,
+        json=body,
+        timeout=60,
+    )
+    response.raise_for_status()
+    contract_id = response.json().get("new_contract")
+except requests.HTTPError as exc:
+    resp = exc.response
+    status = resp.status_code if resp is not None else 0
+    try:
+        err_body = resp.json() if resp is not None else {}
+    except ValueError:
+        err_body = {}
+    err = err_body.get("error", "") if isinstance(err_body, dict) else ""
+    msg = err_body.get("msg", "") if isinstance(err_body, dict) else ""
+    if status == 429:
+        wait = 5
+        if resp is not None:
+            try:
+                wait = max(float(resp.headers.get("Retry-After") or 0), 5)
+            except ValueError:
+                wait = 5
+        time.sleep(wait)
+        rows = instances_for_label()
+        if rows is None:
+            raise RuntimeError(
+                "Label lookup failed. Do not PUT again until you have checked Instances."
+            ) from exc
+        if rows:
+            contract_id = rows[0].get("id")
+        else:
+            try:
+                response = requests.put(
+                    f"https://console.vast.ai/api/v0/asks/{offer_id}/",
+                    headers=headers,
+                    json=body,
+                    timeout=60,
+                )
+                response.raise_for_status()
+                contract_id = response.json().get("new_contract")
+            except (requests.Timeout, requests.ConnectionError):
+                contract_id = None
+            except requests.HTTPError as retry_exc:
+                retry_resp = retry_exc.response
+                retry_status = retry_resp.status_code if retry_resp is not None else 0
+                try:
+                    retry_body = retry_resp.json() if retry_resp is not None else {}
+                except ValueError:
+                    retry_body = {}
+                retry_err = retry_body.get("error", "") if isinstance(retry_body, dict) else ""
+                retry_msg = retry_body.get("msg", "") if isinstance(retry_body, dict) else ""
+                offer_gone = (
+                    retry_status in (404, 410)
+                    or retry_err in ("no_such_ask", "invalid_price")
+                    or (retry_err == "invalid_args" and "404/3603" in str(retry_msg))
+                )
+                if retry_status == 429 or retry_status >= 500:
+                    contract_id = None
+                elif offer_gone:
+                    raise RuntimeError(
+                        "Offer is gone or its price changed. Re-search and retry with a new offer id and a new label. Do not retry this offer id."
+                    ) from retry_exc
+                else:
+                    raise RuntimeError(
+                        f"Rent failed ({retry_status} {retry_err}): {retry_msg}. Fix the request or account. Do not retry this offer id."
+                    ) from retry_exc
+    else:
+        offer_gone = (
+            status in (404, 410)
+            or err == "no_such_ask"
+            or err == "invalid_price"
+            or (err == "invalid_args" and "404/3603" in str(msg))
+        )
+        if offer_gone:
+            raise RuntimeError(
+                "Offer is gone or its price changed. Re-search and retry with a new offer id and a new label. Do not retry this offer id."
+            ) from exc
+        if 400 <= status < 500:
+            raise RuntimeError(
+                f"Rent failed ({status} {err}): {msg}. Fix the request or account. Do not retry this offer id."
+            ) from exc
+        contract_id = None
+except (requests.Timeout, requests.ConnectionError):
+    contract_id = None
+
+if contract_id is None:
+    time.sleep(5)
+    for _ in range(5):
+        rows = instances_for_label()
+        if rows:
+            contract_id = rows[0].get("id")
+            break
+        time.sleep(1)
+if contract_id is None:
+    raise RuntimeError(
+        "No instance for this label. Do not PUT again until you have checked Instances."
+    )
+print(contract_id)
+```
+
+The same call with curl:
+
+```bash
+curl -s -X PUT "https://console.vast.ai/api/v0/asks/OFFER_ID/" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "image": "pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime",
+    "disk": 50,
+    "target_reliability": 0.95,
+    "cancel_unavail": true,
+    "label": "rent-YOUR-UUID"
+  }'
+```
+
+See [SLA → API automation](/guides/instances/choosing/sla-coverage#api-automation).

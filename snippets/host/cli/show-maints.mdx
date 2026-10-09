@@ -5,14 +5,14 @@ Show maintenance information for host machines
 ## Usage
 
 ```bash
-vastai show maints -ids 'machine_id_1' [OPTIONS]
-vastai show maints -ids 'machine_id_1, machine_id_2' [OPTIONS]
+vastai show maints --ids 'machine_id_1' [OPTIONS]
+vastai show maints --ids 'machine_id_1,machine_id_2' [OPTIONS]
 ```
 
 ## Options
 
-<ParamField path="-ids" type="string">
-  comma seperated string of machine_ids for which to get maintenance information
+<ParamField path="--ids" type="string" required>
+  Comma-separated machine IDs (required). Example: `'12345,12346'`.
 </ParamField>
 
 <ParamField path="-q" type="boolean">
@@ -22,7 +22,13 @@ vastai show maints -ids 'machine_id_1, machine_id_2' [OPTIONS]
 ## Examples
 
 ```bash
-vastai show maints
+vastai show maints --ids '12345,12346' --raw
+```
+
+`--raw` prints a JSON list, one object per window. Each object includes `machine_id`, `start_time` (Unix seconds, UTC), `end_time`, `duration_hours`, `maintenance_category`, and `admin_scheduled` (`true` when Vast scheduled that window). To count windows that start at one time:
+
+```bash
+vastai show maints --ids '12345' --raw | jq --argjson s 1784851200 '[.[] | select(.start_time == $s)] | length'
 ```
 
 ## Global Options
@@ -32,7 +38,7 @@ The following options are available for all commands:
 | Option | Description |
 | --- | --- |
 | `--url URL` | Server REST API URL |
-| `--retry N` | Retry limit |
+| `--retry N` | Total attempts (default 3; use 1 for a single request; 0 sends nothing) |
 | `--raw` | Output machine-readable JSON |
 | `--explain` | Verbose explanation of API calls |
 | `--api-key KEY` | API key (defaults to `~/.config/vastai/vast_api_key`) |

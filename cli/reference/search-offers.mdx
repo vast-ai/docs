@@ -5,6 +5,15 @@ sidebarTitle: "search offers"
 
 Search for instance types using custom query
 
+<Note>
+The CLI can find SLA offers but cannot price them. To see the SLA fee in `dph_total`, search in the console or with REST. The CLI also cannot enable SLA at rent—use the [web console](/guides/instances/choosing/sla-coverage#in-the-web-console) or [API automation](/guides/instances/choosing/sla-coverage#api-automation). Details: [Next step for SLA](#next-step-for-sla).
+</Note>
+
+**If you only use the CLI today**
+
+1. Use `search offers` to find offers (SLA filters are optional). The CLI price does not include the SLA fee.
+2. To rent with SLA, open console Search, set **Reliability target** in the **left Search filters**, confirm an **SLA fee** line, then **RENT**—or follow [API automation](/guides/instances/choosing/sla-coverage#api-automation). `vastai create instance` cannot set `target_reliability`.
+
 ## Usage
 
 ```bash
@@ -14,13 +23,13 @@ vastai search offers [--help] [--api-key API_KEY] [--raw] <query>
 ## Arguments
 
 <ParamField path="query" type="string" required>
-  Query to search for. default: 'external=false rentable=true verified=true', pass -n to ignore default
+  Query to search for. default: `external=false rentable=true verified=true`. Pass `-n` to ignore the default. Neither the CLI nor the server filters on `rented`.
 </ParamField>
 
 ## Options
 
 <ParamField path="-t" type="string" default="on-demand">
-  Show 'on-demand', 'reserved', or 'bid'(interruptible) pricing. default: on-demand (alias: `--type`)
+  Show 'on-demand', 'reserved', or 'bid' (interruptible) pricing. default: on-demand (alias: `--type`)
 </ParamField>
 
 <ParamField path="-i" type="string">
@@ -44,24 +53,74 @@ vastai search offers [--help] [--api-key API_KEY] [--raw] <query>
 </ParamField>
 
 <ParamField path="--new" type="boolean">
-  New search exp
+  Experimental search path. Behavior and SLA fields may differ from the default search—not recommended for SLA automation or production. Prefer the default search for SLA filtering and `dph_total` quotes.
 </ParamField>
 
 <ParamField path="--limit" type="integer">
-  
+  Maximum number of offers to return. Prefer an explicit limit when comparing results. CLI `dph_total` never includes the SLA fee. Combine with `--order` / `-o` as needed.
 </ParamField>
 
 <ParamField path="--storage" type="number" default="5.0">
-  Amount of storage to use for pricing, in GiB. default=5.0GiB
+  Amount of storage to use for pricing, in GiB. default=5.0GiB. Console, REST, and CLI use different default disk sizes—see [SLA coverage → API automation](/guides/instances/choosing/sla-coverage#api-automation) before REST rent after a CLI search.
 </ParamField>
 
 <ParamField path="-o" type="string" default="score-">
-  Comma-separated list of fields to sort on. postfix field with - to sort desc. ex: -o 'num_gpus,total_flops-'.  default='score-' (alias: `--order`)
+  Comma-separated list of fields to sort on. Postfix the field name with `-` to sort descending (for example, `-o 'num_gpus,total_flops-'`). Default: `score-` (alias: `--order`)
 </ParamField>
 
 ## Description
 
-**Query syntax**
+Filter examples (including finding SLA offers) are under [Examples](#examples). Query syntax for advanced filters is at the end of Examples.
+
+## Examples
+
+<Warning>
+The CLI can find SLA offers but cannot price them. Treat `dph_total` as SLA-inclusive only when the search set `target_reliability` in the console or REST. From the CLI, `--order dph_total` sorts by price without the SLA fee. Match `--storage` to `--disk` if you rent via CLI for non-SLA. To **enable** SLA at rent, see [Next step for SLA](#next-step-for-sla) and [SLA coverage](/guides/instances/choosing/sla-coverage#finding-sla-offers).
+</Warning>
+
+```bash
+# Marketplace reliability score (not SLA commitment)
+# neither the CLI nor the server filters on rented; drop .rented == true yourself if you need to
+vastai search offers 'reliability > 0.98 num_gpus=1 gpu_name=RTX_3090' --raw | jq '[.[] | select(.rented != true)]'
+
+# Find SLA offers, then keep commitments of at least 99% in jq.
+# Do not put has_sla and expected_reliability in one CLI query: the CLI sends
+# the number as text and that pair fails on the server.
+# dph_total here excludes the SLA fee (see the Warning below).
+# Always set --storage explicitly when comparing dph_total (CLI default 5 GiB ≠ REST 8 GB).
+vastai search offers 'has_sla=true' --storage 50 --order dph_total --raw \
+  | jq '[.[] | select((.expected_reliability // 0) >= 0.99)]'
+```
+
+<Warning>
+The CLI can find SLA offers with `has_sla=true`. Filter `expected_reliability` in `jq`, not in the same query string. The CLI cannot price an SLA. `vastai search offers 'target_reliability=0.95'` is sent as `{"eq": 0.95}` and fails with HTTP 400 (`target_reliability: Input should be a valid number`). Treat `dph_total` as SLA-inclusive only when the search set `target_reliability` in the console or REST. From the CLI, `--order dph_total` sorts by price without the SLA fee.
+</Warning>
+
+<a id="next-step-for-sla"></a>
+
+**Next step for SLA:** Search quotes an SLA price. It does not enable an SLA. Enable SLA in the web console (**Reliability target** in **Search filters**, then **RENT**) or via REST `PUT /api/v0/asks/{id}/` with `target_reliability`. Do not use `vastai create instance` expecting SLA. See [SLA coverage](/guides/instances/choosing/sla-coverage#finding-sla-offers).
+
+```bash
+# datacenter GPUs with minimum compute capability and TFLOPs
+vastai search offers 'compute_cap > 610 total_flops > 5 datacenter=True'
+
+# reliable 4-GPU offers in Taiwan or Sweden
+vastai search offers 'reliability>0.99 num_gpus=4 geolocation in [TW,SE]'
+
+# reliable RTX 3090 or 4090 NOT in China or Vietnam
+vastai search offers 'reliability>0.99 gpu_name in [RTX_4090, RTX_3090] geolocation notin [CN,VN]'
+
+# nvidia driver 535.86.05 or greater with various constraints
+vastai search offers 'disk_space>146 duration>24 gpu_ram>10 cuda_vers>=12.1 direct_port_count>=2 driver_version >= 535.86.05'
+
+# reliable 4+ GPU offers, unverified allowed, sort by num_gpus desc
+vastai search offers 'reliability > 0.99  num_gpus>=4 verified=False' -o 'num_gpus-'
+
+# arm64 cpu architecture only
+vastai search offers 'cpu_arch=arm64'
+```
+
+**Query syntax (advanced)**
 
 ```
 query      = comparison comparison...
@@ -74,31 +133,6 @@ bool       = True | False
 
 - Wrap `>` and `<` in quotes on the command line
 - For string values (e.g. `gpu_name`), replace spaces with underscores: `RTX_3090` not `RTX 3090`
-
-## Examples
-
-```bash
-# reliable single RTX 3090, no conflicts with stopped instances
-vastai search offers 'reliability > 0.98 num_gpus=1 gpu_name=RTX_3090 rented=False'
-
-# datacenter GPUs with minimum compute capability and TFLOPs
-vastai search offers 'compute_cap > 610 total_flops > 5 datacenter=True'
-
-# reliable 4-GPU offers in Taiwan or Sweden
-vastai search offers 'reliability>0.99 num_gpus=4 geolocation in [TW,SE]'
-
-# reliable RTX 3090 or 4090 NOT in China or Vietnam
-vastai search offers 'reliability>0.99 gpu_name in ["RTX 4090", "RTX 3090"] geolocation notin [CN,VN]'
-
-# nvidia driver 535.86.05 or greater with various constraints
-vastai search offers 'disk_space>146 duration>24 gpu_ram>10 cuda_vers>=12.1 direct_port_count>=2 driver_version >= 535.86.05'
-
-# reliable 4+ GPU offers, unverified allowed, sort by num_gpus desc
-vastai search offers 'reliability > 0.99  num_gpus>=4 verified=False rented=any' -o 'num_gpus-'
-
-# arm64 cpu architecture only
-vastai search offers 'cpu_arch=arm64'
-```
 
 ## Available Fields
 
@@ -129,30 +163,47 @@ vastai search offers 'cpu_arch=arm64'
 | `gpu_max_temp` | float | GPU temp limit (°C) |
 | `gpu_mem_bw` | float | GPU memory bandwidth in GB/s |
 | `gpu_name` | string | GPU model name (no quotes, replace spaces with underscores, ie: RTX_3090) |
-| `gpu_ram` | float | per GPU RAM in GB |
+| `gpu_ram` | float | per GPU RAM in GB (CLI query). REST `POST /api/v0/bundles/` `gpu_ram` filters use MB—follow [Search Offers OpenAPI](/api-reference/search/search-offers) for REST. |
 | `gpu_total_ram` | float | total GPU RAM in GB |
 | `gpu_frac` | float | ratio of GPUs in the offer to GPUs in the system |
 | `gpu_display_active` | bool | True if the GPU has a display attached |
 | `has_avx` | bool | CPU supports AVX instruction set |
-| `id` | int | instance unique ID |
+| `id` | int | Offer/ask ID. Same `id` for `vastai create instance` (standard rent) or REST/console rent. For SLA, use REST `PUT /api/v0/asks/{id}/` or console Search filters **Reliability target** then **RENT**—CLI cannot set `target_reliability` |
 | `inet_down` | float | internet download speed in Mb/s |
 | `inet_down_cost` | float | internet download bandwidth cost in $/GB |
 | `inet_up` | float | internet upload speed in Mb/s |
 | `inet_up_cost` | float | internet upload bandwidth cost in $/GB |
-| `machine_id` | int | machine id of instance |
+| `machine_id` | int | Host machine ID (the physical machine backing the offer). Use it to find offers from a specific host machine — not the offer/ask `id` and not your rental contract ID (`new_contract`) |
 | `min_bid` | float | current minimum bid price in $/hr for interruptible |
 | `num_gpus` | int | number of GPUs |
 | `pci_gen` | float | PCIE generation |
 | `pcie_bw` | float | PCIE bandwidth (CPU to GPU) |
 | `reliability` | float | machine reliability score (see FAQ for explanation) |
+| `expected_reliability` | float | host’s advertised SLA reliability commitment on the offer |
+| `has_sla` | bool | restrict to offers with SLA enabled (`true`) or without (`false`) |
+| `target_reliability` | float | REST and console only. The current CLI sends this as an operator object and search rejects it (HTTP 400). See the Warning under Examples. |
 | `rentable` | bool | is the instance currently rentable |
-| `rented` | bool | allow/disallow duplicates and potential conflicts with existing stopped instances |
+| `rented` | bool | Returned on each offer. Not a filter. The server drops `rented` in the query. |
 | `storage_cost` | float | storage cost in $/GB/month |
 | `static_ip` | bool | is the IP addr static/stable |
 | `total_flops` | float | total TFLOPs from all GPUs |
 | `ubuntu_version` | string | host machine ubuntu OS version |
 | `verified` | bool | is the machine verified |
 | `vms_enabled` | bool | is the machine a VM instance |
+
+**SLA query keys:** `has_sla`, `expected_reliability`, `target_reliability`. `dph_total` and `search.slaPremiumPerHour` include the SLA fee only when the search set `target_reliability`. The CLI cannot send it: a query string becomes `{"eq": …}` and returns HTTP 400, so CLI `--raw` output has no SLA fee. The `VastAI` client can, if you pass a dict such as `search_offers(query={"has_sla": {"eq": True}, "target_reliability": 0.95}, storage=50)`. `SyncClient.search` (and `AsyncClient.search`) can also quote an SLA with `target_reliability` as a plain number. Neither client can enable SLA at rent: `create_instance()` and `InstanceConfig` have no `target_reliability`. `SyncClient` and `AsyncClient` do not retry. Pass the same `storage` you will rent. The SDK default is 5 GiB, which changes `dph_total`. The SDK returns only the offers list. `truncated` is visible only via REST. When it is true, the server cut the result short of `limit`. Narrow the query instead of assuming you saw every offer. A string query fails the same way as the CLI. `search_offers()` cannot rent with SLA. `dph_total` (alias `dph`) is also a CLI query filter, and that filter compares the price **without** the SLA fee.
+
+| Field | Meaning |
+| --- | --- |
+| `dph_total` | Total $/hr. Includes the SLA fee only when that search set `target_reliability` (not in CLI output) |
+| `search.slaPremiumPerHour` | SLA fee for that quote. `0` or absent in CLI `--raw` output |
+| `expected_reliability` | Host reliability commitment (also a query key; see Available Fields) |
+
+<Note>
+REST and the Python SDK (dict query only) accept `target_reliability` and return `search.slaPremiumPerHour` for that quote. The CLI cannot. A string `target_reliability` filter is sent as an operator object and returns HTTP 400. Do not read an SLA fee from CLI `--raw` output. Setting `target_reliability` in search does not enable the SLA at rent time; use console **Search filters → Reliability target** then **RENT**, or REST `PUT /api/v0/asks/{id}/` (not `vastai create instance` or `create_instance()`) as in [SLA](/guides/instances/choosing/sla-coverage).
+
+The same filters on `POST /api/v0/bundles/` use JSON operators. Match this shape from [SLA → API automation](/guides/instances/choosing/sla-coverage#api-automation): `"has_sla": {"eq": true}`, `"expected_reliability": {"gte": 0.99}`, `"target_reliability": 0.95` (a plain number; `{"eq": 0.95}` is rejected with 400). In that example `allocated_storage` is a number, not an operator object. The current CLI prints `Warning: Unrecognized field` for `has_sla` and `expected_reliability`. The warning is harmless: those fields are still sent. `target_reliability` is not in that harmless set. To self-check, run `--raw | jq 'all(.[]; .expected_reliability > 0)'` (CLI `--raw` prints a bare array of offers, not an `offers` object).
+</Note>
 
 ## Global Options
 
@@ -161,7 +212,7 @@ The following options are available for all commands:
 | Option | Description |
 | --- | --- |
 | `--url URL` | Server REST API URL |
-| `--retry N` | Retry limit |
+| `--retry N` | Total attempts (default 3; use 1 for a single request; 0 sends nothing) |
 | `--raw` | Output machine-readable JSON |
 | `--explain` | Verbose explanation of API calls |
 | `--api-key KEY` | API key (defaults to `~/.config/vastai/vast_api_key`) |

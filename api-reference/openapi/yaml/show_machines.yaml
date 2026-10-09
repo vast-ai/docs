@@ -9,15 +9,25 @@ paths:
       description: |
         Fetches data for multiple machines associated with the authenticated user.
 
+        `--raw` includes listing state for read-modify-write: `listed`, `listed_gpu_cost` (send as `price_gpu`), `listed_storage_cost` (send as `price_disk`), `end_date`, `duration`, `sla_reliability_claim` (send as `sla_r_claim`) and the `sla_confidence` band label. `sla_sigma_x` is not returned. See [SLA Offers](/host/sla-offers#api-for-automation).
+
         CLI Usage: `vastai show machines [--user_id <user_id>]`
       operationId: getMachines
       parameters:
       - name: user_id
         in: query
-        required: true
-        description: The ID of the user whose machines are being requested.
+        required: false
+        description: Ignored. Results are scoped to the API key owner.
         schema:
           type: string
+      - name: include_offline
+        in: query
+        required: false
+        schema:
+          type: boolean
+        description: >
+          When true, include this host's machines that have been offline for up to about 3 days.
+          The default cutoff is about 10 hours.
       responses:
         '200':
           description: A list of machines
@@ -32,11 +42,78 @@ paths:
                       type: object
                       properties:
                         id:
-                          type: string
+                          type: integer
                           description: The unique identifier for the machine.
                         name:
                           type: string
                           description: The name of the machine.
+                        listed:
+                          type: boolean
+                          description: true when the machine currently has a published offer.
+                        listed_gpu_cost:
+                          type: number
+                          nullable: true
+                          description: Listed GPU price in $/hour (`price_gpu` on create_asks). null when not listed.
+                        listed_storage_cost:
+                          type: number
+                          nullable: true
+                          description: Listed storage price in $/GB/month (`price_disk` on create_asks). null when not listed. Omitting `price_disk` on update resets it to 0.10.
+                        listed_inet_up_cost:
+                          type: number
+                          nullable: true
+                          description: Listed upload bandwidth price (`price_inetu` on create_asks).
+                        listed_inet_down_cost:
+                          type: number
+                          nullable: true
+                          description: Listed download bandwidth price (`price_inetd` on create_asks).
+                        duration:
+                          type: number
+                          nullable: true
+                          description: Auto-renew duration. Send it back on create_asks or the listing stops auto-renewing.
+                        end_date:
+                          type: number
+                          nullable: true
+                          description: Offer expiration as Unix timestamp. null when not listed.
+                        listed_min_gpu_count:
+                          type: integer
+                          nullable: true
+                          description: Minimum GPUs rented together (`min_chunk` on create_asks).
+                        sla_reliability_claim:
+                          type: number
+                          nullable: true
+                          description: |
+                            Host reliability commitment (`sla_r_claim` on create_asks). Returned when SLA terms are visible (listed, approved, daemon recent enough). `0` means SLA was explicitly turned off. Null when terms are not visible.
+                        sla_confidence:
+                          type: string
+                          nullable: true
+                          enum: [high, medium, low]
+                          description: |
+                            Confidence band for the ask's `sla_sigma_x`: high = Tight (sigma_x <= 0.32),
+                            medium = Normal (<= 0.71), low = Wide. Same visibility as `sla_reliability_claim`: present when terms are visible, null otherwise. `low` is Wide, not low risk.
+                        current_rentals_resident:
+                          type: integer
+                          nullable: true
+                          description: Resident rentals on the machine, including stopped ones. Null when the summary is missing.
+                        credit_discount_max:
+                          type: number
+                          nullable: true
+                          description: Reserved discount on the ask. Null when the machine is not listed.
+                        min_bid_price:
+                          type: number
+                          nullable: true
+                          description: Host-side minimum bid, net of the platform fee. It does not round-trip as price_min_bid.
+              example:
+                machines:
+                  - id: 12345
+                    name: my-h100
+                    listed: true
+                    listed_gpu_cost: 3.5
+                    listed_storage_cost: 0.15
+                    duration: null
+                    end_date: 1735689600
+                    listed_min_gpu_count: 1
+                    sla_reliability_claim: 0.99
+                    sla_confidence: medium
         '401':
           description: Unauthorized - User authentication failed
         '429':

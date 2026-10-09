@@ -3,13 +3,13 @@ title: "CLI Rate Limits and Errors"
 sidebarTitle: "Rate Limits"
 ---
 
-The Vast.ai CLI automatically retries rate-limited requests. You do not need to implement your own retry logic -- the CLI handles HTTP 429 responses with exponential backoff out of the box.
+The Vast.ai CLI retries some failed requests. With the default of 3 attempts, those retries finish in under a second and do not read `Retry-After`. For offer search, rent, `create_asks`, and maintenance scheduling, add your own spacing. See [SLA API automation](/guides/instances/choosing/sla-coverage#api-automation).
 
 This page covers the error format, how rate limits work, and how to configure the CLI's built-in retry behavior. For the full details on rate limit mechanics, see the [API Rate Limits and Errors](/api-reference/rate-limits-and-errors) page.
 
 ## Error Responses
 
-When a CLI command fails, it prints the error message from the API and exits with a non-zero status code. The underlying API error shape is:
+When the server returns an HTTP error, the CLI prints it to stderr and exits with status 0. With `--raw`, that stderr line is JSON: `{"error": true, "status_code": N, "msg": "…"}`. Scripts must check the output, not the exit status. The underlying API error shape is:
 
 ```json
 {
@@ -23,7 +23,7 @@ Some endpoints omit `success` or `error` and return only `msg` or `message`. The
 
 ## How Rate Limits Work
 
-Vast.ai applies rate limits **per endpoint** and **per identity**. The identity is determined by your bearer token, session user, `api_key` parameter, and client IP.
+Vast.ai applies rate limits **per endpoint**. For an API key, the limit is on that key's account. Extra keys on the same account share it. The client IP is used only when a request does not resolve to an account.
 
 Some endpoints also enforce **method-specific** limits (GET vs POST) and **max-calls-per-period** limits for short bursts.
 
@@ -31,51 +31,41 @@ For the full breakdown, see [How rate limits are applied](/api-reference/rate-li
 
 ## Rate Limit Response
 
-When you hit a rate limit, the API returns **HTTP 429** with a message like:
+HTTP 429 comes in two families. See [Rate Limits and Errors](/api-reference/rate-limits-and-errors#rate-limit-response-behavior).
 
-```
-API requests too frequent
-```
+- Rent, show-instances, `create_asks`, and `show earnings` (machine earnings) do not return the JSON `{"error": …}` body. With a default Accept header the body is usually HTML. Search, charges, the other earnings routes, schedule maintenance, and the SLA backtester return JSON. A short limit uses `"error": "HTTPTooManyRequests"`. A daily search quota hit uses `"error": "search_quota_exceeded"` and a `Retry-After` that can be hours. The CLI prints only the server `msg` (`Daily search row quota exhausted`), not that `error` code. In scripts, match HTTP 429 plus the message text.
+- Both kinds include a `Retry-After` header. Detect a limit by HTTP status 429. The CLI never reads `Retry-After`.
 
-or
-
-```
-API requests too frequent: endpoint threshold=...
-```
-
-The API does not return a `Retry-After` header. The CLI handles this automatically using its built-in retry logic.
+The CLI never reads `Retry-After`. With the default of 3 attempts, its retries finish in under a second. If your script calls the API directly, wait at least `Retry-After` when it is present.
 
 ## Built-in Retry Behavior
 
-When the CLI receives an HTTP 429 response, it automatically retries the request using exponential backoff:
+The CLI retries a failed request on HTTP 429, 502, 503, and 504, and on connection errors and timeouts. With the default of 3 attempts, those retries finish in under a second. It never reads `Retry-After`.
 
-- **Retried status codes:** 429 only
-- **Default retries:** 3
-- **Backoff strategy:** starts at 0.15 seconds, multiplied by 1.5x after each attempt
-- **Retry delays:** ~0.15s, ~0.225s, ~0.34s
+- `--retry` is the **total number of attempts**, not extra retries after the first try.
+- **Default:** 3 attempts (one request plus two retries), with delays of about 0.15 s and 0.225 s.
+- **Backoff:** starts at 0.15 seconds, multiplied by 1.5 after each attempt. The CLI does not read `Retry-After`.
+- To send a request once, use `--retry 1`. Do not use `--retry 0`. It sends no request and the command fails.
 
-For most usage, the defaults handle transient rate limits without any intervention.
+Any rent can be sent twice if the first request reached the server and the connection then failed. The same applies to `vastai schedule maint` and `vastai list machine`: a retry after a timeout can create a second maintenance window or a second ask. For those commands in scripts, pass `--retry 1` and confirm the result before you run the command again. Set a unique `--label` and check your instances for it before you rent again. The CLI and SDK cannot turn SLA on; SLA rentals use the console or REST. Use the same label check in your own retry logic. See [SLA API automation](/guides/instances/choosing/sla-coverage#api-automation).
 
 <Tip>
-The CLI only retries on 429 (rate limit). Other HTTP errors (4xx, 5xx) are reported immediately.
+The CLI retries 429, 502, 503, 504, connection errors, and timeouts. Other HTTP errors are reported immediately.
 </Tip>
 
 ## Configuring Retries
 
-Use the `--retry` flag on any command to change the number of retry attempts:
+Use the `--retry` flag on any command to change the total number of attempts:
 
 ```bash
-# Use default 3 retries
+# Default: 3 attempts
 vastai search offers 'gpu_name=RTX_4090 rentable=true'
 
-# Increase to 6 retries for a batch script
-vastai search offers 'gpu_name=RTX_4090 rentable=true' --retry 6
-
-# Disable retries entirely
-vastai search offers 'gpu_name=RTX_4090 rentable=true' --retry 0
+# One attempt only
+vastai search offers 'gpu_name=RTX_4090 rentable=true' --retry 1
 ```
 
-Increasing the retry count is useful for scripts that make many API calls in sequence, where occasional rate limiting is expected.
+Raising `--retry` does not replace your own request spacing. On a rent, each extra attempt can send the request again.
 
 ## Reducing Rate Limit Errors
 

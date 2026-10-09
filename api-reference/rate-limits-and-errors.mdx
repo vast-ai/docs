@@ -23,28 +23,34 @@ Some omit `error` and return only `msg` or `message`.
 
 ### How rate limits are applied
 
-Vast.ai applies rate limits **per endpoint** and **per identity**. This is enforced as a minimum interval between requests for a given endpoint and identity.
+Vast.ai applies rate limits **per endpoint** and **per identity**. This is enforced as a minimum interval between requests for a given endpoint and identity. OpenAPI `x-rate-limit.threshold`, and the `threshold=` value in a 429 message, is that interval in seconds.
 
-The identity is determined by: bearer token + session user + `api_key` query param + client IP.
+For a signed-in API key, the limit is per user account. Extra keys on the same account do not raise it. A call that does not resolve to an account is limited by client IP.
 
 Some endpoints also use **method-specific** limits (GET vs POST) and/or **max-calls-per-period** limits for short bursts.
 
+The combined API reference does not always show each operation's `x-rate-limit` block. For SLA workflows, use this pacing:
+
+| Endpoint | Safe pacing |
+| --- | --- |
+| Search offers (`POST /bundles/`) | about 10 requests per minute |
+| Rent (`PUT /asks/{id}/`) | At least 5 seconds between calls (server threshold 4.5 s) |
+| Show instances (v1) | one call per second |
+| Show charges | one call per second |
+| Show earnings and the SLA backtester | one call every 2 seconds |
+| Schedule maintenance | one call every 2.5 seconds |
+| Create or update a listing (`create_asks`) | one call every 5 seconds |
 
 ### Rate limit response behavior
 
-When you hit a rate limit, you will receive **HTTP 429**. The response body is often plain text (in certain cases JSON with `success`/`error`/`msg` like above) with one of the following messages:
+When you hit a rate limit, you will receive **HTTP 429**. There are two families:
 
-```
-API requests too frequent
-```
+- **Legacy-limited routes** (rent `PUT /api/v0/asks/{id}/`, `GET /api/v1/instances/`, listing `PUT /api/v0/machines/create_asks/`, and machine earnings `GET /api/v0/users/{user_id}/machine-earnings/`): the body is not the JSON `{"error": …}` shape. With the default `Accept: */*` (curl, `requests`) it is usually an HTML page. With `Accept: application/json` it is a generic JSON error. Detect the limit by HTTP status 429 and `Retry-After`.
+- **JSON 429:** search `POST /api/v0/bundles/`, charges `GET /api/v0/charges/`, the other earnings routes, schedule maintenance, and the SLA backtester. The body is `{"error": "HTTPTooManyRequests", "msg": "API requests too frequent", "retry_after": …}`. A daily search quota hit uses the same shape with `"error": "search_quota_exceeded"` and a `Retry-After` that can be hours.
 
-or
+Both kinds include a `Retry-After` header and `X-RateLimit-*` headers. Honor `Retry-After` when you see it. The CLI and SDK never read `Retry-After`.
 
-```
-API requests too frequent: endpoint threshold=...
-```
-
-The API does not currently set standard rate-limit headers (for example `Retry-After`), so clients should apply their own backoff strategy.
+Honor `Retry-After` whenever it is present. If it is absent, wait at least that endpoint's pacing interval before the next call.
 
 ### How to reduce rate limit errors
 
