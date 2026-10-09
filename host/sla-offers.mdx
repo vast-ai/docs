@@ -360,7 +360,7 @@ This creates an offer with a reliability commitment of `0.99` and confidence spr
 - On a **new** ask (first publish, or a new offer after unlist), omitted `price_inetu` and `price_inetd` become `0` (free bandwidth) and omitted `credit_discount_max` becomes `0.4`. Updating an existing ask keeps those values when they are omitted. Send `listed_inet_up_cost`, `listed_inet_down_cost`, and `credit_discount_max` when you create the offer.
 - Send **either** `duration` (integer seconds; a float such as `2592000.0` returns 400 `Invalid duration`) **or** `end_date`, never both. Sending both returns `400` `Cannot set both duration and end_date`.
 
-Always read the current listing and send `price_disk` plus either `duration` or `end_date`. Map read-side names as follows: `listed_gpu_cost` → `price_gpu`, `listed_storage_cost` → `price_disk`.
+Always read the current listing and send `price_disk`. To change Claim or Confidence on a rented machine **without** extending rentals, omit both `duration` and `end_date`. The stored end date stays, and no contract is extended. Omitting `duration` on a rolling listing turns auto-renew off. Send `duration` (integer seconds) or `end_date` only when you mean to keep auto-renew or to extend. Map read-side names as follows: `listed_gpu_cost` → `price_gpu`, `listed_storage_cost` → `price_disk`.
 </Warning>
 
 Read current listing fields from `vastai show machines --raw`:
@@ -376,6 +376,12 @@ Machine `id` may be a string in raw JSON. The response is wrapped in a `machines
 Then `PUT /api/v0/machines/create_asks/` with the merged body (read → merge → PUT). `vastai list machine` and the Python SDK listing helpers cannot set SLA fields; start from this REST pattern (or the console) when you move an existing CLI listing to SLA.
 
 ### Fleet SLA re-list (machines that already have an SLA)
+
+Use this loop only to restore SLA offers that no longer appear in search on machines with **zero** rentals. It does not change prices or SLA terms. To change terms, use [Update SLA on an existing ask](#update-sla-on-an-existing-ask-partial-body).
+
+<Warning>
+"Missing from search" also matches every **hidden** listing (hidden listings are not shown in search) and every **offline** machine (`create_asks` returns HTTP 402 until the machine is online). Any hidden machine not listed in `HIDDEN_IDS` becomes **public** on a live run. Machines in `HIDDEN_IDS` show up as "would re-list" in every dry run. That is expected. Set `HIDDEN_IDS` before `DRY_RUN=0` (space-separated IDs, or `HIDDEN_IDS=none` if you have no hidden listings).
+</Warning>
 
 <Note>
 **Console hosts:** skip this section. Enable an SLA with [Web console](#web-console) and check settlement in [Console (recommended for day-to-day checks)](#console-recommended-for-day-to-day-checks).
@@ -425,8 +431,13 @@ This example is illustrative: it sleeps between machines and logs success/error 
 # Set DRY_RUN=0 to apply.
 # ALLOWLIST required for DRY_RUN=0 (space-separated listed machine IDs).
 ALLOWLIST="${ALLOWLIST:-}"
-# Hidden listings: show machines does not return hidden_listing, and omitting it
-# makes the listing public. Put every hidden machine ID here, or leave it off ALLOWLIST.
+# Hidden listings: show machines does not return hidden_listing. A live PUT
+# without hidden_listing: true makes the listing public. Set HIDDEN_IDS to
+# every hidden machine ID, or HIDDEN_IDS=none if you have no hidden listings.
+if [ "${DRY_RUN:-1}" = "0" ] && { [ -z "${HIDDEN_IDS+x}" ] || [ -z "$HIDDEN_IDS" ]; }; then
+  echo "abort: set HIDDEN_IDS (space-separated hidden machine IDs, or HIDDEN_IDS=none) before DRY_RUN=0" >&2
+  exit 1
+fi
 HIDDEN_IDS="${HIDDEN_IDS:-}"
 # Volume offers: 0 = do not create a volume offer (default). It does not delete one you already have.
 # Set VOL_SIZE="" only if every allowlisted machine should get the server default (half of free disk).
