@@ -230,7 +230,7 @@ For planning, assume a worst-case day costs up to one full day of covered comput
 
 On a listed machine, moving the offer end date later extends every shorter active SLA rental and your credit exposure. To avoid that, unlist instead of extending. Auto-renew (`duration` or `vastai list machine -l`) keeps moving that end date forward and extends active SLA rentals with it. See the warning under [Full listing update](#full-listing-update-existing-ask).
 
-When a rental contract is extended (by moving the offer end date forward at the same or lower price), the original SLA parameters remain in effect for the extended period. Changing SLA parameters on the offer does not alter SLA terms on existing contracts — only new rental contracts pick up updated SLA settings. Hosts do not set the SLA fee directly. It changes when you change **Claim** or **Confidence** (a wider Confidence raises the fee at a given target). Any `end_date` you send extends every active rental that ends before that timestamp, SLA rentals included, under their original terms. You cannot see each contract's end date. To avoid extending SLA rentals, unlist. If you do send an `end_date`, assume shorter rentals will be extended, and read `upd_contracts` afterwards. Some contracts are extended a few minutes after the response and do not appear in `upd_contracts`. A GPU, disk, or bandwidth price increase blocks extension. A Claim or Confidence change alone does not. Assume any shorter active rental may still be extended under its original SLA terms, even if it does not appear in `upd_contracts`.
+When a rental contract is extended (by moving the offer end date forward at the same or lower price), the original SLA parameters remain in effect for the extended period. Changing SLA parameters on the offer does not alter SLA terms on existing contracts — only new rental contracts pick up updated SLA settings. Hosts do not set the SLA fee directly. It changes when you change **Claim** or **Confidence** (a wider Confidence raises the fee at a given target). Any `end_date` you send extends every active rental that ends before that timestamp, SLA rentals included, under their original terms. You cannot see each contract's end date. To avoid extending SLA rentals, unlist. If you do send an `end_date`, assume shorter rentals will be extended, and read `upd_contracts` afterwards. Some contracts are extended a few minutes after the response and do not appear in `upd_contracts`. A GPU, disk, or bandwidth price increase blocks extension. A Claim or Confidence change in the same request also blocks extension for any contract whose SLA fee would rise. That contract keeps its current end date and is missing from `upd_contracts`. Those changes never alter existing contract terms, and they do not block an extension in a later request. You cannot see each contract's end date. **Host → Machines** shows the latest rental end date on the machine.
 
 Disabling SLA on the offer (setting `sla_r_claim` to `0`) prevents new SLA-covered contracts but does not terminate SLA on existing active contracts — they continue under their original SLA terms until their rental end date.
 
@@ -306,7 +306,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
 Replace `price_disk` with the machine's current `listed_storage_cost`. Replace `CURRENT_MIN_CHUNK` with `listed_min_gpu_count` (it defaults to 1 only when offers are created or re-created). Send `"hidden_listing": true` if the listing is hidden. Do not copy example prices into a first listing. Send `end_date` only in the full listing update below, when you mean to extend.
 
 <Warning>
-Any active rental that ends **before** the `end_date` you send is extended to that date, unless the same request raises the GPU, disk, or bandwidth price. A Claim or Confidence change that only raises the SLA fee does **not** prevent a later extension (see [SLA on extended contracts](#sla-on-extended-contracts)). Resending the offer's current `end_date` is not a no-op when some rentals end sooner. `upd_contracts` lists only contracts extended immediately. See [Extending rental contracts](/host/hosting-overview#extending-rental-contracts).
+Any active rental that ends **before** the `end_date` you send is extended to that date, unless the same request raises the GPU, disk, or bandwidth price, or changes Claim or Confidence in a way that would raise that contract's SLA fee. A Claim or Confidence change does **not** prevent a later extension (see [SLA on extended contracts](#sla-on-extended-contracts)). Resending the offer's current `end_date` is not a no-op when some rentals end sooner. `upd_contracts` lists only contracts extended immediately. See [Extending rental contracts](/host/hosting-overview#extending-rental-contracts).
 </Warning>
 
 #### Full listing update (existing ask)
@@ -768,7 +768,7 @@ SLA approval, settlement questions, credit disputes, and locked machines are sep
   3. Unlist the machine.
   4. Fix the problem.
   5. After the next UTC midnight, check **Host → Billing** for that day's SLA earnings.
-  6. Re-enter the terms from step 2, confirm the SLA fee preview, **Save**, then **LIST**. Re-entering an end date later than a rental's current end extends that rental, including SLA rentals from this outage. You cannot see each rental's end date. To avoid extending them, wait until those rentals end before you relist.
+  6. Re-enter the terms from step 2, confirm the SLA fee preview, **Save**, then **LIST**. Re-entering an end date later than a rental's current end extends that rental, including SLA rentals from this outage. You cannot see each rental's end date. **Host → Machines** shows the latest rental end date on the machine. Relist after that date so you do not extend any rental.
 
   **API**
 
@@ -797,13 +797,15 @@ SLA approval, settlement questions, credit disputes, and locked machines are sep
 
 ## Monitoring SLA after listing
 
-On SLA rentals, compute pay and the SLA fee are released together as SLA earnings over several days. A single smaller release can reflect release timing, not a service credit. By itself it is not proof of a credit.
-
 After you enable SLA, charges and credits settle on UTC (Coordinated Universal Time) day boundaries. SLA earnings rows typically appear in **Host → Billing** within a few hours after UTC midnight (exact timing can vary).
 
-For SLA contracts, `sla_earn` is the escrow released to you that day. It is not a per-contract list of service credits. A lower value can be release timing rather than a credit. For a breakdown on one contract, contact support. Do not treat `sla_earn` as the same number as the backtester's `escrow_to_host_balance`. The replay's compute input leaves out earnings from SLA contracts, so the two diverge on days that already had SLA rentals. See [Simulation limits](/host/sla-backtester#simulation-limits). Releases are spread over time rather than paid out the same day, so an early or low day can reflect release timing, not a service credit. A credit can also reduce later releases. Compare several days of `per_machine[].sla_earn` before you assume a credit. The backtester cannot confirm a past credit: it under-counts days that already had SLA rentals. See [Simulation limits](/host/sla-backtester#simulation-limits). SLA-contract compute is **not** included in `gpu_earn`, `sto_earn`, or bandwidth earnings, so those fields stay near zero for SLA rentals. `sla_earn` is normally positive and is negative only when a prior day is corrected. Do not compare it to the backtester's largest single-day credit.
+**Reading `sla_earn`**
 
-When you poll the API, use **`per_machine[].sla_earn`** for a single machine. **`per_day[].sla_earn` is always fleet-wide**—even if you pass `machid`.
+- `sla_earn` is the SLA escrow released to you that day. It is not a list of service credits, and it is not the same number as the backtester's `escrow_to_host_balance`.
+- Releases are spread across days, so one low day can be release timing. Compare several days of `per_machine[].sla_earn` with a normal week before you assume a credit. For one contract, contact support.
+- The backtester under-counts days that already had SLA rentals, so it cannot confirm a past credit. See [Simulation limits](/host/sla-backtester#simulation-limits).
+- SLA-contract compute is not included in `gpu_earn`, `sto_earn`, or bandwidth earnings. `sla_earn` is negative only when a prior day is corrected.
+- `per_day[].sla_earn` is fleet-wide even when you pass a machine ID. Use `per_machine[].sla_earn` for one machine.
 
 ### Console (recommended for day-to-day checks)
 

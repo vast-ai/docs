@@ -242,11 +242,12 @@ curl -s -X PUT "https://console.vast.ai/api/v0/asks/OFFER_ID/" \
     "image": "pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime",
     "disk": 50,
     "target_reliability": 0.95,
+    "cancel_unavail": true,
     "label": "rent-YOUR-UUID"
   }'
 ```
 
-On-demand REST rent with default `cancel_unavail` may return **HTTP 410** if the offer cannot start immediately. Re-search and pick a new offer—do not backoff-retry the same id (see the error table below). Use a new `label` on each attempt.
+On-demand rent defaults `target_state` to `running`, and then `cancel_unavail` defaults to true when you do not send a bid. Send `"cancel_unavail": true` anyway. With it, an offer that cannot start returns **HTTP 410** instead of a stopped instance. Re-search and pick a new offer. Do not retry the same id (see the error table below). Use a new `label` on each attempt.
 
 See [Create Instance](/api-reference/instances/create-instance) and [Search Offers](/api-reference/search/search-offers).
 
@@ -260,6 +261,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/asks/OFFER_ID/" \
     "template_hash_id": "YOUR_TEMPLATE_HASH",
     "disk": 50,
     "target_reliability": 0.95,
+    "cancel_unavail": true,
     "label": "rent-YOUR-UUID"
   }'
 ```
@@ -399,7 +401,7 @@ Console users: open **Instances** → select your instance → **price details**
 <details>
 <summary>API integrators: field names and filters</summary>
 
-**Rent body (SLA):** Among SLA-related fields, send only `target_reliability`. Host listing fields (`sla_r_claim`, `sla_r_target`) are read-only on the contract. Still send `image` or `template_hash_id` and matching `disk`.
+**Rent body (SLA):** Among SLA-related fields, send only `target_reliability`. The host's reliability commitment is `sla_r_claim`, locked on the contract. Your locked target is `target_reliability` (stored as `sla_r_target`). Do not send either `sla_r_*` field when you rent. Still send `image` or `template_hash_id` and matching `disk`.
 
 Show-instances output may include `target_reliability` and price fields under `search` / `instance` (including `slaPremiumPerHour`).
 
