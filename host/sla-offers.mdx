@@ -79,7 +79,7 @@ On an outage day the renter is still charged the normal hourly rate, and you may
 </Warning>
 
 - Optional: run the [backtester](/host/sla-backtester) after you have weeks of history; otherwise use the web console SLA preview and the economics walkthrough on this page.
-- **New or low-history machines:** If the backtester returns `has_data: false`, rely on the web console SLA preview. Wait for rental history before trusting backtester results. Consider wider confidence or a more conservative reliability commitment until you have a few weeks of data.
+- **New or low-history machines:** If the backtester returns `has_data: false`, rely on the web console SLA preview. Wait for rental history before trusting backtester results. Start **Confidence** at **Low** (wider margin, larger fee) or use a more conservative reliability commitment until you have a few weeks of data.
 
 ## SLA in plain language
 
@@ -124,7 +124,7 @@ When a client rents an on-demand instance on your SLA-listed offer with a chosen
 - While a rental **contract** is active, clients pay GPU, storage, bandwidth (usage-based), and a **small hourly SLA fee** — including during downtime. Settlement credits for missed targets are calculated separately at UTC day boundaries. In search results, **`dph_total`** is the quoted hourly rental cost: GPU + storage + SLA fee at the quoted allocation — **not** bandwidth.
 - Each UTC calendar day, Vast measures reliability for the contract and settles the SLA.
 - **Strong reliability relative to the client's target** → you keep the SLA fee for that day.
-- **Shortfalls** → credits flow to the client from your earnings (bounded by that day's covered compute).
+- **Shortfalls** → credits flow to the client from your earnings. On a normal day that is up to that day's rental charges for the contract. See [SLA and GPU slicing](#sla-and-gpu-slicing) for the last-day caveat.
 
 Over many strong days, SLA fees can offset occasional credits, but a single bad day can exceed months of collected SLA fees — see [Risk scenarios](#risk-scenarios) and the backtester's [largest single-day credit](/host/sla-backtester#summarize-with-jq) before you commit.
 
@@ -365,7 +365,7 @@ SLA fields example (existing listing, no extension). Same fields as the curl abo
 }
 ```
 
-This creates an offer with a reliability commitment of `0.99` and confidence spread `0.5`. Clients who search with `target_reliability` below your reliability commitment see a lower SLA fee than clients who choose a reliability target near your reliability commitment.
+This updates the offer to a reliability commitment of `0.99` and confidence `sla_sigma_x` 0.5 (console **Medium**). Clients who search with `target_reliability` below your reliability commitment see a lower SLA fee than clients who choose a reliability target near your reliability commitment.
 
 <Warning>
 `create_asks` is not a pure partial update. If you change only SLA fields, the platform re-validates the merged SLA parameters. Set `sla_r_claim` to `0` to disable SLA on an existing listing. Other omitted fields are not all kept:
@@ -729,9 +729,9 @@ Clients receive credits tied to how far measured reliability falls below **their
 
 SLA fees are **much higher** when the client's target sits near your reliability commitment (little headroom). Prefer a reliability commitment you can sustain above the targets clients actually choose.
 
-### You widen confidence (`sla_sigma_x` → 1.0)
+### You set Confidence to Low (`sla_sigma_x` → 1.0)
 
-Clients pay more because you admit greater uncertainty. Use this if your reliability history is volatile or the machine is new.
+Clients pay a higher SLA fee, which gives you a larger cushion. Use **Low** if your reliability history is volatile or the machine is new.
 
 ### Scheduled maintenance
 
@@ -801,7 +801,7 @@ SLA approval, settlement questions, credit disputes, and locked machines are sep
 
   **Console**
   1. Notify renters if you can ([Set a maintenance window](/host/set-maintenance-window)).
-  2. Write down every field on **Set Pricing** (price, minimum GPUs, end date, storage price, bandwidth, **Reliability Commitment**, **Confidence**, reserved discount, and min bid). If you unlist, you must re-enter every one of them when you relist. A blank bandwidth price publishes at $0.
+  2. Write down every field on **Set Pricing**: GPU price, minimum GPUs, storage price, bandwidth, reserved discount, min bid, whether the listing is **hidden**, the offer end date or auto-renew duration, **Reliability Commitment**, and **Confidence**. If you unlist, you must re-enter every one of them when you relist. A blank bandwidth price publishes at $0.
   3. Unlist only if the machine is online and you need to stop new rentals. If it is offline, leave it listed until it reconnects. Unlisting removes the SLA terms.
   4. Fix the machine. See [Machine offline](/host/machine-offline) for common causes.
   5. After the next UTC midnight, check **Host → Billing**. There is no separate SLA line on the normal host view, and the page shows fleet totals. Compare with a normal week. One low day can be release timing. For one machine, use `vastai show earnings`.
