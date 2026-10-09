@@ -4,7 +4,7 @@ description: "Rent GPU instances with an SLA. Learn how the SLA fee, reliability
 "canonical": "/guides/instances/choosing/sla-coverage"
 ---
 
-Some Vast.ai offers include a **Service Level Agreement (SLA)** — an optional reliability commitment on an **on-demand** rental. You set a **Reliability target** before you rent and pay an hourly **SLA fee**. If measured reliability falls below your target, you receive a **service credit**. Searching or filtering by reliability does not turn an SLA on. Set a **Reliability target** and confirm an **SLA Fee** line before you click **RENT**. See [Settlement timing](#settlement-timing) for how fees and credits show up on Charges.
+Some Vast.ai offers include a **Service Level Agreement (SLA)** — an optional reliability commitment on an **on-demand** rental. You set a **Reliability target** before you rent and pay an hourly **SLA fee**. Settlement is a smooth curve: the credit is small when uptime is well above your target, about half of that day's covered compute when the day lands on your target, and close to a full day of covered compute when uptime is far below it. Searching or filtering by reliability does not turn an SLA on. Set a **Reliability target** and confirm an **SLA Fee** line before you click **RENT**. See [Settlement timing](#settlement-timing) for how fees and credits show up on Charges.
 
 This page explains SLA from the renter side: how to find SLA offers, how pricing works, and when you get credited.
 
@@ -16,13 +16,13 @@ An SLA is an optional reliability promise on an **on-demand** GPU rental. You do
 2. **You** choose a **reliability target**: how much uptime you want. A higher target costs more.
 3. You pay an **SLA fee** (a service level fee) on top of the GPU price.
 4. Each day, Vast combines recent and longer-term uptime into a **blended reliability measure**.
-5. If that blended measure met your reliability target, no credit is owed. If it fell short, you receive a **service credit**. Because longer-term uptime is included, a single bad day after a stretch of good uptime can produce a smaller credit than that day's raw uptime suggests. The reverse is also true: raw uptime at or slightly above your target can still produce a partial credit when the blended measure is below it.
+5. The credit depends on how far that blended measure sits relative to your target. It is small when reliability is well above your target, about half of that day's covered compute at your target, and close to a full day's covered compute far below it. Settlement is a smooth curve, not pass/fail. Because longer-term uptime is included, one bad day after good days usually pays less than that day's raw uptime suggests.
 6. That credit can be larger than the SLA fee you paid that day.
 
 A few things people mix up:
 
 - The **reliability score** on an offer card is a separate marketplace signal. It is not your SLA.
-- The GPU bill does **not** stop during an outage. A credit is paid only when the blended measure falls below your target, usually after the next UTC midnight. A short outage that stays above the target is billed in full with no credit.
+- The GPU bill does **not** stop during an outage. The day's credit grows the further the blended measure falls, and a day near your target still pays a credit. Settlement is usually after the next UTC midnight.
 - Filtering for SLA offers does not turn on an SLA. Set **Reliability target** in the Search filters before you click **RENT**.
 - SLA is only for **on-demand** rentals, not interruptible (spot) or reserved rentals.
 - If the Search offer has **no SLA Fee** line, renting it gives you no SLA. On an instance, that line appears only while the instance is **running**. For how SLA amounts appear in **Charges**, see [Settlement timing](#settlement-timing).
@@ -358,7 +358,7 @@ When you rent an SLA-backed offer **with a target set**:
 1. **Contract terms lock in** — your reliability target, the host's reliability commitment, and the rental end date are fixed for that rental. The host's pricing margin is also fixed, and it is not shown to you. When comparing offers, use the SLA fee line or `dph_total`. An SLA does not extend **Max Duration**. Reaching that end date is not an outage, so no credit is owed for the expiry itself. At the end date the instance stops and cannot be restarted. It may be deleted 48 hours later. Copy your data off before then. See [Contract Expiration](/guides/instances/manage-instances#contract-expiration). The host may extend the rental on the same terms.
 2. **Charges and settlement** — compute, storage, and the SLA fee accrue while the rental contract is active, **including while the machine is offline**. That is different from a non-SLA rental. The net SLA row (SLA fee minus any service credit) settles once per UTC day. See [Settlement timing](#settlement-timing) and [What you pay during an outage](#what-you-pay-during-an-outage).
 3. **Daily settlement** — Vast measures reliability across multiple timescales and calculates any SLA credit.
-4. **Credits appear in billing** — service credits improve your balance; strong days mean you paid the SLA fee with no credit.
+4. **Credits appear in billing** — each UTC day nets the SLA fee against that day's credit. On strong days the credit is small. On days near or below your target it is larger.
 
 ### What you pay during an outage
 
@@ -370,7 +370,7 @@ Billing continues during downtime. You are still charged for **compute, storage,
 During an outage the Instances price popover may say "Machine is offline. You're not being charged." That message does not apply to SLA rentals: compute, storage, and the SLA fee continue while the contract is active. The **SLA Fee** line is hidden, and `slaPremiumPerHour` reads `0`, while an instance is stopped, loading, or offline. Neither means the charges have stopped.
 </Note>
 
-**This is different from non-SLA rentals.** Normally you are not charged while a machine is offline (see [Billing](/guides/reference/billing)). On an SLA contract you are billed for GPU compute, storage, and the SLA fee, and a service credit is paid only when the blended measure falls below your target.
+**This is different from non-SLA rentals.** Normally you are not charged while a machine is offline (see [Billing](/guides/reference/billing)). On an SLA contract you are billed for GPU compute, storage, and the SLA fee, and a service credit can still be paid on a day that meets your target.
 
 **Stop vs destroy.**
 
@@ -399,10 +399,10 @@ Using the H100 example ($84/day compute, ~$0.97/day SLA fee, target 95%, host re
 
 | Scenario | Approx. SLA fee | Approx. service credit | Credit minus SLA fee |
 | --- | --- | --- | --- |
-| Well above the target | ~$0.97/day | Small | You can still pay more than the SLA fee |
-| About the target | ~$0.97/day | About half of that day's covered compute | On the order of **+$41** in this example |
-| Short outage (about 1 hour) | ~$0.97/day | Not zero if the day is near the target | Plus about $3.50 of GPU billed for that hour |
+| About the target | ~$0.97/day | ~$42 | **+$41** |
 | Severe shortfall (~90% or less) | ~$0.97/day | ~$84 | **+$83** |
+
+Well above the target, the credit is small and can still exceed the day's SLA fee. In a short outage of about an hour, GPU for that hour (about $3.50 in this example) is still billed. It is not part of the credit.
 
 These rows assume the shortfall lasts long enough that the blended measure is that low. A single bad day after several good days usually pays less than the row, because the good days are still in the blend.
 
@@ -422,7 +422,7 @@ Production settlement uses the multi-window reliability blend described above, n
 
 ## If your instance goes down
 
-1. Turn on **Instance offline** and **Instance back online** ([Notifications](/guides/reference/notifications)) so you can decide quickly whether to wait or **Destroy**. If you can still reach the instance, save work. If the machine is offline, you may not be able to copy data off it. You can wait (compute, storage, and the SLA fee keep billing; a credit applies only if that day's blended measure falls below your target) or **Destroy** (charges stop and the disk is deleted). Check **Instances** for host or maintenance status.
+1. Turn on **Instance offline** and **Instance back online** ([Notifications](/guides/reference/notifications)) so you can decide quickly whether to wait or **Destroy**. If you can still reach the instance, save work. If the machine is offline, you may not be able to copy data off it. You can wait (compute, storage, and the SLA fee keep billing; a credit can still apply on a day that meets your target) or **Destroy** (charges stop and the disk is deleted). Check **Instances** for host or maintenance status.
 2. Remember: compute, storage, and SLA fees continue until you destroy the instance. Credits are calculated at the next UTC settlement and apply to the **previous UTC day**, not the current hour.
 3. **Console:** Open **Instances**, select the instance, then **Destroy** to end charges on an unavailable SLA instance. See [Stop vs destroy](#what-you-pay-during-an-outage). Destroy deletes the disk, so copy off anything you need first.
 4. After the UTC day settles, check **Account → Billing → Charges** or `GET /api/v0/charges/` for the net SLA row. Invoices do not show SLA credits.
