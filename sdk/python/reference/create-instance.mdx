@@ -259,8 +259,32 @@ except requests.HTTPError as exc:
                 )
                 response.raise_for_status()
                 contract_id = response.json().get("new_contract")
-            except (requests.Timeout, requests.ConnectionError, requests.HTTPError):
+            except (requests.Timeout, requests.ConnectionError):
                 contract_id = None
+            except requests.HTTPError as retry_exc:
+                retry_resp = retry_exc.response
+                retry_status = retry_resp.status_code if retry_resp is not None else 0
+                try:
+                    retry_body = retry_resp.json() if retry_resp is not None else {}
+                except ValueError:
+                    retry_body = {}
+                retry_err = retry_body.get("error", "") if isinstance(retry_body, dict) else ""
+                retry_msg = retry_body.get("msg", "") if isinstance(retry_body, dict) else ""
+                offer_gone = (
+                    retry_status in (404, 410)
+                    or retry_err in ("no_such_ask", "invalid_price")
+                    or (retry_err == "invalid_args" and "404/3603" in str(retry_msg))
+                )
+                if retry_status == 429 or retry_status >= 500:
+                    contract_id = None
+                elif offer_gone:
+                    raise RuntimeError(
+                        "Offer is gone or its price changed. Re-search and retry with a new offer id and a new label. Do not retry this offer id."
+                    ) from retry_exc
+                else:
+                    raise RuntimeError(
+                        f"Rent failed ({retry_status} {retry_err}): {retry_msg}. Fix the request or account. Do not retry this offer id."
+                    ) from retry_exc
     else:
         offer_gone = (
             status in (404, 410)

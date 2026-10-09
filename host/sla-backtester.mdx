@@ -304,8 +304,12 @@ extra=""
 [ -n "${T:-}" ] && extra="${extra}&r_target=${T}"
 # The CLI prints HTTP errors to stderr and exits 0. Check stdout, not $?.
 machines=$(vastai show machines --raw --api-key "$VAST_API_KEY" 2>"$BT_DIR/cli.err")
-printf '%s' "$machines" | jq -e '.machines | type == "array"' >/dev/null \
-  || { echo "show machines failed (check machine_read); see $BT_DIR/cli.err" >&2; exit 1; }
+printf '%s' "$machines" | jq -e '.machines | type == "array"' >/dev/null
+if [ $? -ne 0 ]; then
+  echo "show machines failed (check machine_read):" >&2
+  cat "$BT_DIR/cli.err" >&2
+  exit 1
+fi
 echo "note: machines offline more than about 10 hours are not in this list; compare the count with Host → Machines" >&2
 for id in $(echo "$machines" | jq -r '.machines[].id'); do
   machine=$(echo "$machines" | jq -c --arg id "$id" \
