@@ -46,7 +46,8 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 6. Read [Scheduled maintenance](#scheduled-maintenance) before you turn SLA on. Turn on **Host → Notification Settings** for `host:machine_offline` and `host:machine_error` ([Host Notifications](/host/notifications)) so you hear about downtime before next-day settlement. Schedule planned work as far ahead as you can. Some hosts assume 24 hours of notice fully forgives the downtime. It does not, and forgiveness is not guaranteed.
 7. Enter **Reliability Commitment** and **Confidence**. On a machine that is already listed, **Save** publishes SLA to live renters immediately. Start **Confidence** at **Low** unless you have rental history. The commitment field is a percent (it ends with `%`; type `99` for 99%). Search hides your offer from renters whose target is above your commitment. The dashboard reliability score is not your SLA measurement. Prefer a [backtester](/host/sla-backtester) run before you enable SLA when you have history.
    - **API users:** send `sla_r_claim` as a fraction (`0.99`, not `99`). After **Save**, run the confidence check in [Validation rules](#validation-rules).
-8. **Verify now.** From your separate client account, run `vastai search offers 'machine_id=12345 verified=any has_sla=true' --storage 10 --raw --api-key "$CLIENT_API_KEY"`. An offer in the result means the SLA listing is live. Confirm `expected_reliability` with `jq`. Do not add `expected_reliability>=…` to that CLI query. In the console, sign in as the client, include unverified machines, set **Reliability target** at or below your commitment, and confirm an **SLA Fee** line. Console search cannot look up a machine by id. If no offer shows an **SLA Fee** line, contact support before you change the listing. Optionally rent that offer briefly, then **Destroy** the test instance. See [Testing your own machine](/host/hosting-overview#testing-your-own-machine).
+8. **Verify now.** In the console, sign in as your separate client account, include unverified machines, set **Reliability target** at or below your commitment, and confirm an **SLA Fee** line. Console search cannot look up a machine by id. If no offer shows that line, contact support before you change the listing.
+   - **Optional (CLI):** create a client key first ([Testing your own machine](/host/hosting-overview#testing-your-own-machine)), then run `vastai search offers 'machine_id=12345 verified=any has_sla=true' --storage 10 --raw --api-key "$CLIENT_API_KEY"`. Do not add `expected_reliability>=…` to that query. Confirm `expected_reliability` with `jq`. Optionally rent that offer briefly, then **Destroy** the test instance.
 
 ## Before you enable SLA
 
@@ -77,7 +78,7 @@ On an outage day the renter is still charged the normal hourly rate, and you may
 </Warning>
 
 - Optional: run the [backtester](/host/sla-backtester) after you have weeks of history; otherwise use the web console SLA preview and the economics walkthrough on this page.
-- **New or low-history machines:** If the backtester returns `has_data: false`, there is no history to replay. Start **Confidence** at **Low** (wider margin, larger fee) or use a more conservative reliability commitment until you have a few weeks of data. Confirm the SLA fee renters see in search. If **Set Pricing** has no **SLA** section, contact support before you enable SLA. Listing (`PUT /api/v0/machines/create_asks/`) returns 403 `sla_not_approved` when the host is not approved. A missing section is not a fee preview.
+- **New or low-history machines:** If the backtester returns `has_data: false`, there is no history to replay. Start **Confidence** at **Low** (wider margin, larger fee) or use a more conservative reliability commitment until you have a few weeks of data. Confirm the SLA fee renters see in search. If **Set Pricing** has no **SLA** section, use [checklist step 4](#sla-host-checklist).
 
 ## SLA in plain language
 
@@ -274,7 +275,7 @@ In the web console, **Set Pricing → Save** stores SLA settings; clicking **LIS
 
 #### Web console SLA preview
 
-In the host console, open **Host Machines** → select your machine → **Set Pricing** → **SLA** when that section is shown. It is a forward-looking quote, not a historical replay — use the [SLA Backtester](/host/sla-backtester) when you have rental history. If **Set Pricing** has no **SLA** section, contact support before you enable SLA. Listing (`PUT /api/v0/machines/create_asks/`) returns 403 `sla_not_approved` when the host is not approved. A missing section is not a fee preview.
+In the host console, open **Host Machines** → select your machine → **Set Pricing** → **SLA** when that section is shown. It is a forward-looking quote, not a historical replay — use the [SLA Backtester](/host/sla-backtester) when you have rental history. If **Set Pricing** has no **SLA** section, use [checklist step 4](#sla-host-checklist).
 
 ### API (for automation)
 
@@ -611,6 +612,14 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
       fi
       ;;
     429) echo "machine=$id http=429 rate limited; back off and retry this machine" >&2 ;;
+    403)
+      if grep -q sla_disabled "$tmp"; then
+        echo "SLA disabled platform-wide; stopping run." >&2
+        rm -f "$tmp"
+        exit 1
+      fi
+      echo "machine=$id http=403 $(head -c 300 "$tmp")" >&2
+      ;;
     402) echo "machine=$id http=402 machine offline; skipped" >&2 ;;
     *) echo "machine=$id http=$http $(head -c 200 "$tmp")" >&2 ;;
   esac

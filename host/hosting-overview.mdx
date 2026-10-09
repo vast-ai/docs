@@ -82,7 +82,7 @@ You can set the offer end date in the hosting interface by clicking on the date 
 
 #### How the offer becomes a rental contract
 
-When a client rents an instance from your offer, all of the offer's terms at that moment, the offer end date, the pricing, and the hardware specs, are locked into a **rental contract**. The offer end date becomes the contract's **rental end date** (shown in the UI as "client end date"), and the pricing becomes the contract's rate. Once created, price and SLA terms stay locked. Unlisting or editing the offer does not change them. **One exception:** sending an offer end date, at the same or lower price, extends every active rental that ends before that date. See [Extending rental contracts](#extending-rental-contracts).
+When a client rents an instance from your offer, all of the offer's terms at that moment (the offer end date, the pricing, and the hardware specs) are locked into a **rental contract**. The offer end date becomes the contract's **rental end date** (shown in the UI as "client end date"), and the pricing becomes the contract's rate. Once created, price and SLA terms stay locked. Unlisting or editing the offer does not change them. **One exception:** sending an offer end date, at the same or lower price, extends every active rental that ends before that date. See [Extending rental contracts](#extending-rental-contracts).
 
 #### Can I change the offer?
 
@@ -93,7 +93,7 @@ Yes, but changes only affect future rental contracts. Existing rental contracts 
 - **Extending** the offer end date allows new clients to rent for a longer period. It also extends every active rental that ends sooner than the new date, including SLA rentals and their credit exposure. See [Extending rental contracts](#extending-rental-contracts).
 - **Unlisting** the machine prevents new rental contracts entirely, but existing ones continue at their original pricing and rental end dates
 
-You can also unlist and relist with entirely new terms (new price, new offer end date). New rental contracts use the new terms. A relist at the same or lower price with a later end date extends shorter active rentals to that date. If you offer an SLA, a change to your SLA settings (**Reliability Commitment**, or **Confidence**, which is the fee margin) that would raise a contract's SLA fee means that contract is **not extended** by that request. A contract's SLA terms are locked when it is rented and never change. A contract skipped only for that fee change is extended by a later request only if your settings at that time no longer raise its SLA fee. Unlike a price increase, nothing is recorded that keeps blocking it. See [SLA on extended contracts](/host/sla-offers#sla-on-extended-contracts). A machine can have active rentals at different prices and different end dates.
+You can also unlist and relist with entirely new terms (new price, new offer end date). New rental contracts use the new terms. A relist at the same or lower price with a later end date extends shorter active rentals to that date. If you offer an SLA, a change to your SLA settings (**Reliability Commitment**, or **Confidence**, which is the fee margin) that would raise a contract's SLA fee means that contract is **not extended** by that request. A contract's SLA terms are locked when it is rented and never change. A contract skipped only for that fee change is extended by a later request only if your settings at that time no longer raise its SLA fee. A price increase records a pending block that stops later extensions. A skip caused only by an SLA-fee change records nothing, so a later request can still extend the contract. See [SLA on extended contracts](/host/sla-offers#sla-on-extended-contracts). A machine can have active rentals at different prices and different end dates.
 
 The latest rental end date across all active rental contracts on a machine is shown in the UI. You must keep the machine available until this date.
 
@@ -203,13 +203,19 @@ It is vital to test your own machine to ensure the ports and software are runnin
 
 ### Set up a separate client account
 
-There are two supported ways to test your own machine. If you want to use the website GUI, you will need to set up a new account on a different email address, add a credit card and then find your machine and create instances on it like a client. Include unverified machines in Search filters. New machines are usually unverified and are hidden by default. This has the benefit of showing you the entire client experience. Testing the recommended PyTorch template is vital to ensure that SSH and Jupyter are working properly.
+There are two supported ways to test your own machine. If you want to use the website GUI, you will need to set up a new account on a different email address, add a credit card and then find your machine and create instances on it like a client. Testing from a separate account shows you the entire client experience. Include unverified machines in Search filters: new machines are usually unverified and are hidden by default. Testing the recommended PyTorch template is vital to ensure that SSH and Jupyter are working properly.
 
 ### Use the CLI (preferred)
 
 The preferred method of testing your own machine is to run the [CLI](https://cloud.vast.ai/cli/). For Windows users, we suggest setting up [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) which will require you to install Ubuntu on your Windows machine and change your bios settings to allow virtualization. Then you can start an Ubuntu terminal and run the CLI.
 
-To rent your own machine you will need to first search the offers with your machine ID to find the ID and then create an instance using that ID. Use the **host** account key for `show machines` and a separate **client** account key for `search offers` and `create instance` (`--api-key`). A host key can rent offers on your own machines. Every other offer returns HTTP 400 `invalid_args` (`error 403/3586`). Use the client key so the test matches a real renter. The show machine command will show all your connected machines.
+To rent your own machine you will need to first search the offers with your machine ID to find the ID and then create an instance using that ID. Sign in to the separate client account, open **Account → API Keys**, and [create a key](/api-reference/accounts/create-api-key). Then set it in your shell:
+
+```bash
+export CLIENT_API_KEY='key from the client account'
+```
+
+Use the **host** account key for `show machines` and `$CLIENT_API_KEY` for `search offers` and `create instance`. A host key can rent offers on your own machines. Every other offer returns HTTP 400 `invalid_args` (`error 403/3586`). Use the client key so the test matches a real renter. The show machine command will show all your connected machines.
 
 ```text Text
 ./vastai show machines

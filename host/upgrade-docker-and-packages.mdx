@@ -67,7 +67,7 @@ Occ: 0
 #Stored: D: 0, I: 0, R: 0
 ```
 
-No `C.` lines and all three at 0 means the machine is free. If it has an SLA, write down every **Set Pricing** field first (GPU, storage, and bandwidth prices, minimum GPUs, end date, reserved discount, min bid, whether the listing is hidden, **Reliability Commitment**, and **Confidence**). Unlisting drops the SLA ask, and `show machines` will not return the exact confidence afterward. See [Severe outage](/host/sla-offers#severe-outage). Then unlist so nobody rents it while Docker or the GPUs are down, and continue at step 2:
+No `C.` lines and all three at 0 means the machine is free. Before you unlist, write down every **Set Pricing** field (GPU, storage, and bandwidth prices, minimum GPUs, end date, reserved discount, min bid, and whether the listing is hidden). Relisting creates a new offer. Bandwidth can come back at $0, the reserved discount at 0.4, and a hidden listing can come back public. If the machine has an SLA, also write down **Reliability Commitment** and **Confidence**. Unlisting drops the SLA ask, and `show machines` will not return the exact confidence afterward. See [Severe outage](/host/sla-offers#severe-outage). Then unlist so nobody rents it while Docker or the GPUs are down, and continue at step 2:
 
 ```bash
 vastai unlist machine <machine_id>
@@ -76,14 +76,12 @@ vastai unlist machine <machine_id>
 See [`vastai unlist machine`](/host/cli/unlist-machine).
 
 <Warning>
-**If anything is rented and you still want to upgrade:** stay listed and schedule a maintenance window instead of unlisting. A window does not stop new rentals. If you need to stop them, save the listing terms above, then unlist. On an SLA machine, see [Scheduled maintenance](/host/sla-offers#scheduled-maintenance). Do not stop or delete client containers.
+If anything is rented, you cannot upgrade yet. A maintenance window does not remove renters' instances, and staying listed lets new rentals arrive.
 
-```bash
-vastai schedule maint MACHINE_ID --sdate UNIX_UTC --duration HOURS --maintenance_category software
-```
-
-See [`vastai schedule maint`](/host/cli/schedule-maint). When the window starts,
-repeat both checks above and continue only when both are clear.
+1. Write down every **Set Pricing** field, then unlist so no new rental pushes the end date later.
+2. Wait until the latest rental end date on **Host → Machines** has passed, or until renters destroy their instances.
+3. Schedule the maintenance window for after that date.
+4. If the window starts and instances are still there, do not stop them. Reschedule the window instead.
 </Warning>
 
 ## 2. Check what needs upgrading
@@ -493,22 +491,6 @@ If `Loaded:` says `masked`, redo the start commands above. If the daemon keeps
 restarting or the console stays Offline after 5 minutes, follow the
 [Offline Machine](/host/machine-offline) page from its step 2.
 
-### Self-test
-
-`vastai self-test machine` searches for a live offer first. If the machine is still unlisted it fails with no valid offers. Complete **Re-lock**, then **Relist**, below, and come back to run this. Do not relist before the holds are back.
-
-```bash
-vastai self-test machine <machine_id>
-```
-
-```text nocopy
-...
-Test completed successfully.
-```
-
-The last line must be `Test completed successfully.`. On failure the output
-names the failing check; see [How to self-test](/host/how-to-self-test).
-
 ### Re-lock
 
 The daemon puts its holds back within the hour. Run its script now so the
@@ -553,7 +535,7 @@ Canceled hold on linux-image-generic-hwe-24.04.
 
 ### Relist
 
-Relist from the [Machines page](https://cloud.vast.ai/host/machines/). If the machine had an SLA, use **Set Pricing → SLA → Save → LIST** and re-enter every field you wrote down. `vastai list machine` creates the ask without SLA and can reset bandwidth and other fields. See the [`list machine` cautions](/host/cli/list-machine). After 2 to 3
+Relist from the [Machines page](https://cloud.vast.ai/host/machines/). Re-enter every **Set Pricing** field you wrote down. If the machine had an SLA, relist with **Reliability Commitment** at `0`, run the self-test below, and only then set your SLA terms and click **Save**. If the self-test fails, unlist right away. `vastai list machine` creates the ask without SLA and can reset bandwidth and other fields. See the [`list machine` cautions](/host/cli/list-machine). After 2 to 3
 minutes:
 
 ```bash
@@ -566,6 +548,22 @@ ID       CUDA  N  Model     PCIE  cpu_ghz  vCPUs  RAM   Disk  $/hr   DLP  ...
 ```
 
 A result row means the machine is listed.
+
+### Self-test
+
+`vastai self-test machine` searches for a live offer first. Run it only after **Re-lock** and **Relist**.
+
+```bash
+vastai self-test machine <machine_id>
+```
+
+```text nocopy
+...
+Test completed successfully.
+```
+
+The last line must be `Test completed successfully.`. On failure the output
+names the failing check; see [How to self-test](/host/how-to-self-test). If it fails and you already relisted an SLA machine, unlist it.
 
 <Check>
 New Docker, containerd and driver; every GPU visible on the host and in a
