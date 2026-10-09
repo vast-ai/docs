@@ -23,7 +23,7 @@ A few things people mix up:
 
 - The **reliability score** on an offer card is a separate marketplace signal. It is not your SLA.
 - The GPU bill does **not** stop during an outage. SLA pays you back later as a credit, usually after the next UTC midnight.
-- Filtering for SLA offers (`has_sla`, SLA-enabled) or quoting from the CLI/API does **not** turn on an SLA. Setting **Reliability target** in the console Search filters and then clicking **RENT**, or sending `target_reliability` on REST rent, does. The CLI cannot turn SLA on.
+- Filtering for SLA offers (`has_sla`, SLA-enabled), or a CLI or API search, does **not** turn on an SLA. Setting **Reliability target** in the console Search filters and then clicking **RENT**, or sending `target_reliability` on REST rent, does. The CLI cannot turn SLA on.
 - SLA is only for **on-demand** rentals, not interruptible (spot) or reserved rentals.
 - If the price breakdown has **no SLA Fee line**, you do not have an SLA. In **Account → Billing** the same charge appears as **SLA Fee**, and credits as **Service Credit**. In API responses the hourly amount is `slaPremiumPerHour`.
 
@@ -90,7 +90,7 @@ Quoted hourly cost with SLA in search (`dph_total`):
 dph_total ≈ GPU + storage + SLA fee
 ```
 
-Bandwidth is billed separately from usage (`inet_*` rates) and is **not** included in `dph_total`.
+Bandwidth is billed separately, based on usage (`inet_*` rates), and is **not** included in `dph_total`.
 
 | Factor | What it means for you |
 | --- | --- |
@@ -186,7 +186,7 @@ Always compare **`dph_total`**, not just GPU price, when SLA matters. Sort by `d
 <a id="automation-limits"></a>
 
 <Note title="Automation limits (read once)">
-Search quotes SLA; renting with SLA requires REST (or the console) with `target_reliability`. The CLI and published SDK cannot enable SLA on rent. Service credits are not itemized in any API. In Charges, `type: "sla"` rows are the net of the SLA fee minus any credit (they can be negative) and appear only after the window settles. The itemized **Service Credit** line is only in the web console. Invoices and credit webhooks do not itemize it.
+Search quotes SLA; renting with SLA requires REST (or the console) with `target_reliability`. The CLI and published SDK cannot enable SLA on rent. Service credits are not itemized in any API. In Charges, `type: "sla"` rows are the SLA fee minus any service credit (they can be negative) and appear only after the window settles. The itemized **Service Credit** line is only in the web console. Invoices and credit webhooks do not itemize it.
 </Note>
 
 <Warning>
@@ -198,7 +198,7 @@ Search quotes SLA; renting with SLA requires REST (or the console) with `target_
 | Search / quote an SLA | Yes | Yes (`POST /api/v0/bundles/`) |
 | Enable an SLA at rent | Yes | Yes (`target_reliability` on `PUT /api/v0/asks/{id}/`) |
 | Verify the SLA on an instance | Yes | Yes (`GET /api/v1/instances/`) |
-| SLA service credits | **Account → Billing** (itemized **Service Credit**) | Charges `results[].items[].type` `sla` is the net of fee minus credit, not an itemized credit. Not in invoices or client webhooks. |
+| SLA service credits | **Account → Billing** (itemized **Service Credit**) | Charges `results[].items[].type` `sla` is the SLA fee minus any service credit, not an itemized credit. Not in invoices or client webhooks. |
 
 **Rent body (SLA):** Among SLA-related fields, send only `target_reliability` (not `sla_r_claim` / `sla_r_target`). Still include `image` or `template_hash_id` and a `disk` that matches your search quote.
 
@@ -282,7 +282,7 @@ Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `ta
 - **REST** (`GET /api/v1/instances/`): pass an explicit `limit` and page with `after_token` (the response `next_token`). If you omit `limit`, the server returns at most **25** rows. A non-positive `limit` is treated as 5, then capped at 25.
 - **CLI** (`vastai show instances-v1`): use `--limit` and `--next-token`. The CLI default `--limit` is **25** unless you set it.
 
-**Billing reconciliation (console):** Verifying the SLA on an instance (for example via `GET /api/v1/instances/`) does not show service credits. After UTC settlement, open **Account → Billing** for the itemized **Service Credit**. `GET /api/v0/charges/` requires `select_filters` with `day.gte` and `day.lte` (unix seconds). `results[].items[]` with `type: "sla"` is the net of the SLA fee minus any credit (the description still says **SLA Fee**). It can be smaller or negative, and it is omitted until the last day in the window has settled. Send the response `next_token` as `after_token`. Stop when `next_token` is `null`.
+**Billing reconciliation (console):** Verifying the SLA on an instance (for example via `GET /api/v1/instances/`) does not show service credits. After UTC settlement, open **Account → Billing** for the itemized **Service Credit**. `GET /api/v0/charges/` requires `select_filters` with `day.gte` and `day.lte` (unix seconds). `results[].items[]` with `type: "sla"` is the SLA fee minus any service credit (the description still says **SLA Fee**). It can be smaller or negative, and it is omitted until the last day in the window has settled. Send the response `next_token` as `after_token`. Stop when `next_token` is `null`.
 
 **Automation limitations:** SLA service credits are reconciled in the console (**Account → Billing**). There is no renter API, export, or webhook for those credit line items today. After the UTC day boundary (wait up to about 48 hours if a line is missing), check billing or contact support. Verify an active SLA on instances with `GET /api/v1/instances/`. Confirm `target_reliability > 0`. A present but zero value means the rental has no SLA. Also check `instance.slaPremiumPerHour`. Show-instances uses OpenAPI threshold `1.0` (about one request per second).
 
@@ -291,7 +291,7 @@ Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `ta
 | Target outside `[0, 1)` (negative, or 1 or above) | HTTP 400 `invalid_args` ("target reliability must be greater than or equal to 0 and less than 1") | SLA requires `0 < target_reliability < 1`. Sending `0` or omitting the field rents **without** an SLA (HTTP 200, no error). |
 | Offer has no SLA, target is above the host commitment, or the SLA fee would exceed 1× compute | HTTP 400 `invalid_sla_params` (body includes `ask_id`; message may say "SLA Fee would be N.NNx compute") | Lower the target, or pick an offer with a higher commitment |
 | SLA not enabled for the account or region | HTTP 403 `sla_disabled` | Contact support |
-| Offer no longer exists | HTTP 400 `invalid_args` (`no_such_ask`; `msg` may contain `error 404/3603`) or HTTP 410 | Re-search and use a fresh offer ID. The HTTP status for a missing offer is 400, not 404. |
+| Offer no longer exists | HTTP 400 `invalid_args` (`msg` may contain `error 404/3603`), HTTP 404 `no_such_ask` (`msg` may contain `error 404/3659` if the offer was taken mid-request), or HTTP 410 | Re-search and use a fresh offer ID. Do not retry the same ID. |
 | Ask cannot start now (`cancel_unavail`) | HTTP 410, error `no_such_ask` | Search for a new offer; this is not a transient glitch to retry on the same id |
 | `price` (bid) sent together with `target_reliability` | HTTP 400 "Cannot combine interruptible instances with SLAs" | Remove `price`. SLA rentals are on-demand only |
 | Timeout, dropped connection, or HTTP 5xx | Outcome unknown — the rental may already exist | There is no idempotency key. Put a unique `label` on the rent body. Look it up with URL-encoded `select_filters` (`curl -G --data-urlencode 'select_filters={"label":{"eq":"YOUR_LABEL"}}'`) a few times, about a second apart (Show Instances threshold `1.0`). If any lookup returns a row, do not PUT again. If none do, re-search and retry with a fresh offer id and a **new** `label`. |
@@ -359,7 +359,7 @@ Production settlement uses the multi-window reliability blend described above, n
 ### Settlement timing
 
 - Settlement runs **once per day** for the previous billing day (UTC).
-- Service credits post to your **account balance**. View the itemized **Service Credit** under **Account → Billing**. Do not treat a Charges `type: "sla"` row as that line: it is the net of fee minus credit. Do not use invoices to reconcile SLA credits.
+- Service credits post to your **account balance**. View the itemized **Service Credit** under **Account → Billing**. Do not treat a Charges `type: "sla"` row as that line: it is the SLA fee minus any service credit. Do not use invoices to reconcile SLA credits.
 - When your contract ends, any remaining unsettled days are resolved at close.
 
 ## If your instance goes down
@@ -434,7 +434,7 @@ No. Verification is a platform quality signal (see [Machine Tiers](/guides/insta
 
 ### Where do I see historical SLA credits?
 
-**Console:** After UTC settlement, open **Account → Billing** and look for **Service Credit** — not in the instance price panel. Service credits are not itemized in the Charges API, invoices, or billing exports. A Charges `type: "sla"` row is the net of fee minus credit, not that line.
+**Console:** After UTC settlement, open **Account → Billing** and look for **Service Credit** — not in the instance price panel. Service credits are not itemized in the Charges API, invoices, or billing exports. A Charges `type: "sla"` row is the SLA fee minus any service credit, not that line.
 
 **API integrators:** Prefer **Account → Billing** for an itemized **Service Credit**. `GET /api/v0/charges/` → `results[].items[]` with `type: "sla"` (description **SLA Fee**) is the net SLA settlement for the window: fee minus credit. The amount can be negative. The row is omitted until the window's last day has settled. The call requires `day.gte` and `day.lte` (unix seconds). Send `next_token` back as `after_token`, and stop when `next_token` is `null`. `GET /api/v1/invoices/` covers payment transactions, not SLA credits. Client webhooks for SLA credits are not available. Host-side settlement uses [machine earnings](/api-reference/billing/show-earnings) (`sla_earn`).
 
