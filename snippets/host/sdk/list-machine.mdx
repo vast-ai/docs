@@ -3,7 +3,7 @@ Lists a machine for rent with optional pricing and configuration parameters.
 <Note>This is a **host** method, used for managing machines you are renting out on Vast.ai.</Note>
 
 <Note>
-SLA listing parameters are not in the published Python SDK yet — use the console (**Set Pricing → SLA**) or REST `PUT /api/v0/machines/create_asks/` ([SLA Offers](/host/sla-offers#api-for-automation)). On an already-listed SLA machine, `list_machine()` does not send SLA fields, so Claim and Confidence stay. After an unlist, a relist creates a new ask **without** SLA. `list_machine()` cannot send `hidden_listing`. A later reprice through the SDK or CLI makes a hidden listing public and can reset storage price and auto-renew. Update hidden SLA listings with REST and send `hidden_listing` explicitly.
+SLA listing parameters are not in the published Python SDK yet — use the console (**Set Pricing → SLA**) or REST `PUT /api/v0/machines/create_asks/` ([SLA Offers](/host/sla-offers#api-for-automation)). On an already-listed SLA machine, `list_machine()` does not send SLA fields, so Claim and Confidence stay. After an unlist, a relist creates a new ask **without** SLA. `list_machine()` cannot send `hidden_listing`, so a reprice makes a hidden listing public. It also sends `vol_size` and `duration` as `null` unless you pass them: null `vol_size` can create a volume offer at half the free disk, and null `duration` clears auto-renew. Pass `vol_size=0` to skip a new volume offer. Pass `min_chunk` as well (null `min_chunk` is HTTP 400). Update hidden SLA listings with REST and send `hidden_listing` explicitly.
 </Note>
 
 ## Signature
@@ -63,12 +63,13 @@ VastAI.list_machine(
 
 ```python
 from vastai import VastAI
+import os
 
 client = VastAI(api_key="YOUR_API_KEY")
-# Base listing only — for SLA, use the console or REST create_asks after list_machine()
-# see SLA Offers → API (for automation): /host/sla-offers#api-for-automation
-# On a live listing, end_date extends active rentals that end sooner (including SLA).
-# Replace the numbers with this machine's listed_storage_cost, listed_min_gpu_count, and end_date.
-result = client.list_machine(id=12345, price_gpu=3.50, price_disk=0.10, min_chunk=1, end_date=1790000000)
+# Replace price_disk and min_chunk with this machine's current values.
+# CURRENT_END_DATE_UNIX must be that machine's future end_date. A past value expires the offer.
+# vol_size=0 avoids creating a volume offer.
+CURRENT_END_DATE_UNIX = int(os.environ["CURRENT_END_DATE_UNIX"])
+result = client.list_machine(id=12345, price_gpu=3.50, price_disk=0.15, min_chunk=1, vol_size=0, end_date=CURRENT_END_DATE_UNIX)
 print(result)
 ```

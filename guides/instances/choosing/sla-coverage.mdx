@@ -4,7 +4,7 @@ description: "Rent GPU instances with an SLA. Learn how the SLA fee, reliability
 "canonical": "/guides/instances/choosing/sla-coverage"
 ---
 
-Some Vast.ai offers include a **Service Level Agreement (SLA)** — an optional reliability promise on an **on-demand** rental. You pay a small hourly **SLA fee** on top of compute only after you set a **reliability target** at rent time. The console shows that fee as the **SLA Fee** line. API fields call it a premium (for example `slaPremiumPerHour`). If measured uptime falls short of your target, you receive a **service credit**, shown as **Service Credit** in Account → Billing. Search can show the price; it does not turn the SLA on by itself.
+Some Vast.ai offers include a **Service Level Agreement (SLA)** — an optional reliability promise on an **on-demand** rental. You pay an hourly **SLA fee** on top of compute, but only after you set a **reliability target** at rent time. The fee is usually small when your target is well below the host's reliability commitment. It can approach the GPU price when your target is close to that commitment. The console shows the fee as the **SLA Fee** line. API fields call it a premium (for example `slaPremiumPerHour`). A **service credit** is paid only when measured reliability falls below your target, and it is shown as **Service Credit** in Account → Billing. A short outage that stays above the target is billed with no credit. Search can show the price; it does not turn the SLA on by itself.
 
 This page explains SLA from the renter side: how to find SLA offers, how pricing works, and when you get credited.
 
@@ -22,7 +22,7 @@ An SLA is an optional reliability promise on an **on-demand** GPU rental. You do
 A few things people mix up:
 
 - The **reliability score** on an offer card is a separate marketplace signal. It is not your SLA.
-- The GPU bill does **not** stop during an outage. SLA pays you back later as a credit, usually after the next UTC midnight.
+- The GPU bill does **not** stop during an outage. A credit is paid only when the blended measure falls below your target, usually after the next UTC midnight. A short outage that stays above the target is billed in full with no credit.
 - Filtering for SLA offers (`has_sla`, SLA-enabled), or a CLI or API search, does **not** turn on an SLA. Setting **Reliability target** in the console Search filters and then clicking **RENT**, or sending `target_reliability` on REST rent, does. The CLI cannot turn SLA on.
 - SLA is only for **on-demand** rentals, not interruptible (spot) or reserved rentals.
 - If the price breakdown has **no SLA Fee line**, you do not have an SLA. In **Account → Billing** the same charge appears as **SLA Fee**, and credits as **Service Credit**. In API responses the hourly amount is `slaPremiumPerHour`.
@@ -281,6 +281,8 @@ Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `ta
 
 - **REST** (`GET /api/v1/instances/`): pass an explicit `limit` and page with `after_token` (the response `next_token`). If you omit `limit`, the server returns at most **25** rows. A non-positive `limit` is treated as 5, then capped at 25.
 - **CLI** (`vastai show instances-v1`): use `--limit` and `--next-token`. The CLI default `--limit` is **25** unless you set it.
+
+**4. Tear down.** Destroy the instance to end compute, storage, and SLA fee charges. Stopping it is not guaranteed to end the GPU charge or the SLA fee. Use [Delete Instance](/api-reference/instances/destroy-instance) or `vastai destroy instance NEW_CONTRACT`. Destroying deletes the instance disk. The `instance_write` permission covers this call.
 
 **Billing reconciliation (console):** Verifying the SLA on an instance (for example via `GET /api/v1/instances/`) does not show service credits. After UTC settlement, open **Account → Billing** for the itemized **Service Credit**. `GET /api/v0/charges/` requires `select_filters` with `day.gte` and `day.lte` (unix seconds). `results[].items[]` with `type: "sla"` is the SLA fee minus any service credit (the description still says **SLA Fee**). It can be smaller or negative, and it is omitted until the last day in the window has settled. Send the response `next_token` as `after_token`. Stop when `next_token` is `null`.
 

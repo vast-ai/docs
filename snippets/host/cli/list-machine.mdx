@@ -3,7 +3,19 @@ Lists a machine for rent.
 <Note>This is a **host** command, used for managing machines you are renting out on Vast.ai.</Note>
 
 <Note>
-SLA listing flags are not in the published CLI yet — prefer console **Set Pricing → SLA**, or REST; see [SLA Offers](/host/sla-offers#api-for-automation). On a machine that is already listed with SLA, `vastai list machine` does not send SLA fields, so the current Claim and Confidence stay. After you unlist, a CLI relist creates a new ask **without** SLA. Turn it back on in **Set Pricing → SLA** or REST. For any other listing field you leave out, the CLI sends `null`, which overwrites the current setting. Always pass `-m` with the current `listed_min_gpu_count` (a null `min_chunk` is HTTP 400 `invalid_args`). Omitting `-l` clears auto-renew (`duration`); pass `-l` again to keep it. Omitting `-v` can create a volume offer at half the free disk; pass `-v 0` to skip that. There is no flag that keeps a listing hidden, so `vastai list machine` makes a hidden listing public. It also resets the storage price to the default ($0.10/GB/month) unless you pass `-s`. On a live listing, `-e` extends any active rental that ends before the new date, including SLA rentals. See [SLA on extended contracts](/host/sla-offers#sla-on-extended-contracts). Update hidden SLA listings through REST.
+SLA listing flags are not in the published CLI yet — prefer console **Set Pricing → SLA**, or REST; see [SLA Offers](/host/sla-offers#api-for-automation). On a machine that is already listed with SLA, `vastai list machine` does not send SLA fields, so the current Claim and Confidence stay. After you unlist, a CLI relist creates a new ask **without** SLA. Turn it back on in **Set Pricing → SLA** or REST.
+
+On an existing listing, omitted GPU price, bandwidth prices, reserved discount, and `end_date` are kept. These are not:
+
+- **Hidden listings become public.** There is no flag for `hidden_listing`.
+- **`-e` / `-l` can extend active rentals,** including SLA contracts. Normal CLI output does not print that. Pass `--raw` and read `.results[0].upd_contracts`.
+- **Storage price resets to $0.10/GB/month** unless you pass `-s`.
+- **Auto-renew is cleared** unless you pass `-l` again.
+- **Omitting `-v` can create a volume offer** at half the free disk. Pass `-v 0` to skip that.
+- **`-m` is required.** Omitting it returns HTTP 400 `invalid_args`.
+- **`vastai list machines` (plural)** applies the same resets and extensions to every ID. Do not use it on SLA or hidden listings. Use the [fleet REST loop](/host/sla-offers#fleet-sla-re-list) instead.
+
+See [SLA on extended contracts](/host/sla-offers#sla-on-extended-contracts). Update hidden SLA listings through REST.
 </Note>
 
 ## Usage
@@ -76,7 +88,7 @@ We strongly recommend you test the machine first and only list when ready. Alway
 
 ```bash
 # On a live listing, -e extends active rentals that end sooner (including SLA).
-# Reuse the current end date and storage price when you only want to reprice.
+# Reuse the current end date, storage price, and min GPU count when you only want to reprice.
 vastai list machine <ID> -g 3.50 -s <CURRENT_STORAGE_PRICE> -m <CURRENT_MIN_CHUNK> -v 0 -e <CURRENT_END_DATE>
 # For an auto-renew listing, pass -l <DURATION> again instead of -e.
 ```

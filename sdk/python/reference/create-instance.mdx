@@ -184,27 +184,37 @@ print(result)
 **SLA via REST:** `create_instance()` cannot set `target_reliability`. If you only use Python, rent with REST and pass the same target you searched with:
 
 ```python
+import json
 import requests
 
 offer_id = 12345  # path id: offer/ask ID from search, not a running instance ID
-response = requests.put(
-    f"https://console.vast.ai/api/v0/asks/{offer_id}/",
-    headers={"Authorization": "Bearer YOUR_API_KEY"},
-    json={
-        "image": "pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime",
-        "disk": 50,
-        "target_reliability": 0.95,
-        "label": "rent-YOUR-UUID",
-    },
-    timeout=60,
-)
-if not response.ok:
-    print(response.status_code, response.text)  # body contains error / msg
+label = "rent-YOUR-UUID"
+headers = {"Authorization": "Bearer YOUR_API_KEY"}
+body = {
+    "image": "pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime",
+    "disk": 50,
+    "target_reliability": 0.95,
+    "label": label,
+}
+try:
+    response = requests.put(
+        f"https://console.vast.ai/api/v0/asks/{offer_id}/",
+        headers=headers,
+        json=body,
+        timeout=60,
+    )
     response.raise_for_status()
-print(response.json())  # new_contract is the rental instance ID
-# On a timeout, dropped connection, 429, or 5xx the rental may already exist.
-# Look up label=rent-YOUR-UUID on GET /api/v1/instances/ before sending the same PUT again.
-# URL-encode select_filters (curl -G --data-urlencode).
+except requests.RequestException:
+    found = requests.get(
+        "https://console.vast.ai/api/v1/instances/",
+        params={"select_filters": json.dumps({"label": {"eq": label}})},
+        headers=headers,
+        timeout=30,
+    )
+    found.raise_for_status()
+    # If this returns no instance, re-search and PUT again with a new offer ID and label.
+else:
+    print(response.json())  # new_contract is the rental instance ID
 ```
 
 The same call with curl:
