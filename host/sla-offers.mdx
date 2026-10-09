@@ -56,6 +56,8 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 If you expect downtime during active rentals, notify renters before you take the machine down. Use either the console ([Set a maintenance window](/host/set-maintenance-window)) or the CLI/REST ([`vastai schedule maint`](/host/cli/schedule-maint)). Use one path per window. For maintenance forgiveness, follow [Scheduled maintenance](#scheduled-maintenance): at least 24 hours' notice. Forgiveness is not guaranteed, and it is not a service credit paid to you.
 </Warning>
 
+Hosts cannot currently see which active rentals carry an SLA. If SLA was enabled at any point during a rental that is still active, follow the SLA maintenance path: schedule the window at least 24 hours ahead. See [Scheduled maintenance](#scheduled-maintenance).
+
 **Pre-flight checklist (before tuning reliability commitment and confidence):**
 
 - Hosting requires a separate host account and hosting agreement — see [Account setup](/host/hosting-overview#account-setup-and-hosting-agreement) if you have not completed host onboarding.
@@ -88,7 +90,7 @@ SLA is an optional reliability promise on **on-demand** rentals. You do not have
 3. The **renter** picks a **reliability target**. You do not set their target.
 4. The renter pays an **SLA fee** (a service level fee) on top of the GPU price.
 5. Each day, Vast checks how long that rental was actually up.
-6. Each day, Vast combines recent and longer-term uptime into a **blended reliability measure**. If it met the renter's target, you keep the SLA fee and no credit is paid. If it fell short, the renter receives a **service credit** from your earnings. A single bad day after a stretch of good uptime can owe less than that day's raw uptime suggests. Raw uptime at or slightly above the target can still owe a partial credit when the blend is below it.
+6. Each day, Vast combines recent and longer-term uptime into a **blended reliability measure**. If it met the renter's target, you keep the SLA fee and no credit is paid. If it fell short, the renter receives a **service credit** from your earnings. After a stretch of good uptime, a single bad day can cost you a smaller credit than that day's raw uptime suggests. Even when raw uptime is at or slightly above the target, you can still owe a partial credit if the blended measure is below it.
 7. One bad day can cost more than many days of fees.
 
 What this is not:
@@ -229,7 +231,7 @@ For planning, assume a worst-case day costs up to one full day of covered comput
 
 On a listed machine, moving the offer end date later extends every shorter active SLA rental and your credit exposure. To avoid that, unlist instead of extending.
 
-When a rental contract is extended (by moving the offer end date forward at the same or lower price), the original SLA parameters remain in effect for the extended period. Changing SLA parameters on the offer does not alter SLA terms on existing contracts — only new rental contracts pick up updated SLA settings. Hosts do not set the SLA fee directly. It changes when you change **Claim** or **Confidence** (a wider Confidence raises the fee at a given target). Any `end_date` you send extends every active rental that ends before that timestamp, SLA rentals included, under their original terms. You cannot see each contract's end date. To avoid extending SLA rentals, unlist. If you do send an `end_date`, assume shorter rentals will be extended, and read `upd_contracts` afterwards. Some contracts are extended a few minutes after the response and do not appear in `upd_contracts`. A GPU, disk, or bandwidth price increase blocks both the immediate extension and that later one. Raising the SLA fee skips only the immediate extension; the later job can still extend the contract under its original SLA terms.
+When a rental contract is extended (by moving the offer end date forward at the same or lower price), the original SLA parameters remain in effect for the extended period. Changing SLA parameters on the offer does not alter SLA terms on existing contracts — only new rental contracts pick up updated SLA settings. Hosts do not set the SLA fee directly. It changes when you change **Claim** or **Confidence** (a wider Confidence raises the fee at a given target). Any `end_date` you send extends every active rental that ends before that timestamp, SLA rentals included, under their original terms. You cannot see each contract's end date. To avoid extending SLA rentals, unlist. If you do send an `end_date`, assume shorter rentals will be extended, and read `upd_contracts` afterwards. Some contracts are extended a few minutes after the response and do not appear in `upd_contracts`. A GPU, disk, or bandwidth price increase blocks both the immediate extension and that later one. A Claim or Confidence change that only raises the SLA fee skips only the immediate extension; the later job can still extend the contract under its original SLA terms.
 
 Disabling SLA on the offer (setting `sla_r_claim` to `0`) prevents new SLA-covered contracts but does not terminate SLA on existing active contracts — they continue under their original SLA terms until their rental end date.
 
@@ -304,7 +306,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
 Replace `price_disk` with the machine's current `listed_storage_cost`. Replace `CURRENT_MIN_CHUNK` with `listed_min_gpu_count` (it defaults to 1 only when offers are created or re-created). Send `"hidden_listing": true` if the listing is hidden. Do not copy example prices into a first listing. Send `end_date` only in the full listing update below, when you mean to extend.
 
 <Warning>
-Any active rental that ends **before** the `end_date` you send is extended to that date, unless the same request raises the GPU, disk, or bandwidth price. A change that only raises the SLA fee does **not** prevent a later extension (see [SLA on extended contracts](#sla-on-extended-contracts)). Resending the offer's current `end_date` is not a no-op when some rentals end sooner. `upd_contracts` lists only contracts extended immediately. See [Extending rental contracts](/host/hosting-overview#extending-rental-contracts).
+Any active rental that ends **before** the `end_date` you send is extended to that date, unless the same request raises the GPU, disk, or bandwidth price. A Claim or Confidence change that only raises the SLA fee does **not** prevent a later extension (see [SLA on extended contracts](#sla-on-extended-contracts)). Resending the offer's current `end_date` is not a no-op when some rentals end sooner. `upd_contracts` lists only contracts extended immediately. See [Extending rental contracts](/host/hosting-overview#extending-rental-contracts).
 </Warning>
 
 #### Full listing update (existing ask)
@@ -645,7 +647,7 @@ Settlement uses a **blended** reliability measure (recent plus longer-term uptim
 Example: you publish **reliability commitment 99%**, the client chose **target 95%**, and the **blended** measure is **~97%**.
 
 - **Credits** are evaluated against the client's **target** (95%), not your reliability commitment.
-- Because that blended 97% is above 95%, you **owe no SLA credit** for that day. Raw uptime in the same range can still credit if the blend is below the target.
+- Because that blended 97% is above 95%, you **owe no SLA credit** for that day. Even when raw uptime is in the same range, you can still owe a partial credit if the blended measure is below the target.
 - **SLA fees** are priced from your **reliability commitment**, confidence, and the client's target — a higher reliability commitment relative to the target generally means lower client charges.
 
 The **reliability commitment** is your belief and pricing knob. The client's **reliability target** is what drives service-credit eligibility.
@@ -688,12 +690,12 @@ Clients pay more because you admit greater uncertainty. Use this if your reliabi
 ### Scheduled maintenance
 
 <Note title="One window, one path">
-Notify renters in the console ([Set a maintenance window](/host/set-maintenance-window)) or with CLI/REST. After you schedule from the CLI or API, confirm the window under **Host → Machines → Settings → Machine Maintenances**. Do not schedule the same downtime twice. Maintenance-forgiveness review looks for at least 24 hours of notice. Forgiveness is not guaranteed, and it does not pay the host.
+Notify renters in the console ([Set a maintenance window](/host/set-maintenance-window)) or with CLI/REST. After you schedule from the CLI or API, confirm the window in the **Machine Maintenances** tab (redesigned Machines page) or the **Scheduled Maintenances** list (classic Machines page). Do not schedule the same downtime twice. Maintenance-forgiveness review looks for at least 24 hours of notice. Forgiveness is not guaranteed, and it does not pay the host.
 </Note>
 
 **Console**
 
-1. Open [Host → Machines](https://cloud.vast.ai/host/machines/), then **Settings** → **Machine Maintenances**.
+1. Open [Host → Machines](https://cloud.vast.ai/host/machines/), then **Settings**. On the redesigned page open **Machine Maintenances**. On the classic page use **Set Machine Maintenance** and confirm the window under **Scheduled Maintenances**. See [Set a maintenance window](/host/set-maintenance-window).
 2. Set a start at least 24 hours ahead and a duration in whole hours. The server rounds a fractional duration **down** (minimum 1 hour), so `2.5` becomes a 2-hour window. Round **up** when sizing an SLA maintenance window.
 3. Confirm the window is listed in that table before you take the machine down.
 
@@ -723,7 +725,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/${MACHINE_ID}/dnotify" \
 
 `sdate` is Unix epoch seconds (UTC), at least 24 hours ahead for planned notice. `duration` is whole hours. `maintenance_category` is one of `power`, `internet`, `disk`, `gpu`, `software`, or `other`. The server stores `maintenance_reason` as empty, so do not rely on that field. See [Schedule Maintenance](/api-reference/machines/schedule-maint).
 
-**Cancel or reschedule:** [`vastai cancel maint`](/host/cli/cancel-maint) cancels **every** window you scheduled on that machine, not one window. Windows Vast scheduled stay in place and are listed as `admin_locked`. To change one window, cancel, then create again every window you still want, at least 24 hours ahead, and confirm under **Settings → Machine Maintenances**.
+**Cancel or reschedule:** [`vastai cancel maint`](/host/cli/cancel-maint) cancels **every** window you scheduled on that machine, not one window. Windows Vast scheduled stay in place and are listed as `admin_locked`. To change one window, cancel, then create again every window you still want, at least 24 hours ahead, and confirm under **Machine Maintenances** (redesigned page) or **Scheduled Maintenances** (classic page).
 
 **Emergency or unplanned downtime:** Notify clients if possible using `schedule maint`, but expect **full SLA settlement exposure**. Advance-notice forgiveness does not apply to unplanned outages.
 
@@ -762,7 +764,7 @@ SLA approval, settlement questions, credit disputes, and locked machines are sep
      ```
 
      `show machines` leaves out machines that have been offline for more than about 10 hours. If the snapshot is empty, call `GET /api/v0/machines/?include_offline=true` with the same key (machines offline up to about 3 days). That query parameter works on the server but is not listed in the API reference yet. If it is still empty, use the console notes above. Do not unlist until you have the terms.
-  2. **Notify renters.** In the console: **Host → Machines → Settings → Machine Maintenances** (see [Set a maintenance window](/host/set-maintenance-window)). To automate: `echo y | vastai schedule maint MACHINE_ID --sdate "$(date -u +%s)" --duration HOURS --maintenance_category other`.
+  2. **Notify renters.** In the console, open **Settings** and use **Machine Maintenances** (redesigned page) or **Set Machine Maintenance** (classic page). See [Set a maintenance window](/host/set-maintenance-window). To automate: `echo y | vastai schedule maint MACHINE_ID --sdate "$(date -u +%s)" --duration HOURS --maintenance_category other`.
   3. **Unlist** in the console (**Host → Machines**). Do not change SLA settings or relist during the outage. API users: `create_asks` returns HTTP 402 while the machine is offline, and resending `end_date` can extend shorter rentals. `vastai unlist machine MACHINE_ID` removes the listing and does not republish it.
   4. Fix the machine. Existing SLA contracts keep their terms and settle against each renter's target; unlisting or setting the commitment to `0` does not change that.
   5. **Check settlement** a few hours after the next UTC midnight. In the console, compare those days with a normal week in **Host → Billing**. Releases are spread over time, so one low day is not by itself a credit. To automate, read `per_machine[].sla_earn`. A backtester re-run is an estimate for one simulated contract, not the settlement record.
