@@ -4,7 +4,7 @@ description: "Rent GPU instances with an SLA. Learn how the SLA fee, reliability
 "canonical": "/guides/instances/choosing/sla-coverage"
 ---
 
-Some Vast.ai offers include a **Service Level Agreement (SLA)** — an optional reliability promise on an **on-demand** rental. You pay a small hourly **SLA fee** only after you set a **reliability target** at rent time. If measured uptime falls short of that target, you receive a **service credit**. The console shows that amount as the **SLA Fee** line. API fields call it a premium (for example `slaPremiumPerHour`). Search can show the price; it does not turn the SLA on by itself.
+Some Vast.ai offers include a **Service Level Agreement (SLA)** — an optional reliability promise on an **on-demand** rental. You pay a small hourly **SLA fee** on top of compute only after you set a **reliability target** at rent time. The console shows that fee as the **SLA Fee** line. API fields call it a premium (for example `slaPremiumPerHour`). If measured uptime falls short of your target, you receive a **service credit**, shown as **Service Credit** in Account → Billing. Search can show the price; it does not turn the SLA on by itself.
 
 This page explains SLA from the renter side: how to find SLA offers, how pricing works, and when you get credited.
 
@@ -16,7 +16,7 @@ An SLA is an optional reliability promise on an **on-demand** GPU rental. You do
 2. **You** choose a **reliability target**: how much uptime you want. A higher target costs more.
 3. You pay an **SLA fee** (a service level fee) on top of the GPU price.
 4. Each day, Vast checks how long your instance was actually up.
-5. If uptime met your reliability target, the host keeps the SLA fee. "Met" is judged on Vast's blended reliability measure (recent and longer-term uptime), not on a single day's raw uptime. Settlement is graduated: a day that looks close to the target can still produce a partial credit.
+5. If the blended measure met your reliability target, the host keeps the SLA fee. "Met" uses Vast's blended reliability measure (recent and longer-term uptime), not that day's raw uptime alone. A day whose raw uptime is at or slightly above your target can still produce a partial credit if the blended measure falls below it.
 6. If uptime missed your reliability target, you receive a **service credit**. That credit can be larger than the SLA fee you paid that day.
 
 A few things people mix up:
@@ -294,7 +294,7 @@ Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `ta
 | Timeout, dropped connection, or HTTP 5xx | Outcome unknown — the rental may already exist | Before sending the same `PUT` again, check `GET /api/v1/instances/` for a new contract. There is no idempotency key, so a blind retry can create a second paid rental. |
 | Too many requests | HTTP 429. Search is about 10 requests per minute. Rent uses `threshold` 4.5; the body is `{"detail": ...}`, not `{success, error, msg}`. | Back off, then confirm with `GET /api/v1/instances/` whether the contract already exists. If retry returns `invalid_price`, `no_such_ask`, 404, or 410, re-search and rent a fresh offer id. |
 | Missing SSH key for the VM | HTTP 400 `no_ssh_key_for_vm` (or similar) | Add an SSH key on your account before renting, then retry with a current offer id. |
-| Forbidden / wrong account | HTTP 403 `invalid_args` ("Hosts can only rent their own machines.") | Rent with a **renter** account API key, not the host listing key (see [Hosting Overview](/host/hosting-overview) self-test note). |
+| Forbidden / wrong account | HTTP 400 `invalid_args`. The message text includes `error 403/3586` and "Hosts can only rent their own machines." The HTTP status is 400, not 403. | Rent with a **renter** account API key, not the host listing key (see [Hosting Overview](/host/hosting-overview) self-test note). |
 
 | Channel | Default storage | Field | Units (label) |
 | --- | --- | --- | --- |
@@ -425,7 +425,7 @@ No. For short experiments or fault-tolerant batch jobs, standard on-demand renta
 
 ### Can I change my reliability target mid-rental?
 
-No. The target is fixed when the contract is created. End the instance and rent again with a different search filter if you need a different level.
+No. The target is fixed when the contract is created. **Destroy** the instance (this deletes its disk; the same machine may not be available again) and rent again with a different **Reliability target**.
 
 ### Does SLA replace verification?
 

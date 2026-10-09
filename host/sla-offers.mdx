@@ -88,7 +88,7 @@ SLA is an optional reliability promise on **on-demand** rentals. You do not have
 3. The **renter** picks a **reliability target**. You do not set their target.
 4. The renter pays an **SLA fee** (a service level fee) on top of the GPU price.
 5. Each day, Vast checks how long that rental was actually up.
-6. If uptime met their reliability target, you keep the SLA fee. "Met" is judged on Vast's blended reliability measure (recent and longer-term uptime), not on a single day's raw uptime. Settlement is graduated: a day that looks close to the target can still produce a partial credit.
+6. If the blended measure met their reliability target, you keep the SLA fee. "Met" uses Vast's blended reliability measure (recent and longer-term uptime), not that day's raw uptime alone. A day whose raw uptime is at or slightly above the target can still produce a partial credit if the blended measure falls below it. When the blended measure meets the target, no credit is paid.
 7. If uptime missed their reliability target, the renter receives a **service credit** from your earnings. One bad day can cost more than many days of fees.
 
 What this is not:
@@ -173,7 +173,7 @@ When you list or update a machine, set SLA fields via the host console or `PUT /
 
 ### Machine reliability score vs SLA reliability
 
-The **reliability score** on the Host Machines page reflects connection and instance-start behavior over recent activity. **SLA settlement** measures whether covered instances met the client's published uptime target for billing purposes.
+The **reliability score** on the Host Machines page reflects connection and instance-start behavior over recent activity. **SLA settlement** measures whether covered instances met the renter's chosen reliability target for billing purposes.
 
 Do not assume the dashboard score equals SLA reliability. Before choosing `sla_r_claim`:
 
@@ -278,10 +278,14 @@ SLA listing via CLI/SDK is not available yet — use the REST API below (or cons
 curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"machine": 12345, "price_disk": 0.15, "hidden_listing": false, "end_date": 1893456000, "sla_r_claim": 0.99, "sla_sigma_x": 0.5}'
+  -d '{"machine": 12345, "price_disk": 0.15, "hidden_listing": false, "end_date": "CURRENT_END_DATE_FROM_SHOW_MACHINES", "sla_r_claim": 0.99, "sla_sigma_x": 0.5}'
 ```
 
-Replace `price_disk` with the machine's current `listed_storage_cost`. Send `duration` as an integer number of seconds if the listing auto-renews (`show machines` returns a float such as `2592000.0`, which the API rejects), otherwise send `end_date`. Never send both. Send `"hidden_listing": true` if the listing is hidden. See the warning below. Do not copy example prices into a first listing.
+Replace `price_disk` with the machine's current `listed_storage_cost`. Replace `end_date` with the machine's **current** `end_date` from `show machines` (a Unix timestamp, not the placeholder string). Send `duration` as an integer number of seconds if the listing auto-renews (`show machines` returns a float such as `2592000.0`, which the API rejects), otherwise send `end_date`. Never send both. Send `"hidden_listing": true` if the listing is hidden. See the warning below. Do not copy example prices into a first listing.
+
+<Warning>
+Send your **current** `end_date` unless you intend to extend. A later `end_date` at the same or lower price extends existing rental contracts, including their SLA terms and service-credit exposure. See [Extending rental contracts](/host/hosting-overview#extending-rental-contracts).
+</Warning>
 
 #### Full listing update (existing ask)
 
@@ -298,11 +302,11 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
     "hidden_listing": false,
     "sla_r_claim": 0.99,
     "sla_sigma_x": 0.5,
-    "end_date": 1893456000
+    "end_date": "CURRENT_END_DATE_FROM_SHOW_MACHINES"
   }'
 ```
 
-Replace `end_date` with a **future** Unix timestamp — past dates expire the offer immediately (example `1893456000` = 2030-01-01 00:00 UTC). Set `end_date` so the offer does not stay open indefinitely — especially important for SLA commitments. See [Offer End Date](/host/hosting-overview#offer-end-date). Convert a calendar date to Unix seconds: `date -u -d '2030-01-01' +%s` (Linux) or `date -u -j -f '%Y-%m-%d' '2030-01-01' +%s` (macOS). The CLI also accepts `MM/DD/YYYY` via `-e`.
+Replace `end_date` with the listing's current Unix timestamp from `show machines`, or with a new future timestamp only if you mean to change the offer end. Past dates expire the offer immediately. A later date at the same or lower price extends live contracts. See [Offer End Date](/host/hosting-overview#offer-end-date). Convert a calendar date to Unix seconds: `date -u -d '2030-01-01' +%s` (Linux) or `date -u -j -f '%Y-%m-%d' '2030-01-01' +%s` (macOS). The CLI also accepts `MM/DD/YYYY` via `-e`.
 
 <Warning>Open-ended offers (no `end_date`) combined with SLA expose you to indefinite asymmetric service-credit risk. See [Offer End Date](/host/hosting-overview#offer-end-date).</Warning>
 
@@ -314,7 +318,7 @@ SLA fields example (existing listing, same limit as the curl above):
   "price_gpu": 3.50,
   "price_disk": 0.15,
   "hidden_listing": false,
-  "end_date": 1893456000,
+  "end_date": "CURRENT_END_DATE_FROM_SHOW_MACHINES",
   "sla_r_claim": 0.99,
   "sla_sigma_x": 0.5
 }
@@ -468,8 +472,10 @@ Fetch the fleet once before the loop — do not call `show machines --raw` insid
 curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"machine": 12345, "price_disk": 0.15, "hidden_listing": false, "end_date": 1893456000, "sla_r_claim": 0.995, "sla_sigma_x": 0.2}'
+  -d '{"machine": 12345, "price_disk": 0.15, "hidden_listing": false, "end_date": "CURRENT_END_DATE_FROM_SHOW_MACHINES", "sla_r_claim": 0.995, "sla_sigma_x": 0.2}'
 ```
+
+Replace `CURRENT_END_DATE_FROM_SHOW_MACHINES` with the current `end_date` from `show machines`. Do not leave a far-future timestamp in a copied body. A later `end_date` extends live SLA contracts.
 
 **Disable SLA on new rentals** — set `sla_r_claim` to `0` (active contracts keep their terms). This request publishes a live listing (same as **LIST**), so don't run it on machines you have unlisted.
 
@@ -550,19 +556,22 @@ vastai search offers 'machine_id=12345 verified=any has_sla=true' --storage 10 -
 
 In the **You net** column, values follow host earnings sign conventions: positive means SLA fee you kept; negative means credit you owed the client.
 
-| Measured reliability (simplified) | You net (per day) |
+| Blended reliability vs the client's target | You net (per day) |
 | --- | --- |
-| ~100% (excellent day) | +$0.20 (keep SLA fee) |
-| ~99% (good day) | +$0.17 (keep most of the SLA fee) |
+| Meets or exceeds the target (for example blended ~99% vs a 95% target) | +$0.20 (keep the full SLA fee) |
 
-You keep most or all of the SLA fee.
+When the blended measure meets the target, you keep the SLA fee. These rows are not raw uptime.
+
+<Note>
+Settlement uses a **blended** reliability measure (recent plus longer-term uptime), not the day's raw uptime alone. A day whose raw uptime is at or slightly above the target can still settle with a small partial credit if the blended measure falls below it. When the blended measure meets the target, no credit is paid.
+</Note>
 
 ### What if measured reliability is between the client's target and my reliability commitment?
 
-Example: you publish **reliability commitment 99%**, the client chose **target 95%**, and measured reliability is **~97%**.
+Example: you publish **reliability commitment 99%**, the client chose **target 95%**, and the **blended** measure is **~97%**.
 
 - **Credits** are evaluated against the client's **target** (95%), not your reliability commitment.
-- Because 97% is above 95%, you typically **owe no SLA credit** for that day.
+- Because that blended 97% is above 95%, you **owe no SLA credit** for that day. Raw uptime in the same range can still credit if the blend is below the target.
 - **SLA fees** are priced from your **reliability commitment**, confidence, and the client's target — a higher reliability commitment relative to the target generally means lower client charges.
 
 The **reliability commitment** is your belief and pricing knob. The client's **reliability target** is what drives service-credit eligibility.
@@ -616,7 +625,7 @@ Notify renters in the console ([Set a maintenance window](/host/set-maintenance-
 
 **Or use CLI/REST below.** Forgiveness is not guaranteed either way.
 
-**Planned SLA maintenance (may reduce the service credits you owe — not guaranteed).** Schedule at least 24 hours in advance with [`vastai schedule maint`](/host/cli/schedule-maint) (or the [REST schedule-maintenance API](/api-reference/machines/schedule-maint)). Include `--sdate`, `--duration`, and `--maintenance_category`. The CLI always sends a category; its default `"not provided"` is rejected with `invalid_args`. Use one of `power`, `internet`, `disk`, `gpu`, `software`, or `other`. Scheduling maintenance ahead can cause part of the window to count as uptime when the SLA is settled. That reduces the service credits you may owe. It does not pay you or the renter. The longer the window, the smaller the share that is forgiven. Rescheduling resets the notice clock. Renters see maintenance status under **Instances**. Maintenance status is not a separate field on instance webhooks or `GET /api/v0/charges/`. The CLI does not send `maintenance_reason`; the REST body can.
+**Planned SLA maintenance (may reduce the service credits you owe — not guaranteed).** Schedule at least 24 hours in advance with [`vastai schedule maint`](/host/cli/schedule-maint) (or the [REST schedule-maintenance API](/api-reference/machines/schedule-maint)). Include `--sdate`, `--duration`, and `--maintenance_category`. The CLI always sends a category; its default `"not provided"` is rejected with `invalid_args`. Use one of `power`, `internet`, `disk`, `gpu`, `software`, or `other`. Scheduling maintenance ahead can cause part of the window to count as uptime when the SLA is settled. That reduces the service credits you may owe. It does not pay you or the renter. The longer the window, the smaller the share that is forgiven. Rescheduling resets the notice clock. Renters see maintenance status under **Instances**. Maintenance status is not a separate field on instance webhooks or `GET /api/v0/charges/`. Include `duration` (whole hours) and `maintenance_category`. The server does not currently apply `maintenance_reason`, so renters will not see a reason you send.
 
 **`sdate` is Unix epoch seconds (UTC)** for both CLI `--sdate` and the REST body. **`--duration` is in hours.** The CLI asks `Continue? [y/n]` before it sends the request; in scripts or cron, pipe the answer (`echo y | vastai schedule maint …`) or call REST directly. Schedule maintenance **sequentially** across a fleet, at least 3 seconds apart (`sleep 3` between machines; the Schedule Maintenance OpenAPI `x-rate-limit` threshold is `2.5`). If you still get HTTP 429, wait longer and retry. See [Rate Limits and Errors](/api-reference/rate-limits-and-errors).
 
@@ -629,11 +638,20 @@ vastai schedule maint MACHINE_ID \
   --maintenance_category software
 ```
 
-REST equivalent: `PUT /api/v0/machines/{machine_id}/dnotify` with `"sdate"` as Unix epoch seconds (UTC) at least 24 hours ahead (optional `"maintenance_reason": "OS kernel upgrade"`) — see [Schedule Maintenance](/api-reference/machines/schedule-maint).
+REST equivalent:
+
+```bash
+curl -s -X PUT "https://console.vast.ai/api/v0/machines/${MACHINE_ID}/dnotify" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"sdate": START_UNIX_UTC, "duration": 2, "maintenance_category": "software"}'
+```
+
+`sdate` is Unix epoch seconds (UTC), at least 24 hours ahead for planned notice. `duration` is whole hours. `maintenance_category` is one of `power`, `internet`, `disk`, `gpu`, `software`, or `other`. The server stores `maintenance_reason` as empty, so do not rely on that field. See [Schedule Maintenance](/api-reference/machines/schedule-maint).
 
 **Cancel or reschedule:** To cancel a window, use [`vastai cancel maint`](/host/cli/cancel-maint) (requires `machine_write`) or the [REST cancel-maintenance API](/api-reference/machines/cancel-maint). To reschedule, cancel the existing window, then run `schedule maint` with a new `--sdate` (still ≥24 hours ahead for planned SLA maintenance).
 
-**Emergency or unplanned downtime:** Notify clients if possible using `schedule maint`, but expect **full SLA settlement exposure**. Advance-notice credits do not apply to unplanned outages.
+**Emergency or unplanned downtime:** Notify clients if possible using `schedule maint`, but expect **full SLA settlement exposure**. Advance-notice forgiveness does not apply to unplanned outages.
 
 See [CLI install](/cli/hello-world) if you have not set up the CLI.
 
