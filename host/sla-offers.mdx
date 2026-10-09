@@ -59,7 +59,7 @@ If you expect downtime during active rentals, notify renters before you take the
 **Pre-flight checklist (before tuning reliability commitment and confidence):**
 
 - Hosting requires a separate host account and hosting agreement — see [Account setup](/host/hosting-overview#account-setup-and-hosting-agreement) if you have not completed host onboarding.
-- Confirm SLA is enabled for your account. In the console, open **Set Pricing → SLA** on a machine — if the panel is missing or listing returns `sla_not_approved`, contact [Discord](https://discord.gg/hSuEbSQ4X8) or [contact@vast.ai](mailto:contact@vast.ai) to request access before configuring a fleet. Approval timing varies; complete host setup and have base pricing ready in **Set Pricing** (a public **LIST** is not required for SLA approval—follow the [SLA host checklist](#sla-host-checklist): list without SLA in step 2, then **Save** SLA in step 7, which goes live immediately).
+- Confirm SLA is enabled for your account. In the console, open **Set Pricing → SLA** on a machine — if the panel is missing or listing returns `sla_not_approved`, contact [Discord](https://discord.gg/hSuEbSQ4X8) or [contact@vast.ai](mailto:contact@vast.ai) to request access before configuring a fleet. Approval timing varies; complete host setup and have base pricing ready in **Set Pricing**. A public **LIST** is not required to request SLA approval. To turn SLA on, follow the [SLA host checklist](#sla-host-checklist): list without SLA (step 2), test, then **Save** SLA (step 7). On a listed machine, **Save** goes live immediately.
 - Ensure your host daemon is current per the [host setup guide](https://cloud.vast.ai/host/setup/).
 - If listing fails with `sla_not_approved` or `sla_daemon_outdated`, resolve eligibility before changing SLA parameters.
 - **Planned maintenance tooling:** Use [`vastai schedule maint`](/host/cli/schedule-maint) or REST — see [Scheduled maintenance](#scheduled-maintenance).
@@ -145,7 +145,7 @@ For SLA-covered on-demand contracts, compute billing uses the **intended daily c
 
 ## SLA parameters
 
-When you list or update a machine, set SLA fields via the host console or `PUT /api/v0/machines/create_asks/` (see [Listing an SLA offer](#listing-an-sla-offer) below).
+When you list or update a machine, set SLA fields via the host console or `PUT /api/v0/machines/create_asks/` (see [Listing an SLA offer](#listing-an-sla-offer) below). In the API, an offer (listing) is called an **ask**. A new ask means the offer was recreated, and settings you do not send again are reset.
 
 | Parameter | API field | Backtester alias | What it means |
 | --- | --- | --- | --- |
@@ -203,13 +203,13 @@ Offers with invalid combinations are rejected at listing time:
 
 - `sla_r_claim` must be `0` (disable) or greater than 0 and at most **0.99999**. Exactly `1.0` is rejected.
 - If you send `sla_sigma_x`, it must be positive and at most `3.0`. It defaults to `0.5` only on a new ask. **Always send `sla_sigma_x` when you enable SLA.** If the claim is above `0` and confidence was never stored, search can quote a **$0** SLA fee while you still carry credit exposure. If a value is already stored, omitting it keeps that value.
+- Optional `sla_max_beta` must be in `(0, 1)` and at least the default β derived at your reliability commitment. Hosts do not set β; this field only caps the client-derived β the offer accepts. Omit for uncapped.
 
 ```bash
 vastai show machines --raw | jq -r '.machines[] | select((.sla_reliability_claim // 0) > 0 and .sla_confidence == null) | .id'
 ```
 
 For each ID that prints, PUT `sla_sigma_x` (see [Update SLA on an existing ask](#update-sla-on-an-existing-ask-partial-body)).
-- Optional `sla_max_beta` must be in `(0, 1)` and at least the default β derived at your reliability commitment. Hosts do not set β; this field only caps the client-derived β the offer accepts. Omit for uncapped.
 
 <Note>
 If listing is rejected with `error: "invalid_sla_params"`, check the `msg` field against the rules above. Other SLA listing errors include `sla_not_approved` and `sla_daemon_outdated`.
@@ -227,7 +227,7 @@ For planning, assume a worst-case day costs up to one full day of covered comput
 
 ### SLA on extended contracts
 
-When a rental contract is extended (by moving the offer end date forward at the same or lower price), the original SLA parameters remain in effect for the extended period. Changing SLA parameters on the offer does not alter SLA terms on existing contracts — only new rental contracts pick up updated SLA settings. Hosts do not set the SLA fee directly. It changes when you change **Claim** or **Confidence** (a wider Confidence raises the fee at a given target). Any `end_date` you send extends every active rental that ends before that timestamp, SLA rentals included, under their original terms. You cannot see each contract's end date. To avoid extending SLA rentals, unlist, or accept the extension and read `upd_contracts` afterwards. Some contracts are extended a few minutes after the response and do not appear in `upd_contracts`. A GPU, disk, or bandwidth price increase blocks both the immediate extension and that later one. Raising the SLA fee skips only the immediate extension; the later job can still extend the contract under its original SLA terms.
+When a rental contract is extended (by moving the offer end date forward at the same or lower price), the original SLA parameters remain in effect for the extended period. Changing SLA parameters on the offer does not alter SLA terms on existing contracts — only new rental contracts pick up updated SLA settings. Hosts do not set the SLA fee directly. It changes when you change **Claim** or **Confidence** (a wider Confidence raises the fee at a given target). Any `end_date` you send extends every active rental that ends before that timestamp, SLA rentals included, under their original terms. You cannot see each contract's end date. To avoid extending SLA rentals, unlist. If you do send an `end_date`, assume shorter rentals will be extended, and read `upd_contracts` afterwards. Some contracts are extended a few minutes after the response and do not appear in `upd_contracts`. A GPU, disk, or bandwidth price increase blocks both the immediate extension and that later one. Raising the SLA fee skips only the immediate extension; the later job can still extend the contract under its original SLA terms.
 
 Disabling SLA on the offer (setting `sla_r_claim` to `0`) prevents new SLA-covered contracts but does not terminate SLA on existing active contracts — they continue under their original SLA terms until their rental end date.
 
@@ -455,7 +455,7 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
       echo "skip $id: missing end_date and duration"; continue
     fi
     now=$(date -u +%s)
-    if ! jq -e -n --argjson end "$end" --argjson now "$now" '$end > $now' >/dev/null 2>&1; then
+    if ! jq -e -n --argjson e "$end" --argjson n "$now" '$e > $n' >/dev/null 2>&1; then
       echo "skip machine_id=$id: end_date expired"; continue
     fi
   fi
