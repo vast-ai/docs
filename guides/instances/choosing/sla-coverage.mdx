@@ -36,7 +36,7 @@ Before you start: ensure [Account → Billing](https://cloud.vast.ai/billing/) h
 1. Open [Search](https://cloud.vast.ai/create/) with **On-demand** selected.
 2. In **Search filters** (left bar), set **Reliability target**. If that control is missing, SLA is not available in the console right now. Rent without it, or contact [Discord](https://discord.gg/hSuEbSQ4X8) or contact@vast.ai.
 3. Set the instance disk size on the slider (console default is 10 GB). If you are comparing against a CLI or REST quote, use the same disk size so the prices match.
-4. Hover over the offer's price and confirm an **SLA Fee** line in the breakdown. That line means this offer will be rented with an SLA at your target when you click **RENT**. If an offer shows no **SLA Fee** line, renting it gives you no SLA. Then click **RENT**.
+4. Hover over the offer's price and confirm an **SLA Fee** line, then click **RENT**. That line means this offer will be rented with an SLA at your target. If an offer shows no **SLA Fee** line, renting it gives you no SLA.
 5. Once the instance shows **running**, open **Instances** → **price details** and confirm an **SLA Fee** line. The line is hidden while the instance is loading, stopped, or offline.
 6. After the prior UTC day has settled (credits usually appear hours after UTC midnight; see [Settlement timing](#settlement-timing)), open **Account → Billing → Charges** (not Invoices). Each UTC day has one net SLA row: the fee minus any service credit. If the credit is larger than the fee, the row is **Service Credit** (`+$`). Otherwise it is **SLA Fee** (`−$`), and that row can still include a partial credit. You cannot see measured reliability, and you cannot split the fee from the credit. If a day had an outage and you need to know whether a credit was applied, contact support with the instance ID and the UTC date.
 7. When you are done, **Destroy** the instance to end the rental. Destroy deletes the disk. Do not assume **Stop** ends SLA charges. See [Stop vs destroy](#what-you-pay-during-an-outage).
@@ -234,7 +234,7 @@ curl -s -X POST "https://console.vast.ai/api/v0/bundles/" \
 
 The CLI default query is `external=false rentable=true verified=true`. Neither the CLI nor the server filters on `rented`. REST `POST /api/v0/bundles/` drops that key and still returns a `rented` flag on each offer. Drop rows where `rented` is true if you need to hide GPUs you already rent. The response includes `truncated`. When it is `true`, the server cut the result short of `limit`. Narrow the query instead of assuming you saw every offer.
 
-Server-side sort by `dph_total` can put a row with no SLA fee first. Offers whose SLA terms fail validation are left out of the results. They still count against `limit`, so a page can return fewer rows than you asked for. A row that comes back with `slaPremiumPerHour` of `0` while you set `target_reliability` has incomplete SLA terms. Drop it, then sort again. Do not rent it.
+Offers whose SLA terms fail validation are left out of the results. A page can still return fewer rows than `limit`. Narrow the query instead of raising `limit`. A row that comes back with `slaPremiumPerHour` of `0` while you set `target_reliability` has incomplete SLA terms. Drop it, then sort again. Do not rent it.
 
 ```bash
 curl ... | jq '.offers | map(select((.search.slaPremiumPerHour // 0) > 0)) | sort_by(.dph_total)'
@@ -355,7 +355,7 @@ If you quoted with the CLI (default `--storage` 5), set `--storage` ≥ **8** be
 
 When you rent an SLA-backed offer **with a target set**:
 
-1. **Contract terms lock in** — your reliability target, the host's reliability commitment, and the rental end date are fixed for that rental. The host's pricing margin is also fixed, and it is not shown to you. When comparing offers, use the SLA fee line or `dph_total`. An SLA does not extend **Max Duration**. Reaching that end date is not an outage, so no credit is owed for the expiry itself. The host may extend the rental on the same terms.
+1. **Contract terms lock in** — your reliability target, the host's reliability commitment, and the rental end date are fixed for that rental. The host's pricing margin is also fixed, and it is not shown to you. When comparing offers, use the SLA fee line or `dph_total`. An SLA does not extend **Max Duration**. Reaching that end date is not an outage, so no credit is owed for the expiry itself. At the end date the instance stops and cannot be restarted. It may be deleted 48 hours later. Copy your data off before then. See [Contract Expiration](/guides/instances/manage-instances#contract-expiration). The host may extend the rental on the same terms.
 2. **Charges and settlement** — compute, storage, and the SLA fee accrue while the rental contract is active, **including while the machine is offline**. That is different from a non-SLA rental. The net SLA row (SLA fee minus any service credit) settles once per UTC day. See [Settlement timing](#settlement-timing) and [What you pay during an outage](#what-you-pay-during-an-outage).
 3. **Daily settlement** — Vast measures reliability across multiple timescales and calculates any SLA credit.
 4. **Credits appear in billing** — service credits improve your balance; strong days mean you paid the SLA fee with no credit.

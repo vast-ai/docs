@@ -41,7 +41,7 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 Read [SLA in plain language](#sla-in-plain-language) before this list.
 
 1. Complete [Account setup and hosting agreement](/host/hosting-overview#account-setup-and-hosting-agreement) on a **dedicated host account**, then [host setup](https://cloud.vast.ai/host/setup/). Confirm the machine appears on **Host → Machines** (healthy; GPU price and offer end date saved under **Set Pricing**). Listing happens in step 2. If the listing uses auto-renew, read [SLA on extended contracts](#sla-on-extended-contracts) before you enable SLA.
-2. Publish once **without** SLA. In **Set Pricing**, leave **Reliability Commitment** (the share of time you commit the machine will be up) at `0`, **Save**, then click **LIST**. If you do not see an SLA section, list without it. Step 4 is where you check SLA access. Test ports, SSH, and Jupyter from a separate client account (see [Testing your own machine](/host/hosting-overview#testing-your-own-machine)). Do not turn SLA on until that test passes.
+2. Publish once **without** SLA. In **Set Pricing**, do not open the SLA controls, then **Save** and click **LIST**. The console cannot set **Reliability Commitment** to `0`. If you do not see an SLA section, list without it. Step 4 is where you check SLA access. Test ports, SSH, and Jupyter from a separate client account (see [Testing your own machine](/host/hosting-overview#testing-your-own-machine)). Do not turn SLA on until that test passes.
 3. Install the [CLI](/cli/hello-world) if you schedule maintenance from the command line, or if you want SLA earnings for one machine. **Host → Billing** is fleet-wide and has no per-machine SLA line. `vastai show earnings --machine_id ID` needs an API key with `billing_read`. The console [Set a maintenance window](/host/set-maintenance-window) page can notify renters without the CLI.
 4. Confirm SLA account access: open **Set Pricing → SLA** and confirm the panel is visible (do **not** Save final commitment/confidence yet). If **Set Pricing** has no **SLA** section, contact support before you enable SLA. A missing section is not a fee preview.
    - **API users:** `PUT /api/v0/machines/create_asks/` returns 403 `sla_not_approved` when the host is not approved.
@@ -50,8 +50,7 @@ Read [SLA in plain language](#sla-in-plain-language) before this list.
 6. Read [Scheduled maintenance](#scheduled-maintenance) before you turn SLA on. Turn on **Host → Notification Settings** for `host:machine_offline` and `host:machine_error` ([Host Notifications](/host/notifications)) so you hear about downtime before next-day settlement. Schedule planned work as far ahead as you can. Some hosts assume 24 hours of notice fully forgives the downtime. It does not, and forgiveness is not guaranteed.
 7. Enter **Reliability Commitment** and **Confidence**. On a machine that is already listed, **Save** publishes SLA to live renters immediately. Start **Confidence** at **Low** unless you have rental history. The commitment field is a percent (it ends with `%`; type `99` for 99%). Search hides your offer from renters whose target is above your commitment. The dashboard reliability score is not your SLA measurement. Prefer a [backtester](/host/sla-backtester) run before you enable SLA when you have history.
    - **API users:** send `sla_r_claim` as a fraction (`0.99`, not `99`). After **Save**, run the confidence check in [Validation rules](#validation-rules).
-8. **Verify now.** In the console, sign in as your separate client account, include unverified machines, set **Reliability target** at or below your commitment, and confirm an **SLA Fee** line. Console search cannot look up a machine by id. If no offer shows that line, contact support before you change the listing.
-   - **Optional (CLI):** create a client key first ([Testing your own machine](/host/hosting-overview#testing-your-own-machine)), then run `vastai search offers 'machine_id=12345 verified=any has_sla=true' --storage 10 --raw --api-key "$CLIENT_API_KEY"`. Do not add `expected_reliability>=…` to that query. Confirm `expected_reliability` with `jq`. Optionally rent that offer briefly, then **Destroy** the test instance.
+8. **Verify now.** The reliable check is a client API key, not console search. Create the key first ([Testing your own machine](/host/hosting-overview#testing-your-own-machine)), then run `vastai search offers 'machine_id=12345 verified=any has_sla=true' --storage 10 --raw --api-key "$CLIENT_API_KEY"`. Confirm `expected_reliability` with `jq`. Do not add `expected_reliability>=…` to that query. Console search cannot look up your machine by id, so a missing **SLA Fee** line on some other offer does not mean yours failed. If your machine's offer has no **SLA Fee** line, contact support before you change the listing. Optionally rent that offer briefly, then **Destroy** the test instance.
 
 ## Before you enable SLA
 
@@ -154,7 +153,7 @@ When you list or update a machine, set SLA fields via the host console or `PUT /
 
 | Parameter | API field | Backtester alias | What it means |
 | --- | --- | --- | --- |
-| Reliability commitment | `sla_r_claim` | `r_claim` (the simulated renter target `r_target` defaults to it) | Your advertised belief about machine reliability. Set above `0` to enable SLA. Values are greater than 0 and at most **0.99999** (for example, `0.99` = 99%). Exactly `1.0` is rejected. Set to `0` to disable SLA on new rentals. |
+| Reliability commitment | `sla_r_claim` | `r_claim` (the simulated renter target `r_target` defaults to it) | Your advertised belief about machine reliability. Set above `0` to enable SLA. Values are greater than 0 and at most **0.99999** (for example, `0.99` = 99%). Exactly `1.0` is rejected. The API accepts `0` to stop SLA on new rentals. The console control cannot be set to `0`. |
 | Confidence | `sla_sigma_x` | `p` (different scale — see [backtester](/host/sla-backtester#confidence-values-p)) | Pricing margin built into the SLA fee. **High** is a smaller fee. **Low** is a larger fee. It does not change the credit you owe. Defaults to `0.5` (console **Medium**) only on a **new** ask. When you first enable SLA on an existing listing, send `sla_sigma_x` yourself. Omitting it leaves the stored value empty, so `show machines` reports no confidence. On an ask that already has a stored value, omitting `sla_sigma_x` keeps that value. |
 
 ### Advanced: `sla_max_beta` (optional)
@@ -232,7 +231,7 @@ For planning, assume a bad day can cost up to one full day of covered compute fo
 
 ### SLA on extended contracts
 
-**In the console:** moving the offer end date later, or leaving auto-renew on, extends active SLA rentals and your credit exposure. To limit that, set a fixed end date or unlist.
+**In the console:** every **Save** on a machine with active rentals sends the listing end date or auto-renew duration. Any rental that ends sooner, including an SLA contract, is extended to that date, even if you changed only **Reliability Commitment** or **Confidence**. To change SLA terms without extending rentals, use the API and omit both `end_date` and `duration`.
 
 **API detail (`create_asks`):**
 
@@ -264,11 +263,15 @@ Disabling SLA on the offer (setting `sla_r_claim` to `0`) prevents new SLA-cover
 
 #### Updating SLA on an already-listed machine
 
+<Warning>
+Every console **Save** on a machine with active rentals sends the listing end date or auto-renew duration. Any rental that ends sooner, including SLA contracts, is extended to that date, even if you only changed **Reliability Commitment** or **Confidence**. A console **Save** also sends the Confidence preset (`sla_sigma_x` **High** 0.2, **Medium** 0.5, **Low** 1.0). A custom value you set through the API can be replaced. To change SLA terms without extending rentals, and to keep a custom σ, use the API and omit `end_date` and `duration`.
+</Warning>
+
 If the machine is already **listed**:
 
 1. Open **Host → Machines → Set Pricing → SLA**, set **Reliability Commitment** and **Confidence**, then click **Save**.
 2. **Save** applies SLA to the live offer — you do not need to click **LIST** again unless this is a brand-new listing that was never published.
-3. To stop offering SLA on **new** rentals, set **Reliability Commitment** to `0` and **Save**. On an already-listed machine, **Save** updates the live offer; you do not need to click **LIST** again. Active contracts keep their SLA terms until they end. API users: send the full `create_asks` body with `"sla_r_claim": 0` (see [Update SLA on an existing ask](#update-sla-on-an-existing-ask-partial-body)).
+3. To stop offering SLA on **new** rentals, use the API. Send `"sla_r_claim": 0` in the full `create_asks` body (see [Update SLA on an existing ask](#update-sla-on-an-existing-ask-partial-body)). The console control cannot be set to `0`, and a **Save** that omits SLA fields keeps the current terms. Active contracts keep their locked terms until they end.
 4. Verify after listing:
    - **Console:** confirm the machine status is **Listed**, reopen **Set Pricing → SLA** to review the preview, or check offer details under **Host → Machines**.
    - **Search:** `dph_total` includes the SLA fee at a client's `target_reliability`, and `expected_reliability` matches your reliability commitment (see [Search / client-visible fields](#search--client-visible-fields)).
@@ -346,7 +349,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
   }'
 ```
 
-Replace `end_date` with the listing's current Unix timestamp from `show machines`, or with a new future timestamp only if you mean to change the offer end. Past dates expire the offer immediately. A later date at the same or lower price extends live contracts. See [Offer End Date](/host/hosting-overview#offer-end-date). Convert a calendar date to Unix seconds: `date -u -d '2030-01-01' +%s` (Linux) or `date -u -j -f '%Y-%m-%d' '2030-01-01' +%s` (macOS). The CLI also accepts `MM/DD/YYYY` via `-e`, read as 00:00 UTC on that date, not your local time zone. `vastai show earnings --start_date` and `--end_date` are different: bare dates there are parsed in the local time zone of the computer running the CLI.
+Replace `CURRENT_END_DATE_UNIX` with the listing's current `end_date` (Unix seconds) from `show machines`, or with a new future timestamp only if you mean to change the offer end. Past dates expire the offer immediately. A later date at the same or lower price extends live contracts. See [Offer End Date](/host/hosting-overview#offer-end-date). Convert a calendar date to Unix seconds: `date -u -d '2030-01-01' +%s` (Linux) or `date -u -j -f '%Y-%m-%d' '2030-01-01' +%s` (macOS). The CLI also accepts `MM/DD/YYYY` via `-e`, read as 00:00 UTC on that date, not your local time zone. `vastai show earnings --start_date` and `--end_date` are different: bare dates there are parsed in the local time zone of the computer running the CLI.
 
 <Warning>Open-ended offers (no `end_date`) combined with SLA expose you to indefinite asymmetric service-credit risk. See [Offer End Date](/host/hosting-overview#offer-end-date).</Warning>
 
