@@ -23,7 +23,7 @@ vastai search offers [--help] [--api-key API_KEY] [--raw] <query>
 ## Arguments
 
 <ParamField path="query" type="string" required>
-  Query to search for. default: `external=false rentable=true verified=true rented=false` (`--help` omits `rented`). Pass `-n` to ignore the default.
+  Query to search for. default: `external=false rentable=true verified=true`. Pass `-n` to ignore the default. Neither the CLI nor the server filters on `rented`.
 </ParamField>
 
 ## Options
@@ -80,8 +80,8 @@ The CLI can find SLA offers but cannot price them. Treat `dph_total` as SLA-incl
 
 ```bash
 # Marketplace reliability score (not SLA commitment)
-# rented=false (excludes slots you already rent) is already in the CLI default query; shown here explicitly
-vastai search offers 'reliability > 0.98 num_gpus=1 gpu_name=RTX_3090 rented=false'
+# neither the CLI nor the server filters on rented; drop .rented == true yourself if you need to
+vastai search offers 'reliability > 0.98 num_gpus=1 gpu_name=RTX_3090' --raw | jq '[.[] | select(.rented != true)]'
 
 # Find SLA offers. dph_total here excludes the SLA fee (see the Warning below).
 # Always set --storage explicitly when comparing dph_total (CLI default 5 GiB ≠ REST 8 GB).
@@ -110,7 +110,7 @@ vastai search offers 'reliability>0.99 gpu_name in [RTX_4090, RTX_3090] geolocat
 vastai search offers 'disk_space>146 duration>24 gpu_ram>10 cuda_vers>=12.1 direct_port_count>=2 driver_version >= 535.86.05'
 
 # reliable 4+ GPU offers, unverified allowed, sort by num_gpus desc
-vastai search offers 'reliability > 0.99  num_gpus>=4 verified=False rented=any' -o 'num_gpus-'
+vastai search offers 'reliability > 0.99  num_gpus>=4 verified=False' -o 'num_gpus-'
 
 # arm64 cpu architecture only
 vastai search offers 'cpu_arch=arm64'
@@ -179,7 +179,7 @@ bool       = True | False
 | `has_sla` | bool | restrict to offers with SLA enabled (`true`) or without (`false`) |
 | `target_reliability` | float | REST and console only. The current CLI sends this as an operator object and search rejects it (HTTP 400). See the Warning under Examples. |
 | `rentable` | bool | is the instance currently rentable |
-| `rented` | bool | allow/disallow duplicates and potential conflicts with existing stopped instances |
+| `rented` | bool | Returned on each offer. Not a filter. The server drops `rented` in the query. |
 | `storage_cost` | float | storage cost in $/GB/month |
 | `static_ip` | bool | is the IP addr static/stable |
 | `total_flops` | float | total TFLOPs from all GPUs |

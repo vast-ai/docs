@@ -45,7 +45,7 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 5. Preview economics (console SLA panel or [backtester](/host/sla-backtester)). Read [Billing vs settlement](#billing-vs-settlement-important) and [Risk scenarios](#risk-scenarios). GPU billing can continue during outages, and SLA credits can exceed many days of SLA fees. On SLA rentals, compute pay is not in `gpu_earn`. Much of the escrow can stay held until the contract ends, so a low `sla_earn` over several days is not by itself a credit.
 6. Read [Scheduled maintenance](#scheduled-maintenance) before you turn SLA on. Schedule planned work as far ahead as you can. Twenty-four hours is not a forgiveness cutoff.
 7. Enter **Claim** and **Confidence**. Enter Claim in the units the console field shows. In the API, 99% is `0.99`, not `99`. With no history, start **Claim** below the uptime you expect to deliver, and start **Confidence** at **Wide**. Use the console SLA preview or the backtester, not the dashboard reliability score. Search hides your offer from renters whose target is above your Claim. Confirm the SLA fee preview, then **Save**. The machine is already listed from step 2, so **Save** publishes SLA to live renters immediately. If you enabled SLA through the API, run the confidence check in [Validation rules](#validation-rules) right away.
-8. **Verify now.** From the client account, search with a **Reliability target** and confirm an **SLA Fee** line. Optionally rent that offer briefly, then **Destroy** the test instance. See [Testing your own machine](/host/hosting-overview#testing-your-own-machine).
+8. **Verify now.** From the client account, include unverified machines (a new machine usually is) and set **Reliability target** at or below your Claim. Search hides offers whose Claim is below the target. Confirm an **SLA Fee** line. Optionally rent that offer briefly, then **Destroy** the test instance. See [Testing your own machine](/host/hosting-overview#testing-your-own-machine).
    - **Console verify:** confirm **Listed** on **Host → Machines** and reopen **Set Pricing → SLA**.
    - **Optional CLI/API:** search with `--storage` matching how renters quote; add `verified=any` if you search your own machine and see no rows (for example `vastai search offers 'machine_id=12345 verified=any has_sla=true expected_reliability>=0.99' --storage 10`). On sliced machines, filter on-demand rows with the jq example in [Search / client-visible fields](#search--client-visible-fields).
 
@@ -89,7 +89,7 @@ SLA is an optional reliability promise on **on-demand** rentals. You do not have
 3. The **renter** picks a **reliability target**. You do not set their target.
 4. The renter pays an **SLA fee** (a service level fee) on top of the GPU price.
 5. Each day, Vast checks how long that rental was actually up.
-6. Each day, Vast combines recent and longer-term uptime into a **blended reliability measure**. If it met the renter's target, you keep the SLA fee and no credit is paid. If it fell short, the renter receives a **service credit** from your earnings. After a stretch of good uptime, a single bad day can cost you a smaller credit than that day's raw uptime suggests. Even when raw uptime is at or slightly above the target, you can still owe a partial credit if the blended measure is below it.
+6. Each day, Vast combines recent and longer-term uptime into a **blended reliability measure**. If it met the renter's target, you keep the SLA fee and no credit is paid. If it fell short, the renter receives a **service credit** from your earnings. On an SLA rental, compute pay is not in `gpu_earn`. It is released over time as `sla_earn`, and much of it can stay held until the contract ends. A low `sla_earn` day is not by itself a credit.
 7. One bad day can cost more than many days of fees.
 
 What this is not:
@@ -186,7 +186,7 @@ Do not assume the dashboard score equals SLA reliability. Before choosing `sla_r
 
 ### Confidence values
 
-**Confidence** sets how wide a pricing margin is built into the SLA fee around your reliability commitment. **Tight** means a smaller fee and less fee income for you. **Wide** means a larger fee. Confidence never changes the credit you owe when a renter's target is missed. The API field is `sla_sigma_x` (σ): a lower value is tighter. Backtester `p` runs the other way: a higher value is tighter. `show machines` uses `high`, `medium`, and `low` (`low` is Wide). Prefer the console controls. Set raw `sla_sigma_x` via the API when automating.
+In the console, pick **Tight**, **Normal**, or **Wide**. You do not need the table unless you use the API or the backtester.
 
 | Console label | API `sla_sigma_x` (σ) | Backtester `p` | `show machines` | Pricing effect |
 | --- | --- | --- | --- | --- |
@@ -760,7 +760,7 @@ SLA approval, settlement questions, credit disputes, and locked machines are sep
 
   **Console**
   1. Notify renters if you can ([Set a maintenance window](/host/set-maintenance-window)).
-  2. Write down Claim, Confidence, prices, end date, reserved discount, and min bid from **Set Pricing**.
+  2. Write down Claim, Confidence, GPU price, storage price, upload and download bandwidth prices, min GPU count, end date, whether the listing is hidden, reserved discount, and min bid from **Set Pricing**. A relist that omits bandwidth can publish it at $0, and omitting min GPU can slice the machine into 1-GPU offers.
   3. Unlist only if the machine is still online and you need to stop new rentals. If it is offline, `create_asks` returns HTTP 402 until the daemon reconnects, and unlisting drops the SLA ask you would then have to rebuild.
   4. Fix the problem.
   5. After the next UTC midnight, check **Host → Billing** for that day's SLA earnings.
