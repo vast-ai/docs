@@ -25,7 +25,7 @@ A few things people mix up:
 - The GPU bill does **not** stop during an outage. A credit is paid only when the blended measure falls below your target, usually after the next UTC midnight. A short outage that stays above the target is billed in full with no credit.
 - Filtering for SLA offers (`has_sla`, SLA-enabled), or a CLI or API search, does **not** turn on an SLA. Setting **Reliability target** in the console Search filters and then clicking **RENT**, or sending `target_reliability` on REST rent, does. The CLI cannot turn SLA on.
 - SLA is only for **on-demand** rentals, not interruptible (spot) or reserved rentals.
-- If the Search offer has **no SLA Fee line**, you do not have an SLA. On an instance, that line appears only while the instance is **running**. In **Account → Billing → Charges** the settlement row is labeled **Service Credit** only when the net amount is negative, and **SLA Fee** otherwise. In API responses the hourly amount is `slaPremiumPerHour`.
+- If the Search offer has **no SLA Fee line**, you do not have an SLA. On an instance, that line appears only while the instance is **running**. In **Account → Billing → Charges**, **Service Credit** is shown as a positive amount (`+$`) and **SLA Fee** as a negative amount (`−$`). The API `amount` has the opposite sign. In API responses the hourly amount is `slaPremiumPerHour`.
 
 Hosts who want the same idea from the listing side can read [SLA in plain language](/host/sla-offers#sla-in-plain-language).
 
@@ -38,7 +38,7 @@ Before you start: ensure [Account → Billing](https://cloud.vast.ai/billing/) h
 3. Set the instance disk size on the slider (console default is 10 GB). If you are comparing against a CLI or REST quote, use the same disk size so the prices match.
 4. Hover over the offer's price and confirm an **SLA Fee** line in the breakdown. Write down **SLA Fee/hr**. You need it later to check credits, and the line is hidden while the instance is loading, stopped, or offline. Then click **RENT**.
 5. Once the instance shows **running**, open **Instances** → **price details** and confirm an **SLA Fee** line. The line is hidden while the instance is loading, stopped, or offline.
-6. After the prior UTC day has settled (credits usually appear hours after UTC midnight; see [Settlement timing](#settlement-timing)), check credits in **Account → Billing → Charges** (not Invoices). Expand the instance row. A negative net is labeled **Service Credit**. Any other net is labeled **SLA Fee**.
+6. After the prior UTC day has settled (credits usually appear hours after UTC midnight; see [Settlement timing](#settlement-timing)), check credits in **Account → Billing → Charges** (not Invoices). Expand the instance row. **Service Credit** is a positive amount (`+$`). **SLA Fee** is a negative amount (`−$`). A partial credit is an **SLA Fee** row closer to zero than your usual daily fee.
 7. When you are done, **Destroy** the instance to end the rental. Destroy deletes the disk. Do not assume **Stop** ends SLA charges. See [Stop vs destroy](#what-you-pay-during-an-outage).
 
 **If you used the CLI to search:** set **Reliability target** again in the console **Search filters** (left bar) before you click **RENT**. CLI filters do not carry over.
@@ -187,7 +187,7 @@ Always compare the total hourly price: the offer **Price** in the console, whose
 <a id="automation-limits"></a>
 
 <Note title="Automation limits (read once)">
-Search quotes SLA; renting with SLA requires REST (or the console) with `target_reliability`. The CLI and published SDK cannot enable SLA on rent. Charges and the console Charges tab show the same net `type: "sla"` row (SLA fee minus any service credit). The console labels it **Service Credit** only when the amount is negative. Invoices and credit webhooks do not include that row.
+Search quotes SLA; renting with SLA requires REST (or the console) with `target_reliability`. The CLI and published SDK cannot enable SLA on rent. Charges and the console Charges tab show the same net `type: "sla"` row. In the console, **Service Credit** is a positive amount and **SLA Fee** is a negative amount. In the API, a negative `amount` is a net credit and a positive `amount` is a net fee. Invoices and credit webhooks do not include that row.
 </Note>
 
 <Warning>
@@ -413,7 +413,7 @@ Production settlement uses the multi-window reliability blend described above, n
 ### Settlement timing
 
 - Settlement runs **once per day** for the previous billing day (UTC).
-- Service credits post to your **account balance**. In **Account → Billing → Charges**, a negative net SLA row is labeled **Service Credit**. Any other net is labeled **SLA Fee**. `GET /api/v0/charges/` returns that same net as `type: "sla"`. Do not use invoices to reconcile SLA credits.
+- Service credits post to your **account balance**. In **Account → Billing → Charges**, **Service Credit** is shown as a positive amount (`+$`) and **SLA Fee** as a negative amount (`−$`). `GET /api/v0/charges/` returns the same row as `type: "sla"` with the opposite sign: a negative `amount` is a net credit and a positive `amount` is a net fee. Do not use invoices to reconcile SLA credits.
 - When your contract ends, any remaining unsettled days are resolved at close.
 
 ## If your instance goes down
@@ -489,7 +489,7 @@ No. Verification is a platform quality signal (see [Machine Tiers](/guides/insta
 
 ### Where do I see historical SLA credits?
 
-**Console:** After UTC settlement, open **Account → Billing → Charges**. A negative net SLA row is labeled **Service Credit**. A smaller but still positive **SLA Fee** row means a partial credit. Compare it with the **SLA Fee/hr** you wrote down at rent (console quick start step 4) times every hour the contract existed that UTC day, including downtime. The Charges API returns the same net. Invoices do not. You cannot see the measured reliability for that day in the console or the API.
+**Console:** After UTC settlement, open **Account → Billing → Charges**. **Service Credit** is a positive amount (`+$`). **SLA Fee** is a negative amount (`−$`). A partial credit is an **SLA Fee** row closer to zero than your usual daily fee. Compare the size of that row with the **SLA Fee/hr** you wrote down at rent (console quick start step 4) times every hour the contract existed that UTC day, including downtime. The Charges API returns the same row with the opposite sign. Invoices do not. You cannot see the measured reliability for that day in the console or the API.
 
 **API integrators:** Use the same Charges row as [Settlement timing](#settlement-timing). The call requires `day.gte` and `day.lte` (unix seconds). Send `next_token` back as `after_token`, and stop when `next_token` is `null`. A row below the fee you expected means a credit was applied. `GET /api/v1/invoices/` covers payment transactions, not SLA credits. Client webhooks for SLA credits are not available. Host-side settlement uses [machine earnings](/api-reference/billing/show-earnings) (`sla_earn`).
 
