@@ -132,7 +132,7 @@ Over many strong days, SLA fees can offset occasional credits, but a single bad 
 
 SLA reliability is measured at the **rental contract (instance) level** using platform health signals for active on-demand contracts — not your personal SSH session or Jupyter tab.
 
-- **Instance fails to start** because the machine is down (driver, disk, network, or daemon) → counts against SLA reliability for that contract. Whether downtime the renter causes (their own Stop or reboot, a bad image, a container crash, or a stop at zero balance) counts against you, or earns them a credit, is not specified. Contact support before you treat that downtime as yours.
+- **Instance fails to start** because the machine is down (driver, disk, network, or daemon) → counts against SLA reliability for that contract. For downtime the renter causes (their own Stop or reboot, a bad image, a container crash, or a stop at zero balance), contact support before you treat it as yours or as a credit you owe.
 - **Machine-level outage** while contracts are active → affects settlement for those contracts.
 - **Brief host reboots** during active rentals may count as downtime. No fixed reboot-duration threshold applies. Treat any unplanned reboot as SLA risk. For planned work, use [Scheduled maintenance](#scheduled-maintenance). Notice is not a cutoff that removes the credit.
 - **Scheduled maintenance** may be partly forgiven (counted as uptime) — see [Scheduled maintenance](#scheduled-maintenance). That is not a service credit.
@@ -524,7 +524,7 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
   fi
   # A failed search must not become a PUT. Fully rented machines are also absent from search.
   sleep 6
-  if ! out=$(vastai search offers "machine_id=$id verified=any has_sla=true" --raw --api-key "$SEARCH_API_KEY" 2>/dev/null); then
+  if ! out=$(vastai search offers "machine_id=$id verified=any has_sla=true" --raw --retry 1 --api-key "$SEARCH_API_KEY" 2>/dev/null); then
     echo "skip $id: search failed (missing misc permission or HTTP 429)" >&2
     continue
   fi

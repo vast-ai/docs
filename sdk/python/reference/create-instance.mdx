@@ -225,26 +225,47 @@ except requests.HTTPError as exc:
     resp = exc.response
     status = resp.status_code if resp is not None else 0
     try:
-        body = resp.json() if resp is not None else {}
+        err_body = resp.json() if resp is not None else {}
     except ValueError:
-        body = {}
-    err = body.get("error", "") if isinstance(body, dict) else ""
-    msg = body.get("msg", "") if isinstance(body, dict) else ""
-    offer_gone = (
-        status in (404, 410)
-        or err == "no_such_ask"
-        or err == "invalid_price"
-        or (err == "invalid_args" and "404/3603" in str(msg))
-    )
-    if offer_gone:
-        raise RuntimeError(
-            "Offer is gone or its price changed. Re-search and retry with a new offer id and a new label. Do not retry this offer id."
-        ) from exc
-    if status != 429 and 400 <= status < 500:
-        raise RuntimeError(
-            f"Rent failed ({status} {err}): {msg}. Fix the request or account. Do not retry this offer id."
-        ) from exc
-    contract_id = None
+        err_body = {}
+    err = err_body.get("error", "") if isinstance(err_body, dict) else ""
+    msg = err_body.get("msg", "") if isinstance(err_body, dict) else ""
+    if status == 429:
+        wait = 5
+        if resp is not None:
+            try:
+                wait = max(float(resp.headers.get("Retry-After") or 0), 5)
+            except ValueError:
+                wait = 5
+        time.sleep(wait)
+        rows = instances_for_label()
+        if rows:
+            contract_id = rows[0].get("id")
+        else:
+            response = requests.put(
+                f"https://console.vast.ai/api/v0/asks/{offer_id}/",
+                headers=headers,
+                json=body,
+                timeout=60,
+            )
+            response.raise_for_status()
+            contract_id = response.json().get("new_contract")
+    else:
+        offer_gone = (
+            status in (404, 410)
+            or err == "no_such_ask"
+            or err == "invalid_price"
+            or (err == "invalid_args" and "404/3603" in str(msg))
+        )
+        if offer_gone:
+            raise RuntimeError(
+                "Offer is gone or its price changed. Re-search and retry with a new offer id and a new label. Do not retry this offer id."
+            ) from exc
+        if 400 <= status < 500:
+            raise RuntimeError(
+                f"Rent failed ({status} {err}): {msg}. Fix the request or account. Do not retry this offer id."
+            ) from exc
+        contract_id = None
 except (requests.Timeout, requests.ConnectionError):
     contract_id = None
 
