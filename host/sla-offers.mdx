@@ -148,7 +148,7 @@ When you list or update a machine, set SLA fields via the host console or `PUT /
 | Parameter | API field | Backtester alias | What it means |
 | --- | --- | --- | --- |
 | Reliability commitment | `sla_r_claim` | `r_claim` (the simulated renter target `r_target` defaults to it) | Your advertised belief about machine reliability. Set above `0` to enable SLA. Values are greater than 0 and at most **0.99999** (for example, `0.99` = 99%). Exactly `1.0` is rejected. Set to `0` to disable SLA on new rentals. |
-| Confidence spread | `sla_sigma_x` | `p` (different scale — see [backtester](/host/sla-backtester#confidence-values-p)) | How wide your belief is around the reliability commitment. Lower = more confident (lower SLA fees for clients at a given target). Defaults to `0.5` if omitted. |
+| Confidence spread | `sla_sigma_x` | `p` (different scale — see [backtester](/host/sla-backtester#confidence-values-p)) | How wide your belief is around the reliability commitment. Lower = more confident (lower SLA fees for clients at a given target). Defaults to `0.5` when SLA is first enabled on an ask. On an existing SLA ask, omitting `sla_sigma_x` keeps the current value. |
 
 ### Advanced: `sla_max_beta` (optional)
 
@@ -200,7 +200,7 @@ Do not assume the dashboard score equals SLA reliability. Before choosing `sla_r
 Offers with invalid combinations are rejected at listing time:
 
 - `sla_r_claim` must be `0` (disable) or greater than 0 and at most **0.99999**. Exactly `1.0` is rejected.
-- When the reliability commitment is positive, `sla_sigma_x` must be positive and at most `3.0` (defaults to `0.5` if omitted).
+- When the reliability commitment is positive, `sla_sigma_x` must be positive and at most `3.0`. It defaults to `0.5` when SLA is first enabled. On an existing SLA ask, omitting it keeps the current value.
 - Optional `sla_max_beta` must be in `(0, 1)` and at least the default β derived at your reliability commitment. Hosts do not set β; this field only caps the client-derived β the offer accepts. Omit for uncapped.
 
 <Note>
@@ -213,7 +213,9 @@ SLA settlement applies per rental contract. If your machine has multiple GPU sli
 
 The backtester replays **machine-level** daily earnings (total compute across all active rentals on that machine). Its largest single-day credit reflects the worst simulated day for the whole machine in the replay window — not a single GPU slice in isolation.
 
-If multiple on-demand SLA contracts can be active on one machine at once, a single outage may trigger service credits **per contract**. The backtester’s largest single-day credit reflects a machine-level replay as one contract—it may not equal the sum of worst-case credits across concurrent SLA renters. For sliced hosts, treat it as a **lower bound** until you confirm aggregation with support. Do **not** naively multiply it by contract count as a substitute for that check—the backtester already models machine-level compute for the replay window, but live per-contract settlement can still stack differently than one simulated day.
+The backtester simulates **one** SLA contract. On a sliced machine, each concurrently rented SLA contract settles separately, so real single-day credits can be higher than that simulated day.
+
+For planning, assume a worst-case day costs up to one full day of covered compute for **each** SLA contract running on the machine that day, plus any closing settlement on a contract's last active day (see [Simulation limits](/host/sla-backtester#simulation-limits)). Ask support if you want a tighter estimate before listing tight SLA terms on sliced machines.
 
 ### SLA on extended contracts
 
@@ -278,10 +280,10 @@ SLA listing via CLI/SDK is not available yet — use the REST API below (or cons
 curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"machine": 12345, "price_disk": 0.15, "hidden_listing": false, "end_date": "CURRENT_END_DATE_FROM_SHOW_MACHINES", "sla_r_claim": 0.99, "sla_sigma_x": 0.5}'
+  -d '{"machine": 12345, "price_disk": 0.15, "min_chunk": CURRENT_MIN_CHUNK, "hidden_listing": false, "end_date": CURRENT_END_DATE_UNIX, "sla_r_claim": 0.99, "sla_sigma_x": 0.5}'
 ```
 
-Replace `price_disk` with the machine's current `listed_storage_cost`. Replace `end_date` with the machine's **current** `end_date` from `show machines` (a Unix timestamp, not the placeholder string). Send `duration` as an integer number of seconds if the listing auto-renews (`show machines` returns a float such as `2592000.0`, which the API rejects), otherwise send `end_date`. Never send both. Send `"hidden_listing": true` if the listing is hidden. See the warning below. Do not copy example prices into a first listing.
+Replace `price_disk` with the machine's current `listed_storage_cost`. Replace `CURRENT_END_DATE_UNIX` with the machine's current `end_date` from `show machines`, as a number with no quotes. Replace `CURRENT_MIN_CHUNK` with `listed_min_gpu_count` (omitting `min_chunk` resets it to 1). Send `duration` as an integer number of seconds if the listing auto-renews (`show machines` returns a float such as `2592000.0`, which the API rejects), otherwise send `end_date`. Never send both. Send `"hidden_listing": true` if the listing is hidden. See the warning below. Do not copy example prices into a first listing.
 
 <Warning>
 Send your **current** `end_date` unless you intend to extend. A later `end_date` at the same or lower price extends existing rental contracts, including their SLA terms and service-credit exposure. See [Extending rental contracts](/host/hosting-overview#extending-rental-contracts).
@@ -299,10 +301,11 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
     "machine": 12345,
     "price_gpu": 3.50,
     "price_disk": 0.15,
+    "min_chunk": CURRENT_MIN_CHUNK,
     "hidden_listing": false,
     "sla_r_claim": 0.99,
     "sla_sigma_x": 0.5,
-    "end_date": "CURRENT_END_DATE_FROM_SHOW_MACHINES"
+    "end_date": CURRENT_END_DATE_UNIX
   }'
 ```
 
@@ -317,8 +320,9 @@ SLA fields example (existing listing, same limit as the curl above):
   "machine": 12345,
   "price_gpu": 3.50,
   "price_disk": 0.15,
+  "min_chunk": CURRENT_MIN_CHUNK,
   "hidden_listing": false,
-  "end_date": "CURRENT_END_DATE_FROM_SHOW_MACHINES",
+  "end_date": CURRENT_END_DATE_UNIX,
   "sla_r_claim": 0.99,
   "sla_sigma_x": 0.5
 }
@@ -333,7 +337,9 @@ This creates an offer with a reliability commitment of `0.99` and confidence spr
 - `price_disk` resets to **$0.10/GB/month** if omitted or `null`.
 - `duration` is cleared if omitted (a listing created with `vastai list machine -l` stops auto-renewing).
 - `hidden_listing` resets to `false` if omitted (a hidden listing becomes visible). `show machines` does not return this flag, so send `true` when the listing should stay hidden.
-- Send **either** `duration` (when `show machines` returns a non-null `duration`) **or** `end_date`, never both. Both together returns `400` `Cannot set both duration and end_date`.
+- `min_chunk` resets to **1** if omitted, which can make a whole-GPU listing sliceable. Send the current `listed_min_gpu_count`.
+- `vol_size` omitted on a machine with no volume offer creates one sized at half the free disk. Send `"vol_size": 0` to keep volume offers off.
+- Send **either** `duration` (integer seconds; a float such as `2592000.0` returns 400 `Invalid duration`) **or** `end_date`, never both. Sending both returns `400` `Cannot set both duration and end_date`.
 
 Always read the current listing and send `price_disk` plus either `duration` or `end_date`. Map read-side names as follows: `listed_gpu_cost` → `price_gpu`, `listed_storage_cost` → `price_disk`.
 </Warning>
@@ -477,10 +483,10 @@ Fetch the fleet once before the loop — do not call `show machines --raw` insid
 curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"machine": 12345, "price_disk": 0.15, "hidden_listing": false, "end_date": "CURRENT_END_DATE_FROM_SHOW_MACHINES", "sla_r_claim": 0.995, "sla_sigma_x": 0.2}'
+  -d '{"machine": 12345, "price_disk": 0.15, "min_chunk": CURRENT_MIN_CHUNK, "hidden_listing": false, "end_date": CURRENT_END_DATE_UNIX, "sla_r_claim": 0.995, "sla_sigma_x": 0.2}'
 ```
 
-Replace `CURRENT_END_DATE_FROM_SHOW_MACHINES` with the current `end_date` from `show machines`. Do not leave a far-future timestamp in a copied body. A later `end_date` extends live SLA contracts.
+Replace `CURRENT_END_DATE_UNIX` and `CURRENT_MIN_CHUNK` with the current values from `show machines`, as numbers with no quotes. A later `end_date` extends live SLA contracts. Omitting `min_chunk` resets it to 1.
 
 **Disable SLA on new rentals** — set `sla_r_claim` to `0` (active contracts keep their terms). This request publishes a live listing (same as **LIST**), so don't run it on machines you have unlisted.
 
@@ -588,16 +594,16 @@ The **reliability commitment** is your belief and pricing knob. The client's **r
 Credits scale relative to the day's compute, not only the SLA fee collected. A single bad day near the client's target boundary can cost as much as 200+ days of collected SLA fees. Review the economics below and run the [backtester](/host/sla-backtester) before enabling SLA.
 </Warning>
 
-These scenarios show settlement when reliability **drops to or below** a 95% client target — they are boundary illustrations, not typical strong days:
+These scenarios show settlement when the blended measure falls **below** a 95% client target. They are illustrations, not typical strong days:
 
 | Measured reliability (simplified) | You net (per day) |
 | --- | --- |
-| Just below target on the blended measure (daily uptime may look close to 95%) | −$42 (credit you owe) |
+| Blended measure ~93–94% (illustrative shortfall) | −$42 (credit you owe) |
 | Well below target (~90% or less) | −$84 (large credit owed) |
 
 To put the asymmetry in perspective: at ~$0.20/day in SLA fees, it takes roughly 210 strong days to accumulate the $42 you could lose on a single day at the target boundary. The SLA fee is a small fraction of daily compute, while credits scale against total daily compute.
 
-Your maximum SLA loss on any single settlement day is bounded by that day's covered compute (GPU, storage, and bandwidth).
+Your maximum SLA loss on any single settlement day is bounded by that day's covered compute **per SLA contract** (GPU, storage, and bandwidth). The closing settlement on a contract's last day can add more.
 
 ## Risk scenarios
 
@@ -626,7 +632,7 @@ Notify renters in the console ([Set a maintenance window](/host/set-maintenance-
 **Console**
 
 1. Open [Host → Machines](https://cloud.vast.ai/host/machines/), then **Settings** → **Machine Maintenances**.
-2. Set a start at least 24 hours ahead and a duration in whole hours.
+2. Set a start at least 24 hours ahead and a duration in whole hours. The server rounds a fractional duration **down** (minimum 1 hour), so `2.5` becomes a 2-hour window. Round **up** when sizing an SLA maintenance window.
 3. Confirm the window is listed in that table before you take the machine down.
 
 **Or use CLI/REST below.** Forgiveness is not guaranteed either way.

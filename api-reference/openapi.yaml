@@ -1809,8 +1809,11 @@ paths:
         '400':
           description: "Bad Request. SLA failures use `invalid_sla_params` (no SLA\
             \ on the offer, target above the host commitment, target out of range,\
-            \ or SLA fee above 1\xD7 compute). Also SSH key requirements and `no_such_ask`\
-            \ when the offer is gone.\n"
+            \ or SLA fee above 1\xD7 compute). Also SSH key requirements. A missing\
+            \ offer is HTTP 400 `invalid_args` with `no_such_ask` (`msg` contains\
+            \ `error 404/3603`). A host account renting someone else's offer is also\
+            \ HTTP 400 `invalid_args` (`msg` contains `error 403/3586`). The HTTP\
+            \ status is 400 in both cases.\n"
           content:
             application/json:
               schema:
@@ -1840,7 +1843,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '403':
-          description: Forbidden
+          description: 'Forbidden. SLA is not enabled for this account or region (`error`
+            is `sla_disabled`). A host account renting another host''s offer is not
+            403; that is HTTP 400 with `error 403/3586` inside `msg`.
+
+            '
           content:
             application/json:
               schema:
@@ -1851,31 +1858,10 @@ paths:
                     example: false
                   error:
                     type: string
-                    example: invalid_args
+                    example: sla_disabled
                   msg:
                     type: string
-                    example: 'error 403/3586: Offer 1234567 is not your own. Hosts
-                      can only rent their own machines.'
-                  ask_id:
-                    type: integer
-                    example: 1234567
-        '404':
-          description: Offer not found or not available
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  error:
-                    type: string
-                    example: invalid_args
-                  msg:
-                    type: string
-                    example: 'error 404/3603: no_such_ask Instance type by id 1234567
-                      is not available.'
+                    example: SLA is not enabled.
                   ask_id:
                     type: integer
                     example: 1234567
@@ -4520,17 +4506,18 @@ paths:
         \ rent on the vast.ai platform.\nAllows setting offer pricing, rental types,\
         \ end dates, discount rates, and SLA parameters.\nUnspecified fields generally\
         \ keep their current values, except `price_disk` (defaults to 0.10), `duration`\
-        \ (cleared if omitted) and `hidden_listing` (defaults to false). Send `price_disk`\
-        \ and `hidden_listing` on every update. Send either `duration` or `end_date`,\
-        \ never both (400). Read the current offer with show machines before changing\
-        \ pricing.\n\nSLA request-body fields (`sla_r_claim`, `sla_sigma_x`, optional\
-        \ `sla_max_beta`) are supported on this REST endpoint. SLA activates when\
-        \ `sla_r_claim > 0`. Host-sent `sla_r_target` / legacy `sla_reliability` are\
-        \ ignored \u2014 clients choose a reliability target at search/rent time.\
-        \ The published CLI and SDK do not yet expose SLA fields \u2014 use the host\
-        \ console (**Set Pricing \u2192 SLA**) or REST/`curl` until CLI/SDK support\
-        \ ships.\n\nCLI Usage (non-SLA fields): `vastai list machine <machine_id>\
-        \ [options]`"
+        \ (cleared if omitted), `hidden_listing` (defaults to false), and `min_chunk`\
+        \ (defaults to 1). Omitting `vol_size` on a machine with no volume offer creates\
+        \ one at half the free disk; send `0` to opt out. Send `price_disk`, `hidden_listing`,\
+        \ and `min_chunk` on every update. Send either `duration` or `end_date`, never\
+        \ both (400). Read the current offer with show machines before changing pricing.\n\
+        \nSLA request-body fields (`sla_r_claim`, `sla_sigma_x`, optional `sla_max_beta`)\
+        \ are supported on this REST endpoint. SLA activates when `sla_r_claim > 0`.\
+        \ Host-sent `sla_r_target` / legacy `sla_reliability` are ignored \u2014 clients\
+        \ choose a reliability target at search/rent time. The published CLI and SDK\
+        \ do not yet expose SLA fields \u2014 use the host console (**Set Pricing\
+        \ \u2192 SLA**) or REST/`curl` until CLI/SDK support ships.\n\nCLI Usage (non-SLA\
+        \ fields): `vastai list machine <machine_id> [options]`"
       security:
       - BearerAuth: []
       requestBody:
@@ -4567,7 +4554,10 @@ paths:
                   description: Minimum bid price allowed
                 min_chunk:
                   type: integer
-                  description: Minimum number of GPUs that must be rented together
+                  description: Minimum number of GPUs that must be rented together.
+                    Omitted values reset to 1, which can slice a machine that was
+                    previously whole-GPU only. Send the current listed_min_gpu_count
+                    on every update.
                   default: 1
                 end_date:
                   type: number
@@ -4576,11 +4566,13 @@ paths:
                     send together with `duration` (400 Cannot set both duration and
                     end_date).
                 duration:
-                  type: number
-                  format: float
-                  description: Auto-renew length in seconds. Send this instead of
-                    `end_date` for listings created with `vastai list machine -l`.
-                    Omitting it on an auto-renew listing turns auto-renew off.
+                  type: integer
+                  description: 'Whole seconds until the listing ends (auto-renewing
+                    listings). Floats such as 2592000.0 are rejected with 400 Invalid
+                    duration. Mutually exclusive with end_date. Omitting it on an
+                    auto-renew listing turns auto-renew off.
+
+                    '
                 hidden_listing:
                   type: boolean
                   description: When true, the offer is not shown in search. Defaults
@@ -4609,7 +4601,8 @@ paths:
                   format: float
                   description: "Host confidence spread \u2014 how wide your belief\
                     \ is around the claim.\nMust be greater than 0 and at most 3.0.\
-                    \ Defaults to 0.5 when enabling SLA.\n"
+                    \ Defaults to 0.5 when SLA is first enabled on an ask. Omitting\
+                    \ it on an existing SLA ask keeps the current value.\n"
                 sla_max_beta:
                   type: number
                   format: float

@@ -288,7 +288,7 @@ Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `ta
 | --- | --- | --- |
 | Offer has no SLA, target is above the host commitment, target is out of range, or the SLA fee would exceed 1× compute | HTTP 400 `invalid_sla_params` (body includes `ask_id`; message may say "SLA Fee would be N.NNx compute") | Lower the target, or pick an offer with a higher commitment |
 | SLA not enabled for the account or region | HTTP 403 `sla_disabled` | Contact support |
-| Offer no longer exists | HTTP 400 `invalid_args` / `no_such_ask`, HTTP 404, or HTTP 410 | Re-search and use a fresh offer ID |
+| Offer no longer exists | HTTP 400 `invalid_args` (`no_such_ask`; `msg` may contain `error 404/3603`) or HTTP 410 | Re-search and use a fresh offer ID. The HTTP status for a missing offer is 400, not 404. |
 | Ask cannot start now (`cancel_unavail`) | HTTP 410, error `no_such_ask` | Search for a new offer; this is not a transient glitch to retry on the same id |
 | `price` (bid) sent together with `target_reliability` | HTTP 400 "Cannot combine interruptible instances with SLAs" | Remove `price`. SLA rentals are on-demand only |
 | Timeout, dropped connection, or HTTP 5xx | Outcome unknown — the rental may already exist | Before sending the same `PUT` again, check `GET /api/v1/instances/` for a new contract. There is no idempotency key, so a blind retry can create a second paid rental. |
@@ -347,7 +347,7 @@ Using the H100 example ($84/day compute, ~$0.20/day SLA fee, target 95%, host re
 | Below target (~93–94% for the day) | ~$0.20/day | ~$42 | **+$41.80** (net credit after SLA fee) |
 | Severe shortfall (~90% or less) | ~$0.20/day | ~$84 | **+$83.80** |
 
-**How to read “Net vs no SLA”:** negative = you paid more than without SLA; positive = you received a net credit versus renting the same offer without the SLA. Credits are graduated. A day close to your target can pay a small credit, and the further below target the day falls, the larger the credit. A day that meets the target does not pay a credit.
+**How to read “Net vs no SLA”:** negative = you paid more than without SLA; positive = you received a net credit versus renting the same offer without the SLA. Credits grow with the size of the shortfall. In this example, a day 1–2 points below target pays a meaningful share of that day's compute, not a token amount. Figures are illustrative. A day that meets the target does not pay a credit.
 
 Production settlement can issue credits even when a single daily snapshot looks close to your target, because measurement uses the blended daily reliability calculation.
 
