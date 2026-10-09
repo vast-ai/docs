@@ -282,18 +282,18 @@ Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `ta
 
 **Billing reconciliation (console):** Verifying the SLA on an instance (for example via `GET /api/v1/instances/`) does not show service credits. After UTC settlement, open **Account → Billing**. `GET /api/v0/charges/` does not list those credits.
 
-**Automation limitations:** SLA service credits are reconciled in the console (**Account → Billing**). There is no renter API, export, or webhook for those credit line items today. After the UTC day boundary (wait up to about 48 hours if a line is missing), check billing or contact support. Verify an active SLA on instances with `GET /api/v1/instances/` (`target_reliability`, `instance.slaPremiumPerHour`).
+**Automation limitations:** SLA service credits are reconciled in the console (**Account → Billing**). There is no renter API, export, or webhook for those credit line items today. After the UTC day boundary (wait up to about 48 hours if a line is missing), check billing or contact support. Verify an active SLA on instances with `GET /api/v1/instances/`. Confirm `target_reliability > 0`. A present but zero value means the rental has no SLA. Also check `instance.slaPremiumPerHour`. Show-instances uses OpenAPI threshold `1.0` (about one request per second).
 
 | Symptom | Typical response | What to do |
 | --- | --- | --- |
-| Target out of range (below 0 or 1 or above) | HTTP 400 `invalid_args` ("target reliability must be greater than or equal to 0 and less than 1") | Send a plain number in `[0, 1)`. |
+| Target outside `[0, 1)` (negative, or 1 or above) | HTTP 400 `invalid_args` ("target reliability must be greater than or equal to 0 and less than 1") | SLA requires `0 < target_reliability < 1`. Sending `0` or omitting the field rents **without** an SLA (HTTP 200, no error). |
 | Offer has no SLA, target is above the host commitment, or the SLA fee would exceed 1× compute | HTTP 400 `invalid_sla_params` (body includes `ask_id`; message may say "SLA Fee would be N.NNx compute") | Lower the target, or pick an offer with a higher commitment |
 | SLA not enabled for the account or region | HTTP 403 `sla_disabled` | Contact support |
 | Offer no longer exists | HTTP 400 `invalid_args` (`no_such_ask`; `msg` may contain `error 404/3603`) or HTTP 410 | Re-search and use a fresh offer ID. The HTTP status for a missing offer is 400, not 404. |
 | Ask cannot start now (`cancel_unavail`) | HTTP 410, error `no_such_ask` | Search for a new offer; this is not a transient glitch to retry on the same id |
 | `price` (bid) sent together with `target_reliability` | HTTP 400 "Cannot combine interruptible instances with SLAs" | Remove `price`. SLA rentals are on-demand only |
 | Timeout, dropped connection, or HTTP 5xx | Outcome unknown — the rental may already exist | Before sending the same `PUT` again, check `GET /api/v1/instances/` for a new contract. There is no idempotency key, so a blind retry can create a second paid rental. |
-| Too many requests | HTTP 429. Search is about 10 requests per minute. Rent uses `threshold` 4.5; the body is `{"detail": ...}`, not `{success, error, msg}`. | Back off, then confirm with `GET /api/v1/instances/` whether the contract already exists. If retry returns `invalid_price`, `no_such_ask`, 404, or 410, re-search and rent a fresh offer id. |
+| Too many requests | HTTP 429. Search is about 10 requests per minute. Space rent calls about 5 seconds apart (OpenAPI `x-rate-limit` threshold 4.5, penalty 12). The body is `{"detail": ...}`, not `{success, error, msg}`. | Wait, then confirm with `GET /api/v1/instances/` whether the contract already exists before you retry. If retry returns `invalid_price`, `no_such_ask`, or 410, re-search and rent a fresh offer id. |
 | Missing SSH key for the VM | HTTP 400 `no_ssh_key_for_vm` (or similar) | Add an SSH key on your account before renting, then retry with a current offer id. |
 | Forbidden / wrong account | HTTP 400 `invalid_args`. The message text includes `error 403/3586` and "Hosts can only rent their own machines." The HTTP status is 400, not 403. | Rent with a **renter** account API key, not the host listing key (see [Hosting Overview](/host/hosting-overview) self-test note). |
 

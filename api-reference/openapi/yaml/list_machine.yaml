@@ -13,7 +13,7 @@ paths:
       description: |
         Creates or updates ask contracts for a machine to list it for rent on the vast.ai platform.
         Allows setting offer pricing, rental types, end dates, discount rates, and SLA parameters.
-        Unspecified fields generally keep their current values, except `price_disk` (defaults to 0.10), `duration` (cleared if omitted), `hidden_listing` (defaults to false), and `min_chunk` (defaults to 1). Omitting `vol_size` on a machine with no volume offer creates one at half the free disk; send `0` to opt out. Send `price_disk`, `hidden_listing`, and `min_chunk` on every update. Send either `duration` or `end_date`, never both (400). Read the current offer with show machines before changing pricing.
+        Unspecified fields generally keep their current values, except `price_disk` (defaults to 0.10), `duration` (cleared if omitted), `hidden_listing` (defaults to false), `min_chunk` defaults to 1 only when offers are created or re-created, not when an existing listing is updated. Omitting `vol_size` on a machine with no volume offer creates one at half the free disk; send `0` to opt out. Send `price_disk`, `hidden_listing`, and `min_chunk` on every update. Send either `duration` or `end_date`, never both (400). Read the current offer with show machines before changing pricing.
 
         SLA request-body fields (`sla_r_claim`, `sla_sigma_x`, optional `sla_max_beta`) are supported on this REST endpoint. SLA activates when `sla_r_claim > 0`. Host-sent `sla_r_target` / legacy `sla_reliability` are ignored — clients choose a reliability target at search/rent time. The published CLI and SDK do not yet expose SLA fields — use the host console (**Set Pricing → SLA**) or REST/`curl` until CLI/SDK support ships.
 
@@ -54,7 +54,7 @@ paths:
                   description: Minimum bid price allowed
                 min_chunk:
                   type: integer
-                  description: Minimum number of GPUs that must be rented together. Omitted values reset to 1, which can slice a machine that was previously whole-GPU only. Send the current listed_min_gpu_count on every update.
+                  description: Minimum number of GPUs that must be rented together. Defaults to 1 when offers are created or re-created (first publish, or relist after unlist). Omitting it on an already-listed machine does not change the current minimum. Send listed_min_gpu_count so a later relist does not slice the machine.
                   default: 1
                 end_date:
                   type: number

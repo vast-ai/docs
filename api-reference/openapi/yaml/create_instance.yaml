@@ -73,12 +73,12 @@ paths:
                   type: number
                   format: float
                   minimum: 0
+                  maximum: 1
                   exclusiveMaximum: true
                   description: |
-                    Client SLA coverage target (greater than 0 and less than 1). When set on an SLA-enabled offer
-                    (`sla_r_claim > 0`), locks SLA terms on the new contract. Omit or set to 0 for a non-SLA rental.
-                    Use the same value you used in search when comparing `dph_total`.
-                    Common failures: `invalid_sla_params` when the offer has no SLA, the target is above the host commitment, the target is out of range, or the SLA fee would exceed 1× compute.
+                    0 or omitted means no SLA. A value in (0, 1) requests an SLA at that reliability target.
+                    Values below 0 or at least 1 return HTTP 400 `invalid_args`.
+                    `invalid_sla_params` covers an offer with no SLA, a target above the host commitment, or an SLA fee above 1× compute.
                     See [SLA Coverage](/guides/instances/choosing/sla-coverage).
                 runtype:
                   type: string
@@ -199,7 +199,7 @@ paths:
                     example: 1234568
         '400':
           description: |
-            Bad Request. SLA failures use `invalid_sla_params` (no SLA on the offer, target above the host commitment, target out of range, or SLA fee above 1× compute). Also SSH key requirements. A missing offer is HTTP 400 `invalid_args` with `no_such_ask` (`msg` contains `error 404/3603`). A host account renting someone else's offer is also HTTP 400 `invalid_args` (`msg` contains `error 403/3586`). The HTTP status is 400 in both cases.
+            Bad Request. Out-of-range `target_reliability` (below 0 or at least 1) is `invalid_args`. `invalid_sla_params` covers no SLA on the offer, a target above the host commitment, or an SLA fee above 1× compute. Also SSH key requirements. A missing offer is HTTP 400 `invalid_args` with `no_such_ask` (`msg` contains `error 404/3603`). A host account renting someone else's offer is also HTTP 400 `invalid_args` (`msg` contains `error 403/3586`). The HTTP status is 400 in both cases.
           content:
             application/json:
               schema:

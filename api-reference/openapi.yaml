@@ -1654,15 +1654,13 @@ paths:
                   type: number
                   format: float
                   minimum: 0
+                  maximum: 1
                   exclusiveMaximum: true
-                  description: "Client SLA coverage target (greater than 0 and less\
-                    \ than 1). When set on an SLA-enabled offer\n(`sla_r_claim > 0`),\
-                    \ locks SLA terms on the new contract. Omit or set to 0 for a\
-                    \ non-SLA rental.\nUse the same value you used in search when\
-                    \ comparing `dph_total`.\nCommon failures: `invalid_sla_params`\
-                    \ when the offer has no SLA, the target is above the host commitment,\
-                    \ the target is out of range, or the SLA fee would exceed 1\xD7\
-                    \ compute.\nSee [SLA Coverage](/guides/instances/choosing/sla-coverage).\n"
+                  description: "0 or omitted means no SLA. A value in (0, 1) requests\
+                    \ an SLA at that reliability target.\nValues below 0 or at least\
+                    \ 1 return HTTP 400 `invalid_args`.\n`invalid_sla_params` covers\
+                    \ an offer with no SLA, a target above the host commitment, or\
+                    \ an SLA fee above 1\xD7 compute.\nSee [SLA Coverage](/guides/instances/choosing/sla-coverage).\n"
                 runtype:
                   type: string
                   description: 'Launch mode for the instance. If omitted, defaults
@@ -1807,13 +1805,13 @@ paths:
                     description: ID of the newly created instance contract
                     example: 1234568
         '400':
-          description: "Bad Request. SLA failures use `invalid_sla_params` (no SLA\
-            \ on the offer, target above the host commitment, target out of range,\
-            \ or SLA fee above 1\xD7 compute). Also SSH key requirements. A missing\
-            \ offer is HTTP 400 `invalid_args` with `no_such_ask` (`msg` contains\
-            \ `error 404/3603`). A host account renting someone else's offer is also\
-            \ HTTP 400 `invalid_args` (`msg` contains `error 403/3586`). The HTTP\
-            \ status is 400 in both cases.\n"
+          description: "Bad Request. Out-of-range `target_reliability` (below 0 or\
+            \ at least 1) is `invalid_args`. `invalid_sla_params` covers no SLA on\
+            \ the offer, a target above the host commitment, or an SLA fee above 1\xD7\
+            \ compute. Also SSH key requirements. A missing offer is HTTP 400 `invalid_args`\
+            \ with `no_such_ask` (`msg` contains `error 404/3603`). A host account\
+            \ renting someone else's offer is also HTTP 400 `invalid_args` (`msg`\
+            \ contains `error 403/3586`). The HTTP status is 400 in both cases.\n"
           content:
             application/json:
               schema:
@@ -4506,18 +4504,20 @@ paths:
         \ rent on the vast.ai platform.\nAllows setting offer pricing, rental types,\
         \ end dates, discount rates, and SLA parameters.\nUnspecified fields generally\
         \ keep their current values, except `price_disk` (defaults to 0.10), `duration`\
-        \ (cleared if omitted), `hidden_listing` (defaults to false), and `min_chunk`\
-        \ (defaults to 1). Omitting `vol_size` on a machine with no volume offer creates\
-        \ one at half the free disk; send `0` to opt out. Send `price_disk`, `hidden_listing`,\
-        \ and `min_chunk` on every update. Send either `duration` or `end_date`, never\
-        \ both (400). Read the current offer with show machines before changing pricing.\n\
-        \nSLA request-body fields (`sla_r_claim`, `sla_sigma_x`, optional `sla_max_beta`)\
-        \ are supported on this REST endpoint. SLA activates when `sla_r_claim > 0`.\
-        \ Host-sent `sla_r_target` / legacy `sla_reliability` are ignored \u2014 clients\
-        \ choose a reliability target at search/rent time. The published CLI and SDK\
-        \ do not yet expose SLA fields \u2014 use the host console (**Set Pricing\
-        \ \u2192 SLA**) or REST/`curl` until CLI/SDK support ships.\n\nCLI Usage (non-SLA\
-        \ fields): `vastai list machine <machine_id> [options]`"
+        \ (cleared if omitted), `hidden_listing` (defaults to false), `min_chunk`\
+        \ defaults to 1 only when offers are created or re-created, not when an existing\
+        \ listing is updated. Omitting `vol_size` on a machine with no volume offer\
+        \ creates one at half the free disk; send `0` to opt out. Send `price_disk`,\
+        \ `hidden_listing`, and `min_chunk` on every update. Send either `duration`\
+        \ or `end_date`, never both (400). Read the current offer with show machines\
+        \ before changing pricing.\n\nSLA request-body fields (`sla_r_claim`, `sla_sigma_x`,\
+        \ optional `sla_max_beta`) are supported on this REST endpoint. SLA activates\
+        \ when `sla_r_claim > 0`. Host-sent `sla_r_target` / legacy `sla_reliability`\
+        \ are ignored \u2014 clients choose a reliability target at search/rent time.\
+        \ The published CLI and SDK do not yet expose SLA fields \u2014 use the host\
+        \ console (**Set Pricing \u2192 SLA**) or REST/`curl` until CLI/SDK support\
+        \ ships.\n\nCLI Usage (non-SLA fields): `vastai list machine <machine_id>\
+        \ [options]`"
       security:
       - BearerAuth: []
       requestBody:
@@ -4555,9 +4555,10 @@ paths:
                 min_chunk:
                   type: integer
                   description: Minimum number of GPUs that must be rented together.
-                    Omitted values reset to 1, which can slice a machine that was
-                    previously whole-GPU only. Send the current listed_min_gpu_count
-                    on every update.
+                    Defaults to 1 when offers are created or re-created (first publish,
+                    or relist after unlist). Omitting it on an already-listed machine
+                    does not change the current minimum. Send listed_min_gpu_count
+                    so a later relist does not slice the machine.
                   default: 1
                 end_date:
                   type: number

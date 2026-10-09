@@ -276,7 +276,7 @@ SLA listing via CLI/SDK is not available yet — use the REST API below (or cons
 **Not a first listing.** Use this SLA-only body when the machine already has base pricing. For a **first publish**, use a full `create_asks` body from [List Machine](/api-reference/machines/list-machine) (include at least `min_chunk`, disk/bandwidth prices, and `end_date`) or **Set Pricing → SLA** in the console. See [Hosting overview](/host/hosting-overview#offers-and-rental-contracts).
 </Warning>
 
-Omitted fields reset. Read the warning under [Full listing update](#full-listing-update-existing-ask) before you copy a body. `"vol_size": 0` keeps a new volume offer from being created. It does not delete a volume offer you already have.
+Some omitted fields reset to defaults (for example `price_disk`, `hidden_listing`, and `duration`). Read the warning under [Full listing update](#full-listing-update-existing-ask) before you copy a body. `"vol_size": 0` keeps a new volume offer from being created. It does not delete a volume offer you already have.
 
 ```bash
 # "vol_size": 0 keeps volume offers off. Remove it only if this machine should have a volume offer.
@@ -286,7 +286,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
   -d '{"machine": 12345, "price_disk": 0.15, "min_chunk": CURRENT_MIN_CHUNK, "vol_size": 0, "hidden_listing": false, "end_date": CURRENT_END_DATE_UNIX, "sla_r_claim": 0.99, "sla_sigma_x": 0.5}'
 ```
 
-Replace `price_disk` with the machine's current `listed_storage_cost`. Replace `CURRENT_END_DATE_UNIX` with the machine's current `end_date` from `show machines`, as a number with no quotes. Replace `CURRENT_MIN_CHUNK` with `listed_min_gpu_count` (omitting `min_chunk` resets it to 1). Send `duration` as an integer number of seconds if the listing auto-renews (`show machines` returns a float such as `2592000.0`, which the API rejects), otherwise send `end_date`. Never send both. Send `"hidden_listing": true` if the listing is hidden. See the warning below. Do not copy example prices into a first listing.
+Replace `price_disk` with the machine's current `listed_storage_cost`. Replace `CURRENT_END_DATE_UNIX` with the machine's current `end_date` from `show machines`, as a number with no quotes. Replace `CURRENT_MIN_CHUNK` with `listed_min_gpu_count` (it defaults to 1 only when offers are created or re-created). Send `duration` as an integer number of seconds if the listing auto-renews (`show machines` returns a float such as `2592000.0`, which the API rejects), otherwise send `end_date`. Never send both. Send `"hidden_listing": true` if the listing is hidden. See the warning below. Do not copy example prices into a first listing.
 
 <Warning>
 Send your **current** `end_date` unless you intend to extend. A later `end_date` at the same or lower price extends existing rental contracts, including their SLA terms and service-credit exposure. See [Extending rental contracts](/host/hosting-overview#extending-rental-contracts).
@@ -342,7 +342,7 @@ This creates an offer with a reliability commitment of `0.99` and confidence spr
 - `price_disk` resets to **$0.10/GB/month** if omitted or `null`.
 - `duration` is cleared if omitted (a listing created with `vastai list machine -l` stops auto-renewing).
 - `hidden_listing` resets to `false` if omitted (a hidden listing becomes visible). `show machines` does not return this flag, so send `true` when the listing should stay hidden.
-- `min_chunk` resets to **1** if omitted, which can make a whole-GPU listing sliceable. Send the current `listed_min_gpu_count`.
+- `min_chunk` defaults to **1** when offers are created or re-created (first publish, or relisting after an unlist). On an already-listed machine, omitting it does not change the current minimum. Still send `listed_min_gpu_count` so a later relist does not slice the machine by accident.
 - `vol_size` omitted on a machine with no volume offer creates one sized at half the free disk. Send `"vol_size": 0` to keep that from happening. `0` does not delete a volume offer that already exists.
 - Send **either** `duration` (integer seconds; a float such as `2592000.0` returns 400 `Invalid duration`) **or** `end_date`, never both. Sending both returns `400` `Cannot set both duration and end_date`.
 
@@ -482,7 +482,7 @@ Fetch the fleet once before the loop — do not call `show machines --raw` insid
 </Accordion>
 </AccordionGroup>
 
-**SLA-only update (existing ask only)** — send `machine`, the current `price_disk`, `hidden_listing`, and either `duration` (integer seconds) or `end_date`, plus the SLA fields. Omitted fields reset as described in the warning above. Do **not** use this body for a first listing. Replace the placeholders with values from `show machines`.
+**SLA-only update (existing ask only)** — send `machine`, the current `price_disk`, `hidden_listing`, and either `duration` (integer seconds) or `end_date`, plus the SLA fields. Some omitted fields reset, as described in the warning above. Do **not** use this body for a first listing. Replace the placeholders with values from `show machines`.
 
 ```bash
 curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
@@ -491,7 +491,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
   -d '{"machine": 12345, "price_disk": 0.15, "min_chunk": CURRENT_MIN_CHUNK, "vol_size": 0, "hidden_listing": false, "end_date": CURRENT_END_DATE_UNIX, "sla_r_claim": 0.995, "sla_sigma_x": 0.2}'
 ```
 
-Replace `CURRENT_END_DATE_UNIX` and `CURRENT_MIN_CHUNK` with the current values from `show machines`, as numbers with no quotes. A later `end_date` extends live SLA contracts. Omitting `min_chunk` resets it to 1.
+Replace `CURRENT_END_DATE_UNIX` and `CURRENT_MIN_CHUNK` with the current values from `show machines`, as numbers with no quotes. A later `end_date` extends live SLA contracts. `min_chunk` defaults to 1 only when offers are created or re-created, not on an update of a live listing.
 
 **Disable SLA on new rentals** — set `sla_r_claim` to `0` (active contracts keep their terms). This request publishes a live listing (same as **LIST**), so don't run it on machines you have unlisted.
 
@@ -688,17 +688,17 @@ Use the [SLA Earnings Backtester](/host/sla-backtester) (API-only; requires a `m
 - **`sla_daemon_outdated`** — Update the host daemon from the [host setup guide](https://cloud.vast.ai/host/setup/), confirm the machine reconnects on **Host → Machines**, then retry LIST / `create_asks`. If the error persists, contact support with the machine ID.
 - **Unexpected credit** — Review reliability; re-run the backtester over the affected dates and check `escrow_to_client_balance` and `reliability` on those days.
 - **Severe outage (active SLA contracts):**
-  1. Notify renters now: `echo y | vastai schedule maint MACHINE_ID --sdate "$(date -u +%s)" --duration HOURS --maintenance_category other`.
-  2. Stop new SLA rentals. The fastest way is `vastai unlist machine MACHINE_ID`, which publishes nothing. Setting the reliability commitment to `0` (`sla_r_claim=0`) only works while the machine is online. If it is down, `create_asks` returns HTTP 402 and `vastai unlist machine` is the path that works. Only change the commitment on machines that are currently listed, because `create_asks` publishes a live listing. Include the current `price_disk` on that update.
+  1. **Notify renters.** In the console: **Host → Machines → Settings → Machine Maintenances** (see [Set a maintenance window](/host/set-maintenance-window)). To automate: `echo y | vastai schedule maint MACHINE_ID --sdate "$(date -u +%s)" --duration HOURS --maintenance_category other`.
+  2. **Stop new rentals.** In the console, use **Unlist** on **Host → Machines**. To automate: `vastai unlist machine MACHINE_ID`, which publishes nothing. Setting the reliability commitment to `0` (`sla_r_claim=0`) only works while the machine is online. If it is down, `create_asks` returns HTTP 402. Only change the commitment on machines that are currently listed, because `create_asks` publishes a live listing. Include the current `price_disk` on that update.
   3. Fix the machine. Existing SLA contracts keep their terms and settle against each renter's target; unlisting or setting the commitment to `0` does not change that.
-  4. After the next UTC midnight, check `sla_earn` for the affected day.
+  4. **Check settlement** a few hours after the next UTC midnight. In the console, compare those days with a normal week in **Host → Billing**. Releases are spread over time, so one low day is not by itself a credit. To automate, read `per_machine[].sla_earn`, or re-run the backtester and read `days[].escrow_to_client_balance`.
   5. Contact [Discord](https://discord.gg/hSuEbSQ4X8) before relisting.
 
 ## Monitoring SLA after listing
 
 After you enable SLA, charges and credits settle on UTC (Coordinated Universal Time) day boundaries. SLA earnings rows typically appear in **Host → Billing** within a few hours after UTC midnight (exact timing can vary).
 
-For SLA contracts, `sla_earn` is the escrow released to you that day: your net compute earnings plus the SLA fee, minus any service credits paid to the renter. It matches the backtester's `escrow_to_host_balance`. SLA-contract compute is **not** included in `gpu_earn`, `sto_earn`, or bandwidth earnings, so those fields stay near zero for SLA rentals. `sla_earn` is normally positive and is negative only when a prior day is corrected. Do not treat a smaller `sla_earn` as a negative credit, and do not compare it to the backtester's largest single-day credit.
+For SLA contracts, `sla_earn` is the escrow released to you that day. It matches the backtester's `escrow_to_host_balance`. Releases are spread over time rather than paid out the same day, so an early or low day can be timing, not a service credit. A credit can also reduce later releases. Compare several days before you assume a credit, or read `days[].escrow_to_client_balance` in the [backtester](/host/sla-backtester). SLA-contract compute is **not** included in `gpu_earn`, `sto_earn`, or bandwidth earnings, so those fields stay near zero for SLA rentals. `sla_earn` is normally positive and is negative only when a prior day is corrected. Do not compare it to the backtester's largest single-day credit.
 
 When you poll the API, use **`per_machine[].sla_earn`** for a single machine. **`per_day[].sla_earn` is always fleet-wide**—even if you pass `machid`.
 
@@ -708,7 +708,7 @@ When you poll the API, use **`per_machine[].sla_earn`** for a single machine. **
 2. Set the date range to include the UTC day you want to review.
 3. Filter by machine ID if available.
 4. Look for the SLA settlement in the earnings breakdown. On an SLA rental, compute pay is released with the SLA fee (the same amount as `sla_earn` in the API), not as a separate GPU earnings line.
-5. After downtime, a smaller release than a normal day can mean a service credit was paid. Do not look for a negative SLA line, and do not match that amount to the backtester's largest single-day credit.
+5. After downtime, compare several days with a normal week. A single smaller release can be timing, because escrow is released over time, not proof of a credit by itself. Do not look for a negative SLA line, and do not match one day to the backtester's largest single-day credit.
 
 **If you don't see SLA rows:** widen the date range (settlement uses UTC day boundaries), confirm the machine had an active on-demand rental that day, and confirm SLA was enabled and the offer was **listed** (not just saved).
 
