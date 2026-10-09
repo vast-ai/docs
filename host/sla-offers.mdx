@@ -31,7 +31,7 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 | Goal | Start here |
 | --- | --- |
 | Understand what SLA is | [SLA in plain language](#sla-in-plain-language) |
-| Preview economics and enable SLA in the console | [How it works](#how-it-works-plain-english) → [Listing an SLA offer](#listing-an-sla-offer). For downtime, use the console ([Set a maintenance window](/host/set-maintenance-window)) or [CLI/REST](#scheduled-maintenance). Use one path per window. |
+| Preview economics and enable SLA in the console | [SLA host checklist](#sla-host-checklist) (list and test without SLA first). For downtime, use the console ([Set a maintenance window](/host/set-maintenance-window)) or [CLI/REST](#scheduled-maintenance). Use one path per window. |
 | Enable or update SLA via API | [Before you enable SLA](#before-you-enable-sla) → [API (for automation)](#api-for-automation) |
 | I list with CLI only (no SLA flags yet) | **Set Pricing → SLA** + **LIST** in the console, or REST `PUT /api/v0/machines/create_asks/` — SLA flags are **not** in `vastai list machine` yet |
 | Monitor settlement after listing | [Monitoring SLA after listing](#monitoring-sla-after-listing) |
@@ -44,7 +44,7 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 4. Confirm SLA account access: open **Set Pricing → SLA** and confirm the panel is visible (do **not** Save final commitment/confidence yet). If the panel is missing, contact support.
 5. Preview economics (console SLA panel or [backtester](/host/sla-backtester)). Read [Billing vs settlement](#billing-vs-settlement-important) and [Risk scenarios](#risk-scenarios)—GPU billing can continue during outages and SLA credits can exceed many days of SLA fees.
 6. Read [Scheduled maintenance](#scheduled-maintenance) before you turn SLA on (24-hour notice for planned work).
-7. Review the SLA fee preview. The machine is already listed from step 2, so **Save** publishes SLA to live renters immediately. Press **Save** only after you accept the preview.
+7. Review the SLA fee preview. The machine is already listed from step 2, so **Save** publishes SLA to live renters immediately. Press **Save** only after you accept the preview. If you enabled SLA through the API, run the confidence check in [Validation rules](#validation-rules) first.
 8. **Verify the live SLA offer.** The machine has been listed since step 2, so **Save** in step 7 already published the SLA terms. From the client account, search with a **Reliability target** and confirm an **SLA Fee** line.
    - **Console verify:** confirm **Listed** on **Host → Machines** and reopen **Set Pricing → SLA**.
    - **Optional CLI/API:** search with `--storage` matching how renters quote; add `verified=any` if you search your own machine and see no rows (for example `vastai search offers 'machine_id=12345 verified=any has_sla=true expected_reliability>=0.99' --storage 10`). On sliced machines, filter on-demand rows with the jq example in [Search / client-visible fields](#search--client-visible-fields).
@@ -202,7 +202,13 @@ Do not assume the dashboard score equals SLA reliability. Before choosing `sla_r
 Offers with invalid combinations are rejected at listing time:
 
 - `sla_r_claim` must be `0` (disable) or greater than 0 and at most **0.99999**. Exactly `1.0` is rejected.
-- If you send `sla_sigma_x`, it must be positive and at most `3.0`. It defaults to `0.5` only on a new ask. **Always send `sla_sigma_x` when you enable SLA.** If the claim is above `0` and `show machines` reports `sla_confidence: null`, search quotes a **$0** SLA fee while settlement uses Normal confidence (`0.5`). If a value is already stored, omitting it keeps that value.
+- If you send `sla_sigma_x`, it must be positive and at most `3.0`. It defaults to `0.5` only on a new ask. **Always send `sla_sigma_x` when you enable SLA.** If the claim is above `0` and confidence was never stored, search can quote a **$0** SLA fee while you still carry credit exposure. If a value is already stored, omitting it keeps that value.
+
+```bash
+vastai show machines --raw | jq -r '.machines[] | select((.sla_reliability_claim // 0) > 0 and .sla_confidence == null) | .id'
+```
+
+For each ID that prints, PUT `sla_sigma_x` (see [Update SLA on an existing ask](#update-sla-on-an-existing-ask-partial-body)).
 - Optional `sla_max_beta` must be in `(0, 1)` and at least the default β derived at your reliability commitment. Hosts do not set β; this field only caps the client-derived β the offer accepts. Omit for uncapped.
 
 <Note>
@@ -231,12 +237,14 @@ Disabling SLA on the offer (setting `sla_r_claim` to `0`) prevents new SLA-cover
 
 ### Web console
 
+**New machine?** Complete [SLA host checklist](#sla-host-checklist) steps 1–2 first (list and test **without** SLA). Then set SLA here.
+
 1. Open your machine on the [Host Machines page](https://cloud.vast.ai/host/machines) → **Set Pricing**.
 2. Set base listing fields first (GPU price, offer end date, rental types) if this is a new listing.
 3. Expand **SLA**.
 4. Set your **reliability commitment** (the console control is **Claim**; the API field is `sla_r_claim`). Renters see it as expected reliability on the offer. Set **Confidence** too. For a new or volatile machine, start with **Wide**. Wider confidence charges a higher SLA fee, which is a cushion against credits; it does not reduce what you owe when a day misses the target. Move to **Normal** (`sla_sigma_x ≈ 0.5`) once uptime is stable. See [Confidence values](#confidence-values).
 5. Confirm the SLA fee preview, then click **Save**. On an already-listed machine, **Save** publishes SLA immediately.
-6. After saving pricing, click **LIST** on the Host Machines page (or confirm the machine status changes to **listed**). Saving pricing alone stores your offer settings; listing publishes the offer to search.
+6. **First publish only:** after saving pricing, click **LIST**. On a machine that is already listed, **Save** in step 5 already published SLA. Skip this step.
 
 #### Updating SLA on an already-listed machine
 
@@ -250,7 +258,7 @@ If the machine is already **listed**:
    - **Search:** `dph_total` includes the SLA fee at a client's `target_reliability`, and `expected_reliability` matches your reliability commitment (see [Search / client-visible fields](#search--client-visible-fields)).
 
 <Note title="Console vs API">
-In the web console, **Set Pricing → Save** stores SLA settings; clicking **LIST** publishes the offer to search. `PUT /api/v0/machines/create_asks/` performs both steps in one request — it creates or updates the **live listing** (same publish step as **LIST**; SLA parameters require this REST body or **Set Pricing → SLA**, not `vastai list machine` flags).
+In the web console, **Set Pricing → Save** stores SLA settings; clicking **LIST** publishes a new listing (on a machine that is already listed, **Save** is already live). `PUT /api/v0/machines/create_asks/` performs both steps in one request — it creates or updates the **live listing** (same publish step as **LIST**; SLA parameters require this REST body or **Set Pricing → SLA**, not `vastai list machine` flags).
 </Note>
 
 #### Web console SLA preview
@@ -375,7 +383,7 @@ Then `PUT /api/v0/machines/create_asks/` with the merged body (read → merge �
 Each live PUT resends the offer's `end_date` (or `duration`). Any active rental that ends **before** that date is extended to it, which also extends your service-credit exposure. This cannot be undone, and `DRY_RUN=1` does not show which contracts will be affected. You cannot see per-contract end dates beforehand. Assume a live run extends any shorter rental, and read `upd_contracts` afterwards (it may not list contracts extended a few minutes later).
 </Warning>
 
-Run this only when an SLA listing is missing from search after a daemon update even though **Set Pricing** still shows SLA. A fully rented machine is absent from search too. Do not re-list it for that reason. Healthy listings do not need a re-list, and every re-list can extend shorter active contracts. It does not turn an SLA on for new machines. Enable an SLA on each machine first (console **Set Pricing → SLA**, or a per-machine `PUT /api/v0/machines/create_asks/` with `sla_r_claim` and `sla_sigma_x`). The loop only considers machines that are `listed` and already have `sla_reliability_claim > 0`.
+Run this only when an SLA listing is missing from search after a daemon update even though **Set Pricing** still shows SLA. A fully rented machine is absent from search too. Do not re-list it for that reason. Healthy listings do not need a re-list, and every re-list can extend shorter active contracts. It does not turn an SLA on for new machines. Enable an SLA on each machine first (console **Set Pricing → SLA**, or a per-machine `PUT /api/v0/machines/create_asks/` with `sla_r_claim` and `sla_sigma_x`). The loop only considers machines that are `listed` and already have `sla_reliability_claim > 0`. It skips a machine whose confidence was never stored. Fix those with the check under [Validation rules](#validation-rules) before you re-list.
 
 `show machines` returns confidence only as a label, so the loop does **not** send `sla_sigma_x`. On an existing SLA ask, `create_asks` keeps the current confidence when `sla_sigma_x` is omitted, so each machine keeps its exact value. Set a new confidence per machine in the console (or PUT `sla_sigma_x` for that machine) if you want to change it.
 

@@ -295,7 +295,7 @@ Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `ta
 | Ask cannot start now (`cancel_unavail`) | HTTP 410, error `no_such_ask` | Search for a new offer; this is not a transient glitch to retry on the same id |
 | `price` (bid) sent together with `target_reliability` | HTTP 400 "Cannot combine interruptible instances with SLAs" | Remove `price`. SLA rentals are on-demand only |
 | Timeout, dropped connection, or HTTP 5xx | Outcome unknown — the rental may already exist | There is no idempotency key. Put a unique `label` on the rent body. Look it up with URL-encoded `select_filters` (`curl -G --data-urlencode 'select_filters={"label":{"eq":"YOUR_LABEL"}}'`) a few times, about a second apart (Show Instances threshold `1.0`). If any lookup returns a row, do not PUT again. If none do, re-search and retry with a fresh offer id and a **new** `label`. |
-| Too many requests | HTTP 429. Stay at or below about 10 search requests per minute per IP (Search Offers `x-rate-limit`). Back off on HTTP 429 before sending more. Space rent calls about 5 seconds apart (the rent endpoint's rate-limit threshold is 4.5). The body is `{"detail": ...}`, not `{success, error, msg}`. | Wait, then look up the same `label` with `GET /api/v1/instances/` before you retry. If a row exists, do not PUT again. If retry returns `invalid_price`, `no_such_ask`, or 410, re-search and rent a fresh offer id. |
+| Too many requests | HTTP 429. Detect throttling by the status code. The body differs by endpoint (JSON `msg`/`error` or plain text), so do not parse a `detail` field. Stay at or below about 10 search requests per minute per IP. If a `Retry-After` header is present, honor it. Space rent calls at least 5 seconds apart (threshold 4.5). OpenAPI `penalty: 12` on rent is seconds added to the server's last-request time, so a burst can block longer than that spacing. | Wait, then look up the same `label` with `GET /api/v1/instances/` before you retry. If a row exists, do not PUT again. If retry returns `invalid_price`, `no_such_ask`, or 410, re-search and rent a fresh offer id. |
 | Missing SSH key for the VM | HTTP 400 `no_ssh_key_for_vm` (or similar) | Add an SSH key on your account before renting, then retry with a current offer id. |
 | Forbidden / wrong account | HTTP 400 `invalid_args`. The message includes `error 403/3586` ("Hosts can only rent their own machines"). The HTTP status is 400, not 403. A host-only key gets this for every offer that is not on its own machines, including a missing offer. | Switch to a renter account key, then re-search (see [Hosting Overview](/host/hosting-overview) self-test note). |
 
@@ -346,13 +346,13 @@ When a host schedules maintenance in advance, part of that downtime is counted a
 
 Using the H100 example ($84/day compute, ~$0.20/day SLA fee, target 95%, host reliability commitment 99%). A day's service credit is capped relative to that UTC day's covered compute (GPU, storage, and bandwidth combined). The dollar figures below use GPU cost only.
 
-| Scenario | Approx. SLA fee | Approx. service credit | Net vs no SLA (approx.) |
+| Scenario | Approx. SLA fee | Approx. service credit | Credit minus SLA fee |
 | --- | --- | --- | --- |
 | Above target (excellent / good day) | ~$0.20/day | $0 | **−$0.20** (you paid the SLA fee) |
-| Below target (~93–94% for the day) | ~$0.20/day | ~$42 | **+$41.80** (net credit after SLA fee) |
+| Below target (~93–94% for the day) | ~$0.20/day | ~$42 | **+$41.80** (credit after the SLA fee) |
 | Severe shortfall (~90% or less) | ~$0.20/day | ~$84 | **+$83.80** |
 
-**How to read “Net vs no SLA”:** negative = you paid more than without SLA; positive = you received a net credit versus renting the same offer without the SLA. Credits grow with the size of the shortfall. In this example, a day 1–2 points below target pays a meaningful share of that day's compute, not a token amount. Figures are illustrative. A day where the **blended measure** meets your target does not pay a credit. Raw daily uptime can sit at or slightly above the target while the blended measure is still below it.
+**How to read “Credit minus SLA fee”:** this column is only the service credit minus the SLA fee. It is not your net versus a non-SLA rental. On an SLA rental, offline time is still billed as intended compute. On a non-SLA rental it is not, so add that billed downtime when you compare the two. Credits grow with the size of the shortfall. In this example, a day 1–2 points below target pays a meaningful share of that day's compute, not a token amount. Figures are illustrative. A day where the **blended measure** meets your target does not pay a credit. Raw daily uptime can sit at or slightly above the target while the blended measure is still below it.
 
 Production settlement can issue credits even when a single daily snapshot looks close to your target, because measurement uses the blended daily reliability calculation.
 
