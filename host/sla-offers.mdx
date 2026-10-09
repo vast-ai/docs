@@ -52,7 +52,7 @@ Read [SLA in plain language](#sla-in-plain-language) before this list. Check SLA
 7. **Enable SLA.**
    - **Do this:** In **Set Pricing → SLA**, enter **Reliability Commitment** as a percent (the field ends with `%`; type `99` for 99%). Set **Confidence**. Start at **Low** unless you have rental history. Then click **Save**.
    - **What Save also does:** On a machine that is already listed, **Save** publishes immediately and extends every shorter rental to the listing end date. See [SLA on extended contracts](#sla-on-extended-contracts).
-   - **Turning SLA off later:** The console cannot set the commitment to `0`. Before you unlist, write down every **Set Pricing** field, then relist without opening the SLA controls. API users can send `"sla_r_claim": 0` instead. Active SLA contracts keep their terms either way. See [Updating SLA on an already-listed machine](#updating-sla-on-an-already-listed-machine).
+   - **Turning SLA off later:** The console cannot set the commitment to `0`. Before you unlist, write down every **Set Pricing** field, then relist without opening the SLA controls. A relist that sends a later end date or a duration extends shorter rentals, including SLA contracts, with no fee check. See [SLA on extended contracts](#sla-on-extended-contracts). API users can send `"sla_r_claim": 0` instead. Active SLA contracts keep their terms either way. See [Updating SLA on an already-listed machine](#updating-sla-on-an-already-listed-machine).
    - Search hides your offer from renters whose target is above your commitment. The dashboard reliability score is not your SLA measurement. Prefer a [backtester](/host/sla-backtester) run before you enable SLA when you have history.
    - **API users:** send `sla_r_claim` as a fraction (`0.99`, not `99`). After **Save**, run the confidence check in [Validation rules](#validation-rules).
 8. **Verify now.** In **Host → Machines**, confirm the machine shows **Listed**, then reopen **Set Pricing → SLA** and confirm your terms are saved.
@@ -278,7 +278,7 @@ If the machine is already **listed**:
 
 1. Open **Host → Machines → Set Pricing → SLA**, set **Reliability Commitment** and **Confidence**, then click **Save**.
 2. **Save** applies SLA to the live offer — you do not need to click **LIST** again unless this is a brand-new listing that was never published.
-3. To stop offering SLA on **new** rentals, use the API. Send `"sla_r_claim": 0` in the full `create_asks` body (see [Update SLA on an existing ask](#update-sla-on-an-existing-ask-partial-body)). The console control cannot be set to `0`, and a **Save** that omits SLA fields keeps the current terms. **Console-only hosts:** write down every **Set Pricing** field, unlist, then relist without opening the SLA controls (see [SLA host checklist](#sla-host-checklist), step 7). Active contracts keep their locked terms until they end.
+3. To stop offering SLA on **new** rentals, use the API. Send `"sla_r_claim": 0` in the full `create_asks` body (see [Update SLA on an existing ask](#update-sla-on-an-existing-ask-partial-body)). The console control cannot be set to `0`, and a **Save** that omits SLA fields keeps the current terms. **Console-only hosts:** write down every **Set Pricing** field, unlist, then relist without opening the SLA controls (see [SLA host checklist](#sla-host-checklist), step 7). A relist that sends a later end date or a duration extends shorter rentals, including SLA contracts, with no fee check. See [SLA on extended contracts](#sla-on-extended-contracts). Active contracts keep their locked terms until they end.
 4. Verify after listing:
    - **Console:** confirm the machine status is **Listed**, reopen **Set Pricing → SLA** to review the preview, or check offer details under **Host → Machines**.
    - **Search:** `dph_total` includes the SLA fee at a client's `target_reliability`, and `expected_reliability` matches your reliability commitment (see [Search / client-visible fields](#search--client-visible-fields)).
@@ -759,7 +759,7 @@ Example: you publish **reliability commitment 99%**, the client chose **target 9
 - A blended 97% is above a 95% target, but that is not a zero-credit day. The credit can still be larger than the SLA fee. Raw uptime alone does not decide the result.
 - **SLA fees** are priced from your **reliability commitment**, confidence, and the client's target — a higher reliability commitment relative to the target generally means lower client charges.
 
-The **reliability commitment** is your belief and pricing knob. The client's **reliability target** is what drives service-credit eligibility.
+The **reliability commitment** is your belief and pricing knob. The client's **reliability target** is what credits are measured against.
 
 ### If the client's target is missed
 
@@ -782,11 +782,11 @@ Your SLA loss on a normal settlement day is tied to that day's covered compute *
 
 ### Reliability commitment 99%, delivered 99.5%
 
-You outperform your reliability commitment. Clients who chose targets at or below 99% pay small SLA fees. Credits on those days are small. Whether you net positive depends on how far delivered reliability sits above the break-even level in the backtester.
+Whether you net positive depends on the renter's target, not only on beating your commitment. Renters whose target sits well below your commitment (for example 95%) pay small SLA fees, and a 99.5% day is above break-even for that contract. Renters whose target is at or near 99% pay much higher SLA fees, and a 99.5% day can still fall below break-even (`r_be`) for that contract. Run the [SLA backtester](/host/sla-backtester) with `r_target=0.99` before you rely on this case.
 
 ### Reliability commitment 99% with an offline day
 
-Clients receive credits tied to how far measured reliability falls below **their** target. Extended outages can approach a full-day compute credit. Your reliability score and verification status may also be affected separately from SLA settlement.
+Clients receive credits tied to where the blended measure lands relative to their target. Credits start before the target is missed. Extended outages can approach a full-day compute credit. Your reliability score and verification status may also be affected separately from SLA settlement.
 
 ### Clients target near your reliability commitment
 
