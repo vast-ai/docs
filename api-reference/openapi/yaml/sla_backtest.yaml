@@ -205,9 +205,9 @@ paths:
                   msg:
                     type: string
         '401':
-          description: Unauthorized — missing or invalid API key, or missing machine_read permission
+          description: Unauthorized. `error` is `auth_error` for an unknown or invalid API key, or a key that lacks `machine_read`.
         '403':
-          description: Forbidden — not the machine owner, or SLA is not currently enabled on the platform
+          description: Forbidden. `error` is `auth_error` when the Authorization header is missing ("This action requires login."), `not_owner` when the machine belongs to someone else, or `sla_disabled` when SLA is off for the platform.
           content:
             application/json:
               schema:
@@ -219,12 +219,13 @@ paths:
                   error:
                     type: string
                     enum:
+                    - auth_error
                     - not_owner
                     - sla_disabled
                   msg:
                     type: string
         '404':
-          description: Machine not found
+          description: Machine not found (`machine_not_found`), or a malformed API key (`auth_error`, "Invalid user key").
           content:
             application/json:
               schema:
@@ -235,6 +236,9 @@ paths:
                     example: false
                   error:
                     type: string
+                    enum:
+                    - machine_not_found
+                    - auth_error
                     example: machine_not_found
         '429':
           description: Too Many Requests — rate limit exceeded
