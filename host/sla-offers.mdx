@@ -851,6 +851,7 @@ After you enable SLA, charges and credits settle on UTC (Coordinated Universal T
 - The backtester under-counts days that already had SLA rentals, so it cannot confirm a past credit. See [Simulation limits](/host/sla-backtester#simulation-limits).
 - SLA-contract compute is not included in `gpu_earn`, `sto_earn`, or bandwidth earnings. `sla_earn` is negative only when a prior day is corrected.
 - `per_day[].sla_earn` is fleet-wide even when you pass a machine ID. Use `per_machine[].sla_earn` for one machine.
+- `summary.total_sla` adds up `sla_earn` for the window (from `per_day` when that list is present, otherwise from `per_machine`). Like `sla_earn`, it is escrow released to you, not fees minus credits.
 
 ### Console (fleet totals only)
 
@@ -871,13 +872,13 @@ SLA settlement does not emit a host webhook. Machine offline and error alerts do
 **Linux (GNU date):**
 
 ```bash
-vastai show earnings --machine_id <id> --start_date "$(date -u -d '7 days ago' +%F)T00:00:00Z" --end_date "$(date -u +%F)T00:00:00Z"
+vastai show earnings --machine_id <id> --start_date "$(date -u -d '7 days ago' +%F)T00:00:00Z" --end_date "$(date -u -d 'yesterday' +%F)T00:00:00Z"
 ```
 
 **macOS:**
 
 ```bash
-vastai show earnings --machine_id <id> --start_date "$(date -u -v-7d +%F)T00:00:00Z" --end_date "$(date -u +%F)T00:00:00Z"
+vastai show earnings --machine_id <id> --start_date "$(date -u -v-7d +%F)T00:00:00Z" --end_date "$(date -u -v-1d +%F)T00:00:00Z"
 ```
 
 Keep the `T00:00:00Z` suffix: the CLI parses bare dates such as `2026-07-24` in the local time zone of the computer running the CLI, not UTC, so append `T00:00:00Z` for an exact UTC day. On Windows, use WSL or the API example below. See [`show earnings`](/cli/reference/show-earnings) for all options.
