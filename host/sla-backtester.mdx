@@ -286,7 +286,7 @@ Optional, for API automation only. To check one machine, use the single-machine 
    - The loop reads each machine's `sla_reliability_claim` and `sla_confidence` label from `show machines`.
    - For machines whose terms are not visible, set `R` (commitment) and `P` (confidence `p`) as fallbacks. That covers machines without SLA yet, and machines whose terms are hidden because they are unlisted, have an outdated daemon, or lack SLA approval. The loop logs every fallback it uses, so check those rows before trusting them.
    - Machines missing either value, with no `R`/`P` fallback, are skipped and logged.
-   - The confidence label is a band, so a custom `sla_sigma_x` is backtested at the nearest band's `p`. To test an exact value, use the single-machine request with `p = 1/(1 + sla_sigma_x)`.
+   - The confidence label is a band. The loop uses one `p` per band: `high` → 0.83 (σ 0.2), `medium` → 0.6667 (σ 0.5), `low` → 0.50 (σ 1.0). `low` covers every σ above 0.71, so a machine listed at σ 2.0 is backtested at `p` 0.50, not at its real `p`. For an exact value, use the single-machine request with `p = 1/(1 + sla_sigma_x)`.
 2. Responses are written to a private temp directory that is deleted when the loop exits.
 
 ```bash
