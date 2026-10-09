@@ -3,7 +3,7 @@ title: "SDK Rate Limits and Errors"
 sidebarTitle: "Rate Limits"
 ---
 
-The Vast.ai SDK automatically retries rate-limited requests. You do not need to implement your own retry logic -- both the `VastAI` client and the serverless client handle retries with exponential backoff out of the box.
+The Vast.ai SDK retries some failed requests. Those retries finish in under a second and do not read `Retry-After`. For offer search, rent, and listing calls, add your own spacing. See [SLA API automation](/guides/instances/choosing/sla-coverage#api-automation).
 
 This page covers the error format, how rate limits work, and how to configure retry behavior for each client. For the full details on rate limit mechanics, see the [API Rate Limits and Errors](/api-reference/rate-limits-and-errors) page.
 
@@ -55,17 +55,17 @@ The SDK includes two clients with different retry strategies.
 
 The main `VastAI` client retries on rate limit responses:
 
-- **Retried status codes:** 429, 502, 503, and 504, plus connection errors and timeouts
-- **Default retries:** 3
-- **Backoff strategy:** starts at 0.15 seconds, multiplied by 1.5x after each attempt. The SDK does not read `Retry-After`.
-- **Retry delays:** ~0.15s, ~0.225s, ~0.34s
+- `retry` is the **total number of attempts**.
+- **Default:** 3 attempts (one request plus two retries), with delays of about 0.15 s and 0.225 s.
+- **Backoff:** starts at 0.15 seconds, multiplied by 1.5 after each attempt. The SDK does not read `Retry-After`.
+- To send a request once, use `retry=1`. Do not use `retry=0`. It sends no request.
 
 For SLA rentals, a timeout or 5xx retry can send the same rent twice. Set a unique label and check instances for that label before you rent again.
 
 ```python
 from vastai import VastAI
 
-# Uses default retry behavior (3 retries)
+# Default: 3 attempts (2 retries)
 vast = VastAI(api_key="your-api-key")
 vast.search_offers(query="gpu_name=RTX_4090 rentable=true")
 ```
@@ -94,11 +94,8 @@ Pass the `retry` parameter to the constructor to change the number of retry atte
 ```python
 from vastai import VastAI
 
-# Increase to 6 retries for a batch script
-vast = VastAI(api_key="your-api-key", retry=6)
-
-# Disable retries entirely
-vast = VastAI(api_key="your-api-key", retry=0)
+# One attempt only
+vast = VastAI(api_key="your-api-key", retry=1)
 ```
 
 The retry count applies to all requests made through that client instance.

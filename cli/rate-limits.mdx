@@ -3,7 +3,7 @@ title: "CLI Rate Limits and Errors"
 sidebarTitle: "Rate Limits"
 ---
 
-The Vast.ai CLI automatically retries rate-limited requests. You do not need to implement your own retry logic -- the CLI handles HTTP 429 responses with exponential backoff out of the box.
+The Vast.ai CLI retries some failed requests. Those retries finish in under a second and do not read `Retry-After`. For offer search, rent, `create_asks`, and maintenance scheduling, add your own spacing. See [SLA API automation](/guides/instances/choosing/sla-coverage#api-automation).
 
 This page covers the error format, how rate limits work, and how to configure the CLI's built-in retry behavior. For the full details on rate limit mechanics, see the [API Rate Limits and Errors](/api-reference/rate-limits-and-errors) page.
 
@@ -49,10 +49,10 @@ Some HTTP 429 responses include a `Retry-After` header. The daily search row quo
 
 When the CLI receives an HTTP 429 response, it automatically retries the request using exponential backoff:
 
-- **Retried status codes:** 429, 502, 503, and 504, plus connection errors and timeouts
-- **Default retries:** 3
-- **Backoff strategy:** starts at 0.15 seconds, multiplied by 1.5x after each attempt. The CLI does not read `Retry-After`.
-- **Retry delays:** ~0.15s, ~0.225s, ~0.34s
+- `--retry` is the **total number of attempts**, not extra retries after the first try.
+- **Default:** 3 attempts (one request plus two retries), with delays of about 0.15 s and 0.225 s.
+- **Backoff:** starts at 0.15 seconds, multiplied by 1.5 after each attempt. The CLI does not read `Retry-After`.
+- To send a request once, use `--retry 1`. Do not use `--retry 0`. It sends no request and the command fails.
 
 For SLA rentals, a timeout or 5xx retry can send the same rent twice. Set a unique label and check instances for that label before you rent again. See [SLA](/guides/instances/choosing/sla-coverage).
 
@@ -65,14 +65,11 @@ The CLI retries 429, 502, 503, and 504. Other HTTP errors are reported immediate
 Use the `--retry` flag on any command to change the number of retry attempts:
 
 ```bash
-# Use default 3 retries
+# Default: 3 attempts
 vastai search offers 'gpu_name=RTX_4090 rentable=true'
 
-# Increase to 6 retries for a batch script
-vastai search offers 'gpu_name=RTX_4090 rentable=true' --retry 6
-
-# Disable retries entirely
-vastai search offers 'gpu_name=RTX_4090 rentable=true' --retry 0
+# One attempt only (use this when you must not send a rent twice)
+vastai search offers 'gpu_name=RTX_4090 rentable=true' --retry 1
 ```
 
 Increasing the retry count is useful for scripts that make many API calls in sequence, where occasional rate limiting is expected.

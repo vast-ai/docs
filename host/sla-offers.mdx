@@ -42,7 +42,7 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 2. Publish once **without** SLA. In **Set Pricing**, leave **Claim** (your reliability commitment, the share of time you commit the machine will be up) at `0`, **Save**, then click **LIST**. If you do not see an SLA or Claim section, list without it. Step 4 is where you check SLA access. Test ports, SSH, and Jupyter from a separate client account (see [Testing your own machine](/host/hosting-overview#testing-your-own-machine)). Do not turn SLA on until that test passes.
 3. Install the [CLI](/cli/hello-world) if you schedule maintenance or read earnings from the CLI. The console [Set a maintenance window](/host/set-maintenance-window) page can notify renters without the CLI.
 4. Confirm SLA account access: open **Set Pricing → SLA** and confirm the panel is visible (do **not** Save final commitment/confidence yet). If the panel is missing, contact support.
-5. Preview economics (console SLA panel or [backtester](/host/sla-backtester)). Read [Billing vs settlement](#billing-vs-settlement-important) and [Risk scenarios](#risk-scenarios). GPU billing can continue during outages, and SLA credits can exceed many days of SLA fees. On SLA rentals, compute pay is not in `gpu_earn`. Much of the escrow can stay held until the contract ends, so a low `sla_earn` over several days is not by itself a credit.
+5. Preview economics (console SLA panel or [backtester](/host/sla-backtester)). Read [Billing vs settlement](#billing-vs-settlement-important) and [Risk scenarios](#risk-scenarios). GPU billing can continue during outages, and SLA credits can exceed many days of SLA fees. The normal **Host → Billing** view has no separate SLA earnings line. After you enable SLA, GPU earnings can drop because that compute is released as `sla_earn` (`vastai show earnings`). Much of it can stay held until the contract ends, so a low week is not by itself a credit.
 6. Read [Scheduled maintenance](#scheduled-maintenance) before you turn SLA on. Schedule planned work as far ahead as you can. Twenty-four hours is not a forgiveness cutoff.
 7. Enter **Claim** and **Confidence**. Enter Claim in the units the console field shows. In the API, 99% is `0.99`, not `99`. With no history, start **Claim** below the uptime you expect to deliver, and start **Confidence** at **Wide**. Use the console SLA preview or the backtester, not the dashboard reliability score. Search hides your offer from renters whose target is above your Claim. Confirm the SLA fee preview, then **Save**. The machine is already listed from step 2, so **Save** publishes SLA to live renters immediately. If you enabled SLA through the API, run the confidence check in [Validation rules](#validation-rules) right away.
 8. **Verify now.** From the client account, include unverified machines (a new machine usually is) and set **Reliability target** at or below your Claim. Search hides offers whose Claim is below the target. Confirm an **SLA Fee** line. Optionally rent that offer briefly, then **Destroy** the test instance. See [Testing your own machine](/host/hosting-overview#testing-your-own-machine).
@@ -405,7 +405,7 @@ Each live PUT resends the offer's `end_date` (or `duration`). Any active rental 
 
 The loop needs two keys: a listing key (`machine_write` and `machine_read`, `VAST_API_KEY`) and a separate search key with `misc` (`SEARCH_API_KEY`). Offer search is about 10 requests per minute per IP. The loop runs local checks first and only searches machines that pass them, so skipped machines use none of that budget. If a search fails or is not a JSON array, that machine is skipped. A failed search never becomes a re-list. An empty array can also mean every GPU is rented. The loop skips a machine unless `current_rentals_resident` is `0`. That count includes stopped rentals. A PUT that resends `end_date` extends every shorter rental on the machine, whether its instance is running or stopped. Before `DRY_RUN=0`, confirm on **Host → Machines** that each allowlisted machine has no rentals at all. Stopped rentals count. The loop does not turn an SLA on for new machines. Enable an SLA on each machine first (console **Set Pricing → SLA**, or a per-machine `PUT /api/v0/machines/create_asks/` with `sla_r_claim` and `sla_sigma_x`). The loop only considers machines that are `listed` and already have `sla_reliability_claim > 0`. It skips a machine whose confidence was never stored. Fix those with the check under [Validation rules](#validation-rules) before you re-list.
 
-`show machines` returns confidence only as a label, so the loop does **not** send `sla_sigma_x`. On an existing SLA ask, `create_asks` keeps the current confidence when `sla_sigma_x` is omitted, so each machine keeps its exact value. Set a new confidence per machine in the console (or PUT `sla_sigma_x` for that machine) if you want to change it.
+`show machines` returns confidence only as a label, so the loop does **not** send `sla_sigma_x`. On an existing SLA ask, omitting it keeps the current confidence. If the PUT creates a **new** ask, the server sets `sla_sigma_x` to `0.5` unless you send it. Keep your own record of each machine's σ and check **Set Pricing → SLA** after any run that logs a new ask.
 
 <Warning>
 `PUT /api/v0/machines/create_asks/` **publishes a live listing** (same as **LIST**). The loop skips machines whose `listed` field is not `true`, so it does not republish machines you unlisted. Still keep an `ALLOWLIST` of the machine IDs you intend to automate, and confirm them on **Host → Machines** before you run with `DRY_RUN=0`.
@@ -540,7 +540,7 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
   if [ "$ok" = "true" ]; then
     echo "machine_id=$id ok extended=$(echo "$resp" | jq -c '.results[0].upd_contracts // []')"
     if echo "$resp" | jq -e '.results[0].new_contracts | length > 0' >/dev/null; then
-      echo "WARN machine_id=$id: re-list created a new ask; confirm bandwidth, credit_discount_max, and price_min_bid" >&2
+      echo "WARN machine_id=$id: re-list created a new ask; confirm bandwidth, credit_discount_max, price_min_bid, and confidence (a new ask defaults sla_sigma_x to 0.5)" >&2
     fi
   else
     echo "machine_id=$id error: $(echo "$resp" | jq -c '{success, error: (.error // .results[0].error), msg: (.msg // .results[0].msg)}' 2>/dev/null || echo "$resp")"
@@ -653,7 +653,7 @@ Settlement uses a **blended** reliability measure (recent plus longer-term uptim
 Example: you publish **reliability commitment 99%**, the client chose **target 95%**, and the **blended** measure is **~97%**.
 
 - **Credits** are evaluated against the client's **target** (95%), not your reliability commitment.
-- Because that blended 97% is above 95%, you **owe no SLA credit** for that day. Even when raw uptime is in the same range, you can still owe a partial credit if the blended measure is below the target.
+- Because that blended 97% is above 95%, you **owe no SLA credit** for that day. Raw uptime alone does not decide this: a day with 97% raw uptime can still carry a partial credit if the blended measure falls below the target.
 - **SLA fees** are priced from your **reliability commitment**, confidence, and the client's target — a higher reliability commitment relative to the target generally means lower client charges.
 
 The **reliability commitment** is your belief and pricing knob. The client's **reliability target** is what drives service-credit eligibility.
@@ -763,7 +763,7 @@ SLA approval, settlement questions, credit disputes, and locked machines are sep
   2. Write down Claim, Confidence, GPU price, storage price, upload and download bandwidth prices, min GPU count, end date, whether the listing is hidden, reserved discount, and min bid from **Set Pricing**. A relist that omits bandwidth can publish it at $0, and omitting min GPU can slice the machine into 1-GPU offers.
   3. Unlist only if the machine is still online and you need to stop new rentals. If it is offline, `create_asks` returns HTTP 402 until the daemon reconnects, and unlisting drops the SLA ask you would then have to rebuild.
   4. Fix the problem.
-  5. After the next UTC midnight, check **Host → Billing** for that day's SLA earnings.
+  5. After the next UTC midnight, check **Host → Billing**. There is no separate SLA line on the normal host view, and the page shows fleet totals. Compare with a normal week. One low day can be release timing. For one machine, use `vastai show earnings`.
   6. Re-enter the terms from step 2, confirm the SLA fee preview, **Save**, then **LIST**. **Host → Machines** shows the latest rental end date. Relisting before that date, with an end date after a shorter rental, extends that rental and its SLA exposure. To avoid any extension, wait until that date has passed, then relist. If you relist sooner, assume shorter rentals will be extended.
 
   **API**
