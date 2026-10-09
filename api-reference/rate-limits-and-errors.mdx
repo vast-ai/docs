@@ -45,8 +45,10 @@ The combined API reference does not always show each operation's `x-rate-limit` 
 
 When you hit a rate limit, you will receive **HTTP 429**. There are two families:
 
-- **Legacy limiter** (plain text, no `Retry-After`): rent `PUT /api/v0/asks/{id}/`, `GET /api/v1/instances/`, listing `PUT /api/v0/machines/create_asks/`, and machine earnings `GET /api/v0/users/{user_id}/machine-earnings/`. The body looks like `API requests too frequent: endpoint threshold=…`. The rent route does not apply a penalty on top of that threshold.
-- **Token-bucket limiter** (JSON plus a `Retry-After` header): search `POST /api/v0/bundles/`, charges `GET /api/v0/charges/`, the other earnings routes, schedule maintenance, and the SLA backtester. The body is `{"error": "HTTPTooManyRequests", "msg": "API requests too frequent", "retry_after": …}`. A daily search quota hit uses the same shape with `"error": "search_quota_exceeded"` and a `Retry-After` that can be hours.
+- **Plain-text 429:** rent `PUT /api/v0/asks/{id}/`, `GET /api/v1/instances/`, listing `PUT /api/v0/machines/create_asks/`, and machine earnings `GET /api/v0/users/{user_id}/machine-earnings/`. The body looks like `API requests too frequent: endpoint threshold=…`. The rent route does not apply a penalty on top of that threshold.
+- **JSON 429:** search `POST /api/v0/bundles/`, charges `GET /api/v0/charges/`, the other earnings routes, schedule maintenance, and the SLA backtester. The body is `{"error": "HTTPTooManyRequests", "msg": "API requests too frequent", "retry_after": …}`. A daily search quota hit uses the same shape with `"error": "search_quota_exceeded"` and a `Retry-After` that can be hours.
+
+Both kinds include a `Retry-After` header and `X-RateLimit-*` headers. Honor `Retry-After` when you see it. Branch on the body, not on whether the header is present. The CLI and SDK never read `Retry-After`.
 
 Honor `Retry-After` whenever it is present. If it is absent, wait at least that endpoint's pacing interval before the next call.
 
