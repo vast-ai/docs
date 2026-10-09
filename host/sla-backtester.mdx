@@ -26,7 +26,7 @@ How much could SLA settlement cost given your reliability commitment and confide
 
 ## When to use it
 
-Use the backtester before you enable SLA on a listing, or when you want to tune parameters. The machine needs at least a few weeks of rental history. History is usable from about mid-2026, when per-day rental active time started being recorded. Earlier days look idle. If `has_data` is `false`, move the window toward the present or pick a machine with more recent rental activity. Widening the window further into the past does not help.
+Use the backtester before you enable SLA on a listing, or when you want to tune parameters. The machine needs at least a few weeks of rental history. Older windows may have no recorded SLA history. If `has_data` is `false`, move the window toward the present or pick a machine with more recent rental activity. Widening the window further into the past does not help.
 
 Use the backtester to:
 
@@ -145,7 +145,7 @@ curl -s -H "Authorization: Bearer YOUR_API_KEY" \
 
 **If you only read three things:** check `has_data` (if `false`, move the window toward the present or wait for more rental history), compare `r_eff` with `r_be`, then look at your [net SLA result and largest single-day credit](#summarize-with-jq).
 
-A successful response looks like this (one `days` row shown; values are illustrative):
+A successful response looks like this (one `days` row shown). These numbers are the response to the `r_target=0.95` request above, not the baseline request that omits `r_target`.
 
 ```json
 {
@@ -179,7 +179,7 @@ A successful response looks like this (one `days` row shown; values are illustra
 
 | Field | Meaning |
 | --- | --- |
-| `has_data` | `true` if the range had at least one day of rental activity to replay. `false` means no usable history in the window. Move the window toward the present (days before about mid-2026 look idle) or wait for more rental history. When `false`, every `days` row is zero with `reliability: null`, and `r_eff` is `null`. |
+| `has_data` | `true` if the range had at least one day of rental activity to replay. `false` means no usable history in the window. Move the window toward the present, or wait for more rental history. Older windows may have no recorded SLA history. When `false`, every `days` row is zero with `reliability: null`, and `r_eff` is `null`. |
 | `start_day`, `end_day` | UTC day indices, `day = floor(epoch_seconds / 86400)`. `day × 86400` is exactly 00:00 UTC on that date. Convert with `date -u -d "@$((day * 86400))" +%F` (Linux) or `date -u -r $((day * 86400)) +%F` (macOS). Show Earnings `sday` / `eday` use the same day index. |
 | `r_eff` | **Effective reliability**: the constant reliability that would have produced the service credits paid in this window. `null` when nothing was paid into escrow in the window (all `client_*_to_escrow` values are zero, as with `has_data: false`). |
 | `r_be` | **Break-even reliability**: the reliability at which SLA fees and service credits cancel out. Always present. |
@@ -359,7 +359,7 @@ Expect about three seconds per machine (`sleep 3` plus request time), so budget 
 
 ## When stuck
 
-- **`has_data: false`** — Move the window toward the present, or wait for rental history. Widening it further into the past does not help. Days before about mid-2026 look idle.
+- **`has_data: false`** — Move the window toward the present, or wait for rental history. Widening it further into the past does not help. Older windows may have no recorded SLA history.
 - **`400 bad_request` on a request that used to work** — Replace `r=` with `r_claim=` and remove `reliability=`.
 - **`401` / `403 auth_error` / `404 auth_error`** — Check that the `Authorization: Bearer` header is present, the key is complete (64 characters), and it has `machine_read`.
 - **Still stuck** — Ask in the [host Discord](https://discord.gg/hSuEbSQ4X8).

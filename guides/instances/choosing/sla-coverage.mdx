@@ -298,7 +298,7 @@ Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `ta
 1. Call Show Charges for one UTC day. `day.gte` and `day.lte` are both required (unix seconds). Set `day.lte` to `day.gte + 86399`.
 2. Page with `after_token` / `next_token` until `next_token` is `null`. Space calls about one second apart.
 3. Find the row whose `source` is `instance-` plus the contract id from `new_contract`, then the `items[]` entry with `type: "sla"`.
-4. Compare that amount with the stored hourly fee times the hours the contract was active that day. A smaller or negative amount usually means a credit was applied. On a day that includes a Stop, a reboot, or a long Loading period, contact support before you treat the difference as a credit. How the console labels the row is in [Settlement timing](#settlement-timing).
+4. Compare that amount with the stored hourly fee times every hour the contract existed that UTC day, including downtime. The SLA fee keeps billing during outages, so do not count only running hours. A smaller or negative amount usually means a credit was applied. On a day that includes a Stop, a reboot, or a long Loading period, contact support before you treat the difference as a credit. How the console labels the row is in [Settlement timing](#settlement-timing).
 
 The contract row can appear before settlement. Its `sla` item is absent until that day settles, so a window that includes the current UTC day has no SLA item yet. If `next_token` is not `null`, repeat the request with `after_token` set to that value before you treat a missing `sla` item as unsettled. `limit` defaults to 100, so a busy account can put the contract on a later page.
 
@@ -327,7 +327,7 @@ A timeout, a dropped connection, or HTTP 5xx means the rental may already exist.
 | --- | --- | --- |
 | Target outside `[0, 1)` (negative, or 1 or above) | HTTP 400 `invalid_args` ("target reliability must be greater than or equal to 0 and less than 1") | SLA requires `0 < target_reliability < 1`. Sending `0` or omitting the field rents **without** an SLA (HTTP 200, no error). |
 | Offer has no SLA, target is above the host commitment, or the SLA fee would exceed 1× compute | HTTP 400 `invalid_sla_params` (body includes `ask_id`; message may say "SLA Fee would be N.NNx compute") | Lower the target, or pick an offer with a higher commitment |
-| SLA not available | HTTP 403 `sla_disabled` | SLA is not enabled for this request. It may be off platform-wide or for this account. Do not retry in a loop. Rent without a reliability target, or contact support. |
+| SLA not available | HTTP 403 `sla_disabled` | SLA is not enabled. This is a single platform-wide switch, not an account or region setting. Do not retry in a loop. Rent without a reliability target, or contact support. |
 | Offer no longer exists | HTTP 400 `invalid_args` (`msg` may contain `error 404/3603`), HTTP 404 `no_such_ask` (`msg` may contain `error 404/3659` if the offer was taken mid-request), or HTTP 410 | Re-search and use a fresh offer ID. Do not retry the same ID. |
 | Ask cannot start now (`cancel_unavail`) | HTTP 410, error `no_such_ask` | Search for a new offer; this is not a transient glitch to retry on the same id |
 | `price` (bid) sent together with `target_reliability` | HTTP 400 "Cannot combine interruptible instances with SLAs" | Remove `price`. SLA rentals are on-demand only |
@@ -489,7 +489,7 @@ No. Verification is a platform quality signal (see [Machine Tiers](/guides/insta
 
 ### Where do I see historical SLA credits?
 
-**Console:** After UTC settlement, open **Account → Billing → Charges**. A negative net SLA row is labeled **Service Credit**. A smaller but still positive **SLA Fee** row means a partial credit. Compare it with the **SLA Fee/hr** you wrote down at rent (console quick start step 4) times the hours the contract was active that UTC day, including downtime. The Charges API returns the same net. Invoices do not. You cannot see the measured reliability for that day in the console or the API.
+**Console:** After UTC settlement, open **Account → Billing → Charges**. A negative net SLA row is labeled **Service Credit**. A smaller but still positive **SLA Fee** row means a partial credit. Compare it with the **SLA Fee/hr** you wrote down at rent (console quick start step 4) times every hour the contract existed that UTC day, including downtime. The Charges API returns the same net. Invoices do not. You cannot see the measured reliability for that day in the console or the API.
 
 **API integrators:** Use the same Charges row as [Settlement timing](#settlement-timing). The call requires `day.gte` and `day.lte` (unix seconds). Send `next_token` back as `after_token`, and stop when `next_token` is `null`. A row below the fee you expected means a credit was applied. `GET /api/v1/invoices/` covers payment transactions, not SLA credits. Client webhooks for SLA credits are not available. Host-side settlement uses [machine earnings](/api-reference/billing/show-earnings) (`sla_earn`).
 

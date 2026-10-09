@@ -44,7 +44,7 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 4. Confirm SLA account access: open **Set Pricing → SLA** and confirm the panel is visible (do **not** Save final commitment/confidence yet). If the panel is missing, contact support.
 5. Preview economics (console SLA panel or [backtester](/host/sla-backtester)). Read [Billing vs settlement](#billing-vs-settlement-important) and [Risk scenarios](#risk-scenarios). GPU billing can continue during outages, and SLA credits can exceed many days of SLA fees. The normal **Host → Billing** view has no separate SLA earnings line. After you enable SLA, GPU earnings can drop because that compute is released as `sla_earn` (`vastai show earnings`). Much of it can stay held until the contract ends, so a low week is not by itself a credit.
 6. Read [Scheduled maintenance](#scheduled-maintenance) before you turn SLA on. Turn on **Host → Notification Settings** for `host:machine_offline` and `host:machine_error` ([Host Notifications](/host/notifications)) so you hear about downtime before next-day settlement. Schedule planned work as far ahead as you can. Some hosts assume 24 hours of notice fully forgives the downtime. It does not, and forgiveness is not guaranteed.
-7. Enter **Reliability Commitment** and **Confidence**. In **Set Pricing → SLA**, the commitment field is a percent (it ends with `%`; type `99` for 99%). Check that the SLA fee preview matches that percent before you **Save**. With no history, start the commitment below the uptime you expect to deliver, and start **Confidence** at **Low** (wide margin). Use the console SLA preview or the backtester, not the dashboard reliability score. Search hides your offer from renters whose target is above your commitment. The machine is already listed from step 2, so **Save** publishes SLA to live renters immediately.
+7. Enter **Reliability Commitment** and **Confidence**. Prefer a few weeks of rentals, then a [backtester](/host/sla-backtester) run, before you enable SLA. If you enable it earlier, the commitment is a guess: start it below the uptime you expect, and start **Confidence** at **Low** (wide margin). In **Set Pricing → SLA**, the commitment field is a percent (it ends with `%`; type `99` for 99%). Check that the SLA fee preview matches that percent before you **Save**. Use the console SLA preview or the backtester, not the dashboard reliability score. Search hides your offer from renters whose target is above your commitment. The machine is already listed from step 2, so **Save** publishes SLA to live renters immediately.
    - **API users:** send `sla_r_claim` as a fraction (`0.99`, not `99`). After **Save**, run the confidence check in [Validation rules](#validation-rules).
 8. **Verify now.** From the client account, include unverified machines in Search filters (the default hides them; new machines usually are unverified) and set **Reliability target** at or below your commitment. Confirm an **SLA Fee** line. If that line is missing on every offer, SLA may be off platform-wide. Contact support before you change the listing. Optionally rent that offer briefly, then **Destroy** the test instance. See [Testing your own machine](/host/hosting-overview#testing-your-own-machine).
    - **Console verify:** confirm **Listed** on **Host → Machines** and reopen **Set Pricing → SLA**.
@@ -126,7 +126,7 @@ When a client rents an on-demand instance on your SLA-listed offer with a chosen
 - **Strong reliability relative to the client's target** → you keep the SLA fee for that day.
 - **Shortfalls** → credits flow to the client from your earnings (bounded by that day's covered compute).
 
-Over many strong days, SLA fees can offset occasional credits, but a single bad day can exceed months of collected charges — see [Risk scenarios](#risk-scenarios) and the backtester's [largest single-day credit](/host/sla-backtester#summarize-with-jq) before you commit.
+Over many strong days, SLA fees can offset occasional credits, but a single bad day can exceed months of collected SLA fees — see [Risk scenarios](#risk-scenarios) and the backtester's [largest single-day credit](/host/sla-backtester#summarize-with-jq) before you commit.
 
 ### How reliability is measured
 
@@ -399,7 +399,7 @@ Then `PUT /api/v0/machines/create_asks/` with the merged body (read → merge �
 Use this loop only to restore SLA offers that no longer appear in search on machines with **zero** rentals. It does not change prices or SLA terms. To change terms, use [Update SLA on an existing ask](#update-sla-on-an-existing-ask-partial-body). `current_rentals_resident`, `credit_discount_max`, and `min_bid_price` are on `GET /api/v0/machines/` but are not all in the Show Machines OpenAPI schema yet. A typed client that drops `current_rentals_resident` will skip every machine.
 
 <Warning>
-"Missing from search" also matches every **hidden** listing (hidden listings are not shown in search) and every **offline** machine (`create_asks` returns HTTP 402 until the machine is online). Any hidden machine not listed in `HIDDEN_IDS` becomes **public** on a live run. Machines in `HIDDEN_IDS` show up as "would re-list" in every dry run. That is expected. Set `HIDDEN_IDS` before `DRY_RUN=0` (space-separated IDs, or `HIDDEN_IDS=none` if you have no hidden listings).
+"Missing from search" also matches every **hidden** listing (hidden listings are not shown in search) and every **offline** machine (`create_asks` returns HTTP 402 until the machine is online). Any hidden machine not listed in `HIDDEN_IDS` becomes **public** on a live run. The loop skips machines in `HIDDEN_IDS` unless you set `RELIST_HIDDEN=1`. Set `HIDDEN_IDS` before `DRY_RUN=0` (space-separated IDs, or `HIDDEN_IDS=none` if you have no hidden listings).
 </Warning>
 
 <Note>
@@ -514,7 +514,13 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
     fi
   fi
   hidden=false
-  if echo "$HIDDEN_IDS" | grep -qw "$id"; then hidden=true; fi
+  if echo "$HIDDEN_IDS" | grep -qw "$id"; then
+    if [ "${RELIST_HIDDEN:-0}" != 1 ]; then
+      echo "skip $id: hidden listing; search cannot confirm it is missing (set RELIST_HIDDEN=1 to force)"
+      continue
+    fi
+    hidden=true
+  fi
   # Opt-in only: skip machines with no positive reliability commitment (do not invent 0.99)
   if ! echo "$machine" | jq -e '(.sla_reliability_claim // 0) > 0' >/dev/null; then
     echo "skip $id: no SLA terms visible (SLA off, daemon below SLA minimum, or account not SLA-approved)"; continue
@@ -763,7 +769,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/${MACHINE_ID}/dnotify" \
   -d '{"sdate": START_UNIX_UTC, "duration": 2, "maintenance_category": "software"}'
 ```
 
-`sdate` is Unix epoch seconds (UTC). Use a future time, as far ahead as you can. `duration` is whole hours. `maintenance_category` is one of `power`, `internet`, `disk`, `gpu`, `software`, or `other`. The server stores `maintenance_reason` as empty, so do not rely on that field. See [Schedule Maintenance](/api-reference/machines/schedule-maint).
+`sdate` is Unix epoch seconds (UTC). Use a future time, as far ahead as you can. `duration` is whole hours. `maintenance_category` is one of `power`, `internet`, `disk`, `gpu`, `software`, or `other`. The server stores `maintenance_reason` as empty, so do not rely on that field. There is no public REST endpoint for reading maintenance windows. Even if you schedule or cancel over REST, confirm the result with `vastai show maints --ids 'MACHINE_ID' --raw` or on the console **Maintenance** tab. Each machine should have exactly one window. See [Schedule Maintenance](/api-reference/machines/schedule-maint).
 
 **Cancel or reschedule:** [`vastai cancel maint`](/host/cli/cancel-maint) cancels **every** window you scheduled on that machine, not one window. It also asks `Continue? [y/n]`. In scripts, use `echo y | vastai cancel maint MACHINE_ID`, or call `PUT /api/v0/machines/{id}/cancel_maint/` directly. Confirm the cancel succeeded before you schedule the replacement. Check with `vastai show maints --ids 'MACHINE_ID' --raw` ([show maints](/host/cli/show-maints)), not only the console. In scripts, pass `--retry 1` on `schedule maint` and `cancel maint`. A retried PUT can create a second window if the first one was stored and the response was lost. Confirm exactly one window before you schedule the next machine. Otherwise a failed cancel plus a new window leaves duplicates. Maintenance windows that Vast scheduled are not cancelled. They stay listed as `admin_locked`. To change one window, cancel, then create again every window you still want, as far ahead as you can, and confirm under **Machine Maintenances** (redesigned page) or **Scheduled Maintenances** (classic page).
 
@@ -917,7 +923,8 @@ When you pass `machid`, use `per_machine[].sla_earn` for that machine's SLA sett
 Call earnings once per UTC day (`sday=eday=D`, no `machid`) for each of the last 7 days, at least 2 seconds apart, and compare `per_machine[].sla_earn` with the value you stored for that machine and day. The backtester is not a per-day audit of `sla_earn`. The two match only when the machine's only rental that day was a single SLA contract at the simulated target. See [Simulation limits](/host/sla-backtester#simulation-limits). Never compare `sla_earn` with the largest single-day credit (`escrow_to_client_balance`). Use `last_days=1` with `machid` only for coarse polling after UTC rollover, not as a match to one settled UTC calendar day.
 
 ```bash
-# Exact UTC day 2026-07-24 for machine 12345 (sday/eday = 20658)
+# Spot check: one machine, one UTC day (2026-07-24, sday/eday = 20658).
+# A daily record for the fleet omits machid. See the loop above this example's prose.
 curl -s -H "Authorization: Bearer $VAST_API_KEY" \
   "https://console.vast.ai/api/v0/users/me/machine-earnings/?machid=12345&sday=20658&eday=20658" \
   | jq '.per_machine[] | select(.machine_id == 12345 or .machine_id == "12345") | {machine_id, sla_earn}'
