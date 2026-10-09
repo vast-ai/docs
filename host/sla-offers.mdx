@@ -383,7 +383,7 @@ Then `PUT /api/v0/machines/create_asks/` with the merged body (read → merge �
 Each live PUT resends the offer's `end_date` (or `duration`). Any active rental that ends **before** that date is extended to it, which also extends your service-credit exposure. This cannot be undone, and `DRY_RUN=1` does not show which contracts will be affected. You cannot see per-contract end dates beforehand. Assume a live run extends any shorter rental, and read `upd_contracts` afterwards (it may not list contracts extended a few minutes later).
 </Warning>
 
-The loop needs two keys: a listing key (`machine_write` and `machine_read`, `VAST_API_KEY`) and a separate search key with `misc` (`SEARCH_API_KEY`). Offer search is about 10 requests per minute per IP. If a search fails or is not a JSON array, that machine is skipped. A failed search never becomes a re-list. An empty array can also mean every GPU is rented, so confirm **Host → Machines** before `DRY_RUN=0`. It does not turn an SLA on for new machines. Enable an SLA on each machine first (console **Set Pricing → SLA**, or a per-machine `PUT /api/v0/machines/create_asks/` with `sla_r_claim` and `sla_sigma_x`). The loop only considers machines that are `listed` and already have `sla_reliability_claim > 0`. It skips a machine whose confidence was never stored. Fix those with the check under [Validation rules](#validation-rules) before you re-list.
+The loop needs two keys: a listing key (`machine_write` and `machine_read`, `VAST_API_KEY`) and a separate search key with `misc` (`SEARCH_API_KEY`). Offer search is about 10 requests per minute per IP. If a search fails or is not a JSON array, that machine is skipped. A failed search never becomes a re-list. An empty array can also mean every GPU is rented. The loop skips a machine unless `current_rentals_running` is `0`, because a PUT that resends `end_date` extends every shorter rental and its credit exposure. Before `DRY_RUN=0`, confirm on **Host → Machines** that each allowlisted machine has free GPUs. It does not turn an SLA on for new machines. Enable an SLA on each machine first (console **Set Pricing → SLA**, or a per-machine `PUT /api/v0/machines/create_asks/` with `sla_r_claim` and `sla_sigma_x`). The loop only considers machines that are `listed` and already have `sla_reliability_claim > 0`. It skips a machine whose confidence was never stored. Fix those with the check under [Validation rules](#validation-rules) before you re-list.
 
 `show machines` returns confidence only as a label, so the loop does **not** send `sla_sigma_x`. On an existing SLA ask, `create_asks` keeps the current confidence when `sla_sigma_x` is omitted, so each machine keeps its exact value. Set a new confidence per machine in the console (or PUT `sla_sigma_x` for that machine) if you want to change it.
 
@@ -452,8 +452,6 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
     echo "skip $id: SLA offer still in search" >&2
     continue
   fi
-  # Empty array: the offer is not in search. A fully rented machine looks the same.
-  # Confirm on Host → Machines before DRY_RUN=0. Do not re-list it only because search is empty.
   machine=$(echo "$machines" | jq -c --arg id "$id" \
     '.machines[] | select((.id|tostring) == $id)')
   if ! echo "$machine" | jq -e '.listed == true' >/dev/null; then
@@ -484,6 +482,12 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
   fi
   if ! echo "$machine" | jq -e '.sla_confidence != null' >/dev/null; then
     echo "skip $id: SLA enabled but no stored confidence; set sla_sigma_x first" >&2
+    continue
+  fi
+  # An empty search usually means every GPU is rented. The PUT resends end_date
+  # or duration and extends every shorter active rental. Skip unless the rental count is 0.
+  if ! echo "$machine" | jq -e 'has("current_rentals_running") and .current_rentals_running == 0' >/dev/null; then
+    echo "skip $id: active rentals or rental count unavailable (PUT would extend them)" >&2
     continue
   fi
   # sla_sigma_x is omitted on purpose: create_asks keeps each machine's current confidence.
@@ -742,7 +746,7 @@ Use the [SLA Earnings Backtester](/host/sla-backtester) (API-only; requires a `m
   3. **Unlist** in the console (**Host → Machines**). Do not change SLA settings or relist during the outage. API users: `create_asks` returns HTTP 402 while the machine is offline, and resending `end_date` can extend shorter rentals. `vastai unlist machine MACHINE_ID` removes the listing and does not republish it.
   4. Fix the machine. Existing SLA contracts keep their terms and settle against each renter's target; unlisting or setting the commitment to `0` does not change that.
   5. **Check settlement** a few hours after the next UTC midnight. In the console, compare those days with a normal week in **Host → Billing**. Releases are spread over time, so one low day is not by itself a credit. To automate, read `per_machine[].sla_earn`. A backtester re-run is an estimate for one simulated contract, not the settlement record.
-  6. When you relist, use the terms you wrote down: GPU price (`price_gpu`), storage (`price_disk`), bandwidth (`price_inetu`, `price_inetd`), min GPU (`min_chunk`), end date or duration, `hidden_listing`, Claim (`sla_r_claim`), Confidence (`sla_sigma_x`), `credit_discount_max`, and `price_min_bid`. If the snapshot lacks the discount or min bid, use the console notes. Relisting creates a new ask, and an omitted `credit_discount_max` becomes `0.4`. Send `sla_sigma_x` explicitly; a new ask otherwise defaults to 0.5. Resending the old `end_date` extends any shorter active rental. If the machine stays locked, contact [Discord](https://discord.gg/hSuEbSQ4X8) or contact@vast.ai before you relist.
+  6. **Console:** Open **Set Pricing**, re-enter the prices you wrote down, and confirm **Claim** and **Confidence** match your notes. Click **Save**, then **LIST**. From a client account, search with a **Reliability target** and confirm an **SLA Fee** line. **API:** send the terms you wrote down: GPU price (`price_gpu`), storage (`price_disk`), bandwidth (`price_inetu`, `price_inetd`), min GPU (`min_chunk`), end date or duration, `hidden_listing`, Claim (`sla_r_claim`), Confidence (`sla_sigma_x`), `credit_discount_max`, and `price_min_bid`. If the snapshot lacks the discount or min bid, use the console notes. Relisting creates a new ask, and an omitted `credit_discount_max` becomes `0.4`. Send `sla_sigma_x` explicitly; a new ask otherwise defaults to 0.5. Resending the old `end_date` extends any shorter active rental. If the machine stays locked, contact [Discord](https://discord.gg/hSuEbSQ4X8) or contact@vast.ai before you relist.
 
 ## Monitoring SLA after listing
 
