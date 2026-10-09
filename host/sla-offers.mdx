@@ -382,7 +382,7 @@ For multiple machines, loop sequentially — do not parallelize without backoff:
 
 1. Skip machines missing base pricing fields.
 2. `PUT /api/v0/machines/create_asks/` with `machine` plus SLA fields (preserve existing reliability commitment and confidence when set).
-3. Space requests (`sleep 2` in the example). At fleet scale, detect HTTP **429** and retry that machine with backoff before treating it as failed—do not rerun the whole loop with `DRY_RUN=0` until transient rate limits clear.
+3. Space requests at least 5 seconds apart (`sleep 5` in the example; `create_asks` has an `x-rate-limit` threshold of `5.0`). At fleet scale, detect HTTP **429** and retry that machine with backoff before treating it as failed—do not rerun the whole loop with `DRY_RUN=0` until transient rate limits clear.
 4. On `invalid_sla_params`, `sla_not_approved`, `sla_daemon_outdated`, or `machine_locked`, log the machine ID and continue or abort per your rollout policy.
 
 See [Fleet workflow](/host/sla-backtester#fleet-workflow) in the backtester for a similar sequential pattern.
@@ -399,11 +399,11 @@ ALLOWLIST="${ALLOWLIST:-}"
 # makes the listing public. Put every hidden machine ID here, or leave it off ALLOWLIST.
 HIDDEN_IDS="${HIDDEN_IDS:-}"
 DRY_RUN="${DRY_RUN:-1}"
+if [ "$DRY_RUN" = "0" ] && [ -z "$ALLOWLIST" ]; then
+  echo "abort: set ALLOWLIST to Listed machine IDs before DRY_RUN=0" >&2; exit 1
+fi
 machines=$(vastai show machines --raw)
 for id in $(echo "$machines" | jq -r '.machines[].id'); do
-  if [ "$DRY_RUN" = "0" ] && [ -z "$ALLOWLIST" ]; then
-    echo "abort: set ALLOWLIST to Listed machine IDs before DRY_RUN=0"; break
-  fi
   if [ -n "$ALLOWLIST" ] && ! echo "$ALLOWLIST" | grep -qw "$id"; then
     echo "skip $id: not in ALLOWLIST"; continue
   fi
@@ -411,6 +411,11 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
     '.machines[] | select((.id|tostring) == $id)')
   if ! echo "$machine" | jq -e '.listed == true' >/dev/null; then
     echo "skip $id: not listed (this loop never republishes unlisted machines)"; continue
+  fi
+  # Rolling listings (-l / duration) recompute end_date daily; writing end_date back would
+  # turn them into a fixed end date. Republish those from the console instead.
+  if echo "$machine" | jq -e '.duration != null' >/dev/null; then
+    echo "skip $id: rolling duration listing (republish from the console)"; continue
   fi
   price=$(echo "$machine" | jq -r '.listed_gpu_cost // empty')
   end=$(echo "$machine" | jq -r '.end_date // empty')
@@ -457,7 +462,7 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
   else
     echo "machine_id=$id error: $(echo "$resp" | jq -c '{success,error,msg}' 2>/dev/null || echo "$resp")"
   fi
-  sleep 2
+  sleep 5
 done
 ```
 
@@ -489,6 +494,7 @@ Replace `CURRENT_END_DATE_FROM_SHOW_MACHINES` with the current `end_date` from `
 | 403 | `sla_daemon_outdated` | Machine daemon build is too old for SLA listing |
 | 400 | `invalid_args` | Machine ID not found for your account, or malformed / incompatible request body |
 | 400 | `invalid_sla_params` | SLA parameters failed validation |
+| 429 | *(rate limited)* | Too many requests. Space fleet calls at least 5 seconds apart, then retry the machines that failed |
 | 402 | `msg`: `can only create asks for an online machine` | The daemon has not checked in for more than 60 seconds. Wait until **Host → Machines** shows the machine online, then retry. If the machine is down, use `vastai unlist machine MACHINE_ID` instead. |
 
 **`machine_locked`:** Returned when a machine is decommissioned or migration-locked. If you are migrating hardware, finish or cancel active rentals first, remove or update the listing as needed, and contact support if the machine remains locked. Existing SLA terms on active contracts remain in force until those contracts end.
