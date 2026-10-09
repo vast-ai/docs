@@ -221,7 +221,7 @@ For planning, assume a worst-case day costs up to one full day of covered comput
 
 ### SLA on extended contracts
 
-When a rental contract is extended (by moving the offer end date forward at the same or lower price), the original SLA parameters remain in effect for the extended period. Changing SLA parameters on the offer does not alter SLA terms on existing contracts — only new rental contracts pick up updated SLA settings. If the same request would raise the SLA fee on an existing SLA contract (lower commitment, wider confidence, or `sla_r_claim` set to `0`), that contract is not extended, and the response does not say so.
+When a rental contract is extended (by moving the offer end date forward at the same or lower price), the original SLA parameters remain in effect for the extended period. Changing SLA parameters on the offer does not alter SLA terms on existing contracts — only new rental contracts pick up updated SLA settings. If the request that moves `end_date` later also changes SLA terms in a way that would raise an existing contract's SLA fee (a lower commitment, wider confidence, or `sla_r_claim` set to `0`), that contract is not extended, and the response does not say so.
 
 Disabling SLA on the offer (setting `sla_r_claim` to `0`) prevents new SLA-covered contracts but does not terminate SLA on existing active contracts — they continue under their original SLA terms until their rental end date.
 
@@ -244,7 +244,8 @@ If the machine is already **listed**:
 
 1. Open **Host → Machines → Set Pricing → SLA**, set Claim and Confidence, then click **Save**.
 2. **Save** applies SLA to the live offer — you do not need to click **LIST** again unless this is a brand-new listing that was never published.
-3. Verify after listing:
+3. To stop offering SLA on **new** rentals, set **Claim** to `0` and **Save**. On an already-listed machine, **Save** updates the live offer; you do not need to click **LIST** again. Active contracts keep their SLA terms until they end. API users: send the full `create_asks` body with `"sla_r_claim": 0` (see [Update SLA on an existing ask](#update-sla-on-an-existing-ask-partial-body)).
+4. Verify after listing:
    - **Console:** confirm the machine status is **Listed**, reopen **Set Pricing → SLA** to review the preview, or check offer details under **Host → Machines**.
    - **Search:** `dph_total` includes the SLA fee at a client's `target_reliability`, and `expected_reliability` matches your reliability commitment (see [Search / client-visible fields](#search--client-visible-fields)).
 
@@ -694,23 +695,32 @@ Use the [SLA Earnings Backtester](/host/sla-backtester) (API-only; requires a `m
 - **`sla_daemon_outdated`** — Update the host daemon from the [host setup guide](https://cloud.vast.ai/host/setup/), confirm the machine reconnects on **Host → Machines**, then retry LIST / `create_asks`. If the error persists, contact support with the machine ID.
 - **Unexpected credit** — Review reliability; re-run the backtester over the affected dates and check `escrow_to_client_balance` and `reliability` on those days.
 - **Severe outage (active SLA contracts):**
-  0. **Before you unlist, save your listing terms.** After unlist, `show machines` returns `null` for prices, `min_chunk`, `end_date`, and SLA terms. Confidence (`sla_sigma_x`) is never returned, so write down Tight, Normal, or Wide as well.
+  1. **Save your current terms before you unlist.** After unlist, `show machines` returns `null` for prices, `listed_min_gpu_count`, `end_date`, and SLA terms. The snapshot does not include confidence (`sla_sigma_x`; only the `sla_confidence` label) or hidden status (`hidden_listing`). Write both down either way.
+
+     **Console:** Before you unlist, open **Set Pricing** and write down the GPU price, storage price, min GPU, end date (or auto-renew duration), whether the listing is hidden, Claim, and Confidence (Tight, Normal, or Wide).
+
      ```bash
-     vastai show machines --raw --api-key "$VAST_API_KEY" | jq '.machines[] | select(.id==MACHINE_ID)' > machine-MACHINE_ID-pre-outage.json
+     vastai show machines --raw --api-key "$VAST_API_KEY" \
+       | jq -e '.machines[] | select((.id|tostring) == "MACHINE_ID")' \
+       > machine-MACHINE_ID-pre-outage.json \
+       && [ -s machine-MACHINE_ID-pre-outage.json ] \
+       || echo "Snapshot is EMPTY: do not unlist yet" >&2
      ```
-  1. **Notify renters.** In the console: **Host → Machines → Settings → Machine Maintenances** (see [Set a maintenance window](/host/set-maintenance-window)). To automate: `echo y | vastai schedule maint MACHINE_ID --sdate "$(date -u +%s)" --duration HOURS --maintenance_category other`.
-  2. **Unlist** in the console (**Host → Machines**). Do not change SLA settings or relist during the outage. API users: `create_asks` returns HTTP 402 while the machine is offline, and resending `end_date` can extend shorter rentals. `vastai unlist machine MACHINE_ID` removes the listing and does not republish it.
-  3. Fix the machine. Existing SLA contracts keep their terms and settle against each renter's target; unlisting or setting the commitment to `0` does not change that.
-  4. **Check settlement** a few hours after the next UTC midnight. In the console, compare those days with a normal week in **Host → Billing**. Releases are spread over time, so one low day is not by itself a credit. To automate, read `per_machine[].sla_earn`, or re-run the backtester and read `days[].escrow_to_client_balance`.
-  5. When you relist, rebuild the listing from the snapshot (`price_disk`, `min_chunk`, `end_date` or `duration`, `hidden_listing`, `sla_r_claim`, `sla_sigma_x`). If the machine stays locked, contact [Discord](https://discord.gg/hSuEbSQ4X8) or contact@vast.ai before you relist.
+
+     `show machines` leaves out machines that have been offline for more than about 10 hours. If the snapshot is empty, call `GET /api/v0/machines/?include_offline=true` with the same key, or use the console notes above. Do not unlist until you have the terms.
+  2. **Notify renters.** In the console: **Host → Machines → Settings → Machine Maintenances** (see [Set a maintenance window](/host/set-maintenance-window)). To automate: `echo y | vastai schedule maint MACHINE_ID --sdate "$(date -u +%s)" --duration HOURS --maintenance_category other`.
+  3. **Unlist** in the console (**Host → Machines**). Do not change SLA settings or relist during the outage. API users: `create_asks` returns HTTP 402 while the machine is offline, and resending `end_date` can extend shorter rentals. `vastai unlist machine MACHINE_ID` removes the listing and does not republish it.
+  4. Fix the machine. Existing SLA contracts keep their terms and settle against each renter's target; unlisting or setting the commitment to `0` does not change that.
+  5. **Check settlement** a few hours after the next UTC midnight. In the console, compare those days with a normal week in **Host → Billing**. Releases are spread over time, so one low day is not by itself a credit. To automate, read `per_machine[].sla_earn`. A backtester re-run is an estimate for one simulated contract, not the settlement record.
+  6. When you relist, rebuild the listing from the snapshot and your notes (`price_disk`, `min_chunk`, `end_date` or `duration`, `hidden_listing`, `sla_r_claim`, `sla_sigma_x`). If the machine stays locked, contact [Discord](https://discord.gg/hSuEbSQ4X8) or contact@vast.ai before you relist.
 
 ## Monitoring SLA after listing
 
-On SLA rentals, compute pay and the SLA fee are released together as SLA earnings over several days. A single smaller release can be timing. By itself it is not proof of a credit.
+On SLA rentals, compute pay and the SLA fee are released together as SLA earnings over several days. A single smaller release can reflect release timing, not a service credit. By itself it is not proof of a credit.
 
 After you enable SLA, charges and credits settle on UTC (Coordinated Universal Time) day boundaries. SLA earnings rows typically appear in **Host → Billing** within a few hours after UTC midnight (exact timing can vary).
 
-For SLA contracts, `sla_earn` is the escrow released to you that day. It matches the backtester's `escrow_to_host_balance`. Releases are spread over time rather than paid out the same day, so an early or low day can be timing, not a service credit. A credit can also reduce later releases. Compare several days before you assume a credit, or read `days[].escrow_to_client_balance` in the [backtester](/host/sla-backtester). SLA-contract compute is **not** included in `gpu_earn`, `sto_earn`, or bandwidth earnings, so those fields stay near zero for SLA rentals. `sla_earn` is normally positive and is negative only when a prior day is corrected. Do not compare it to the backtester's largest single-day credit.
+For SLA contracts, `sla_earn` is the escrow released to you that day. It matches the backtester's `escrow_to_host_balance`. Releases are spread over time rather than paid out the same day, so an early or low day can reflect release timing, not a service credit. A credit can also reduce later releases. Compare several days before you assume a credit, or read `days[].escrow_to_client_balance` in the [backtester](/host/sla-backtester). SLA-contract compute is **not** included in `gpu_earn`, `sto_earn`, or bandwidth earnings, so those fields stay near zero for SLA rentals. `sla_earn` is normally positive and is negative only when a prior day is corrected. Do not compare it to the backtester's largest single-day credit.
 
 When you poll the API, use **`per_machine[].sla_earn`** for a single machine. **`per_day[].sla_earn` is always fleet-wide**—even if you pass `machid`.
 
@@ -720,7 +730,7 @@ When you poll the API, use **`per_machine[].sla_earn`** for a single machine. **
 2. Set the date range to include the UTC day you want to review.
 3. Machine filtering is not available in the console. For one machine, use `vastai show earnings --machine_id ID`.
 4. Look for the SLA settlement in the earnings breakdown. On an SLA rental, compute pay is released with the SLA fee (the same amount as `sla_earn` in the API), not as a separate GPU earnings line.
-5. After downtime, compare several days with a normal week. A single smaller release can be timing, because escrow is released over time, not proof of a credit by itself. Do not look for a negative SLA line, and do not match one day to the backtester's largest single-day credit.
+5. After downtime, compare several days with a normal week. A single smaller release may only reflect timing, because escrow is released over several days. On its own, it does not prove a credit was paid. Do not look for a negative SLA line, and do not match one day to the backtester's largest single-day credit.
 
 **If you don't see SLA rows:** widen the date range (settlement uses UTC day boundaries), confirm the machine had an active on-demand rental that day, and confirm SLA was enabled and the offer was **listed** (not just saved).
 
