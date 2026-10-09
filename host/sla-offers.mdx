@@ -383,7 +383,7 @@ Then `PUT /api/v0/machines/create_asks/` with the merged body (read → merge �
 Each live PUT resends the offer's `end_date` (or `duration`). Any active rental that ends **before** that date is extended to it, which also extends your service-credit exposure. This cannot be undone, and `DRY_RUN=1` does not show which contracts will be affected. You cannot see per-contract end dates beforehand. Assume a live run extends any shorter rental, and read `upd_contracts` afterwards (it may not list contracts extended a few minutes later).
 </Warning>
 
-The loop needs two keys: a listing key (`machine_write` and `machine_read`, `VAST_API_KEY`) and a separate search key with `misc` (`SEARCH_API_KEY`). Offer search is about 10 requests per minute per IP. If a search fails or is not a JSON array, that machine is skipped. A failed search never becomes a re-list. An empty array can also mean every GPU is rented. The loop skips a machine unless `current_rentals_running` is `0`, because a PUT that resends `end_date` extends every shorter rental and its credit exposure. Before `DRY_RUN=0`, confirm on **Host → Machines** that each allowlisted machine has free GPUs. It does not turn an SLA on for new machines. Enable an SLA on each machine first (console **Set Pricing → SLA**, or a per-machine `PUT /api/v0/machines/create_asks/` with `sla_r_claim` and `sla_sigma_x`). The loop only considers machines that are `listed` and already have `sla_reliability_claim > 0`. It skips a machine whose confidence was never stored. Fix those with the check under [Validation rules](#validation-rules) before you re-list.
+The loop needs two keys: a listing key (`machine_write` and `machine_read`, `VAST_API_KEY`) and a separate search key with `misc` (`SEARCH_API_KEY`). Offer search is about 10 requests per minute per IP. The loop runs local checks first and only searches machines that pass them, so skipped machines use none of that budget. If a search fails or is not a JSON array, that machine is skipped. A failed search never becomes a re-list. An empty array can also mean every GPU is rented. The loop skips a machine unless `current_rentals_resident` is `0`. That count includes stopped rentals. A PUT that resends `end_date` extends every shorter rental on the machine, whether its instance is running or stopped. Before `DRY_RUN=0`, confirm on **Host → Machines** that each allowlisted machine has no rentals at all. Stopped rentals count. The loop does not turn an SLA on for new machines. Enable an SLA on each machine first (console **Set Pricing → SLA**, or a per-machine `PUT /api/v0/machines/create_asks/` with `sla_r_claim` and `sla_sigma_x`). The loop only considers machines that are `listed` and already have `sla_reliability_claim > 0`. It skips a machine whose confidence was never stored. Fix those with the check under [Validation rules](#validation-rules) before you re-list.
 
 `show machines` returns confidence only as a label, so the loop does **not** send `sla_sigma_x`. On an existing SLA ask, `create_asks` keeps the current confidence when `sla_sigma_x` is omitted, so each machine keeps its exact value. Set a new confidence per machine in the console (or PUT `sla_sigma_x` for that machine) if you want to change it.
 
@@ -410,7 +410,7 @@ For multiple machines, loop sequentially — do not parallelize without backoff:
 1. Skip machines missing base pricing fields.
 2. `PUT /api/v0/machines/create_asks/` with `machine` plus SLA fields (preserve existing reliability commitment and confidence when set).
 3. Space requests at least 5 seconds apart (`sleep 5` in the example; `create_asks` has an `x-rate-limit` threshold of `5.0`). At fleet scale, detect HTTP **429** and retry that machine with backoff before treating it as failed—do not rerun the whole loop with `DRY_RUN=0` until transient rate limits clear.
-4. On `invalid_sla_params`, `sla_not_approved`, `sla_daemon_outdated`, or `machine_locked`, log the machine ID and continue or abort per your rollout policy.
+4. On `invalid_sla_params`, `sla_not_approved`, `sla_disabled`, `sla_daemon_outdated`, or `machine_locked`, log the machine ID and continue or abort per your rollout policy.
 
 See [Fleet workflow](/host/sla-backtester#fleet-workflow) in the backtester for a similar sequential pattern.
 
@@ -437,20 +437,6 @@ machines=$(vastai show machines --raw --api-key "$VAST_API_KEY")
 for id in $(echo "$machines" | jq -r '.machines[].id'); do
   if [ -n "$ALLOWLIST" ] && ! echo "$ALLOWLIST" | grep -qw "$id"; then
     echo "skip $id: not in ALLOWLIST"; continue
-  fi
-  # A failed search must not become a PUT. Fully rented machines are also absent from search.
-  sleep 6
-  if ! out=$(vastai search offers "machine_id=$id verified=any has_sla=true" --raw --api-key "$SEARCH_API_KEY" 2>/dev/null); then
-    echo "skip $id: search failed (missing misc permission or HTTP 429)" >&2
-    continue
-  fi
-  if ! printf '%s' "$out" | jq -e 'type == "array"' >/dev/null; then
-    echo "skip $id: search returned non-array output" >&2
-    continue
-  fi
-  if printf '%s' "$out" | jq -e 'length > 0' >/dev/null; then
-    echo "skip $id: SLA offer still in search" >&2
-    continue
   fi
   machine=$(echo "$machines" | jq -c --arg id "$id" \
     '.machines[] | select((.id|tostring) == $id)')
@@ -484,10 +470,24 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
     echo "skip $id: SLA enabled but no stored confidence; set sla_sigma_x first" >&2
     continue
   fi
-  # An empty search usually means every GPU is rented. The PUT resends end_date
-  # or duration and extends every shorter active rental. Skip unless the rental count is 0.
-  if ! echo "$machine" | jq -e 'has("current_rentals_running") and .current_rentals_running == 0' >/dev/null; then
-    echo "skip $id: active rentals or rental count unavailable (PUT would extend them)" >&2
+  # current_rentals_running ignores stopped instances. extend_cur_conts still
+  # extends every shorter contract, so gate on resident count (includes stopped).
+  if ! echo "$machine" | jq -e 'has("current_rentals_resident") and .current_rentals_resident == 0' >/dev/null; then
+    echo "skip $id: has rentals (including stopped) or current_rentals_resident missing" >&2
+    continue
+  fi
+  # A failed search must not become a PUT. Fully rented machines are also absent from search.
+  sleep 6
+  if ! out=$(vastai search offers "machine_id=$id verified=any has_sla=true" --raw --api-key "$SEARCH_API_KEY" 2>/dev/null); then
+    echo "skip $id: search failed (missing misc permission or HTTP 429)" >&2
+    continue
+  fi
+  if ! printf '%s' "$out" | jq -e 'type == "array"' >/dev/null; then
+    echo "skip $id: search returned non-array output" >&2
+    continue
+  fi
+  if printf '%s' "$out" | jq -e 'length > 0' >/dev/null; then
+    echo "skip $id: SLA offer still in search" >&2
     continue
   fi
   # sla_sigma_x is omitted on purpose: create_asks keeps each machine's current confidence.
@@ -543,6 +543,7 @@ Replace `CURRENT_END_DATE_UNIX` and `CURRENT_MIN_CHUNK` with the current values 
 | 401 | `success: false` + `msg` (+ optional `error`) | Missing `machine_write` or other required permission |
 | 403 | `machine_locked` | Machine is decommissioned or migration-locked |
 | 403 | `sla_not_approved` | Host account is not approved to create SLA asks |
+| 403 | `sla_disabled` | SLA is switched off platform-wide. Do not retry in a loop. |
 | 403 | `sla_daemon_outdated` | Machine daemon build is too old for SLA listing |
 | 400 | `invalid_args` | Machine ID not found for your account, or malformed / incompatible request body |
 | 400 | `invalid_sla_params` | SLA parameters failed validation |
@@ -722,10 +723,15 @@ Maintenance forgiveness is not guaranteed. Advance notice and window length dete
 
 Use the [SLA Earnings Backtester](/host/sla-backtester) (API-only; requires a `machine_read` API key) to replay historical earnings through SLA math. Console-only hosts can use the web console SLA preview and the economics walkthrough on this page instead.
 
+## Getting help with SLA
+
+SLA approval, settlement questions, credit disputes, and locked machines are separate from machine setup. Contact support on [Discord](https://discord.gg/hSuEbSQ4X8) or at [contact@vast.ai](mailto:contact@vast.ai). Include the machine ID, the instance or contract ID, the UTC date, and the JSON error body or `upd_contracts` output if you have it.
+
 ## When things go wrong
 
 - **Listing rejected (`invalid_sla_params`)** — Re-check the reliability commitment and `sla_sigma_x` against [validation rules](#validation-rules).
-- **`sla_not_approved`** — Contact support; you can keep a non-SLA listing while approval is pending.
+- **`sla_not_approved`** — See [Getting help with SLA](#getting-help-with-sla). You can keep a non-SLA listing while approval is pending.
+- **`sla_disabled`** — SLA is off platform-wide. Do not retry in a loop. See [Getting help with SLA](#getting-help-with-sla).
 - **`sla_daemon_outdated`** — Update the host daemon from the [host setup guide](https://cloud.vast.ai/host/setup/), confirm the machine reconnects on **Host → Machines**, then retry LIST / `create_asks`. If the error persists, contact support with the machine ID.
 - **Unexpected credit** — `sla_earn` is not a per-contract credit record, and the backtester is an estimate, not the settlement. Contact support with the machine ID and the UTC dates.
 - **Severe outage (active SLA contracts):**
