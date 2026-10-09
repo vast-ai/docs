@@ -342,7 +342,7 @@ vastai show machines --raw | jq '.machines[] | select(.id == 12345 or .id == "12
 
 REST equivalent: `GET /api/v0/machines/` (the CLI sends `?owner=me`). The account is the API key owner; a `?user_id=` query is ignored.
 
-Machine `id` may be a string in raw JSON. The response is wrapped in a `machines` array. Read-side names differ from the `create_asks` body: `listed_gpu_cost` → `price_gpu`, `listed_min_gpu_count` → `min_chunk`, `sla_reliability_claim` → `sla_r_claim`. Confidence is returned as a label, `sla_confidence` (`high` = Tight, `medium` = Normal, `low` = Wide), not as `sla_sigma_x`. The SLA fields are `null` unless the machine is listed with SLA terms. Pricing fields and `end_date` are `null` when the machine is not listed.
+Machine `id` may be a string in raw JSON. The response is wrapped in a `machines` array. Read-side names differ from the `create_asks` body: `listed_gpu_cost` → `price_gpu`, `listed_min_gpu_count` → `min_chunk`, `sla_reliability_claim` → `sla_r_claim`. Confidence is returned as a label, `sla_confidence` (`high` = Tight, `medium` = Normal, `low` = Wide), not as `sla_sigma_x`. `sla_reliability_claim` and `sla_confidence` are `null` unless **all** of these are true: SLA is enabled on the platform, the machine is listed, your account is SLA-approved, and the machine's daemon meets the SLA minimum version. A machine with saved SLA terms can still return `null` if it is unlisted, its daemon is outdated, or approval was revoked. A listed machine with SLA turned off returns `0`. Pricing fields and `end_date` are `null` when the machine is not listed.
 
 Then `PUT /api/v0/machines/create_asks/` with the merged body (read → merge → PUT). `vastai list machine` and the Python SDK listing helpers cannot set SLA fields; start from this REST pattern (or the console) when you move an existing CLI listing to SLA.
 
@@ -429,7 +429,7 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
   if echo "$HIDDEN_IDS" | grep -qw "$id"; then hidden=true; fi
   # Opt-in only: skip machines with no positive reliability commitment (do not invent 0.99)
   if ! echo "$machine" | jq -e '(.sla_reliability_claim // 0) > 0' >/dev/null; then
-    echo "skip $id: no positive sla_reliability_claim (enable SLA per machine first)"; continue
+    echo "skip $id: no SLA terms visible (SLA off, daemon below SLA minimum, or account not SLA-approved)"; continue
   fi
   # sla_sigma_x is omitted on purpose: create_asks keeps each machine's current confidence.
   # price_disk is required: null or omitted resets storage price to 0.10.

@@ -52,7 +52,7 @@ For how SLA offers work once listed, see [SLA Offers](/host/sla-offers).
 <Note>
 **Simulation limits**
 - The whole machine is replayed as one contract. Live settlement runs per rental contract, so several concurrent SLA renters on a sliced machine can produce more credits on one day than the simulation shows. Pair this output with [SLA and GPU slicing](/host/sla-offers#sla-and-gpu-slicing).
-- For renter-visible pricing (`dph_total`), use **Set Pricing → SLA** in the console or search with a realistic `target_reliability`.
+- For renter-visible pricing (`dph_total`), use **Set Pricing → SLA** in the console or a REST search with a realistic `target_reliability` (the CLI cannot send `target_reliability` today).
 - How recent versus long-term uptime is weighted is set automatically from the renter target. It is not a host setting; the value used is echoed in `params.beta`.
 </Note>
 
@@ -88,7 +88,7 @@ Requires Bearer authentication. Rate-limited to about one request every two seco
 | `start_date` | No | Range start as Unix epoch seconds. Default: 90 days before `end_date`. |
 | `end_date` | No | Range end as Unix epoch seconds. Default: now. |
 
-Any other query parameter is rejected with `400 bad_request`. The older `r` and `reliability` parameters are no longer accepted; use `r_claim` (and `r_target`).
+`beta` is accepted but ignored for host accounts; the value actually used is echoed in `params.beta`. Any other unknown query parameter is rejected with `400 bad_request`. The older `r` and `reliability` parameters are no longer accepted; use `r_claim` (and `r_target`).
 
 ### Limits
 
@@ -177,7 +177,7 @@ A successful response looks like this (one `days` row shown; values are illustra
 | --- | --- |
 | `has_data` | `true` if the range had at least one day of rental earnings to replay. When `false`, every `days` row is zero with `reliability: null`, and `r_eff` is `null`. Try a wider window or a machine with more rental history. |
 | `start_day`, `end_day` | UTC day indices, `day = floor(epoch_seconds / 86400)`. `day × 86400` is exactly 00:00 UTC on that date. Convert with `date -u -d "@$((day * 86400))" +%F` (Linux) or `date -u -r $((day * 86400)) +%F` (macOS). Show Earnings `sday` / `eday` use the same day index. |
-| `r_eff` | **Effective reliability**: the constant reliability that would have produced the service credits paid in this window. `null` when the window had no deposits. |
+| `r_eff` | **Effective reliability**: the constant reliability that would have produced the service credits paid in this window. `null` when nothing was paid into escrow in the window (all `client_*_to_escrow` values are zero, as with `has_data: false`). |
 | `r_be` | **Break-even reliability**: the reliability at which SLA fees and service credits cancel out. Always present. |
 | `days` | One row per UTC day from `start_day` to `end_day` (see below). |
 | `params` | The SLA terms the replay actually used: `r_claim`, `r_target` (after defaulting), `p`, and the automatically derived `beta`. |
@@ -191,11 +191,13 @@ Every value is money (in $) that moved on that day. All flows are zero or positi
 | Field | Meaning |
 | --- | --- |
 | `day` | UTC day index |
-| `client_compute_to_escrow` | The renter's compute payment for the day, held in escrow (your net earnings after the platform fee) |
+| `client_compute_to_escrow` | The renter's compute payment for the day, net of the platform fee, held in escrow (what would reach you if there were no credits) |
 | `client_premium_to_escrow` | The SLA fee paid in for the day |
 | `escrow_to_client_balance` | Service credits paid to the renter that day |
 | `escrow_to_host_balance` | Money released from escrow to you that day |
-| `reliability` | Measured uptime fraction for the day (0–1), or `null` when the machine had no rental data that day |
+| `reliability` | Raw measured uptime fraction for the day (0–1), or `null` when the machine had no rental data that day |
+
+`reliability` is that day's raw uptime. Credits settle on the blended recent-plus-longer-term measure (see [SLA in plain language](/host/sla-offers#sla-in-plain-language)), so a day can carry a credit even when its `reliability` is at or above `r_target`.
 
 Releases to you are spread over time rather than paid out the same day, and the final active day includes the contract's closing settlement. Read individual days as cash movement, not as that day's profit or loss.
 
@@ -238,6 +240,8 @@ A single outage day can cost far more than many days of fees. Check that you can
 **`p` and `sla_sigma_x` use different scales** — do not copy numeric values between them. For example, `p=0.5` (Wide) maps to `sla_sigma_x ≈ 1.0`, not `0.5`. Use the table below to translate between the two.
 </Warning>
 
+The two values are exactly related: `p = 1 / (1 + sla_sigma_x)`, and `sla_sigma_x = 1/p − 1`. To backtest a custom `sla_sigma_x`, pass `p = 1/(1 + sla_sigma_x)` (for example `sla_sigma_x` 0.3 → `p` 0.7692). `sla_sigma_x` is capped at 3.0, so any `p` at or below 0.25 behaves like `p=0.25`.
+
 | Confidence `p` | Console label | Listing equivalent |
 | --- | --- | --- |
 | `0.83` | Tight | `sla_sigma_x ≈ 0.2` |
@@ -274,7 +278,11 @@ Optional, for API automation only. To check one machine, use the single-machine 
 
 **Prerequisites:** [CLI hello world](/cli/hello-world) and an API key with `machine_read` (see [API permissions](/api-reference/permissions)).
 
-1. Run backtests **sequentially**, one machine at a time. The loop reads each machine's `sla_reliability_claim` and `sla_confidence` label from `show machines`. For machines that don't have SLA yet, set `R` (commitment) and `P` (confidence `p`) to backtest them before you enable SLA. Machines with neither are skipped and logged. The confidence label is a band, so a custom `sla_sigma_x` is backtested at the nearest band's `p`; backtest that machine with the single-machine request to test an exact `p`.
+1. Run backtests **sequentially**, one machine at a time:
+   - The loop reads each machine's `sla_reliability_claim` and `sla_confidence` label from `show machines`.
+   - For machines whose terms are not visible, set `R` (commitment) and `P` (confidence `p`) as fallbacks. That covers machines without SLA yet, and machines whose terms are hidden because they are unlisted, have an outdated daemon, or lack SLA approval. The loop logs every fallback it uses, so check those rows before trusting them.
+   - Machines missing either value, with no `R`/`P` fallback, are skipped and logged.
+   - The confidence label is a band, so a custom `sla_sigma_x` is backtested at the nearest band's `p`. To test an exact value, use the single-machine request with `p = 1/(1 + sla_sigma_x)`.
 2. Responses are written to a private temp directory that is deleted when the loop exits.
 
 ```bash
@@ -286,10 +294,11 @@ machines=$(vastai show machines --raw)
 for id in $(echo "$machines" | jq -r '.machines[].id'); do
   machine=$(echo "$machines" | jq -c --arg id "$id" \
     '.machines[] | select((.id|tostring) == $id)')
-  r=$(echo "$machine" | jq -r '.sla_reliability_claim // empty')
-  r="${r:-${R:-}}"   # R only fills in for machines without SLA terms
+  # Treat 0 (SLA off) and null (terms hidden) as absent; R only fills in for those machines.
+  r=$(echo "$machine" | jq -r '(.sla_reliability_claim // 0) | if . > 0 then . else empty end')
+  if [ -z "$r" ] && [ -n "${R:-}" ]; then r="$R"; echo "machine $id: using fallback R=$R" >&2; fi
   if ! jq -e -n --arg r "$r" 'try (($r | tonumber) > 0) catch false' >/dev/null 2>&1; then
-    echo "skip $id: no sla_reliability_claim; set R=0.99 (or your planned commitment) to backtest before enabling SLA"; continue
+    echo "skip $id: no SLA terms visible; set R=0.99 (or your planned commitment) as a fallback"; continue
   fi
   # show machines returns confidence as a label: high = Tight, medium = Normal, low = Wide.
   # P only fills in for machines without SLA terms.
@@ -297,7 +306,8 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
     high)   p=0.83 ;;
     medium) p=0.6667 ;;
     low)    p=0.50 ;;
-    *)      p="${P:-}" ;;
+    *)      p="${P:-}"
+            [ -n "$p" ] && echo "machine $id: using fallback P=$P (sla_confidence null)" >&2 ;;
   esac
   if [ -z "$p" ]; then
     echo "skip $id: no sla_confidence; set P=0.6667 (Normal) to backtest before enabling SLA"; continue
