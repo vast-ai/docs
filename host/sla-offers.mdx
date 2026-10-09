@@ -187,13 +187,13 @@ Do not assume the dashboard score equals SLA reliability. Before choosing `sla_r
 
 ### Confidence values
 
-**This only changes how SLA fees are priced — it does not change how reliability is measured or what credit you owe when a client's target is missed.** Prefer the console controls. Set raw `sla_sigma_x` via the API when automating.
+**This only changes how SLA fees are priced — it does not change how reliability is measured or what credit you owe when a client's target is missed.** **Confidence** is how much renters pay for your SLA. Tighter confidence means a lower SLA fee and less fee income for you. It does not change the credit you owe when you miss the target. The API field is `sla_sigma_x` (σ). Prefer the console controls. Set raw `sla_sigma_x` via the API when automating.
 
-| Console label | API `sla_sigma_x` | Backtester `p` | Pricing effect |
-| --- | --- | --- | --- |
-| Tight | `0.2` | ~0.83 | Lowest client SLA fees at a given target |
-| Normal (default) | `0.5` | ~0.6667 | Balanced |
-| Wide | `1.0` | ~0.50 | Highest client SLA fees at a given target |
+| Console label | API `sla_sigma_x` (σ) | Backtester `p` | `show machines` | Pricing effect |
+| --- | --- | --- | --- | --- |
+| Tight | `0.2` (band σ ≤ 0.32) | ~0.83 | `high` | Lowest client SLA fees at a given target |
+| Normal (default) | `0.5` (band σ ≤ 0.71) | ~0.6667 | `medium` | Balanced |
+| Wide | `1.0` (band σ above 0.71) | ~0.50 | `low` | Highest client SLA fees at a given target |
 
 **Never copy backtester `p` into `sla_sigma_x` — the scales are inverted.** See the full mapping on the [backtester page](/host/sla-backtester#confidence-values-p).
 
@@ -204,7 +204,7 @@ Do not assume the dashboard score equals SLA reliability. Before choosing `sla_r
 Offers with invalid combinations are rejected at listing time:
 
 - `sla_r_claim` must be `0` (disable) or greater than 0 and at most **0.99999**. Exactly `1.0` is rejected.
-- If you send `sla_sigma_x`, it must be positive and at most `3.0`. It defaults to `0.5` only on a new ask. **Always send `sla_sigma_x` when you enable SLA.** If the claim is above `0` and confidence was never stored, search can quote a **$0** SLA fee while you still carry credit exposure. If a value is already stored, omitting it keeps that value.
+- If you send `sla_sigma_x`, it must be positive and at most `3.0`. It defaults to `0.5` only on a new ask. **Always send `sla_sigma_x` when you enable SLA.** If confidence was never stored, SLA fees may not be priced correctly while you still carry credit exposure. If a value is already stored, omitting it keeps that value.
 - Optional `sla_max_beta` must be in `(0, 1)` and at least the default β derived at your reliability commitment. Hosts do not set β; this field only caps the client-derived β the offer accepts. Omit for uncapped.
 
 ```bash
@@ -330,7 +330,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
   }'
 ```
 
-Replace `end_date` with the listing's current Unix timestamp from `show machines`, or with a new future timestamp only if you mean to change the offer end. Past dates expire the offer immediately. A later date at the same or lower price extends live contracts. See [Offer End Date](/host/hosting-overview#offer-end-date). Convert a calendar date to Unix seconds: `date -u -d '2030-01-01' +%s` (Linux) or `date -u -j -f '%Y-%m-%d' '2030-01-01' +%s` (macOS). The CLI also accepts `MM/DD/YYYY` via `-e` (parsed in the machine's local time, not UTC). Use a Unix timestamp for an exact UTC end.
+Replace `end_date` with the listing's current Unix timestamp from `show machines`, or with a new future timestamp only if you mean to change the offer end. Past dates expire the offer immediately. A later date at the same or lower price extends live contracts. See [Offer End Date](/host/hosting-overview#offer-end-date). Convert a calendar date to Unix seconds: `date -u -d '2030-01-01' +%s` (Linux) or `date -u -j -f '%Y-%m-%d' '2030-01-01' +%s` (macOS). The CLI also accepts `MM/DD/YYYY` via `-e` (parsed in the local time zone of the computer running the CLI, not UTC). Use a Unix timestamp for an exact UTC end.
 
 <Warning>Open-ended offers (no `end_date`) combined with SLA expose you to indefinite asymmetric service-credit risk. See [Offer End Date](/host/hosting-overview#offer-end-date).</Warning>
 
@@ -515,6 +515,8 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
     '{machine: (.id|tonumber), price_gpu: .listed_gpu_cost, price_disk: .listed_storage_cost,
       min_chunk: .listed_min_gpu_count, sla_r_claim: .sla_reliability_claim,
       hidden_listing: $hidden}
+     + (if .listed_inet_up_cost == null then {} else {price_inetu: .listed_inet_up_cost} end)
+     + (if .listed_inet_down_cost == null then {} else {price_inetd: .listed_inet_down_cost} end)
      + (if .duration == null then {end_date} else {duration: (.duration | floor)} end)
      + (if $vol == "" then {} else {vol_size: ($vol|tonumber)} end)')
   if [ "$DRY_RUN" != "0" ]; then
@@ -527,6 +529,9 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
   ok=$(echo "$resp" | jq -r '.success // empty')
   if [ "$ok" = "true" ]; then
     echo "machine_id=$id ok extended=$(echo "$resp" | jq -c '.results[0].upd_contracts // []')"
+    if echo "$resp" | jq -e '.results[0].new_contracts | length > 0' >/dev/null; then
+      echo "WARN machine_id=$id: re-list created a new ask; confirm bandwidth, credit_discount_max, and price_min_bid" >&2
+    fi
   else
     echo "machine_id=$id error: $(echo "$resp" | jq -c '{success, error: (.error // .results[0].error), msg: (.msg // .results[0].msg)}' 2>/dev/null || echo "$resp")"
   fi
@@ -534,7 +539,7 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
 done
 ```
 
-Fetch the fleet once before the loop — do not call `show machines --raw` inside the loop. On fleets of 20+ machines, expect several minutes; back off on HTTP 429. Configure reliability commitment and confidence per machine (console or single-machine `create_asks`) before running with `DRY_RUN=0` — the loop only updates machines that already have a positive `sla_r_claim`.
+Fetch the fleet once before the loop — do not call `show machines --raw` inside the loop. The loop sends listed bandwidth prices. It cannot read `credit_discount_max` or `price_min_bid`. If you use non-default values, add them to the body from your own record. On an existing ask, a bandwidth price of `0` is treated as omitted and the old price is kept. On fleets of 20+ machines, expect several minutes; back off on HTTP 429. Configure reliability commitment and confidence per machine (console or single-machine `create_asks`) before running with `DRY_RUN=0` — the loop only updates machines that already have a positive `sla_r_claim`.
 
 </Accordion>
 </AccordionGroup>
@@ -751,7 +756,12 @@ SLA approval, settlement questions, credit disputes, and locked machines are sep
 - **`sla_daemon_outdated`** — Update the host daemon from the [host setup guide](https://cloud.vast.ai/host/setup/), confirm the machine reconnects on **Host → Machines**, then retry LIST / `create_asks`. If the error persists, contact support with the machine ID.
 - **Unexpected credit** — `sla_earn` is not a per-contract credit record, and the backtester is an estimate, not the settlement. Contact support with the machine ID and the UTC dates.
 - **Severe outage (active SLA contracts):**
-  1. **Save your current terms before you unlist.** After unlist, `show machines` returns `null` for prices, `listed_min_gpu_count`, `end_date`, and SLA terms. The snapshot does not include confidence (`sla_sigma_x`; only the `sla_confidence` label) or hidden status (`hidden_listing`). Write both down either way.
+
+  <Warning>
+  **Keep your own record of listing terms.** `show machines` returns the confidence band (`sla_confidence`), not the exact `sla_sigma_x`, and it does not return `credit_discount_max` or `price_min_bid`. An offline machine drops out of `show machines` after about 10 hours (about 3 days with `include_offline=true`). Write those values down whenever you change them.
+  </Warning>
+
+  1. **Get your current terms.** If the machine is still visible, save them now. If it is not, use the record from the warning above. After unlist, `show machines` returns `null` for prices, `listed_min_gpu_count`, `end_date`, and SLA terms. The snapshot also omits hidden status (`hidden_listing`). Write that down too.
 
      **Console:** Before you unlist, open **Set Pricing** and write down the GPU price, storage price, upload and download bandwidth prices, min GPU, end date (or auto-renew duration), whether the listing is hidden, Claim, Confidence (Tight, Normal, or Wide), the reserved discount, and the interruptible min bid. An omitted reserved discount on a new ask becomes `0.4`.
 
@@ -768,7 +778,7 @@ SLA approval, settlement questions, credit disputes, and locked machines are sep
   3. **Unlist** in the console (**Host → Machines**). Do not change SLA settings or relist during the outage. API users: `create_asks` returns HTTP 402 while the machine is offline, and resending `end_date` can extend shorter rentals. `vastai unlist machine MACHINE_ID` removes the listing and does not republish it.
   4. Fix the machine. Existing SLA contracts keep their terms and settle against each renter's target; unlisting or setting the commitment to `0` does not change that.
   5. **Check settlement** a few hours after the next UTC midnight. In the console, compare those days with a normal week in **Host → Billing**. Releases are spread over time, so one low day is not by itself a credit. To automate, read `per_machine[].sla_earn`. A backtester re-run is an estimate for one simulated contract, not the settlement record.
-  6. **Console:** Open **Set Pricing**, re-enter the prices you wrote down, and confirm **Claim** and **Confidence** match your notes. Click **Save**, then **LIST**. From a client account, search with a **Reliability target** and confirm an **SLA Fee** line. **API:** send the terms you wrote down: GPU price (`price_gpu`), storage (`price_disk`), bandwidth (`price_inetu`, `price_inetd`), min GPU (`min_chunk`), end date or duration, `hidden_listing`, Claim (`sla_r_claim`), Confidence (`sla_sigma_x`), `credit_discount_max`, and `price_min_bid`. If the snapshot lacks the discount or min bid, use the console notes. Relisting creates a new ask, and an omitted `credit_discount_max` becomes `0.4`. Send `sla_sigma_x` explicitly; a new ask otherwise defaults to 0.5. Resending the old `end_date` extends any shorter active rental. If the machine stays locked, contact [Discord](https://discord.gg/hSuEbSQ4X8) or contact@vast.ai before you relist.
+  6. **Console:** Open **Set Pricing**, re-enter the prices you wrote down, and confirm **Claim** and **Confidence** match your notes. Click **Save**, then **LIST**. From a client account, search with a **Reliability target** and confirm an **SLA Fee** line. **API:** send the terms you wrote down: GPU price (`price_gpu`), storage (`price_disk`), bandwidth (`price_inetu`, `price_inetd`), min GPU (`min_chunk`), end date or duration, `hidden_listing`, Claim (`sla_r_claim`), Confidence (`sla_sigma_x`), `credit_discount_max`, and `price_min_bid`. `show machines` never returns `credit_discount_max` or `price_min_bid`, so a snapshot alone is never complete. Restore those, and the exact `sla_sigma_x`, from your own record. Relisting creates a new ask. An omitted `credit_discount_max` becomes `0.4`. An omitted `sla_sigma_x` becomes `0.5`. Resending the old `end_date` extends any shorter active rental. If the machine stays locked, contact [Discord](https://discord.gg/hSuEbSQ4X8) or contact@vast.ai before you relist.
 
 ## Monitoring SLA after listing
 
@@ -808,7 +818,7 @@ vastai show earnings --machine_id <id> --start_date "$(date -u -d '7 days ago' +
 vastai show earnings --machine_id <id> --start_date "$(date -u -v-7d +%F)T00:00:00Z" --end_date "$(date -u +%F)T00:00:00Z"
 ```
 
-Keep the `T00:00:00Z` suffix: the CLI parses bare dates such as `2026-07-24` in your machine's local time, so append `T00:00:00Z` for an exact UTC day. On Windows, use WSL or the API example below. See [`show earnings`](/cli/reference/show-earnings) for all options.
+Keep the `T00:00:00Z` suffix: the CLI parses bare dates such as `2026-07-24` in the local time zone of the computer running the CLI, not UTC, so append `T00:00:00Z` for an exact UTC day. On Windows, use WSL or the API example below. See [`show earnings`](/cli/reference/show-earnings) for all options.
 
 **Linux (GNU date) — one UTC day (exact settlement check):**
 
