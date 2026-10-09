@@ -216,24 +216,26 @@ try:
         timeout=60,
     )
     response.raise_for_status()
+    contract_id = response.json().get("new_contract")
 except requests.HTTPError as exc:
     status = exc.response.status_code if exc.response is not None else 0
     if status != 429 and 400 <= status < 500:
         raise
+    contract_id = None
 except (requests.Timeout, requests.ConnectionError):
-    pass
+    contract_id = None
 
-time.sleep(5)
-contract_id = None
-for _ in range(5):
-    rows = instances_for_label()
-    if rows:
-        contract_id = rows[0].get("id")
-        break
-    time.sleep(1)
+if contract_id is None:
+    time.sleep(5)
+    for _ in range(5):
+        rows = instances_for_label()
+        if rows:
+            contract_id = rows[0].get("id")
+            break
+        time.sleep(1)
 if contract_id is None:
     raise RuntimeError(
-        "No instance for this label. Re-search and PUT again with a new offer id and label."
+        "No instance for this label. Do not PUT again until you have checked Instances."
     )
 print(contract_id)
 ```

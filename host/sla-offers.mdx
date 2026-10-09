@@ -383,7 +383,7 @@ Then `PUT /api/v0/machines/create_asks/` with the merged body (read → merge �
 Each live PUT resends the offer's `end_date` (or `duration`). Any active rental that ends **before** that date is extended to it, which also extends your service-credit exposure. This cannot be undone, and `DRY_RUN=1` does not show which contracts will be affected. You cannot see per-contract end dates beforehand. Assume a live run extends any shorter rental, and read `upd_contracts` afterwards (it may not list contracts extended a few minutes later).
 </Warning>
 
-Run this only when an SLA listing is missing from search after a daemon update even though **Set Pricing** still shows SLA. A fully rented machine is absent from search too. Do not re-list it for that reason. Healthy listings do not need a re-list, and every re-list can extend shorter active contracts. It does not turn an SLA on for new machines. Enable an SLA on each machine first (console **Set Pricing → SLA**, or a per-machine `PUT /api/v0/machines/create_asks/` with `sla_r_claim` and `sla_sigma_x`). The loop only considers machines that are `listed` and already have `sla_reliability_claim > 0`. It skips a machine whose confidence was never stored. Fix those with the check under [Validation rules](#validation-rules) before you re-list.
+The loop needs two keys: a listing key (`machine_write` and `machine_read`, `VAST_API_KEY`) and a separate search key with `misc` (`SEARCH_API_KEY`). Offer search is about 10 requests per minute per IP. If a search fails or is not a JSON array, that machine is skipped. A failed search never becomes a re-list. An empty array can also mean every GPU is rented, so confirm **Host → Machines** before `DRY_RUN=0`. It does not turn an SLA on for new machines. Enable an SLA on each machine first (console **Set Pricing → SLA**, or a per-machine `PUT /api/v0/machines/create_asks/` with `sla_r_claim` and `sla_sigma_x`). The loop only considers machines that are `listed` and already have `sla_reliability_claim > 0`. It skips a machine whose confidence was never stored. Fix those with the check under [Validation rules](#validation-rules) before you re-list.
 
 `show machines` returns confidence only as a label, so the loop does **not** send `sla_sigma_x`. On an existing SLA ask, `create_asks` keeps the current confidence when `sla_sigma_x` is omitted, so each machine keeps its exact value. Set a new confidence per machine in the console (or PUT `sla_sigma_x` for that machine) if you want to change it.
 
@@ -418,6 +418,7 @@ This example is illustrative: it sleeps between machines and logs success/error 
 
 ```bash
 : "${VAST_API_KEY:?export VAST_API_KEY first (needs machine_write and machine_read)}"
+: "${SEARCH_API_KEY:?export SEARCH_API_KEY first (needs misc, on its own key)}"
 # Leave DRY_RUN=1 until you confirm each machine is **Listed** (or on your allowlist).
 # Set DRY_RUN=0 to apply.
 # ALLOWLIST required for DRY_RUN=0 (space-separated listed machine IDs).
@@ -437,11 +438,22 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
   if [ -n "$ALLOWLIST" ] && ! echo "$ALLOWLIST" | grep -qw "$id"; then
     echo "skip $id: not in ALLOWLIST"; continue
   fi
-  # Fully rented machines are also absent from search. Confirm on Host → Machines before you treat a miss as an outage.
-  if vastai search offers "machine_id=$id verified=any has_sla=true" --raw --api-key "$VAST_API_KEY" \
-       | jq -e 'type == "array" and length > 0' >/dev/null; then
-    echo "skip $id: SLA offer still in search"; continue
+  # A failed search must not become a PUT. Fully rented machines are also absent from search.
+  sleep 6
+  if ! out=$(vastai search offers "machine_id=$id verified=any has_sla=true" --raw --api-key "$SEARCH_API_KEY" 2>/dev/null); then
+    echo "skip $id: search failed (missing misc permission or HTTP 429)" >&2
+    continue
   fi
+  if ! printf '%s' "$out" | jq -e 'type == "array"' >/dev/null; then
+    echo "skip $id: search returned non-array output" >&2
+    continue
+  fi
+  if printf '%s' "$out" | jq -e 'length > 0' >/dev/null; then
+    echo "skip $id: SLA offer still in search" >&2
+    continue
+  fi
+  # Empty array: the offer is not in search. A fully rented machine looks the same.
+  # Confirm on Host → Machines before DRY_RUN=0. Do not re-list it only because search is empty.
   machine=$(echo "$machines" | jq -c --arg id "$id" \
     '.machines[] | select((.id|tostring) == $id)')
   if ! echo "$machine" | jq -e '.listed == true' >/dev/null; then
@@ -711,7 +723,7 @@ Use the [SLA Earnings Backtester](/host/sla-backtester) (API-only; requires a `m
 - **Listing rejected (`invalid_sla_params`)** — Re-check the reliability commitment and `sla_sigma_x` against [validation rules](#validation-rules).
 - **`sla_not_approved`** — Contact support; you can keep a non-SLA listing while approval is pending.
 - **`sla_daemon_outdated`** — Update the host daemon from the [host setup guide](https://cloud.vast.ai/host/setup/), confirm the machine reconnects on **Host → Machines**, then retry LIST / `create_asks`. If the error persists, contact support with the machine ID.
-- **Unexpected credit** — Review reliability; re-run the backtester over the affected dates and check `escrow_to_client_balance` and `reliability` on those days.
+- **Unexpected credit** — `sla_earn` is not a per-contract credit record, and the backtester is an estimate, not the settlement. Contact support with the machine ID and the UTC dates.
 - **Severe outage (active SLA contracts):**
   1. **Save your current terms before you unlist.** After unlist, `show machines` returns `null` for prices, `listed_min_gpu_count`, `end_date`, and SLA terms. The snapshot does not include confidence (`sla_sigma_x`; only the `sla_confidence` label) or hidden status (`hidden_listing`). Write both down either way.
 
