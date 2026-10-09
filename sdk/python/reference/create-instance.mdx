@@ -209,8 +209,12 @@ def instances_for_label():
         )
         found.raise_for_status()
     except requests.RequestException:
-        return []
+        return None
     return found.json().get("instances") or []
+
+already = instances_for_label()
+if already is None or already:
+    raise SystemExit("Label lookup failed, or this label already has an instance. Do not PUT.")
 
 try:
     response = requests.put(
@@ -239,17 +243,24 @@ except requests.HTTPError as exc:
                 wait = 5
         time.sleep(wait)
         rows = instances_for_label()
+        if rows is None:
+            raise RuntimeError(
+                "Label lookup failed. Do not PUT again until you have checked Instances."
+            ) from exc
         if rows:
             contract_id = rows[0].get("id")
         else:
-            response = requests.put(
-                f"https://console.vast.ai/api/v0/asks/{offer_id}/",
-                headers=headers,
-                json=body,
-                timeout=60,
-            )
-            response.raise_for_status()
-            contract_id = response.json().get("new_contract")
+            try:
+                response = requests.put(
+                    f"https://console.vast.ai/api/v0/asks/{offer_id}/",
+                    headers=headers,
+                    json=body,
+                    timeout=60,
+                )
+                response.raise_for_status()
+                contract_id = response.json().get("new_contract")
+            except (requests.Timeout, requests.ConnectionError, requests.HTTPError):
+                contract_id = None
     else:
         offer_gone = (
             status in (404, 410)

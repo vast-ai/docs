@@ -43,7 +43,7 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 3. Install the [CLI](/cli/hello-world) if you schedule maintenance from the command line, or if you want SLA earnings for one machine. **Host → Billing** is fleet-wide and has no per-machine SLA line. `vastai show earnings --machine_id ID` needs an API key with `billing_read`. The console [Set a maintenance window](/host/set-maintenance-window) page can notify renters without the CLI.
 4. Confirm SLA account access: open **Set Pricing → SLA** and confirm the panel is visible (do **not** Save final commitment/confidence yet). If the panel is missing, contact support.
 5. Preview economics (console SLA panel or [backtester](/host/sla-backtester)). Read [Billing vs settlement](#billing-vs-settlement-important) and [Risk scenarios](#risk-scenarios). GPU billing can continue during outages, and SLA credits can exceed many days of SLA fees. The normal **Host → Billing** view has no separate SLA earnings line. After you enable SLA, GPU earnings can drop because that compute is released as `sla_earn` (`vastai show earnings`). Much of it can stay held until the contract ends, so a low week is not by itself a credit.
-6. Read [Scheduled maintenance](#scheduled-maintenance) before you turn SLA on. Schedule planned work as far ahead as you can. Some hosts assume 24 hours of notice fully forgives the downtime. It does not, and forgiveness is not guaranteed.
+6. Read [Scheduled maintenance](#scheduled-maintenance) before you turn SLA on. Turn on **Host → Notification Settings** for `host:machine_offline` and `host:machine_error` ([Host Notifications](/host/notifications)) so you hear about downtime before next-day settlement. Schedule planned work as far ahead as you can. Some hosts assume 24 hours of notice fully forgives the downtime. It does not, and forgiveness is not guaranteed.
 7. Enter **Reliability Commitment** and **Confidence**. In **Set Pricing → SLA**, the commitment field is a percent (it ends with `%`; type `99` for 99%). Check that the SLA fee preview matches that percent before you **Save**. With no history, start the commitment below the uptime you expect to deliver, and start **Confidence** at **Low** (wide margin). Use the console SLA preview or the backtester, not the dashboard reliability score. Search hides your offer from renters whose target is above your commitment. The machine is already listed from step 2, so **Save** publishes SLA to live renters immediately.
    - **API users:** send `sla_r_claim` as a fraction (`0.99`, not `99`). After **Save**, run the confidence check in [Validation rules](#validation-rules).
 8. **Verify now.** From the client account, include unverified machines in Search filters (the default hides them; new machines usually are unverified) and set **Reliability target** at or below your commitment. Confirm an **SLA Fee** line. If that line is missing on every offer, SLA may be off platform-wide. Contact support before you change the listing. Optionally rent that offer briefly, then **Destroy** the test instance. See [Testing your own machine](/host/hosting-overview#testing-your-own-machine).
@@ -448,6 +448,8 @@ This example is illustrative: it sleeps between machines and logs success/error 
 ```bash
 : "${VAST_API_KEY:?export VAST_API_KEY first (needs machine_write and machine_read)}"
 : "${SEARCH_API_KEY:?export SEARCH_API_KEY first (needs misc, on its own key)}"
+# Do not reuse this loop to change SLA terms on machines that have rentals.
+# It resends end_date or duration, which extends every shorter active contract.
 # Leave DRY_RUN=1 until you confirm each machine is **Listed** (or on your allowlist).
 # Set DRY_RUN=0 to apply.
 # ALLOWLIST required for DRY_RUN=0 (space-separated listed machine IDs).
@@ -579,7 +581,7 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
 done
 ```
 
-Fetch the fleet once before the loop — do not call `show machines --raw` inside the loop. The loop sends listed bandwidth prices and `credit_discount_max` when `show machines` returns them (listed machines only; `null` after unlist). The loop does not send `price_min_bid`. `show machines` returns `min_bid_price` (your host-side minimum bid, net of the platform fee, same idea as `listed_gpu_cost`). The value you read back can differ slightly from what you sent. Resend the `price_min_bid` you wrote down if you need to change it. On an existing ask, omitting it keeps the stored minimum. After an unlist, resend it: do not rely on the stored value. On an existing ask, a bandwidth price of `0` is treated as omitted and the old price is kept. On fleets of 20+ machines, expect several minutes; back off on HTTP 429. Configure reliability commitment and confidence per machine (console or single-machine `create_asks`) before running with `DRY_RUN=0` — the loop only updates machines that already have a positive `sla_r_claim`.
+Fetch the fleet once before the loop — do not call `show machines --raw` inside the loop. The loop sends listed bandwidth prices and `credit_discount_max` when `show machines` returns them (listed machines only; `null` after unlist). The loop does not send `price_min_bid`. `show machines` returns `min_bid_price` (your host-side minimum bid, net of the platform fee, same idea as `listed_gpu_cost`). The value you read back can differ slightly from what you sent. Resend the `price_min_bid` you wrote down if you need to change it. On an existing ask, omitting it keeps the stored minimum. After an unlist, resend it: do not rely on the stored value. On an existing ask, a bandwidth price of `0` or a storage price of `0` is treated as omitted and the old price is kept. On fleets of 20+ machines, expect several minutes; back off on HTTP 429. Configure reliability commitment and confidence per machine (console or single-machine `create_asks`) before running with `DRY_RUN=0` — the loop only updates machines that already have a positive `sla_r_claim`.
 
 </Accordion>
 </AccordionGroup>
@@ -844,7 +846,7 @@ After you enable SLA, charges and credits settle on UTC (Coordinated Universal T
 **If the daily total looks wrong:** widen the date range (settlement uses UTC day boundaries), confirm the machine had an active on-demand rental that day, and confirm SLA was enabled and the offer was **listed** (not just saved). There is still no separate SLA row on the normal Host → Billing view.
 
 <Note>
-SLA settlement does not currently emit host webhooks. Monitor via console billing or poll `machine-earnings`; settlements align to UTC calendar days.
+SLA settlement does not emit a host webhook. Machine offline and error alerts do ([Host Notifications](/host/notifications)). Subscribe to `host:machine_offline` so you can start the outage steps right away. Otherwise monitor via console billing or poll `machine-earnings`; settlements align to UTC calendar days.
 </Note>
 
 ### CLI

@@ -143,7 +143,7 @@ curl -s -H "Authorization: Bearer YOUR_API_KEY" \
 
 ## Reading the response
 
-**If you only read three things:** check `has_data` (widen dates if `false`), compare `r_eff` with `r_be`, then look at your [net SLA result and largest single-day credit](#summarize-with-jq).
+**If you only read three things:** check `has_data` (if `false`, move the window toward the present or wait for more rental history), compare `r_eff` with `r_be`, then look at your [net SLA result and largest single-day credit](#summarize-with-jq).
 
 A successful response looks like this (one `days` row shown; values are illustrative):
 
@@ -179,7 +179,7 @@ A successful response looks like this (one `days` row shown; values are illustra
 
 | Field | Meaning |
 | --- | --- |
-| `has_data` | `true` if the range had at least one day of rental earnings to replay. When `false`, every `days` row is zero with `reliability: null`, and `r_eff` is `null`. Try a wider window or a machine with more rental history. |
+| `has_data` | `true` if the range had at least one day of rental activity to replay. `false` means no usable history in the window. Move the window toward the present (days before about mid-2026 look idle) or wait for more rental history. When `false`, every `days` row is zero with `reliability: null`, and `r_eff` is `null`. |
 | `start_day`, `end_day` | UTC day indices, `day = floor(epoch_seconds / 86400)`. `day × 86400` is exactly 00:00 UTC on that date. Convert with `date -u -d "@$((day * 86400))" +%F` (Linux) or `date -u -r $((day * 86400)) +%F` (macOS). Show Earnings `sday` / `eday` use the same day index. |
 | `r_eff` | **Effective reliability**: the constant reliability that would have produced the service credits paid in this window. `null` when nothing was paid into escrow in the window (all `client_*_to_escrow` values are zero, as with `has_data: false`). |
 | `r_be` | **Break-even reliability**: the reliability at which SLA fees and service credits cancel out. Always present. |
@@ -273,7 +273,7 @@ Tighter confidence (higher `p`) lowers the SLA fee renters pay. It does **not** 
 
 ## Recommended workflow
 
-1. **Run a baseline** on a machine with at least a few weeks of rental history, with `r_claim` set to the commitment you plan to list and `p=0.6667` (Medium). For a new machine, also run `p=0.50` (Low), the recommended starting confidence. If `has_data` is `false`, widen the date range or wait for more history. Don't rely on the dashboard reliability score alone (see [Machine reliability score vs SLA reliability](/host/sla-offers#machine-reliability-score-vs-sla-reliability)).
+1. **Run a baseline** on a machine with at least a few weeks of rental history, with `r_claim` set to the commitment you plan to list and `p=0.6667` (Medium). For a new machine, also run `p=0.50` (Low), the recommended starting confidence. If `has_data` is `false`, move the date range toward the present or wait for more history. Don't rely on the dashboard reliability score alone (see [Machine reliability score vs SLA reliability](/host/sla-offers#machine-reliability-score-vs-sla-reliability)).
 2. **Compare `r_eff` with `r_be`** to see whether you had headroom.
 3. **Add `r_target`** at the targets renters are likely to choose (for example `0.95`) and compare `net_sla`.
 4. **Check `largest_day_credit`** — can you absorb that from one bad day?
