@@ -44,7 +44,7 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 4. Confirm SLA account access: open **Set Pricing → SLA** and confirm the panel is visible (do **not** Save final commitment/confidence yet). If the panel is missing, contact support.
 5. Preview economics (console SLA panel or [backtester](/host/sla-backtester)). Read [Billing vs settlement](#billing-vs-settlement-important) and [Risk scenarios](#risk-scenarios). GPU billing can continue during outages, and SLA credits can exceed many days of SLA fees. On SLA rentals, compute pay is not in `gpu_earn`. It is released over several days as `sla_earn`.
 6. Read [Scheduled maintenance](#scheduled-maintenance) before you turn SLA on (24-hour notice for planned work).
-7. Enter **Claim** and **Confidence** (start with **Wide** on a new or volatile machine). Use the units the console field shows. Confirm the SLA fee preview, then **Save**. The machine is already listed from step 2, so **Save** publishes SLA to live renters immediately. If you enabled SLA through the API, run the confidence check in [Validation rules](#validation-rules) right away.
+7. Enter **Claim** and **Confidence**. With no history, start **Claim** below the uptime you expect to deliver, and start **Confidence** at **Wide**. Use the units the console field shows. Search hides your offer from renters whose target is above your Claim. Confirm the SLA fee preview, then **Save**. The machine is already listed from step 2, so **Save** publishes SLA to live renters immediately. If you enabled SLA through the API, run the confidence check in [Validation rules](#validation-rules) right away.
 8. **Verify now.** From the client account, search with a **Reliability target** and confirm an **SLA Fee** line. Optionally rent that offer briefly, then **Destroy** the test instance. See [Testing your own machine](/host/hosting-overview#testing-your-own-machine).
    - **Console verify:** confirm **Listed** on **Host → Machines** and reopen **Set Pricing → SLA**.
    - **Optional CLI/API:** search with `--storage` matching how renters quote; add `verified=any` if you search your own machine and see no rows (for example `vastai search offers 'machine_id=12345 verified=any has_sla=true expected_reliability>=0.99' --storage 10`). On sliced machines, filter on-demand rows with the jq example in [Search / client-visible fields](#search--client-visible-fields).
@@ -224,13 +224,18 @@ The backtester replays **machine-level** daily earnings (total compute across al
 
 The backtester simulates **one** SLA contract. On a sliced machine, each concurrently rented SLA contract settles separately, so real single-day credits can be higher than that simulated day.
 
-For planning, assume a worst-case day costs up to one full day of covered compute for **each** SLA contract running on the machine that day, plus any closing settlement on a contract's last active day (see [Simulation limits](/host/sla-backtester#simulation-limits)). Ask support if you want a tighter estimate before listing tight SLA terms on sliced machines.
+For planning, assume a bad day can cost up to one full day of covered compute for **each** SLA contract on the machine. Vast does not publish whether the closing settlement on a contract's last day can exceed that. Use the backtester's largest simulated day as a planning figure, not a cap (see [Simulation limits](/host/sla-backtester#simulation-limits)).
 
 ### SLA on extended contracts
 
-On a listed machine, moving the offer end date later extends every shorter active SLA rental and your credit exposure. To avoid that, unlist instead of extending. Auto-renew (`duration` or `vastai list machine -l`) keeps moving that end date forward and extends active SLA rentals with it. See the warning under [Full listing update](#full-listing-update-existing-ask).
+On a listed machine, moving the offer end date later extends every shorter active SLA rental and your credit exposure. To avoid that, unlist instead of extending. Auto-renew (`duration` or `vastai list machine -l`) keeps moving that end date forward and extends active SLA rentals with it.
 
-When a rental contract is extended (by moving the offer end date forward at the same or lower price), the original SLA parameters remain in effect for the extended period. Changing SLA parameters on the offer does not alter SLA terms on existing contracts — only new rental contracts pick up updated SLA settings. Hosts do not set the SLA fee directly. It changes when you change **Claim** or **Confidence** (a wider Confidence raises the fee at a given target). Any `end_date` you send extends every active rental that ends before that timestamp, SLA rentals included, under their original terms. To avoid extending SLA rentals, unlist. If you do send an `end_date`, assume shorter rentals will be extended, and read `upd_contracts` afterwards. Some contracts are extended a few minutes after the response and do not appear in `upd_contracts`. A GPU, disk, or bandwidth price increase blocks extension. A Claim or Confidence change in the same request also blocks extension for any contract whose SLA fee would rise. That contract keeps its current end date and is missing from `upd_contracts`. Those changes never alter existing contract terms, and they do not block an extension in a later request. You cannot see each contract's end date. **Host → Machines** shows the latest rental end date on the machine.
+- **Extends shorter rentals:** a request that sends `end_date` or `duration` at the same or a lower GPU, disk, and bandwidth price.
+- **Does not extend that contract when the same request:** raises the GPU, disk, or bandwidth price, or changes Claim or Confidence so that contract's SLA fee would rise. The contract keeps its end date and is missing from `upd_contracts`.
+- **Not the whole story:** `upd_contracts` can miss rentals extended a few minutes later. A block applies only to that request. The next request that sends `end_date` can still extend the contract under its original SLA terms.
+- **You cannot see each contract's end date.** **Host → Machines** shows the latest rental end date on the machine.
+
+Changing Claim or Confidence does not change SLA terms already locked on a contract. Only new rentals pick up the new terms. Hosts do not set the SLA fee. It changes when you change Claim or Confidence (wider Confidence raises the fee at a given target).
 
 Disabling SLA on the offer (setting `sla_r_claim` to `0`) prevents new SLA-covered contracts but does not terminate SLA on existing active contracts — they continue under their original SLA terms until their rental end date.
 
@@ -384,7 +389,7 @@ Then `PUT /api/v0/machines/create_asks/` with the merged body (read → merge �
 
 ### Fleet SLA re-list (machines that already have an SLA)
 
-Use this loop only to restore SLA offers that no longer appear in search on machines with **zero** rentals. It does not change prices or SLA terms. To change terms, use [Update SLA on an existing ask](#update-sla-on-an-existing-ask-partial-body).
+Use this loop only to restore SLA offers that no longer appear in search on machines with **zero** rentals. It does not change prices or SLA terms. To change terms, use [Update SLA on an existing ask](#update-sla-on-an-existing-ask-partial-body). `current_rentals_resident`, `credit_discount_max`, and `min_bid_price` are on `GET /api/v0/machines/` but are not all in the Show Machines OpenAPI schema yet. A typed client that drops `current_rentals_resident` will skip every machine.
 
 <Warning>
 "Missing from search" also matches every **hidden** listing (hidden listings are not shown in search) and every **offline** machine (`create_asks` returns HTTP 402 until the machine is online). Any hidden machine not listed in `HIDDEN_IDS` becomes **public** on a live run. Machines in `HIDDEN_IDS` show up as "would re-list" in every dry run. That is expected. Set `HIDDEN_IDS` before `DRY_RUN=0` (space-separated IDs, or `HIDDEN_IDS=none` if you have no hidden listings).
@@ -668,7 +673,7 @@ These scenarios show settlement when the blended measure falls **below** a 95% c
 
 To put the asymmetry in perspective: at ~$0.20/day in SLA fees, it takes roughly 210 strong days to accumulate the $42 you could lose on a single day at the target boundary. The SLA fee is a small fraction of daily compute, while credits scale against total daily compute.
 
-Your maximum SLA loss on any single settlement day is bounded by that day's covered compute **per SLA contract** (GPU, storage, and bandwidth). The closing settlement on a contract's last day can add more.
+Your SLA loss on a normal settlement day is tied to that day's covered compute **per SLA contract** (GPU, storage, and bandwidth). Vast does not publish whether the closing settlement on a contract's last day can exceed that. Use the backtester's largest simulated day as a planning figure, not a cap.
 
 ## Risk scenarios
 
@@ -756,7 +761,7 @@ SLA approval, settlement questions, credit disputes, and locked machines are sep
   **Console**
   1. Notify renters if you can ([Set a maintenance window](/host/set-maintenance-window)).
   2. Write down Claim, Confidence, prices, end date, reserved discount, and min bid from **Set Pricing**.
-  3. Unlist the machine.
+  3. Unlist only if the machine is still online and you need to stop new rentals. If it is offline, `create_asks` returns HTTP 402 until the daemon reconnects, and unlisting drops the SLA ask you would then have to rebuild.
   4. Fix the problem.
   5. After the next UTC midnight, check **Host → Billing** for that day's SLA earnings.
   6. Re-enter the terms from step 2, confirm the SLA fee preview, **Save**, then **LIST**. **Host → Machines** shows the latest rental end date. Relisting before that date, with an end date after a shorter rental, extends that rental and its SLA exposure. To avoid any extension, wait until that date has passed, then relist. If you relist sooner, assume shorter rentals will be extended.

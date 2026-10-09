@@ -34,7 +34,7 @@ Hosts who want the same idea from the listing side can read [SLA in plain langua
 Before you start: ensure [Account → Billing](https://cloud.vast.ai/billing/) has credit or a payment method, add an SSH key under **Account → Keys** (or plan to use a Jupyter/notebook template that does not require SSH; see [Keys](/guides/reference/keys)), and pick a [template](/guides/instances/choosing/templates) in Search (see [Finding & Renting](/guides/instances/choosing/find-and-rent)).
 
 1. Open [Search](https://cloud.vast.ai/create/) with **On-demand** selected.
-2. In **Search filters** (left bar), set **Reliability target**.
+2. In **Search filters** (left bar), set **Reliability target**. If that control is missing, SLA is not available in the console right now. Rent without it, or contact [Discord](https://discord.gg/hSuEbSQ4X8) or contact@vast.ai.
 3. Set the instance disk size on the slider (console default is 10 GB). If you are comparing against a CLI or REST quote, use the same disk size so the prices match.
 4. Hover over the offer's price and confirm an **SLA Fee** line in the breakdown, then click **RENT**.
 5. Once the instance shows **running**, open **Instances** → **price details** and confirm an **SLA Fee** line. The line is hidden while the instance is loading, stopped, or offline.
@@ -230,7 +230,7 @@ curl -s -X POST "https://console.vast.ai/api/v0/bundles/" \
   }'
 ```
 
-The CLI default query sends `external=false rentable=true verified=true rented=false` (the `--help` text omits `rented`; see [search offers](/cli/reference/search-offers)). REST `POST /api/v0/bundles/` does **not** filter on `rented`. The server drops that key and returns a `rented` flag on each offer. Drop rows where `rented` is true if you need to hide GPUs you already rent. The CLI `rented=false` default does that filtering in the client.
+The CLI default query sends `external=false rentable=true verified=true rented=false` (the `--help` text omits `rented`; see [search offers](/cli/reference/search-offers)). REST `POST /api/v0/bundles/` does **not** filter on `rented`. The server drops that key and returns a `rented` flag on each offer. Drop rows where `rented` is true if you need to hide GPUs you already rent. The CLI `rented=false` default does that filtering in the client. The response includes `truncated`. When it is `true`, the server cut the result short of `limit`. Narrow the query instead of assuming you saw every offer.
 
 **2. Rent** the chosen offer. Use `offers[].id` from the search response as `{id}` in `PUT /api/v0/asks/{id}/`. Prefer `id` over `ask_contract_id` when both appear. Never use `bundle_id`. Save `new_contract` from the rent response. Pass the **same** reliability target you searched with:
 
@@ -300,6 +300,7 @@ Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `ta
 | `price` (bid) sent together with `target_reliability` | HTTP 400 "Cannot combine interruptible instances with SLAs" | Remove `price`. SLA rentals are on-demand only |
 | Timeout, dropped connection, or HTTP 5xx | Outcome unknown — the rental may already exist | There is no idempotency key. Put a unique `label` on the rent body. Look it up with URL-encoded `select_filters` (`curl -G --data-urlencode 'select_filters={"label":{"eq":"YOUR_LABEL"}}'`) a few times, about a second apart (Show Instances threshold `1.0`). If any lookup returns a row, do not PUT again. If none do, re-search and retry with a fresh offer id and a **new** `label`. |
 | Too many requests | HTTP 429. Detect throttling by the status code. The body differs by endpoint, so do not parse a `detail` field. Stay at or below about 10 search requests per minute per IP. If a `Retry-After` header is present, honor it. Space rent calls at least 5 seconds apart. A burst can block you for longer than that spacing. | Wait, then look up the same `label` with `GET /api/v1/instances/` before you retry. If a row exists, do not PUT again. If retry returns `invalid_price`, `no_such_ask`, or 410, re-search and rent a fresh offer id. |
+| Daily search row quota | HTTP 429 with `error: "search_quota_exceeded"`. `Retry-After` points at the quota reset and can be hours away. Not every account is capped the same way. | Stop scanning. Honor `Retry-After`. Do not retry in a loop, and do not shard the same search to get around it. |
 | Missing SSH key for the VM | HTTP 400 `no_ssh_key_for_vm` (or similar) | Add an SSH key on your account before renting, then retry with a current offer id. |
 | Forbidden / wrong account | HTTP 400 `invalid_args`. The message includes `error 403/3586` ("Hosts can only rent their own machines"). The HTTP status is 400, not 403. A host-only key gets this for every offer that is not on its own machines, including a missing offer. | Switch to a renter account key, then re-search (see [Hosting Overview](/host/hosting-overview) self-test note). |
 
@@ -390,7 +391,7 @@ Production settlement uses the multi-window reliability blend described above, n
 
 1. Open **Instances** and select your running instance.
 2. Open **price details** only after the instance is **running**. The **SLA Fee** line is hidden while it is loading, stopped, or offline. That does not mean the SLA is missing.
-3. If the UI shows your **reliability target**, confirm it matches what you selected at search time. No SLA Fee line on the Search offer, or on a **running** instance, means that rental has no SLA.
+3. If the UI shows your **reliability target**, confirm it matches what you selected at search time. No SLA Fee line on the Search offer, or on a **running** instance, means that rental has no SLA. If Search never showed **Reliability target**, SLA is not available in the console right now.
 
 ### API integrators
 
@@ -430,7 +431,7 @@ Host ask field `sla_r_claim` on listings is host-side; on active rentals the loc
 - **Interruptible (bid) rentals** never include SLA, even on SLA-enabled machines. Use on-demand with a reliability target set.
 - **Prepaid / reserved-only flows** may reject SLA parameters. Use on-demand rentals for an SLA.
 - Offers without SLA (`expected_reliability = 0` / `has_sla=false`) are excluded when you filter with `has_sla=true` or set a positive `target_reliability`.
-- If SLA parameters on an offer are invalid for your target, search may flag an SLA pricing error instead of showing a charge.
+- If SLA pricing fails for an offer, that row has no positive SLA fee (`search.slaPremiumPerHour` in the API) even though you set a target. Treat it as unpriced. Drop it before you sort by price, and do not rent it.
 
 ## FAQ
 
