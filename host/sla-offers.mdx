@@ -38,17 +38,17 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 
 ## SLA host checklist
 
-1. Complete [Account setup and hosting agreement](/host/hosting-overview#account-setup-and-hosting-agreement) on a **dedicated host account**, then [host setup](https://cloud.vast.ai/host/setup/). Confirm the machine appears on **Host → Machines** (healthy; GPU price and offer end date saved under **Set Pricing**—listing not required yet).
+1. Complete [Account setup and hosting agreement](/host/hosting-overview#account-setup-and-hosting-agreement) on a **dedicated host account**, then [host setup](https://cloud.vast.ai/host/setup/). Confirm the machine appears on **Host → Machines** (healthy; GPU price and offer end date saved under **Set Pricing**). Listing happens in step 2.
 2. Publish once **without** SLA (leave Claim at `0`) and test ports, SSH, and Jupyter from a separate client account (see [Testing your own machine](/host/hosting-overview#testing-your-own-machine)). Do not turn SLA on until that test passes.
 3. Install the [CLI](/cli/hello-world) if you schedule maintenance or read earnings from the CLI. The console [Set a maintenance window](/host/set-maintenance-window) page can notify renters without the CLI.
 4. Confirm SLA account access: open **Set Pricing → SLA** and confirm the panel is visible (do **not** Save final commitment/confidence yet). If the panel is missing, contact support.
 5. Preview economics (console SLA panel or [backtester](/host/sla-backtester)). Read [Billing vs settlement](#billing-vs-settlement-important) and [Risk scenarios](#risk-scenarios)—GPU billing can continue during outages and SLA credits can exceed many days of SLA fees.
 6. Read [Scheduled maintenance](#scheduled-maintenance) before you turn SLA on (24-hour notice for planned work).
 7. Review the SLA fee preview. The machine is already listed from step 2, so **Save** publishes SLA to live renters immediately. Press **Save** only after you accept the preview.
-8. **Verify:** the machine shows **Listed** on **Host → Machines**. If it was never listed, click **LIST** once.
+8. **Verify the live SLA offer.** The machine has been listed since step 2, so **Save** in step 7 already published the SLA terms. From the client account, search with a **Reliability target** and confirm an **SLA Fee** line.
    - **Console verify:** confirm **Listed** on **Host → Machines** and reopen **Set Pricing → SLA**.
    - **Optional CLI/API:** search with `--storage` matching how renters quote; add `verified=any` if you search your own machine and see no rows (for example `vastai search offers 'machine_id=12345 verified=any has_sla=true expected_reliability>=0.99' --storage 10`). On sliced machines, filter on-demand rows with the jq example in [Search / client-visible fields](#search--client-visible-fields).
-9. **Self-test (after LIST):** With the separate client account from step 2, search by `machine_id`, rent with a **Reliability target**, and verify the SLA (billed like any rental)—see [Testing your own machine](/host/hosting-overview#testing-your-own-machine).
+9. With the client account from step 2, rent your own offer with a **Reliability target** and confirm the SLA Fee line (billed like any rental). See [Testing your own machine](/host/hosting-overview#testing-your-own-machine).
 
 ## Before you enable SLA
 
@@ -59,7 +59,7 @@ If you expect downtime during active rentals, notify renters before you take the
 **Pre-flight checklist (before tuning reliability commitment and confidence):**
 
 - Hosting requires a separate host account and hosting agreement — see [Account setup](/host/hosting-overview#account-setup-and-hosting-agreement) if you have not completed host onboarding.
-- Confirm SLA is enabled for your account. In the console, open **Set Pricing → SLA** on a machine — if the panel is missing or listing returns `sla_not_approved`, contact [Discord](https://discord.gg/hSuEbSQ4X8) or [contact@vast.ai](mailto:contact@vast.ai) to request access before configuring a fleet. Approval timing varies; complete host setup and have base pricing ready in **Set Pricing** (a public **LIST** is not required for SLA approval—follow the [SLA host checklist](#sla-host-checklist) and **LIST** in step 8 when SLA economics are finalized).
+- Confirm SLA is enabled for your account. In the console, open **Set Pricing → SLA** on a machine — if the panel is missing or listing returns `sla_not_approved`, contact [Discord](https://discord.gg/hSuEbSQ4X8) or [contact@vast.ai](mailto:contact@vast.ai) to request access before configuring a fleet. Approval timing varies; complete host setup and have base pricing ready in **Set Pricing** (a public **LIST** is not required for SLA approval—follow the [SLA host checklist](#sla-host-checklist): list without SLA in step 2, then **Save** SLA in step 7, which goes live immediately).
 - Ensure your host daemon is current per the [host setup guide](https://cloud.vast.ai/host/setup/).
 - If listing fails with `sla_not_approved` or `sla_daemon_outdated`, resolve eligibility before changing SLA parameters.
 - **Planned maintenance tooling:** Use [`vastai schedule maint`](/host/cli/schedule-maint) or REST — see [Scheduled maintenance](#scheduled-maintenance).
@@ -202,7 +202,7 @@ Do not assume the dashboard score equals SLA reliability. Before choosing `sla_r
 Offers with invalid combinations are rejected at listing time:
 
 - `sla_r_claim` must be `0` (disable) or greater than 0 and at most **0.99999**. Exactly `1.0` is rejected.
-- If you send `sla_sigma_x`, it must be positive and at most `3.0`. It defaults to `0.5` only on a new ask. If you enable SLA on an existing ask without sending it, the request is accepted and `show machines` can report `sla_confidence: null`. If a value is already stored, omitting it keeps that value. Send it explicitly the first time you enable SLA.
+- If you send `sla_sigma_x`, it must be positive and at most `3.0`. It defaults to `0.5` only on a new ask. **Always send `sla_sigma_x` when you enable SLA.** If the claim is above `0` and `show machines` reports `sla_confidence: null`, search quotes a **$0** SLA fee while settlement uses Normal confidence (`0.5`). If a value is already stored, omitting it keeps that value.
 - Optional `sla_max_beta` must be in `(0, 1)` and at least the default β derived at your reliability commitment. Hosts do not set β; this field only caps the client-derived β the offer accepts. Omit for uncapped.
 
 <Note>
@@ -456,6 +456,10 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
   # Opt-in only: skip machines with no positive reliability commitment (do not invent 0.99)
   if ! echo "$machine" | jq -e '(.sla_reliability_claim // 0) > 0' >/dev/null; then
     echo "skip $id: no SLA terms visible (SLA off, daemon below SLA minimum, or account not SLA-approved)"; continue
+  fi
+  if ! echo "$machine" | jq -e '.sla_confidence != null' >/dev/null; then
+    echo "skip $id: SLA enabled but no stored confidence; set sla_sigma_x first" >&2
+    continue
   fi
   # sla_sigma_x is omitted on purpose: create_asks keeps each machine's current confidence.
   # price_disk is required: null or omitted resets storage price to 0.10.
