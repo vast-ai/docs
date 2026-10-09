@@ -39,7 +39,7 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 ## SLA host checklist
 
 1. Complete [Account setup and hosting agreement](/host/hosting-overview#account-setup-and-hosting-agreement) on a **dedicated host account**, then [host setup](https://cloud.vast.ai/host/setup/). Confirm the machine appears on **Host → Machines** (healthy; GPU price and offer end date saved under **Set Pricing**). Listing happens in step 2.
-2. Publish once **without** SLA (leave Claim at `0`) and test ports, SSH, and Jupyter from a separate client account (see [Testing your own machine](/host/hosting-overview#testing-your-own-machine)). Do not turn SLA on until that test passes.
+2. Publish once **without** SLA. In **Set Pricing**, leave **Claim** at `0`, **Save**, then click **LIST**. Test ports, SSH, and Jupyter from a separate client account (see [Testing your own machine](/host/hosting-overview#testing-your-own-machine)). Do not turn SLA on until that test passes.
 3. Install the [CLI](/cli/hello-world) if you schedule maintenance or read earnings from the CLI. The console [Set a maintenance window](/host/set-maintenance-window) page can notify renters without the CLI.
 4. Confirm SLA account access: open **Set Pricing → SLA** and confirm the panel is visible (do **not** Save final commitment/confidence yet). If the panel is missing, contact support.
 5. Preview economics (console SLA panel or [backtester](/host/sla-backtester)). Read [Billing vs settlement](#billing-vs-settlement-important) and [Risk scenarios](#risk-scenarios)—GPU billing can continue during outages and SLA credits can exceed many days of SLA fees.
@@ -130,7 +130,7 @@ Over many strong days, SLA fees can offset occasional credits, but a single bad 
 
 SLA reliability is measured at the **rental contract (instance) level** using platform health signals for active on-demand contracts — not your personal SSH session or Jupyter tab.
 
-- **Instance fails to start** when a client rents → counts against SLA reliability for that contract.
+- **Instance fails to start** because the machine is down (driver, disk, network, or daemon) → counts against SLA reliability for that contract. Whether downtime the renter causes (their own Stop or reboot, a bad image, a container crash, or a stop at zero balance) counts against you, or earns them a credit, is not specified. Contact support before you treat that downtime as yours.
 - **Machine-level outage** while contracts are active → affects settlement for those contracts.
 - **Brief host reboots** during active rentals may count as downtime. Vast does not publish a fixed second-level threshold in host docs — treat unplanned reboots as SLA risk. For planned work, use [Scheduled maintenance](#scheduled-maintenance) with at least 24 hours' notice when possible.
 - **Scheduled maintenance** may be partly forgiven (counted as uptime) — see [Scheduled maintenance](#scheduled-maintenance). That is not a service credit.
@@ -437,6 +437,11 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
   if [ -n "$ALLOWLIST" ] && ! echo "$ALLOWLIST" | grep -qw "$id"; then
     echo "skip $id: not in ALLOWLIST"; continue
   fi
+  # Fully rented machines are also absent from search. Confirm on Host → Machines before you treat a miss as an outage.
+  if vastai search offers "machine_id=$id verified=any has_sla=true" --raw --api-key "$VAST_API_KEY" \
+       | jq -e 'type == "array" and length > 0' >/dev/null; then
+    echo "skip $id: SLA offer still in search"; continue
+  fi
   machine=$(echo "$machines" | jq -c --arg id "$id" \
     '.machines[] | select((.id|tostring) == $id)')
   if ! echo "$machine" | jq -e '.listed == true' >/dev/null; then
@@ -733,7 +738,7 @@ On SLA rentals, compute pay and the SLA fee are released together as SLA earning
 
 After you enable SLA, charges and credits settle on UTC (Coordinated Universal Time) day boundaries. SLA earnings rows typically appear in **Host → Billing** within a few hours after UTC midnight (exact timing can vary).
 
-For SLA contracts, `sla_earn` is the escrow released to you that day. It matches the backtester's `escrow_to_host_balance`. Releases are spread over time rather than paid out the same day, so an early or low day can reflect release timing, not a service credit. A credit can also reduce later releases. Compare several days before you assume a credit, or read `days[].escrow_to_client_balance` in the [backtester](/host/sla-backtester). SLA-contract compute is **not** included in `gpu_earn`, `sto_earn`, or bandwidth earnings, so those fields stay near zero for SLA rentals. `sla_earn` is normally positive and is negative only when a prior day is corrected. Do not compare it to the backtester's largest single-day credit.
+For SLA contracts, `sla_earn` is the escrow released to you that day. It is not a per-contract list of service credits. A lower value can be release timing rather than a credit. For a breakdown on one contract, contact support. It matches the backtester's `escrow_to_host_balance` only when that machine's only rental that day was a single SLA contract at the simulated target. Releases are spread over time rather than paid out the same day, so an early or low day can reflect release timing, not a service credit. A credit can also reduce later releases. Compare several days before you assume a credit, or read `days[].escrow_to_client_balance` in the [backtester](/host/sla-backtester). SLA-contract compute is **not** included in `gpu_earn`, `sto_earn`, or bandwidth earnings, so those fields stay near zero for SLA rentals. `sla_earn` is normally positive and is negative only when a prior day is corrected. Do not compare it to the backtester's largest single-day credit.
 
 When you poll the API, use **`per_machine[].sla_earn`** for a single machine. **`per_day[].sla_earn` is always fleet-wide**—even if you pass `machid`.
 

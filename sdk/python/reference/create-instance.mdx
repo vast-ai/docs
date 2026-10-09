@@ -217,21 +217,25 @@ try:
     )
     response.raise_for_status()
 except requests.HTTPError as exc:
-    status = exc.response.status_code if exc.response is not None else None
-    if status in (400, 403, 404, 410):
+    status = exc.response.status_code if exc.response is not None else 0
+    if status != 429 and 400 <= status < 500:
         raise
-    retry_after = 5
-    if exc.response is not None and str(exc.response.headers.get("Retry-After", "")).isdigit():
-        retry_after = int(exc.response.headers["Retry-After"])
-    time.sleep(retry_after)
-    if not instances_for_label():
-        raise  # no rental: re-search and PUT again with a new offer ID and label
 except (requests.Timeout, requests.ConnectionError):
-    time.sleep(5)
-    if not instances_for_label():
-        raise  # no rental: re-search and PUT again with a new offer ID and label
-else:
-    print(response.json())  # new_contract is the rental instance ID
+    pass
+
+time.sleep(5)
+contract_id = None
+for _ in range(5):
+    rows = instances_for_label()
+    if rows:
+        contract_id = rows[0].get("id")
+        break
+    time.sleep(1)
+if contract_id is None:
+    raise RuntimeError(
+        "No instance for this label. Re-search and PUT again with a new offer id and label."
+    )
+print(contract_id)
 ```
 
 The same call with curl:
