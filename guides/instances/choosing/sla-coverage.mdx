@@ -23,9 +23,9 @@ A few things people mix up:
 
 - The **reliability score** on an offer card is a separate marketplace signal. It is not your SLA.
 - The GPU bill does **not** stop during an outage. A credit is paid only when the blended measure falls below your target, usually after the next UTC midnight. A short outage that stays above the target is billed in full with no credit.
-- Filtering for SLA offers (`has_sla`, SLA-enabled), or a CLI or API search, does **not** turn on an SLA. Setting **Reliability target** in the console Search filters and then clicking **RENT**, or sending `target_reliability` on REST rent, does. The CLI cannot turn SLA on.
+- Filtering for SLA offers does not turn on an SLA. Set **Reliability target** in the Search filters before you click **RENT**.
 - SLA is only for **on-demand** rentals, not interruptible (spot) or reserved rentals.
-- If the Search offer has **no SLA Fee line**, you do not have an SLA. On an instance, that line appears only while the instance is **running**. In **Account → Billing → Charges**, **Service Credit** is shown as a positive amount (`+$`) and **SLA Fee** as a negative amount (`−$`). The API `amount` has the opposite sign. In API responses the hourly amount is `slaPremiumPerHour`.
+- If the Search offer has **no SLA Fee** line, renting it gives you no SLA. On an instance, that line appears only while the instance is **running**. For how SLA amounts appear in **Charges**, see [Settlement timing](#settlement-timing).
 
 Hosts who want the same idea from the listing side can read [SLA in plain language](/host/sla-offers#sla-in-plain-language).
 
@@ -234,7 +234,7 @@ curl -s -X POST "https://console.vast.ai/api/v0/bundles/" \
 
 The CLI default query is `external=false rentable=true verified=true`. Neither the CLI nor the server filters on `rented`. REST `POST /api/v0/bundles/` drops that key and still returns a `rented` flag on each offer. Drop rows where `rented` is true if you need to hide GPUs you already rent. The response includes `truncated`. When it is `true`, the server cut the result short of `limit`. Narrow the query instead of assuming you saw every offer.
 
-Server-side sort by `dph_total` puts offers that could not be SLA-priced first, because they have no SLA fee. Drop them, then sort again. You may need a larger `limit` to make up for the dropped rows.
+Server-side sort by `dph_total` can put a row with no SLA fee first. Offers whose SLA terms fail validation are left out of the results. They still count against `limit`, so a page can return fewer rows than you asked for. A row that comes back with `slaPremiumPerHour` of `0` while you set `target_reliability` has incomplete SLA terms. Drop it, then sort again. Do not rent it.
 
 ```bash
 curl ... | jq '.offers | map(select((.search.slaPremiumPerHour // 0) > 0)) | sort_by(.dph_total)'
@@ -473,7 +473,7 @@ Host ask field `sla_r_claim` on listings is host-side; on active rentals the loc
 - **Interruptible (bid) rentals** never include SLA, even on SLA-enabled machines. Use on-demand with a reliability target set.
 - **Prepaid / reserved-only flows** may reject SLA parameters. Use on-demand rentals for an SLA.
 - Offers without SLA (`expected_reliability = 0` / `has_sla=false`) are excluded when you filter with `has_sla=true` or set a positive `target_reliability`.
-- If SLA pricing fails for an offer, that row has no positive SLA fee (`search.slaPremiumPerHour` in the API) even though you set a target. Treat it as unpriced. Drop it before you sort by price, and do not rent it.
+- Offers whose SLA terms fail validation are left out of search. A row with `slaPremiumPerHour` of `0` while you set a target has incomplete SLA terms. Drop it before you sort by price, and do not rent it.
 - If **every** row is missing `expected_reliability` and `search.slaPremiumPerHour` even though you sent `target_reliability`, SLA may be turned off platform-wide. Search does not return an error in that case. A rent that includes `target_reliability` then returns `403 sla_disabled`. Contact support. Do not treat an empty SLA filter as "no hosts offer SLA" until you have ruled this out.
 
 ## FAQ
