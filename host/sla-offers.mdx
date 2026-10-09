@@ -396,7 +396,7 @@ See [Fleet workflow](/host/sla-backtester#fleet-workflow) in the backtester for 
 This example is illustrative: it sleeps between machines and logs success/error from JSON, but does not implement full HTTP 429 retry. Add status checks and backoff before production fleet rollouts.
 
 ```bash
-export VAST_API_KEY="YOUR_API_KEY"
+: "${VAST_API_KEY:?export VAST_API_KEY first (needs machine_write and machine_read)}"
 # Leave DRY_RUN=1 until you confirm each machine is **Listed** (or on your allowlist).
 # Set DRY_RUN=0 to apply.
 # ALLOWLIST required for DRY_RUN=0 (space-separated listed machine IDs).
@@ -417,11 +417,6 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
     '.machines[] | select((.id|tostring) == $id)')
   if ! echo "$machine" | jq -e '.listed == true' >/dev/null; then
     echo "skip $id: not listed (this loop never republishes unlisted machines)"; continue
-  fi
-  # Rolling listings (-l / duration) recompute end_date daily; writing end_date back would
-  # turn them into a fixed end date. Republish those from the console instead.
-  if echo "$machine" | jq -e '.duration != null' >/dev/null; then
-    echo "skip $id: rolling duration listing (republish from the console)"; continue
   fi
   price=$(echo "$machine" | jq -r '.listed_gpu_cost // empty')
   end=$(echo "$machine" | jq -r '.end_date // empty')

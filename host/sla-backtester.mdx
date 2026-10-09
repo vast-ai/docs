@@ -94,7 +94,7 @@ Requires Bearer authentication. Rate-limited to about one request every two seco
 
 | Limit | Value |
 | --- | --- |
-| Default lookback | 90 days |
+| Default lookback | 90 days before `end_date` (91 inclusive UTC-day rows; today's row is usually empty) |
 | Maximum range | 366 days (inclusive) |
 | Ownership | Must own the machine |
 | Rate limit | About one request every two seconds |
@@ -214,7 +214,7 @@ curl -s -H "Authorization: Bearer YOUR_API_KEY" \
 ```
 
 - **`net_sla`** — SLA fees minus service credits over the window. Positive means SLA would have added income.
-- **`largest_day_credit`** — the most credit paid out on any single day. Use it as your single-day tail-risk reference (the last active day can be larger because it includes the closing settlement).
+- **`largest_day_credit`** — the most credit paid out on any single day. Use it as your single-day tail-risk reference. The largest value often falls on the last active day, because that day includes the contract's closing settlement.
 
 ## Interpreting results
 
@@ -288,7 +288,7 @@ Optional, for API automation only. To check one machine, use the single-machine 
 2. Responses are written to a private temp directory that is deleted when the loop exits.
 
 ```bash
-export VAST_API_KEY="YOUR_API_KEY"
+: "${VAST_API_KEY:?export VAST_API_KEY first (needs machine_read)}"
 # Optional fallbacks for machines without SLA yet (machines with SLA keep their own terms): R=0.99 P=0.6667
 BT_DIR=$(mktemp -d)
 trap 'rm -rf "$BT_DIR"' EXIT
@@ -298,13 +298,17 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
     '.machines[] | select((.id|tostring) == $id)')
   # Treat 0 (SLA off) and null (terms hidden) as absent; R only fills in for those machines.
   r=$(echo "$machine" | jq -r '(.sla_reliability_claim // 0) | if . > 0 then . else empty end')
-  if [ -z "$r" ] && [ -n "${R:-}" ]; then r="$R"; echo "machine $id: using fallback R=$R" >&2; fi
+  used_r_fallback=0
+  if [ -z "$r" ] && [ -n "${R:-}" ]; then r="$R"; used_r_fallback=1; echo "machine $id: using fallback R=$R" >&2; fi
   if ! jq -e -n --arg r "$r" 'try (($r | tonumber) > 0) catch false' >/dev/null 2>&1; then
     echo "skip $id: no SLA terms visible; set R=0.99 (or your planned commitment) as a fallback" >&2; continue
   fi
   # show machines returns confidence as a label: high = Tight, medium = Normal, low = Wide.
   # P only fills in for machines without SLA terms.
-  case "$(echo "$machine" | jq -r '.sla_confidence // empty')" in
+  # When R was used, the machine's SLA terms are off or hidden, so any confidence label is stale: use P.
+  label=$(echo "$machine" | jq -r '.sla_confidence // empty')
+  [ "$used_r_fallback" = 1 ] && label=""
+  case "$label" in
     high)   p=0.83 ;;
     medium) p=0.6667 ;;
     low)    p=0.50 ;;
@@ -331,7 +335,7 @@ done
 
 Expect about three seconds per machine (`sleep 3` plus request time), so budget a few minutes for 50 machines. The example logs a failure and moves on after one attempt. On HTTP **429**, wait and retry that machine before treating it as failed. Don't run requests in parallel unless you implement backoff. See [Rate Limits and Errors](/api-reference/rate-limits-and-errors).
 
-3. Compare `r_eff`, `r_be`, `net_sla`, and `largest_day_credit` across machines. Skip and failure messages go to stderr, so stdout is one JSON object per machine. Save the script as `bt.sh` and sort the results: `./bt.sh > results.jsonl && jq -s 'sort_by(.net_sla)' results.jsonl`.
+3. Compare `r_eff`, `r_be`, `net_sla`, and `largest_day_credit` across machines. Skip and failure messages go to stderr, so stdout is one JSON object per machine. Save the script as `bt.sh`, pass any fallbacks on the same line, and sort the results: `R=0.99 P=0.6667 ./bt.sh > results.jsonl && jq -s 'sort_by(.net_sla)' results.jsonl`.
 4. Apply matching `sla_r_claim` / `sla_sigma_x` when listing via the API (see [SLA Offers](/host/sla-offers#api-for-automation)).
 
 ## When stuck
