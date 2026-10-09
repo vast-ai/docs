@@ -187,7 +187,7 @@ bool       = True | False
 | `verified` | bool | is the machine verified |
 | `vms_enabled` | bool | is the machine a VM instance |
 
-**SLA query keys:** `has_sla`, `expected_reliability`, `target_reliability`. `dph_total` and `search.slaPremiumPerHour` include the SLA fee only when the search set `target_reliability` (console, REST, or SDK `search(..., target_reliability=…)`). The CLI cannot send `target_reliability`, so in CLI `--raw` output `search.slaPremiumPerHour` is 0 or absent and `dph_total` does not include an SLA fee. `dph_total` (alias `dph`) is also a CLI query filter, and that filter compares the price **without** the SLA fee.
+**SLA query keys:** `has_sla`, `expected_reliability`, `target_reliability`. `dph_total` and `search.slaPremiumPerHour` include the SLA fee only when the search set `target_reliability` (console or REST). The CLI and the Python SDK `search_offers()` cannot send `target_reliability`. Adding it to a query string returns HTTP 400. In CLI `--raw` output `search.slaPremiumPerHour` is 0 or absent and `dph_total` does not include an SLA fee. `dph_total` (alias `dph`) is also a CLI query filter, and that filter compares the price **without** the SLA fee.
 
 | Field | Meaning |
 | --- | --- |
@@ -196,7 +196,7 @@ bool       = True | False
 | `expected_reliability` | Host reliability commitment (also a query key; see Available Fields) |
 
 <Note>
-REST and the SDK accept `target_reliability` and return `search.slaPremiumPerHour` for that quote. The CLI can send only `has_sla` and `expected_reliability`. A CLI `target_reliability` filter is sent as an operator object and returns HTTP 400. Do not read an SLA fee from CLI `--raw` output. Setting `target_reliability` in search does not enable the SLA at rent time; use console **Search filters → Reliability target** then **RENT**, or REST `PUT /api/v0/asks/{id}/` (not `vastai create instance`) as in [SLA](/guides/instances/choosing/sla-coverage).
+REST accepts `target_reliability` and returns `search.slaPremiumPerHour` for that quote. The CLI and the Python SDK `search_offers()` cannot. A CLI `target_reliability` filter is sent as an operator object and returns HTTP 400. Do not read an SLA fee from CLI `--raw` output. Setting `target_reliability` in search does not enable the SLA at rent time; use console **Search filters → Reliability target** then **RENT**, or REST `PUT /api/v0/asks/{id}/` (not `vastai create instance`) as in [SLA](/guides/instances/choosing/sla-coverage).
 
 The same filters on `POST /api/v0/bundles/` use JSON operators. Match this shape from [SLA → API automation](/guides/instances/choosing/sla-coverage#api-automation): `"has_sla": {"eq": true}`, `"expected_reliability": {"gte": 0.99}`, `"target_reliability": 0.95` (a plain number; `{"eq": 0.95}` is rejected with 400). In that example `allocated_storage` is a number, not an operator object. The current CLI prints `Warning: Unrecognized field` for `has_sla` and `expected_reliability`. The warning is harmless: those fields are still sent. `target_reliability` is not in that harmless set. To self-check, run `--raw | jq 'all(.[]; .expected_reliability > 0)'` (CLI `--raw` prints a bare array of offers, not an `offers` object).
 </Note>

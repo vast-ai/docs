@@ -195,7 +195,7 @@ This will automatically remove expired/deleted rental contracts from the machine
 
 ## Extending Rental Contracts
 
-Sending a later end date at the same or lower price extends active contracts that end sooner. Raising the GPU, disk, or bandwidth price does not extend them. Lowering Claim or widening Confidence in that same request also skips any SLA contract whose fee would rise. A later request can still extend it. For SLA rentals, an extension also extends service-credit exposure. See [SLA on extended contracts](/host/sla-offers#sla-on-extended-contracts).
+Sending a later end date at the same or lower price extends active contracts that end sooner. Raising the GPU, disk, or bandwidth price does not extend them. Lowering your **Reliability Commitment** or moving **Confidence** toward **Low** in that same request also skips any SLA contract whose fee would rise. A later request can still extend it. For SLA rentals, an extension also extends service-credit exposure. See [SLA on extended contracts](/host/sla-offers#sla-on-extended-contracts).
 
 ## Testing your own machine
 
@@ -223,7 +223,7 @@ Then for each machine id you will need to find the available **offer/ask IDs** (
 
 Replace 12345 with your actual machine ID in question. You can see the number of available listings as well as information about the machine. This is the fastest way to also see all the offers listed for a given machine. The website GUI stacks similar offers and so it is not easy to see all the listings for a given machine. That is not a problem for the CLI.
 
-Take the **offer/ask ID** from the first column of search results and use it with `create instance`. This creates a **test rental billed to your separate client account** like any other rental (it is not free). Host earnings offset client spend only after rentals settle. This example loads the latest pytorch image along with both jupyter and ssh direct launch modes.
+Take the **offer/ask ID** from the first column of search results and use it with `create instance`. This creates a **test rental billed to your separate client account** like any other rental (it is not free). The client account is charged like any renter. Your host account earns from the rental as usual, but the two balances are separate. Add enough credit to the client account to cover the test, including any SLA fee. This example loads the latest pytorch image along with both jupyter and ssh direct launch modes.
 
 ```text Text
 vastai create instance <ID> --api-key "$CLIENT_API_KEY" --image pytorch/pytorch:latest --jupyter --direct --env '-e TZ=PDT -p 22:22 -p 8080:8080'
@@ -251,10 +251,10 @@ Remember that a single machine may have multiple active rental contracts from di
 
 Unlisting the offer prevents new rentals but does not end existing ones.
 
-- **No SLA rentals:** unlist so no new rentals start, then wait for current rentals to end. Do not move the offer end date to prepare for maintenance: any end date you send extends every active rental that ends before it. You cannot see which active rentals carry an SLA. If SLA is enabled now, or was enabled at any point during a rental that is still active, use the SLA path. Do not use the no-SLA unlist path unless SLA was never on during a rental that is still active.
-- **SLA rentals:** For a short planned window, keep the machine listed and schedule maintenance as far ahead as you can. See [Scheduled maintenance](/host/sla-offers#scheduled-maintenance). Unlisting is optional. It stops new rentals, and it also removes the SLA ask: after an unlist, `show machines` no longer returns your terms, so write them down first and re-enter Claim and Confidence before you **LIST** ([Severe outage](/host/sla-offers#when-things-go-wrong)). Do not move the end date later. That extends every shorter SLA contract and its credit exposure. See [SLA on extended contracts](/host/sla-offers#sla-on-extended-contracts).
+- **No SLA rentals:** Use this path only if SLA has never been on while any current rental was active. Otherwise use the SLA path below. Unlist so no new rentals start, then wait for current rentals to end. Do not move the offer end date to prepare for maintenance: any end date you send extends every active rental that ends before it.
+- **SLA rentals:** For a short planned window, keep the machine listed and schedule maintenance as far ahead as you can. See [Scheduled maintenance](/host/sla-offers#scheduled-maintenance). Unlisting is optional. It stops new rentals, and it also removes the SLA ask: after an unlist, `show machines` no longer returns your terms, so write them down first and re-enter **Reliability Commitment** and **Confidence** before you **LIST** ([Severe outage](/host/sla-offers#when-things-go-wrong)). Do not move the end date later. That extends every shorter SLA contract and its credit exposure. See [SLA on extended contracts](/host/sla-offers#sla-on-extended-contracts).
 
-Use these paths in order:
+Pick the path that matches your situation:
 
 1. **Preferred (no active renters):** Wait until all contracts have ended, then take the machine offline.
 2. **Planned downtime with active renters:** Schedule as far ahead as you can from the console or with [`vastai schedule maint`](/host/cli/schedule-maint). See [Scheduled maintenance](/host/sla-offers#scheduled-maintenance).
