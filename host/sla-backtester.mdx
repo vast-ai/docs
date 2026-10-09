@@ -280,7 +280,7 @@ Tighter confidence (higher `p`) lowers the SLA fee renters pay. It does **not** 
 
 ## Fleet workflow
 
-Optional, for API automation only. To check one machine, use the single-machine request above. `vastai show machines --raw` leaves out machines offline for more than about 10 hours. To include them (up to about 3 days), list machines with `GET /api/v0/machines/?include_offline=true`. For machines that already have SLA enabled, the replay under-counts those days. Treat `largest_day_credit` as a lower bound. `net_sla` can be off in either direction, because both fees and credits are understated. For a cleaner estimate, use a window from before SLA was enabled. See [Simulation limits](#simulation-limits).
+Optional, for API automation only. To check one machine, use the single-machine request above. `vastai show machines --raw` leaves out machines offline for more than about 10 hours. To include them (up to about 3 days), list machines with `GET /api/v0/machines/?include_offline=true`. For machines that already have SLA enabled, the replay under-counts those days. Treat `largest_day_credit` as a lower bound. `net_sla` can be off in either direction, because both fees and credits are understated. For a cleaner estimate, set `START` and `END` (Unix seconds) to a window from before SLA was enabled, and set `T` to the renter target you want to model (for example `0.95`, and not above the commitment you send). See [Simulation limits](#simulation-limits).
 
 **Prerequisites:** [CLI hello world](/cli/hello-world) and an API key with `machine_read` (see [API permissions](/api-reference/permissions)).
 
@@ -296,6 +296,11 @@ Optional, for API automation only. To check one machine, use the single-machine 
 # Optional fallbacks for machines without SLA yet (machines with SLA keep their own terms): R=0.99 P=0.6667
 BT_DIR=$(mktemp -d)
 trap 'rm -rf "$BT_DIR"' EXIT
+# Optional: START and END are Unix seconds for a pre-SLA window. T is a renter target at or below the commitment.
+extra=""
+[ -n "${START:-}" ] && extra="${extra}&start_date=${START}"
+[ -n "${END:-}" ] && extra="${extra}&end_date=${END}"
+[ -n "${T:-}" ] && extra="${extra}&r_target=${T}"
 machines=$(vastai show machines --raw --api-key "$VAST_API_KEY")
 for id in $(echo "$machines" | jq -r '.machines[].id'); do
   machine=$(echo "$machines" | jq -c --arg id "$id" \
@@ -325,12 +330,13 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
   out="$BT_DIR/sla_bt_$id.json"
   http=$(curl -s -o "$out" -w "%{http_code}" \
     -H "Authorization: Bearer $VAST_API_KEY" \
-    "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=$id&r_claim=$r&p=$p")
+    "https://console.vast.ai/api/v0/host/sla_backtest/?machine_id=$id&r_claim=$r&p=$p${extra}")
   if [ "$http" != "200" ] || ! jq -e '.success == true' "$out" >/dev/null 2>&1; then
     echo "machine_id=$id failed http=$http body=$(jq -c '{success,error,msg}' "$out" 2>/dev/null)" >&2
     sleep 3; continue
   fi
-  jq -c --arg id "$id" '{machine_id: $id, params, has_data, r_eff, r_be,
+  jq -c --arg id "$id" --arg start "${START:-}" --arg end "${END:-}" --arg t "${T:-}" '{machine_id: $id, params, has_data, r_eff, r_be,
+      start_date: $start, end_date: $end, r_target: $t,
       net_sla: (([.days[].client_premium_to_escrow] | add) - ([.days[].escrow_to_client_balance] | add)),
       largest_day_credit: ([.days[].escrow_to_client_balance] | max)}' "$out"
   sleep 3
