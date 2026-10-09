@@ -41,14 +41,12 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 1. Complete [Account setup and hosting agreement](/host/hosting-overview#account-setup-and-hosting-agreement) on a **dedicated host account**, then [host setup](https://cloud.vast.ai/host/setup/). Confirm the machine appears on **Host → Machines** (healthy; GPU price and offer end date saved under **Set Pricing**). Listing happens in step 2. If the listing uses auto-renew, read [SLA on extended contracts](#sla-on-extended-contracts) before you enable SLA.
 2. Publish once **without** SLA. In **Set Pricing**, leave **Reliability Commitment** (the share of time you commit the machine will be up) at `0`, **Save**, then click **LIST**. If you do not see an SLA section, list without it. Step 4 is where you check SLA access. Test ports, SSH, and Jupyter from a separate client account (see [Testing your own machine](/host/hosting-overview#testing-your-own-machine)). Do not turn SLA on until that test passes.
 3. Install the [CLI](/cli/hello-world) if you schedule maintenance from the command line, or if you want SLA earnings for one machine. **Host → Billing** is fleet-wide and has no per-machine SLA line. `vastai show earnings --machine_id ID` needs an API key with `billing_read`. The console [Set a maintenance window](/host/set-maintenance-window) page can notify renters without the CLI.
-4. Confirm SLA account access: open **Set Pricing → SLA** and confirm the panel is visible (do **not** Save final commitment/confidence yet). If **Set Pricing** has no **SLA** section, contact support before you enable SLA. The API returns `sla_not_approved` when the host is not approved. A missing section is not a fee preview.
+4. Confirm SLA account access: open **Set Pricing → SLA** and confirm the panel is visible (do **not** Save final commitment/confidence yet). If **Set Pricing** has no **SLA** section, contact support before you enable SLA. Listing (`PUT /api/v0/machines/create_asks/`) returns 403 `sla_not_approved` when the host is not approved. A missing section is not a fee preview.
 5. Preview economics (console SLA panel or [backtester](/host/sla-backtester)). Read [Billing vs settlement](#billing-vs-settlement-important) and [Risk scenarios](#risk-scenarios). GPU billing can continue during outages, and SLA credits can exceed many days of SLA fees. The normal **Host → Billing** view has no separate SLA earnings line. After you enable SLA, GPU earnings can drop because that compute is released as `sla_earn` (`vastai show earnings`). Much of it can stay held until the contract ends, so a low week is not by itself a credit.
 6. Read [Scheduled maintenance](#scheduled-maintenance) before you turn SLA on. Turn on **Host → Notification Settings** for `host:machine_offline` and `host:machine_error` ([Host Notifications](/host/notifications)) so you hear about downtime before next-day settlement. Schedule planned work as far ahead as you can. Some hosts assume 24 hours of notice fully forgives the downtime. It does not, and forgiveness is not guaranteed.
 7. Enter **Reliability Commitment** and **Confidence**. On a machine that is already listed, **Save** publishes SLA to live renters immediately. Start **Confidence** at **Low** unless you have rental history. The commitment field is a percent (it ends with `%`; type `99` for 99%). Search hides your offer from renters whose target is above your commitment. The dashboard reliability score is not your SLA measurement. Prefer a [backtester](/host/sla-backtester) run before you enable SLA when you have history.
    - **API users:** send `sla_r_claim` as a fraction (`0.99`, not `99`). After **Save**, run the confidence check in [Validation rules](#validation-rules).
-8. **Verify now.** From the client account, include unverified machines in Search filters (the default hides them; new machines usually are unverified) and set **Reliability target** at or below your commitment. Confirm an **SLA Fee** line. If that line is missing on every offer, SLA may be off platform-wide. Contact support before you change the listing. Optionally rent that offer briefly, then **Destroy** the test instance. See [Testing your own machine](/host/hosting-overview#testing-your-own-machine).
-   - **Console verify:** confirm **Listed** on **Host → Machines** and reopen **Set Pricing → SLA**. Console search cannot look up your machine by id. The reliable check is the client-key CLI command below.
-   - **API users:** search with `verified=any` and `has_sla=true` (for example `vastai search offers 'machine_id=12345 verified=any has_sla=true' --storage 10 --raw`). Confirm `expected_reliability` in `jq`. Do not add `expected_reliability>=…` to that CLI query: the CLI sends the number as text, and combining it with `has_sla=true` errors on the server. The CLI may print `Warning: Unrecognized field` for `has_sla`. That warning is harmless: the filter is still sent. On sliced machines, filter on-demand rows with the jq example in [Search / client-visible fields](#search--client-visible-fields).
+8. **Verify now.** From your separate client account, run `vastai search offers 'machine_id=12345 verified=any has_sla=true' --storage 10 --raw --api-key "$CLIENT_API_KEY"`. An offer in the result means the SLA listing is live. Confirm `expected_reliability` with `jq`. Do not add `expected_reliability>=…` to that CLI query. In the console, sign in as the client, include unverified machines, set **Reliability target** at or below your commitment, and confirm an **SLA Fee** line. Console search cannot look up a machine by id. If no offer shows an **SLA Fee** line, contact support before you change the listing. Optionally rent that offer briefly, then **Destroy** the test instance. See [Testing your own machine](/host/hosting-overview#testing-your-own-machine).
 
 ## Before you enable SLA
 
@@ -79,7 +77,7 @@ On an outage day the renter is still charged the normal hourly rate, and you may
 </Warning>
 
 - Optional: run the [backtester](/host/sla-backtester) after you have weeks of history; otherwise use the web console SLA preview and the economics walkthrough on this page.
-- **New or low-history machines:** If the backtester returns `has_data: false`, there is no history to replay. Start **Confidence** at **Low** (wider margin, larger fee) or use a more conservative reliability commitment until you have a few weeks of data. Confirm the SLA fee renters see in search. If **Set Pricing** has no **SLA** section, contact support before you enable SLA. The API returns `sla_not_approved` when the host is not approved. A missing section is not a fee preview.
+- **New or low-history machines:** If the backtester returns `has_data: false`, there is no history to replay. Start **Confidence** at **Low** (wider margin, larger fee) or use a more conservative reliability commitment until you have a few weeks of data. Confirm the SLA fee renters see in search. If **Set Pricing** has no **SLA** section, contact support before you enable SLA. Listing (`PUT /api/v0/machines/create_asks/`) returns 403 `sla_not_approved` when the host is not approved. A missing section is not a fee preview.
 
 ## SLA in plain language
 
@@ -276,7 +274,7 @@ In the web console, **Set Pricing → Save** stores SLA settings; clicking **LIS
 
 #### Web console SLA preview
 
-In the host console, open **Host Machines** → select your machine → **Set Pricing** → **SLA** when that section is shown. It is a forward-looking quote, not a historical replay — use the [SLA Backtester](/host/sla-backtester) when you have rental history. If **Set Pricing** has no **SLA** section, contact support before you enable SLA. The API returns `sla_not_approved` when the host is not approved. A missing section is not a fee preview.
+In the host console, open **Host Machines** → select your machine → **Set Pricing** → **SLA** when that section is shown. It is a forward-looking quote, not a historical replay — use the [SLA Backtester](/host/sla-backtester) when you have rental history. If **Set Pricing** has no **SLA** section, contact support before you enable SLA. Listing (`PUT /api/v0/machines/create_asks/`) returns 403 `sla_not_approved` when the host is not approved. A missing section is not a fee preview.
 
 ### API (for automation)
 
@@ -576,28 +574,52 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
   if [ "$DRY_RUN" != "0" ]; then
     echo "dry-run machine_id=$id payload: $body"; continue
   fi
-  resp=$(curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
+  fresh=$(vastai show machines --raw --api-key "$VAST_API_KEY" 2>"$BTERR")
+  machine=$(printf '%s' "$fresh" | jq -c --argjson mid "$id" '.machines[] | select((.id|tonumber) == $mid)')
+  if ! printf '%s' "$machine" | jq -e 'has("current_rentals_resident") and .current_rentals_resident == 0' >/dev/null; then
+    echo "skip $id: rented since the snapshot, or current_rentals_resident missing" >&2
+    continue
+  fi
+  body=$(echo "$machine" | jq -c --argjson hidden "$hidden" --arg vol "$VOL_SIZE" --arg sigma "$SIGMA" \
+    '{machine: (.id|tonumber), price_gpu: .listed_gpu_cost, price_disk: .listed_storage_cost,
+      min_chunk: .listed_min_gpu_count, sla_r_claim: .sla_reliability_claim,
+      hidden_listing: $hidden}
+     + (if $sigma == "" then {} else {sla_sigma_x: ($sigma|tonumber)} end)
+     + (if .listed_inet_up_cost == null then {} else {price_inetu: .listed_inet_up_cost} end)
+     + (if .listed_inet_down_cost == null then {} else {price_inetd: .listed_inet_down_cost} end)
+     + (if .credit_discount_max == null then {} else {credit_discount_max: .credit_discount_max} end)
+     + (if .duration == null then {end_date} else {duration: (.duration | floor)} end)
+     + (if $vol == "" then {} else {vol_size: ($vol|tonumber)} end)')
+  tmp=$(mktemp)
+  http=$(curl -s -o "$tmp" -w '%{http_code}' -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
     -H "Authorization: Bearer $VAST_API_KEY" \
     -H "Content-Type: application/json" \
     -d "$body")
-  ok=$(echo "$resp" | jq -r '.success // empty')
-  if [ "$ok" = "true" ]; then
-    echo "machine_id=$id ok extended=$(echo "$resp" | jq -c '.results[0].upd_contracts // []')"
-    if echo "$resp" | jq -e '.results[0].new_contracts | length > 0' >/dev/null; then
-      echo "WARN machine_id=$id: re-list created a new ask; confirm bandwidth, credit_discount_max, price_min_bid, and confidence (a new ask defaults sla_sigma_x to 0.5)" >&2
-    fi
-  else
-    if echo "$resp" | grep -q 'sla_disabled'; then
-      echo "SLA disabled platform-wide; stopping run." >&2
-      exit 1
-    fi
-    echo "machine_id=$id error: $(echo "$resp" | jq -c '{success, error: (.error // .results[0].error), msg: (.msg // .results[0].msg)}' 2>/dev/null || echo "$resp")"
-  fi
+  case "$http" in
+    200)
+      if jq -e '.success == true' "$tmp" >/dev/null; then
+        echo "machine_id=$id ok extended=$(jq -c '.results[0].upd_contracts // []' "$tmp")"
+        if jq -e '.results[0].new_contracts | length > 0' "$tmp" >/dev/null; then
+          echo "WARN machine_id=$id: re-list created a new ask; confirm bandwidth, credit_discount_max, price_min_bid, and confidence (a new ask defaults sla_sigma_x to 0.5)" >&2
+        fi
+      elif grep -q 'sla_disabled' "$tmp"; then
+        echo "SLA disabled platform-wide; stopping run." >&2
+        rm -f "$tmp"
+        exit 1
+      else
+        echo "machine_id=$id error: $(jq -c '{success, error: (.error // .results[0].error), msg: (.msg // .results[0].msg)}' "$tmp" 2>/dev/null || head -c 200 "$tmp")" >&2
+      fi
+      ;;
+    429) echo "machine=$id http=429 rate limited; back off and retry this machine" >&2 ;;
+    402) echo "machine=$id http=402 machine offline; skipped" >&2 ;;
+    *) echo "machine=$id http=$http $(head -c 200 "$tmp")" >&2 ;;
+  esac
+  rm -f "$tmp"
   sleep 5
 done
 ```
 
-Fetch the fleet once before the loop — do not call `show machines --raw` inside the loop. The loop sends listed bandwidth prices and `credit_discount_max` when `show machines` returns them (listed machines only; `null` after unlist). The loop does not send `price_min_bid`. `listed_gpu_cost` round-trips: send it back as `price_gpu` and the price does not change. `min_bid_price` is different. It is reported net of the platform fee and does not round-trip, so never resend it as `price_min_bid`. On an existing ask, omitting `price_min_bid` keeps the stored minimum. After an unlist, send the value you wrote down. On an existing ask, a bandwidth price of `0` is treated as omitted and the old price is kept. A storage price of `0` also keeps the stored price. Omitting `price_disk` is different: it resets storage to $0.10. On fleets of 20+ machines, expect several minutes; back off on HTTP 429. Configure reliability commitment and confidence per machine (console or single-machine `create_asks`) before running with `DRY_RUN=0` — the loop only updates machines that already have a positive `sla_r_claim`.
+Fetch the fleet once to build the work list. Before each live PUT, the loop re-reads `show machines` and skips the machine if `current_rentals_resident` is not `0`. A machine can be rented between the snapshot and its turn, and a PUT on a rented machine can extend that rental. The loop sends listed bandwidth prices and `credit_discount_max` when `show machines` returns them (listed machines only; `null` after unlist). The loop does not send `price_min_bid`. `listed_gpu_cost` round-trips: send it back as `price_gpu` and the price does not change. `min_bid_price` is different. It is reported net of the platform fee and does not round-trip, so never resend it as `price_min_bid`. On an existing ask, omitting `price_min_bid` keeps the stored minimum. After an unlist, send the value you wrote down. On an existing ask, a bandwidth price of `0` is treated as omitted and the old price is kept. A storage price of `0` also keeps the stored price. Omitting `price_disk` is different: it resets storage to $0.10. On fleets of 20+ machines, expect several minutes; back off on HTTP 429. Configure reliability commitment and confidence per machine (console or single-machine `create_asks`) before running with `DRY_RUN=0` — the loop only updates machines that already have a positive `sla_r_claim`.
 
 </Accordion>
 </AccordionGroup>
