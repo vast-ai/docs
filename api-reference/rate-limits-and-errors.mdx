@@ -29,22 +29,27 @@ For a signed-in API key, the limit is per user account. Extra keys on the same a
 
 Some endpoints also use **method-specific** limits (GET vs POST) and/or **max-calls-per-period** limits for short bursts.
 
+The combined API reference does not always show each operation's `x-rate-limit` block. For SLA workflows, use this pacing:
+
+| Endpoint | Safe pacing |
+| --- | --- |
+| Search offers (`POST /bundles/`) | about 10 requests per minute |
+| Rent (`PUT /asks/{id}/`) | one call every 4.5 seconds or slower |
+| Show instances (v1) | one call per second |
+| Show charges | one call per second |
+| Show earnings and the SLA backtester | one call every 2 seconds |
+| Schedule maintenance | one call every 2.5 seconds |
+| Create or update a listing (`create_asks`) | one call every 5 seconds |
 
 ### Rate limit response behavior
 
-When you hit a rate limit, you will receive **HTTP 429**. The response body is often plain text (in certain cases JSON with `success`/`error`/`msg` like above) with one of the following messages:
+When you hit a rate limit, you will receive **HTTP 429**. The body is one of three shapes:
 
-```
-API requests too frequent
-```
+- Plain text: `API requests too frequent: endpoint threshold=…`
+- JSON with a `detail` key containing that same message
+- Search quota only: JSON `{"error": "search_quota_exceeded", "msg": "…"}` plus a `Retry-After` header
 
-or
-
-```
-API requests too frequent: endpoint threshold=...
-```
-
-Some HTTP 429 responses include a `Retry-After` header. The daily search row quota (`error: "search_quota_exceeded"`) does, and its value points at the quota reset, which can be hours away. When `Retry-After` is present, wait at least that long. When it is absent, use your own backoff.
+Treat any other 429 as a short backoff. Only `search_quota_exceeded` carries `Retry-After`, and that wait can be hours.
 
 ### How to reduce rate limit errors
 

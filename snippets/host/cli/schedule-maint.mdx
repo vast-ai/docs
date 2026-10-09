@@ -21,7 +21,7 @@ vastai schedule maint id --sdate START_DATE --duration DURATION --maintenance_ca
 ## Options
 
 <ParamField path="--sdate" type="number" required>
-  Maintenance start time as Unix epoch seconds (UTC). Required. Use a future time, as far ahead as you can, for example `$(date -u -d '2 days 02:00:00' +%s)`. The CLI sends this value to the API unchanged (REST `sdate` is also epoch seconds).
+  Maintenance start time as Unix epoch seconds (UTC). Required. For planned work, use a future time, as far ahead as you can. For an outage already underway, one minute from now is enough. This single-machine route accepts the current time.
 </ParamField>
 
 <ParamField path="--duration" type="number">
@@ -59,10 +59,10 @@ vastai schedule maint MACHINE_ID \
 
 ### Emergency or unplanned maintenance
 
-If the machine must go offline without adequate notice, still run `schedule maint` to notify renters — but expect the full service-credit amount that can be owed when SLA is enabled. Use the current UTC epoch for `--sdate` and an integer `--duration` (hours):
+If the machine must go offline without adequate notice, still run `schedule maint` to notify renters — but expect the full service-credit amount that can be owed when SLA is enabled. Start one minute from now so the window is still ahead of the confirmation prompt:
 
 ```bash
-vastai schedule maint MACHINE_ID --sdate "$(date -u +%s)" --duration 1 --maintenance_category power
+vastai schedule maint MACHINE_ID --sdate "$(( $(date -u +%s) + 60 ))" --duration 1 --maintenance_category power
 ```
 
 To cancel a scheduled window, use [`vastai cancel maint`](/host/cli/cancel-maint). That cancels **every** window you scheduled on the machine, and it asks `Continue? [y/n]`. In scripts, use `echo y | vastai cancel maint MACHINE_ID` and confirm the cancel succeeded before you recreate windows. To reschedule, cancel first, then recreate each window you still want, as far ahead as you can. Across many machines, schedule sequentially at least 3 seconds apart (`sleep 3`; the endpoint's `x-rate-limit` threshold is `2.5`). If you still get HTTP 429, wait longer and retry.

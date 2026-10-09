@@ -151,7 +151,7 @@ When you list or update a machine, set SLA fields via the host console or `PUT /
 | Parameter | API field | Backtester alias | What it means |
 | --- | --- | --- | --- |
 | Reliability commitment | `sla_r_claim` | `r_claim` (the simulated renter target `r_target` defaults to it) | Your advertised belief about machine reliability. Set above `0` to enable SLA. Values are greater than 0 and at most **0.99999** (for example, `0.99` = 99%). Exactly `1.0` is rejected. Set to `0` to disable SLA on new rentals. |
-| Confidence spread | `sla_sigma_x` | `p` (different scale — see [backtester](/host/sla-backtester#confidence-values-p)) | How wide your belief is around the reliability commitment. Lower = more confident (lower SLA fees for clients at a given target). Defaults to `0.5` only on a **new** ask. When you first enable SLA on an existing listing, send `sla_sigma_x` yourself. Omitting it leaves the stored value empty, so `show machines` reports no confidence. On an ask that already has a stored value, omitting `sla_sigma_x` keeps that value. |
+| Confidence spread | `sla_sigma_x` | `p` (different scale — see [backtester](/host/sla-backtester#confidence-values-p)) | Pricing margin built into the SLA fee. Tight is a smaller fee. Wide is a larger fee. It does not change the credit you owe. Defaults to `0.5` only on a **new** ask. When you first enable SLA on an existing listing, send `sla_sigma_x` yourself. Omitting it leaves the stored value empty, so `show machines` reports no confidence. On an ask that already has a stored value, omitting `sla_sigma_x` keeps that value. |
 
 ### Advanced: `sla_max_beta` (optional)
 
@@ -186,7 +186,7 @@ Do not assume the dashboard score equals SLA reliability. Before choosing `sla_r
 
 ### Confidence values
 
-In the console, pick **Tight**, **Normal**, or **Wide**. You do not need the table unless you use the API or the backtester.
+In the console, pick **Tight**, **Normal**, or **Wide**. You do not need the table unless you use the API or the backtester. In `show machines`, `high` means Tight and `low` means Wide. A `low` label is a deliberate wide margin, not a weak setting.
 
 | Console label | API `sla_sigma_x` (σ) | Backtester `p` | `show machines` | Pricing effect |
 | --- | --- | --- | --- | --- |
@@ -772,7 +772,7 @@ SLA approval, settlement questions, credit disputes, and locked machines are sep
   **Keep your own record of the exact `sla_sigma_x`.** `show machines` returns only the confidence band. It does return `credit_discount_max` while the machine is listed (`null` after unlist) and `min_bid_price` (your host-side minimum bid, net of the platform fee). The read-back can differ slightly from what you sent, so resend the `price_min_bid` you wrote down. Omitting it keeps the stored minimum. An offline machine drops out of `show machines` after about 10 hours (about 3 days with `include_offline=true`). Snapshot before you unlist.
   </Warning>
 
-  1. **Notify renters.** `echo y | vastai schedule maint MACHINE_ID --sdate "$(date -u +%s)" --duration HOURS --maintenance_category other`. See [Set a maintenance window](/host/set-maintenance-window).
+  1. **Notify renters.** `echo y | vastai schedule maint MACHINE_ID --sdate "$(( $(date -u +%s) + 60 ))" --duration HOURS --maintenance_category other`. One minute ahead still counts as an unplanned window. See [Set a maintenance window](/host/set-maintenance-window).
   2. **Get your current terms before you unlist.** If the machine is still visible, save them now. If it is not, use your own notes. After unlist, `show machines` returns `null` for prices, `listed_min_gpu_count`, `end_date`, `credit_discount_max`, and SLA terms. The snapshot also omits hidden status (`hidden_listing`) and the exact `sla_sigma_x`. Write those down too.
 
      **Console:** Before you unlist, open **Set Pricing** and write down the GPU price, storage price, upload and download bandwidth prices, min GPU, end date (or auto-renew duration), whether the listing is hidden, Claim, Confidence (Tight, Normal, or Wide), the reserved discount, and the interruptible min bid. An omitted reserved discount on a new ask becomes `0.4`.

@@ -208,7 +208,7 @@ See the [Automation limits](#automation-limits) note in this section before you 
 
 Web app: [cloud.vast.ai](https://cloud.vast.ai). REST examples use `https://console.vast.ai/api/…`.
 
-For repeated search calls, `POST /api/v0/bundles/` is rate-limited. On HTTP 429, read the JSON `error` field before you retry. `search_quota_exceeded` means wait until `Retry-After`, not a short backoff. See [Rate Limits and Errors](/api-reference/rate-limits-and-errors).
+For repeated search calls, `POST /api/v0/bundles/` is rate-limited. On HTTP 429, if the JSON `error` is `search_quota_exceeded`, wait for `Retry-After`. Otherwise (a `detail` body or plain text), back off before the next call. See [Rate Limits and Errors](/api-reference/rate-limits-and-errors).
 
 **1. Search** (prices `dph_total` at your target — include storage explicitly so quotes are comparable). Set `limit` explicitly when you compare many offers. Bundles search has **no pagination** (no offset or page token)—one response returns at most `limit` rows for that query. OpenAPI does not document a maximum `limit`; do not assume a single call walks the full market. To scan a broader SLA market, shard queries with filters such as `gpu_name`, `geolocation`, or `machine_id`, and back off on HTTP 429. Rows from every query, including shards, count against one daily search row quota that varies by account. Size `limit` and the number of shards to fit that budget. See the **Daily search row quota** row below and [Rate Limits and Errors](/api-reference/rate-limits-and-errors).
 
@@ -292,7 +292,21 @@ Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `ta
 
 **4. Tear down.** Destroy the instance to end compute, storage, and SLA fee charges. Stopping it is not guaranteed to end the GPU charge or the SLA fee. Use [Delete Instance](/api-reference/instances/destroy-instance) or `vastai destroy instance NEW_CONTRACT`. Destroying deletes the instance disk. The `instance_write` permission covers this call.
 
-**Billing reconciliation:** Verifying the SLA on an instance does not show settlement. Each Charges row is one contract. Match `source` to `instance-` plus the contract ID from `new_contract` (or `metadata.label` if you set a unique label at rent), then read the `sla` item in `items[]`. Store the hourly SLA fee when the rent succeeds: `search.slaPremiumPerHour` on the `GET /api/v1/instances/` row for that contract. `instance.slaPremiumPerHour` reads `0` until the instance is running, and also while it is stopped or offline, so do not use it as the stored rate. Expected fee for a UTC day is about the stored rate times the hours the contract was active, including downtime. A `sla` row smaller than that, or negative, means a credit was applied. How the console labels that row is in [Settlement timing](#settlement-timing). The call requires `select_filters` with `day.gte` and `day.lte` (unix seconds). The row is omitted until the last day in the window has settled, so a window that includes the current UTC day has no SLA row yet. Each `items[]` entry is the total for that charge type over the whole query window. To see one UTC day, set `day.gte` to that day's start and `day.lte` to `day.gte + 86399`. Page with `after_token` / `next_token` (`limit` defaults to 100, maximum 500) and space calls about one second apart. Send the response `next_token` as `after_token`. Stop when `next_token` is `null`. Compare the row with the SLA fee you expected: a smaller or negative amount means a credit was applied.
+**Billing reconciliation:** Verifying the SLA on an instance does not show settlement. Store the hourly SLA fee when the rent succeeds: `search.slaPremiumPerHour` on the `GET /api/v1/instances/` row for that contract. `instance.slaPremiumPerHour` reads `0` until the instance is running, and also while it is stopped or offline, so do not use it as the stored rate.
+
+1. Call Show Charges for one UTC day. `day.gte` and `day.lte` are both required (unix seconds). Set `day.lte` to `day.gte + 86399`.
+2. Page with `after_token` / `next_token` until `next_token` is `null`. Space calls about one second apart.
+3. Find the row whose `source` is `instance-` plus the contract id from `new_contract`, then the `items[]` entry with `type: "sla"`.
+4. Compare that amount with the stored hourly fee times the hours the contract was active that day, including downtime. A smaller or negative amount means a credit was applied. How the console labels the row is in [Settlement timing](#settlement-timing).
+
+The contract row can appear before settlement. Its `sla` item is absent until that day settles, so a window that includes the current UTC day has no SLA item yet.
+
+```bash
+curl -s -G "https://console.vast.ai/api/v0/charges/" \
+  -H "Authorization: Bearer $VAST_API_KEY" \
+  --data-urlencode 'select_filters={"day":{"gte":1767225600,"lte":1767311999}}' \
+  | jq --arg s "instance-$NEW_CONTRACT" '.results[] | select(.source == $s) | .items[] | select(.type == "sla") | .amount'
+```
 
 **Automation limitations:** SLA credits are not sent as webhooks and do not appear on invoices. Read Charges after settlement (see [Settlement timing](#settlement-timing)). After the UTC day boundary (wait up to about 48 hours if a line is missing), check that row or contact support. Verify an active SLA on instances with `GET /api/v1/instances/`. Confirm `target_reliability > 0`. A present but zero value means the rental has no SLA. Also check `instance.slaPremiumPerHour` once the instance is running. Show-instances uses OpenAPI threshold `1.0` (about one request per second).
 
@@ -342,7 +356,7 @@ During an outage the Instances price popover may say "Machine is offline. You're
 
 **This is different from non-SLA rentals.** Normally you are not charged while a machine is offline (see [Billing](/guides/reference/billing)). On an SLA contract you are billed for GPU compute, storage, and the SLA fee, and a service credit is paid only when the blended measure falls below your target.
 
-**Stop vs destroy:** While an SLA instance is unavailable, you are billed for GPU compute, storage, and the SLA fee until you **Destroy**. Destroy deletes the disk. **Stop** is not guaranteed to end the GPU charge or the SLA fee. **Destroy** the instance when you are done. Contact support before you count on a credit for downtime you caused yourself (your own Stop or reboot, a container crash, or a stop at zero balance). Whether that downtime counts against the host is not specified. Final SLA settlement still posts when the contract closes.
+**Stop vs destroy:** While an SLA instance is unavailable, you are billed for GPU compute, storage, and the SLA fee until you **Destroy**. Destroy deletes the disk. **Stop** is not guaranteed to end the GPU charge or the SLA fee. Until that rule is published, budget as if a stopped SLA instance is still billed for both. Only **Destroy** is documented to end those charges, and it deletes the disk. Contact support before you count on a credit for downtime you caused yourself (your own Stop or reboot, a container crash, or a stop at zero balance). Whether that downtime counts against the host is not specified. Final SLA settlement still posts when the contract closes.
 
 If you qualify for compensation, a **service credit** is applied after daily settlement (UTC), typically within a few hours after UTC midnight for the prior day — not in the same hour as the outage.
 
@@ -415,7 +429,7 @@ Console users: open **Instances** → select your instance → **price details**
 
 Show-instances output may include `target_reliability` and price fields under `search` / `instance` (including `slaPremiumPerHour`).
 
-To find instances with an SLA, post-process the API response in your application (filter or paginate locally)—not in the Vast web console. Prefer filtering the show-instances response (`target_reliability > 0`, `instance.slaPremiumPerHour`) in production. OpenAPI documents optional `select_filters` on stored fields such as `sla_r_target` / `target_reliability` when present; computed fields (for example `has_sla`) are not filterable. Do not rely on `select_filters` alone to detect an SLA.
+To find instances with an SLA, post-process the API response in your application (filter or paginate locally)—not in the Vast web console. Prefer filtering the show-instances response on `target_reliability > 0`. `select_filters` accepts `sla_r_target` (the stored reliability target). `target_reliability` is a response field only; sending it as a filter key returns an error (`target_reliability is not a valid search key`). Computed fields (for example `has_sla`) are not filterable.
 
 **You set at search/rent**
 
