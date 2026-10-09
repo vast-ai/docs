@@ -40,7 +40,7 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 
 1. Complete [Account setup and hosting agreement](/host/hosting-overview#account-setup-and-hosting-agreement) on a **dedicated host account**, then [host setup](https://cloud.vast.ai/host/setup/). Confirm the machine appears on **Host → Machines** (healthy; GPU price and offer end date saved under **Set Pricing**). Listing happens in step 2. If the listing uses auto-renew, read [Auto-renew and SLA](#sla-on-extended-contracts) before you enable SLA.
 2. Publish once **without** SLA. In **Set Pricing**, leave **Claim** (your reliability commitment, the share of time you commit the machine will be up) at `0`, **Save**, then click **LIST**. If you do not see an SLA or Claim section, list without it. Step 4 is where you check SLA access. Test ports, SSH, and Jupyter from a separate client account (see [Testing your own machine](/host/hosting-overview#testing-your-own-machine)). Do not turn SLA on until that test passes.
-3. Install the [CLI](/cli/hello-world) if you schedule maintenance or read earnings from the CLI. The console [Set a maintenance window](/host/set-maintenance-window) page can notify renters without the CLI.
+3. Install the [CLI](/cli/hello-world) if you schedule maintenance from the command line, or if you want SLA earnings for one machine. **Host → Billing** is fleet-wide and has no per-machine SLA line. `vastai show earnings --machine_id ID` needs an API key with `billing_read`. The console [Set a maintenance window](/host/set-maintenance-window) page can notify renters without the CLI.
 4. Confirm SLA account access: open **Set Pricing → SLA** and confirm the panel is visible (do **not** Save final commitment/confidence yet). If the panel is missing, contact support.
 5. Preview economics (console SLA panel or [backtester](/host/sla-backtester)). Read [Billing vs settlement](#billing-vs-settlement-important) and [Risk scenarios](#risk-scenarios). GPU billing can continue during outages, and SLA credits can exceed many days of SLA fees. The normal **Host → Billing** view has no separate SLA earnings line. After you enable SLA, GPU earnings can drop because that compute is released as `sla_earn` (`vastai show earnings`). Much of it can stay held until the contract ends, so a low week is not by itself a credit.
 6. Read [Scheduled maintenance](#scheduled-maintenance) before you turn SLA on. Schedule planned work as far ahead as you can. Some hosts assume 24 hours of notice fully forgives the downtime. It does not, and forgiveness is not guaranteed.
@@ -70,7 +70,7 @@ Complete [host setup](https://cloud.vast.ai/host/setup/) first. A healthy machin
 Before enabling SLA, finish normal listing setup: test your machine, set GPU price and offer end date, choose on-demand vs interruptible, and understand [Testing your own machine](/host/hosting-overview#testing-your-own-machine) and offer terms in [Hosting overview](/host/hosting-overview).
 
 <Warning>
-On outage days you may still bill clients for **intended** compute **and** owe service credits. Tail-risk exposure can approach a full day’s compute per affected contract — not just the daily SLA fee shown in previews. Read [Billing vs settlement](#billing-vs-settlement-important) before enabling SLA.
+On an outage day the renter is still charged the normal hourly rate, and you may also owe a service credit. Tail-risk exposure can approach a full day’s compute per affected contract — not just the daily SLA fee shown in previews. Read [Billing vs settlement](#billing-vs-settlement-important) before enabling SLA.
 </Warning>
 
 <Warning>
@@ -89,7 +89,7 @@ SLA is an optional reliability promise on **on-demand** rentals. You do not have
 3. The **renter** picks a **reliability target**. You do not set their target.
 4. The renter pays an **SLA fee** (a service level fee) on top of the GPU price.
 5. Each day, Vast checks how long that rental was actually up.
-6. Each day, Vast combines recent and longer-term uptime into a **blended reliability measure**. If it met the renter's target, you keep the SLA fee and no credit is paid. If it fell short, the renter receives a **service credit** from your earnings. On an SLA rental, compute pay is not in `gpu_earn`. It is released over time as `sla_earn`, and much of it can stay held until the contract ends. A low `sla_earn` day is not by itself a credit.
+6. Each day, Vast combines recent and longer-term uptime into a **blended reliability measure**. If it met the renter's target, you keep the SLA fee and no credit is paid. If it fell short, the renter receives a **service credit** from your earnings. Vast holds SLA rental pay and releases it over time, so a low earnings day is not by itself a credit. Details are in [Billing vs settlement](#billing-vs-settlement-important).
 7. One bad day can cost more than many days of fees.
 
 What this is not:
@@ -140,7 +140,7 @@ On sliced machines, SLA settles **per rental contract**. If one GPU slice fails 
 
 ### Billing vs settlement (important)
 
-For SLA-covered on-demand contracts, compute billing uses the **intended daily compute** for the rental. Offline time is tracked as an outage in reliability observations. Client compensation for poor reliability flows through **service credits**, not by silently zeroing the day's compute bill.
+For SLA-covered on-demand contracts, the renter is still charged the normal hourly rate during an outage. Vast does not zero that day's compute bill. Compensation is a service credit.
 
 **Where SLA money goes.** On an SLA rental, the renter's compute payment and SLA fee are held by Vast (escrow) instead of being paid to you right away. Service credits are paid from that held money, and the rest is released to you over the following days. Those earnings show up as **SLA** earnings (`sla_earn`), not GPU earnings. See [How SLA money moves](/host/sla-backtester#how-sla-money-moves).
 
@@ -731,7 +731,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/${MACHINE_ID}/dnotify" \
 
 `sdate` is Unix epoch seconds (UTC). Use a future time, as far ahead as you can. `duration` is whole hours. `maintenance_category` is one of `power`, `internet`, `disk`, `gpu`, `software`, or `other`. The server stores `maintenance_reason` as empty, so do not rely on that field. See [Schedule Maintenance](/api-reference/machines/schedule-maint).
 
-**Cancel or reschedule:** [`vastai cancel maint`](/host/cli/cancel-maint) cancels **every** window you scheduled on that machine, not one window. It also asks `Continue? [y/n]`. In scripts, use `echo y | vastai cancel maint MACHINE_ID`, or call `PUT /api/v0/machines/{id}/cancel_maint/` directly. Confirm the cancel succeeded before you schedule the replacement. Otherwise a failed cancel plus a new window leaves duplicates. Windows Vast scheduled stay in place and are listed as `admin_locked`. To change one window, cancel, then create again every window you still want, as far ahead as you can, and confirm under **Machine Maintenances** (redesigned page) or **Scheduled Maintenances** (classic page).
+**Cancel or reschedule:** [`vastai cancel maint`](/host/cli/cancel-maint) cancels **every** window you scheduled on that machine, not one window. It also asks `Continue? [y/n]`. In scripts, use `echo y | vastai cancel maint MACHINE_ID`, or call `PUT /api/v0/machines/{id}/cancel_maint/` directly. Confirm the cancel succeeded before you schedule the replacement. Otherwise a failed cancel plus a new window leaves duplicates. Maintenance windows that Vast scheduled are not cancelled. They stay listed as `admin_locked`. To change one window, cancel, then create again every window you still want, as far ahead as you can, and confirm under **Machine Maintenances** (redesigned page) or **Scheduled Maintenances** (classic page).
 
 **Emergency or unplanned downtime:** Notify clients if possible using `schedule maint`, but expect **full SLA settlement exposure**. Advance-notice forgiveness does not apply to unplanned outages.
 
@@ -760,9 +760,9 @@ SLA approval, settlement questions, credit disputes, and locked machines are sep
 
   **Console**
   1. Notify renters if you can ([Set a maintenance window](/host/set-maintenance-window)).
-  2. Write down Claim, Confidence, GPU price, storage price, upload and download bandwidth prices, min GPU count, end date, whether the listing is hidden, reserved discount, and min bid from **Set Pricing**. A relist that omits bandwidth can publish it at $0, and omitting min GPU can slice the machine into 1-GPU offers.
-  3. Unlist only if the machine is still online and you need to stop new rentals. If it is offline, `create_asks` returns HTTP 402 until the daemon reconnects, and unlisting drops the SLA ask you would then have to rebuild.
-  4. Fix the problem.
+  2. Write down every field on **Set Pricing** (price, minimum GPUs, end date, storage price, bandwidth, Claim, Confidence, reserved discount, and min bid). If you unlist, you must re-enter every one of them when you relist. A blank bandwidth price publishes at $0.
+  3. Unlist only if the machine is online and you need to stop new rentals. If it is offline, leave it listed until it reconnects. Unlisting removes the SLA terms.
+  4. Fix the machine. See [Machine offline](/host/machine-offline) for common causes.
   5. After the next UTC midnight, check **Host → Billing**. There is no separate SLA line on the normal host view, and the page shows fleet totals. Compare with a normal week. One low day can be release timing. For one machine, use `vastai show earnings`.
   6. Relist only if you unlisted in step 3. Re-enter the terms from step 2, confirm the SLA fee preview, **Save**, then **LIST**. **Host → Machines** shows the latest rental end date. Relisting before that date, with an end date after a shorter rental, extends that rental and its SLA exposure. To avoid any extension, wait until that date has passed, then relist. If you relist sooner, assume shorter rentals will be extended.
 
@@ -787,7 +787,7 @@ SLA approval, settlement questions, credit disputes, and locked machines are sep
 
      `show machines` leaves out machines that have been offline for more than about 10 hours. If the snapshot is empty, call `GET /api/v0/machines/?include_offline=true` with the same key (machines offline up to about 3 days). That query parameter works on the server but is not listed in the API reference yet. If that `include_offline` response is also empty, use the console notes above. Do not unlist until you have the terms.
   3. **Unlist** only if the machine is online and you must stop new rentals. An offline machine cannot take new rentals, and unlisting drops the SLA ask. Do not change SLA settings or relist during the outage. API users: `create_asks` returns HTTP 402 while the machine is offline. `vastai unlist machine MACHINE_ID` removes the listing and does not republish it.
-  4. Fix the machine. Existing SLA contracts keep their terms and settle against each renter's target; unlisting or setting the commitment to `0` does not change that.
+  4. Fix the machine. See [Machine offline](/host/machine-offline) for common causes. Existing SLA contracts keep their terms and settle against each renter's target; unlisting or setting the commitment to `0` does not change that.
   5. **Check settlement** a few hours after the next UTC midnight. In the console, compare those days with a normal week in **Host → Billing**. Releases are spread over time, so one low day is not by itself a credit. To automate, read `per_machine[].sla_earn`. A backtester re-run is an estimate for one simulated contract, not the settlement record.
   6. **Relist with every field resent.** Relisting after an unlist creates a new ask, so stored values do not carry over. Send all of these in one `create_asks` request, using the values you recorded before unlisting: `price_gpu`, `price_disk`, `price_inetu`, `price_inetd`, `min_chunk`, `end_date` or `duration` (not both; `duration` as an integer), `hidden_listing`, `sla_r_claim`, `sla_sigma_x`, `credit_discount_max`, `price_min_bid`, and `"vol_size": 0` unless you want a volume offer. An omitted `credit_discount_max` becomes `0.4`. An omitted `sla_sigma_x` becomes `0.5`. `show machines` never returns the exact `sla_sigma_x`. Sending `end_date` or `duration` extends every active rental that ends sooner. No API field shows the latest rental end date. Check **Host → Machines** before you choose it. If the machine stays locked, contact [Discord](https://discord.gg/hSuEbSQ4X8) or contact@vast.ai before you relist.
 
@@ -846,7 +846,7 @@ Weekly aggregates are window totals, not daily series — use a one-day range ab
 ### API (automation)
 
 <Note>
-**Console users:** Skip this section if you check billing in **Host → Billing**. No API key is required.
+**Console users:** Skip this section for fleet-wide totals in **Host → Billing**. To see SLA results for one machine, use `vastai show earnings --machine_id ID` with an API key that has `billing_read`.
 </Note>
 
 **API keys for SLA**
