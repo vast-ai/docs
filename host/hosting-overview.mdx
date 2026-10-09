@@ -82,14 +82,14 @@ You can set the offer end date in the hosting interface by clicking on the date 
 
 #### How the offer becomes a rental contract
 
-When a client rents an instance from your offer, all of the offer's terms at that moment, the offer end date, the pricing, and the hardware specs, are locked into a **rental contract**. The offer end date becomes the contract's **rental end date** (shown in the UI as "client end date"), and the pricing becomes the contract's rate. Once created, a rental contract's terms cannot be changed, not by modifying the offer, not by unlisting the machine, and not by any other host action.
+When a client rents an instance from your offer, all of the offer's terms at that moment, the offer end date, the pricing, and the hardware specs, are locked into a **rental contract**. The offer end date becomes the contract's **rental end date** (shown in the UI as "client end date"), and the pricing becomes the contract's rate. Once created, price and SLA terms stay locked. Unlisting or editing the offer does not change them. **One exception:** sending an offer end date, at the same or lower price, extends every active rental that ends before that date. See [Extending rental contracts](#extending-rental-contracts).
 
 #### Can I change the offer?
 
 Yes, but changes only affect future rental contracts. Existing rental contracts keep their original terms:
 
 - **Changing the price** does not change the rate on any existing rental contract
-- **Shortening** the offer end date limits the commitment window for new clients, but does not shorten any existing rental end date
+- **Shortening** the offer end date limits the commitment window for new clients, but does not shorten any existing rental end date. Any end date you send, including an earlier one, still extends active rentals that end before it, unless the same change raises the GPU, disk, or bandwidth price. To stop new rentals without extending anything, unlist instead.
 - **Extending** the offer end date allows new clients to rent for a longer period. It also extends every active rental that ends sooner than the new date, including SLA rentals and their credit exposure. See [Extending rental contracts](#extending-rental-contracts).
 - **Unlisting** the machine prevents new rental contracts entirely, but existing ones continue at their original pricing and rental end dates
 
@@ -162,8 +162,10 @@ By default, volume offers will be listed with GPU offers at the same disk price 
 Space is listed in Gigabytes, and price in \$/Gb/Month.
 
 ```text Text
-vastai list machine <machine_id> -v <space> -z <price> -g .5 -e <END_DATE> -r 0 -m 1
+vastai list machine <machine_id> -v <space> -z <price> -g <gpu_price> -s <CURRENT_STORAGE_PRICE> -m <CURRENT_MIN_CHUNK> -e <END_DATE>
 ```
+
+Omitted flags reset values on an existing listing, and `-e` extends active rentals that end before the new date, including SLA rentals. Read the [`list machine` caveats](/host/cli/list-machine) and [SLA on extended contracts](/host/sla-offers#sla-on-extended-contracts) first.
 
 You can also directly create a volume offer by running the `vastai list volume` command.
 

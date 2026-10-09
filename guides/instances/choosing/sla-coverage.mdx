@@ -54,7 +54,7 @@ Full steps: [In the web console](#in-the-web-console). CLI/API limits for automa
 | I use the CLI for search | [CLI for search only](#cli-for-search-only) → console or REST to enable SLA at rent |
 | Understand charges and credits | [How pricing works](#how-pricing-works) → [What happens after you rent](#what-happens-after-you-rent) |
 | Automate search → rent → verify | [API automation](#api-automation) |
-| View service credits | **Account → Billing** (console only today) |
+| View service credits | **Account → Billing → Charges**, or `GET /api/v0/charges/` (`billing_read`) |
 
 **Console renters (web only).** You do not need an API key. Follow [In the web console](#in-the-web-console), skip [API automation](#api-automation), and continue at [What happens after you rent](#what-happens-after-you-rent) for outage billing and credits.
 
@@ -284,15 +284,15 @@ Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `ta
 
 **4. Tear down.** Destroy the instance to end compute, storage, and SLA fee charges. Stopping it is not guaranteed to end the GPU charge or the SLA fee. Use [Delete Instance](/api-reference/instances/destroy-instance) or `vastai destroy instance NEW_CONTRACT`. Destroying deletes the instance disk. The `instance_write` permission covers this call.
 
-**Billing reconciliation:** Verifying the SLA on an instance does not show settlement. **Account → Billing → Charges** and `GET /api/v0/charges/` show the same net `type: "sla"` row (SLA fee minus any service credit). The console labels it **Service Credit** only when the amount is negative, and **SLA Fee** otherwise. The call requires `select_filters` with `day.gte` and `day.lte` (unix seconds). The row is omitted until the last day in the window has settled. Send the response `next_token` as `after_token`. Stop when `next_token` is `null`. Compare the row with the SLA fee you expected: a smaller or negative amount means a credit was applied.
+**Billing reconciliation:** Verifying the SLA on an instance does not show settlement. **Account → Billing → Charges** and `GET /api/v0/charges/` show the same net `type: "sla"` row (SLA fee minus any service credit). The console labels it **Service Credit** only when the amount is negative, and **SLA Fee** otherwise. The call requires `select_filters` with `day.gte` and `day.lte` (unix seconds). The row is omitted until the last day in the window has settled, so a window that includes the current UTC day has no SLA row yet. Each `items[]` entry is the total for that charge type over the whole query window. To see one UTC day, set `day.gte` to that day's start and `day.lte` to `day.gte + 86399`. Page with `after_token` / `next_token` (`limit` defaults to 100, maximum 500) and space calls about one second apart. Send the response `next_token` as `after_token`. Stop when `next_token` is `null`. Compare the row with the SLA fee you expected: a smaller or negative amount means a credit was applied.
 
-**Automation limitations:** SLA service credits are reconciled in the console (**Account → Billing**). There is no renter API, export, or webhook for those credit line items today. After the UTC day boundary (wait up to about 48 hours if a line is missing), check billing or contact support. Verify an active SLA on instances with `GET /api/v1/instances/`. Confirm `target_reliability > 0`. A present but zero value means the rental has no SLA. Also check `instance.slaPremiumPerHour`. Show-instances uses OpenAPI threshold `1.0` (about one request per second).
+**Automation limitations:** SLA credits are not sent as webhooks and do not appear on invoices. Read the same net `type: "sla"` row from **Account → Billing → Charges** or `GET /api/v0/charges/` (see the billing reconciliation paragraph above). After the UTC day boundary (wait up to about 48 hours if a line is missing), check that row or contact support. Verify an active SLA on instances with `GET /api/v1/instances/`. Confirm `target_reliability > 0`. A present but zero value means the rental has no SLA. Also check `instance.slaPremiumPerHour` once the instance is running. Show-instances uses OpenAPI threshold `1.0` (about one request per second).
 
 | Symptom | Typical response | What to do |
 | --- | --- | --- |
 | Target outside `[0, 1)` (negative, or 1 or above) | HTTP 400 `invalid_args` ("target reliability must be greater than or equal to 0 and less than 1") | SLA requires `0 < target_reliability < 1`. Sending `0` or omitting the field rents **without** an SLA (HTTP 200, no error). |
 | Offer has no SLA, target is above the host commitment, or the SLA fee would exceed 1× compute | HTTP 400 `invalid_sla_params` (body includes `ask_id`; message may say "SLA Fee would be N.NNx compute") | Lower the target, or pick an offer with a higher commitment |
-| SLA is temporarily disabled platform-wide | HTTP 403 `sla_disabled` | Retry later. While SLA is disabled, search ignores `target_reliability` and returns non-SLA prices. |
+| SLA not available | HTTP 403 `sla_disabled` | SLA is not enabled for this request. It may be off platform-wide or for this account. Do not retry in a loop. Rent without a reliability target, or contact support. |
 | Offer no longer exists | HTTP 400 `invalid_args` (`msg` may contain `error 404/3603`), HTTP 404 `no_such_ask` (`msg` may contain `error 404/3659` if the offer was taken mid-request), or HTTP 410 | Re-search and use a fresh offer ID. Do not retry the same ID. |
 | Ask cannot start now (`cancel_unavail`) | HTTP 410, error `no_such_ask` | Search for a new offer; this is not a transient glitch to retry on the same id |
 | `price` (bid) sent together with `target_reliability` | HTTP 400 "Cannot combine interruptible instances with SLAs" | Remove `price`. SLA rentals are on-demand only |
@@ -377,7 +377,7 @@ Production settlement uses the multi-window reliability blend described above, n
 1. Save work and check **Instances** for host/maintenance status.
 2. Remember: compute, storage, and SLA fees continue until you destroy the instance. Credits are calculated at the next UTC settlement and apply to the **previous UTC day**, not the current hour.
 3. **Console:** Open **Instances**, select the instance, then **Destroy** to end charges on an unavailable SLA instance. See [Stop vs destroy](#what-you-pay-during-an-outage). Destroy deletes the disk, so copy off anything you need first.
-4. After settlement, check **Account → Billing** in the console for SLA line items (not `GET /api/v0/charges/`).
+4. After the UTC day settles, check **Account → Billing → Charges** or `GET /api/v0/charges/` for the net SLA row. Invoices do not show SLA credits.
 5. If credits still look wrong **48 hours** after the outage day, contact support via [Discord](https://discord.gg/hSuEbSQ4X8) or [contact@vast.ai](mailto:contact@vast.ai).
 
 ## Viewing SLA on active instances

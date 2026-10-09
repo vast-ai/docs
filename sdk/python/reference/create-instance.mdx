@@ -185,6 +185,7 @@ print(result)
 
 ```python
 import json
+import time
 import requests
 
 offer_id = 12345  # path id: offer/ask ID from search, not a running instance ID
@@ -196,6 +197,17 @@ body = {
     "target_reliability": 0.95,
     "label": label,
 }
+
+def instances_for_label():
+    found = requests.get(
+        "https://console.vast.ai/api/v1/instances/",
+        params={"select_filters": json.dumps({"label": {"eq": label}})},
+        headers=headers,
+        timeout=30,
+    )
+    found.raise_for_status()
+    return found.json().get("instances") or []
+
 try:
     response = requests.put(
         f"https://console.vast.ai/api/v0/asks/{offer_id}/",
@@ -206,28 +218,18 @@ try:
     response.raise_for_status()
 except requests.HTTPError as exc:
     status = exc.response.status_code if exc.response is not None else None
-    if status == 429 or status is None:
-        found = requests.get(
-            "https://console.vast.ai/api/v1/instances/",
-            params={"select_filters": json.dumps({"label": {"eq": label}})},
-            headers=headers,
-            timeout=30,
-        )
-        found.raise_for_status()
-        # If this returns no instance, re-search and PUT again with a new offer ID and label.
-    elif status in (400, 403, 404, 410):
+    if status in (400, 403, 404, 410):
         raise
-    else:
-        raise
+    retry_after = 5
+    if exc.response is not None and str(exc.response.headers.get("Retry-After", "")).isdigit():
+        retry_after = int(exc.response.headers["Retry-After"])
+    time.sleep(retry_after)
+    if not instances_for_label():
+        raise  # no rental: re-search and PUT again with a new offer ID and label
 except (requests.Timeout, requests.ConnectionError):
-    found = requests.get(
-        "https://console.vast.ai/api/v1/instances/",
-        params={"select_filters": json.dumps({"label": {"eq": label}})},
-        headers=headers,
-        timeout=30,
-    )
-    found.raise_for_status()
-    # If this returns no instance, re-search and PUT again with a new offer ID and label.
+    time.sleep(5)
+    if not instances_for_label():
+        raise  # no rental: re-search and PUT again with a new offer ID and label
 else:
     print(response.json())  # new_contract is the rental instance ID
 ```
