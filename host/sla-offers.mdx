@@ -308,7 +308,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
   -d '{"machine": 12345, "price_disk": CURRENT_STORAGE_PRICE, "min_chunk": CURRENT_MIN_CHUNK, "vol_size": 0, "hidden_listing": CURRENT_HIDDEN, "sla_r_claim": 0.99, "sla_sigma_x": 0.5}'
 ```
 
-Replace every `CURRENT_*` value from `vastai show machines --raw`: `listed_storage_cost`, `listed_min_gpu_count`, and whether the listing is hidden. An unedited paste is not valid JSON. `min_chunk` defaults to 1 only when offers are created or re-created. Send `end_date` only in the full listing update below, when you mean to extend.
+Replace every `CURRENT_*` value from `vastai show machines --raw`: `listed_storage_cost`, `listed_min_gpu_count`, and whether the listing is hidden. An unedited paste is not valid JSON. `min_chunk` defaults to 1 only when offers are created or re-created. If the response has `.results[0].new_contracts` with any entries, the PUT created a new ask. Re-send bandwidth prices, `credit_discount_max`, `price_min_bid`, and `sla_sigma_x` right away, or the new ask keeps the defaults (bandwidth `0`, discount `0.4`, confidence `0.5`). Send `end_date` only in the full listing update below, when you mean to extend.
 
 <Warning>
 Any active rental that ends **before** the `end_date` you send is extended to that date, unless the same request raises the GPU, disk, or bandwidth price, or changes Claim or Confidence in a way that would raise that contract's SLA fee. A Claim or Confidence change does **not** prevent a later extension (see [SLA on extended contracts](#sla-on-extended-contracts)). Resending the offer's current `end_date` is not a no-op when some rentals end sooner. `upd_contracts` lists only contracts extended immediately. See [Extending rental contracts](/host/hosting-overview#extending-rental-contracts).
@@ -807,7 +807,7 @@ After you enable SLA, charges and credits settle on UTC (Coordinated Universal T
 
 1. Go to **Host → Billing**.
 2. Set the date range to include the UTC day you want to review.
-3. Machine filtering is not available in the console. For one machine, use `vastai show earnings --machine_id ID`.
+3. Machine filtering is not available in the console. Per-machine SLA amounts need the CLI and an API key with `billing_read` (`vastai show earnings --machine_id ID`). See [API keys for SLA](/api-reference/permissions).
 4. SLA fees you keep and credits you owe are folded into the daily earnings total. There is no separate SLA line. Compare the total with a normal week. For one machine's SLA amount, run `vastai show earnings --machine_id ID` and read `sla_earn`.
 5. After downtime, compare several days with a normal week. Much of the escrow can stay held until the contract ends, so a low `sla_earn` is not by itself a credit. Do not look for a negative SLA line, and do not match one day to the backtester's largest single-day credit.
 
@@ -846,7 +846,7 @@ Weekly aggregates are window totals, not daily series — use a one-day range ab
 ### API (automation)
 
 <Note>
-**Console users:** Skip this section for fleet-wide totals in **Host → Billing**. To see SLA results for one machine, use `vastai show earnings --machine_id ID` with an API key that has `billing_read`.
+**Console users:** Skip this section. **Host → Billing** shows fleet-wide totals. For one machine's SLA amount, run `vastai show earnings --machine_id ID` with a `billing_read` key.
 </Note>
 
 **API keys for SLA**
@@ -873,7 +873,7 @@ curl -s -H "Authorization: Bearer $VAST_API_KEY" \
 When you pass `machid`, use `per_machine[].sla_earn` for that machine's SLA settlement in the window. Do **not** read `per_day[].sla_earn` for single-machine checks — `per_day[]` is always fleet-wide, even with `?machid=`.
 
 **Quick rules:**
-- **One machine, one UTC day:** Use `sday`/`eday` with `day = floor(unix_epoch_seconds / 86400)`, or CLI `--start_date` / `--end_date` with an explicit UTC time (`YYYY-MM-DDT00:00:00Z`; bare dates are parsed in local time). Example: `2026-07-24` 00:00 UTC is unix `1784851200` → `sday=eday=20658`. The backtester is not a per-day audit of `sla_earn`. The two match only when the machine's only rental that day was a single SLA contract at the simulated target. See [Simulation limits](/host/sla-backtester#simulation-limits). Never compare `sla_earn` with the largest single-day credit (`escrow_to_client_balance`). Use `last_days=1` with `machid` only for coarse polling after UTC rollover—not as a strict match to one settled UTC calendar day.
+- **One machine, one UTC day:** Use `sday`/`eday` with `day = floor(unix_epoch_seconds / 86400)`, or CLI `--start_date` / `--end_date` with an explicit UTC time (`YYYY-MM-DDT00:00:00Z`; bare dates are parsed in local time). Example: `2026-07-24` 00:00 UTC is unix `1784851200` → `sday=eday=20658`. Pull several hours after UTC midnight (for example 06:00 UTC). Later corrections can change `sla_earn`, so re-pull a trailing window (`sday` six days earlier through yesterday) instead of recording a day once. The backtester is not a per-day audit of `sla_earn`. The two match only when the machine's only rental that day was a single SLA contract at the simulated target. See [Simulation limits](/host/sla-backtester#simulation-limits). Never compare `sla_earn` with the largest single-day credit (`escrow_to_client_balance`). Use `last_days=1` with `machid` only for coarse polling after UTC rollover—not as a strict match to one settled UTC calendar day.
 - **Fleet, exact UTC day (one call):** omit `machid` and set `sday` and `eday` to the same day index. Read `per_machine[].sla_earn`.
 - **Recent window (`last_days`, coarse):** one request without `machid` returns all machines in `per_machine[]`. `last_days=1` spans yesterday and today-so-far.
 </Warning>

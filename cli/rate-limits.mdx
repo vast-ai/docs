@@ -31,19 +31,12 @@ For the full breakdown, see [How rate limits are applied](/api-reference/rate-li
 
 ## Rate Limit Response
 
-When you hit a rate limit, the API returns **HTTP 429** with a message like:
+HTTP 429 comes in two families. See [Rate Limits and Errors](/api-reference/rate-limits-and-errors#rate-limit-response-behavior).
 
-```
-API requests too frequent
-```
+- Legacy rent and show-instances calls return plain text and no `Retry-After`.
+- Search and charges return JSON. A short limit uses `"error": "HTTPTooManyRequests"`. A daily search quota hit uses `"error": "search_quota_exceeded"` and a `Retry-After` that can be hours.
 
-or
-
-```
-API requests too frequent: endpoint threshold=...
-```
-
-Some HTTP 429 responses include a `Retry-After` header. The daily search row quota (`error: "search_quota_exceeded"`) does, and its value can be hours. The CLI never reads that header. With the default of 3 attempts, those retries finish in under a second. If your script calls the API directly, wait at least `Retry-After` when it is present.
+The CLI never reads `Retry-After`. With the default of 3 attempts, its retries finish in under a second. If your script calls the API directly, wait at least `Retry-After` when it is present.
 
 ## Built-in Retry Behavior
 
@@ -62,7 +55,7 @@ The CLI retries 429, 502, 503, 504, connection errors, and timeouts. Other HTTP 
 
 ## Configuring Retries
 
-Use the `--retry` flag on any command to change the number of retry attempts:
+Use the `--retry` flag on any command to change the total number of attempts:
 
 ```bash
 # Default: 3 attempts

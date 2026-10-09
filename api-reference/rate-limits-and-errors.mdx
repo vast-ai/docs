@@ -34,7 +34,7 @@ The combined API reference does not always show each operation's `x-rate-limit` 
 | Endpoint | Safe pacing |
 | --- | --- |
 | Search offers (`POST /bundles/`) | about 10 requests per minute |
-| Rent (`PUT /asks/{id}/`) | one call every 4.5 seconds or slower |
+| Rent (`PUT /asks/{id}/`) | one call every 4.5 seconds; space calls at least 5 seconds apart |
 | Show instances (v1) | one call per second |
 | Show charges | one call per second |
 | Show earnings and the SLA backtester | one call every 2 seconds |
@@ -43,13 +43,12 @@ The combined API reference does not always show each operation's `x-rate-limit` 
 
 ### Rate limit response behavior
 
-When you hit a rate limit, you will receive **HTTP 429**. The body is one of three shapes:
+When you hit a rate limit, you will receive **HTTP 429**. There are two families:
 
-- Plain text: `API requests too frequent: endpoint threshold=…`
-- JSON with a `detail` key containing that same message
-- Search quota only: JSON `{"error": "search_quota_exceeded", "msg": "…"}` plus a `Retry-After` header
+- **Legacy endpoints** (rent `PUT /api/v0/asks/{id}/`, `GET /api/v1/instances/`): a plain-text body such as `API requests too frequent: endpoint threshold=…`, with no `Retry-After` header.
+- **Token-bucket endpoints** (search `POST /api/v0/bundles/`, charges `GET /api/v0/charges/`): JSON `{"error": "HTTPTooManyRequests", "msg": "API requests too frequent", "retry_after": …}` with a short `Retry-After` header. A daily search quota hit uses the same shape with `"error": "search_quota_exceeded"` and a `Retry-After` that can be hours.
 
-Treat any other 429 as a short backoff. Only `search_quota_exceeded` carries `Retry-After`, and that wait can be hours.
+Honor `Retry-After` whenever it is present. If it is absent, back off yourself.
 
 ### How to reduce rate limit errors
 

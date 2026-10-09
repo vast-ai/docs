@@ -12,7 +12,7 @@ Use this page for scoped API keys and automation. If you only use the web consol
 | If you are… | Start here | API key needed? |
 | --- | --- | --- |
 | Renter (console) | [SLA](/guides/instances/choosing/sla-coverage#in-the-web-console) | No |
-| Host (console) | [SLA Offers](/host/sla-offers#web-console) | No |
+| Host (console) | [SLA Offers](/host/sla-offers#web-console) | No for listing. Per-machine SLA earnings need the CLI and a `billing_read` key. |
 | Automating search, rent, or listing | Continue below ([renter recipe](#renter-sla-scoped-key-recipe) · [host recipe](#host-sla-scoped-key-recipe)) | Yes |
 
 On this page, **renter** means client and **host** means provider. API names may still say client or provider.
@@ -97,7 +97,7 @@ Create the key via [Create API Key](/api-reference/accounts/create-api-key). Do 
 
 **Workflow summary:** Search, then REST rent with `target_reliability`, then verify on v1 instances. Charges and **Account → Billing → Charges** show the same net `type: "sla"` row. The console labels it **Service Credit** only when the amount is negative.
 
-- Create a **dedicated** key for this workflow only. `misc` covers bundle search and other bundled routes—not only search (including serverless). Constraints cannot limit `misc` to search only today. Treat a `misc` key as a high-impact secret. Do not reuse a full-access key.
+- Create a **dedicated** key for this workflow only. `misc` covers offer search **and** unrelated routes such as serverless endpoints and workergroups. Constraints cannot limit `misc` to search only today. Treat a `misc` key as a high-impact secret. Do not reuse a full-access key.
 - **Search:** `misc` (no search-only permission exists). Search automation is rate-limited—see [Rate Limits and Errors](/api-reference/rate-limits-and-errors) and [API automation](/guides/instances/choosing/sla-coverage#api-automation) before production search loops.
 - **Rent:** `instance_write` on `PUT /api/v0/asks/{id}/` with `target_reliability`.
 - **Verify:** `instance_read` with `GET /api/v1/instances/` or `vastai show instances --raw` (that command already calls v1). Store `search.slaPremiumPerHour` from the instance row when the rent succeeds. `instance.slaPremiumPerHour` is a cross-check only while the instance is running. It reads `0` while loading, stopped, or offline.
@@ -126,11 +126,12 @@ This is the minimum for search, REST rent, and verification. Add `user_read` if 
 ```bash
 curl -G "https://console.vast.ai/api/v0/charges/" \
   -H "Authorization: Bearer $VAST_API_KEY" \
-  --data-urlencode 'select_filters={"day":{"gte":1767225600,"lte":1767311999}}'
+  --data-urlencode 'select_filters={"day":{"gte":1767225600,"lte":1767311999}}' \
+  --data-urlencode "limit=500"
 ```
 
 <Note title="API integrators">
-Each `items[]` entry is the total for the whole query window, so this example is one UTC day (`day.lte` = `day.gte` + 86399). An amount smaller than the SLA fee you expected, or a negative amount, means a credit was applied. The contract row can appear before settlement. Its `sla` item is absent until that day settles.
+Each `items[]` entry is the total for the whole query window, so this example is one UTC day (`day.lte` = `day.gte` + 86399). An amount smaller than the SLA fee you expected, or a negative amount, means a credit was applied. The contract row can appear before settlement. Its `sla` item is absent until that day settles. If `next_token` is not `null`, repeat the request with `after_token` before you treat a missing `sla` item as unsettled.
 </Note>
 
 <a id="host-sla-scoped-key-recipe"></a>
