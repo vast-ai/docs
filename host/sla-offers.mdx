@@ -4,7 +4,7 @@ description: "Offer an SLA on your machines: set a reliability commitment and co
 "canonical": "/host/sla-offers"
 ---
 
-Vast.ai lets hosts attach a **Service Level Agreement (SLA)** to a machine listing. An SLA is a reliability guarantee: clients who choose an SLA pay a small hourly **SLA fee** included in **`dph_total`** (dollars per hour total in search — GPU + storage + SLA fee), and if measured reliability falls short of their chosen target, they receive a service credit funded from your earnings.
+Vast.ai lets hosts attach a **Service Level Agreement (SLA)** to a machine listing. An SLA is a reliability commitment, paid as daily service credits, not as guaranteed uptime: clients who choose an SLA pay a small hourly **SLA fee** included in **`dph_total`** (dollars per hour total in search — GPU + storage + SLA fee), and if measured reliability falls short of their chosen target, they receive a service credit funded from your earnings.
 
 The **SLA fee** is that hourly amount. It appears as the **SLA Fee** line in the console. API field names call the same amount a premium (for example `slaPremiumPerHour`).
 
@@ -24,8 +24,8 @@ SLA settlement is **asymmetric by design**: on strong days you keep the SLA fee;
 
 Not listed yet? Finish [machine setup](/host/hosting-overview#machine-setup) and the [host setup guide](https://cloud.vast.ai/host/setup/) before you enable an SLA.
 
-<Note title="Console-only hosts">
-Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong). Skip [Fleet SLA re-list](#fleet-sla-re-list-machines-that-already-have-an-sla) and API automation unless you manage many machines with scripts. The console shows fleet-wide totals, with SLA folded into earnings. Per-machine SLA amounts need the CLI and an API key with `billing_read`. Outage recovery also needs the CLI. Do not turn SLA back on until `vastai self-test machine` prints `Test completed successfully.` Nothing in the listing API checks that for you. Install the CLI before you enable SLA (checklist step 3).
+<Note title="Console hosts (CLI still required for two steps)">
+You set SLA in the console. Two steps still need the CLI: `vastai self-test machine` after you unlist during an outage, and per-machine SLA earnings (`vastai show earnings`). Install the CLI before you enable SLA. If you stayed listed, your SLA terms did not change and there is nothing to turn back on. A full-access key covers this page. A scoped key needs `billing_read`, `machine_read`, `machine_write`, `instance_read`, and `misc` for the offer search the self-test runs. See the [host SLA recipe](/api-reference/permissions#host-sla-scoped-key-recipe).
 </Note>
 
 | Goal | Start here |
@@ -42,7 +42,7 @@ Read [SLA in plain language](#sla-in-plain-language) before this list.
 
 1. Complete [Account setup and hosting agreement](/host/hosting-overview#account-setup-and-hosting-agreement) on a **dedicated host account**, then [host setup](https://cloud.vast.ai/host/setup/). Confirm the machine appears on **Host → Machines** (healthy; GPU price and offer end date saved under **Set Pricing**). Listing happens in step 2. If the listing uses auto-renew, read [SLA on extended contracts](#sla-on-extended-contracts) before you enable SLA.
 2. Publish once **without** SLA. In **Set Pricing**, leave the SLA controls closed, click **Save**, then **LIST**. The console cannot set **Reliability Commitment** to `0`. If you do not see an SLA section, list without it. Step 4 is where you check SLA access. Test ports, SSH, and Jupyter from a separate client account (see [Testing your own machine](/host/hosting-overview#testing-your-own-machine)). **Destroy** that test instance before step 7. A running or stopped test rental is extended to the listing end date when you click **Save**. Do not turn SLA on until that test passes.
-3. Install the [CLI](/cli/hello-world) and create an API key before step 7, even if you manage the machine in the console. Do not turn SLA back on after an outage until `vastai self-test machine` prints `Test completed successfully.` The listing API does not check that for you. You also need the CLI for maintenance from the command line and for per-machine SLA earnings. **Host → Billing** is fleet-wide and has no per-machine SLA line. `vastai show earnings --machine_id ID` needs an API key with `billing_read`. The console [Set a maintenance window](/host/set-maintenance-window) page can notify renters without the CLI.
+3. Install the [CLI](/cli/hello-world) and create an API key before step 7, even if you manage the machine in the console. If you unlisted during an outage, do not turn SLA back on until `vastai self-test machine` prints `Test completed successfully.` The listing API does not check that for you. If you stayed listed, your SLA terms did not change. You also need the CLI for maintenance from the command line and for per-machine SLA earnings. **Host → Billing** is fleet-wide and has no per-machine SLA line. `vastai show earnings --machine_id ID` needs an API key with `billing_read`. The console [Set a maintenance window](/host/set-maintenance-window) page can notify renters without the CLI.
 4. Confirm SLA account access: open **Set Pricing → SLA** and confirm the panel is visible (do **not** Save final commitment/confidence yet). If **Set Pricing** has no **SLA** section, contact support before you enable SLA. A missing section is not a fee preview.
    - **API users:** `PUT /api/v0/machines/create_asks/` returns 403 `sla_not_approved` when the host is not approved.
 5. Preview economics only if the machine already has rental history (console SLA panel or [backtester](/host/sla-backtester)). On a new machine, neither can show a number yet. Start at **Low** confidence, use the [economics walkthrough](#economics-walkthrough) as your estimate, and confirm the real fee in step 8 after you save. Read [Billing vs settlement](#billing-vs-settlement-important) and [Risk scenarios](#risk-scenarios). GPU billing can continue during outages, and SLA credits can exceed many days of SLA fees.
@@ -838,12 +838,12 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/${MACHINE_ID}/dnotify" \
 **After you schedule**
 
 1. Confirm exactly one window for this downtime: `vastai show maints --ids 'MACHINE_ID' --raw` ([show maints](/host/cli/show-maints)). A scoped key needs `instance_read` for that command. Or use **Machine Maintenances** (redesigned page) or **Scheduled Maintenances** (classic page).
-2. `--raw` is a JSON list. Each object includes `machine_id`, `start_time` (Unix UTC), `end_time`, `duration_hours`, and `maintenance_category`.
+2. `--raw` is a JSON list. Each object includes `machine_id`, `start_time` (Unix UTC), `end_time`, `duration_hours`, `maintenance_category`, and `admin_scheduled` (`true` when Vast scheduled that window).
 3. Wait at least 3 seconds before the next machine.
 
 `sdate` is Unix epoch seconds (UTC). Use a future time. For an outage already underway, one minute from now is enough. `duration` is whole hours. `maintenance_category` is one of `power`, `internet`, `disk`, `gpu`, `software`, or `other`. The server stores `maintenance_reason` as empty. Each planned downtime should have exactly one window. A machine may have several windows for different downtimes. In scripts, pass `--retry 1`. A retried PUT can create a second window if the first was stored and the response was lost. Confirm the count before you schedule the next machine.
 
-**Cancel or reschedule:** The command asks `Continue? [y/n]`. In scripts, use `echo y | vastai cancel maint MACHINE_ID`, or call `PUT /api/v0/machines/{id}/cancel_maint/` directly. Confirm the list is empty of your windows before you schedule the replacement. Windows that Vast scheduled stay listed as `admin_locked` and are not cancelled. See [Schedule Maintenance](/api-reference/machines/schedule-maint).
+**Cancel or reschedule:** The command asks `Continue? [y/n]`. In scripts, use `echo y | vastai cancel maint MACHINE_ID`, or call `PUT /api/v0/machines/{id}/cancel_maint/` directly. Confirm the list is empty of your windows before you schedule the replacement. `cancel maint` does not cancel windows that Vast scheduled. In `show maints --raw` those rows have `admin_scheduled: true`. The cancel response reports how many it left in place as `admin_locked` (a count). See [Schedule Maintenance](/api-reference/machines/schedule-maint).
 
 **Emergency or unplanned downtime:** Notify clients if possible using `schedule maint`, but expect **full SLA settlement exposure**. Advance-notice forgiveness does not apply to unplanned outages.
 
@@ -874,7 +874,7 @@ SLA approval, settlement questions, credit disputes, and locked machines are sep
   **Console**
   1. Notify renters if you can ([Set a maintenance window](/host/set-maintenance-window)). Change **Maintenance start** to a few minutes from now. The form starts 24 hours ahead. An emergency window is still unplanned, so expect full SLA exposure for it.
   2. Write down every field on **Set Pricing**: GPU price, minimum GPUs, storage price, bandwidth, reserved discount, min bid, whether the listing is **hidden**, the offer end date or auto-renew duration, **Reliability Commitment**, and **Confidence**. If you unlist, you must re-enter every one of them when you relist. A blank bandwidth price publishes at $0.
-  3. Unlist only if the machine is online and you need to stop new rentals. If it is offline, leave it listed until it reconnects. Unlisting removes the SLA terms.
+  3. Unlist only if the machine is online and you need to stop new rentals. If it is offline, leave it listed until it reconnects. Unlisting removes the SLA terms. If a rental is still on the machine, SLA stays off for new rentals until that rental ends: the self-test refuses with `currently_rented`, and the relist **Save** can extend the rental. If the machine cannot take new rentals, staying listed keeps your SLA terms.
   4. Fix the machine. See [Machine offline](/host/machine-offline) for common causes.
   5. After the next UTC midnight, check **Host → Billing**. There is no separate SLA line on the normal host view, and the page shows fleet totals. Compare with a normal week. One low day can be release timing. For one machine, use `vastai show earnings`.
   6. **Return to service** only if you unlisted in step 3.
@@ -910,7 +910,7 @@ SLA approval, settlement questions, credit disputes, and locked machines are sep
      ```
 
      `show machines` leaves out machines that have been offline for more than about 10 hours. If the snapshot is empty, call `GET /api/v0/machines/?include_offline=true` with the same key (machines offline up to about 3 days). If that `include_offline` response is also empty, use the console notes above. Do not unlist until you have the terms.
-  3. **Unlist** only if the machine is online and you must stop new rentals. An offline machine cannot take new rentals, and unlisting drops the SLA ask. Do not change SLA settings or relist during the outage. API users: `create_asks` returns HTTP 402 while the machine is offline. `vastai unlist machine MACHINE_ID` removes the listing and does not republish it.
+  3. **Unlist** only if the machine is online and you must stop new rentals. An offline machine cannot take new rentals, and unlisting drops the SLA ask. If a rental is still on the machine, SLA stays off for new rentals until that rental ends, because the self-test refuses with `currently_rented`. Staying listed keeps the current SLA terms. Do not change SLA settings or relist during the outage. API users: `create_asks` returns HTTP 402 while the machine is offline. `vastai unlist machine MACHINE_ID` removes the listing and does not republish it.
   4. Fix the machine. See [Machine offline](/host/machine-offline) for common causes. Existing SLA contracts keep their terms and settle against each renter's target; unlisting or setting the commitment to `0` does not change that.
   5. **Check settlement** a few hours after the next UTC midnight. In the console, compare those days with a normal week in **Host → Billing**. Releases are spread over time, so one low day is not by itself a credit. To automate, read `per_machine[].sla_earn`. A backtester re-run is an estimate for one simulated contract, not the settlement record.
   6. **Return to service.**
