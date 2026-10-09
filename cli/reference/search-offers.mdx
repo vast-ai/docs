@@ -75,7 +75,7 @@ Filter examples (including SLA quotes) are under [Examples](#examples). Query sy
 ## Examples
 
 <Warning>
-**The console and REST quote SLA pricing. The CLI can find SLA offers but cannot price them.** Prefer `dph_total` (and `--order dph_total`) only after a console or REST search that set `target_reliability`. Match `--storage` to `--disk` if you rent via CLI for non-SLA. To **enable** SLA at rent, see [Next step for SLA](#next-step-for-sla) and [SLA coverage](/guides/instances/choosing/sla-coverage#finding-sla-offers).
+The CLI can find SLA offers but cannot price them. Treat `dph_total` as SLA-inclusive only when the search set `target_reliability` in the console or REST. From the CLI, `--order dph_total` sorts by price without the SLA fee. Match `--storage` to `--disk` if you rent via CLI for non-SLA. To **enable** SLA at rent, see [Next step for SLA](#next-step-for-sla) and [SLA coverage](/guides/instances/choosing/sla-coverage#finding-sla-offers).
 </Warning>
 
 ```bash
@@ -83,13 +83,13 @@ Filter examples (including SLA quotes) are under [Examples](#examples). Query sy
 # rented=false (excludes slots you already rent) is already in the CLI default query; shown here explicitly
 vastai search offers 'reliability > 0.98 num_gpus=1 gpu_name=RTX_3090 rented=false'
 
-# Find SLA offers (the CLI cannot quote the SLA fee today; see the Warning below)
+# Find SLA offers. dph_total here excludes the SLA fee (see the Warning below).
 # Always set --storage explicitly when comparing dph_total (CLI default 5 GiB ≠ REST 8 GB).
 vastai search offers 'has_sla=true expected_reliability>=0.99' --storage 50 --order dph_total
 ```
 
 <Warning>
-The current CLI cannot quote an SLA fee: it sends `target_reliability=0.95` as `{"eq": 0.95}`, which search rejects with `400 target_reliability: Input should be a valid number`. Use the CLI to find SLA offers (`has_sla`, `expected_reliability`), then get the SLA-inclusive `dph_total` from the console or REST (`"target_reliability": 0.95` as a plain number).
+The CLI can find SLA offers (`has_sla`, `expected_reliability`) but cannot price them. `vastai search offers 'target_reliability=0.95'` is sent as `{"eq": 0.95}` and fails with HTTP 400 (`target_reliability: Input should be a valid number`). Treat `dph_total` as SLA-inclusive only when the search set `target_reliability` in the console or REST. From the CLI, `--order dph_total` sorts by price without the SLA fee.
 </Warning>
 
 <a id="next-step-for-sla"></a>
@@ -177,7 +177,7 @@ bool       = True | False
 | `reliability` | float | machine reliability score (see FAQ for explanation) |
 | `expected_reliability` | float | host’s advertised SLA reliability commitment on the offer |
 | `has_sla` | bool | restrict to offers with SLA enabled (`true`) or without (`false`) |
-| `target_reliability` | float | reliability target greater than 0 and less than 1 (e.g. `0.95` = 95% — console **Reliability target**); prices `dph_total` in search only — see [SLA](/guides/instances/choosing/sla-coverage#finding-sla-offers) to enable the SLA at rent |
+| `target_reliability` | float | REST and console only. The current CLI sends this as an operator object and search rejects it (HTTP 400). See the Warning under Examples. |
 | `rentable` | bool | is the instance currently rentable |
 | `rented` | bool | allow/disallow duplicates and potential conflicts with existing stopped instances |
 | `storage_cost` | float | storage cost in $/GB/month |

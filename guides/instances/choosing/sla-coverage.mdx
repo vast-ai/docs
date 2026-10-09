@@ -17,7 +17,7 @@ An SLA is an optional reliability promise on an **on-demand** GPU rental. You do
 3. You pay an **SLA fee** (a service level fee) on top of the GPU price.
 4. Each day, Vast checks how long your instance was actually up.
 5. If the blended measure met your reliability target, the host keeps the SLA fee. "Met" uses Vast's blended reliability measure (recent and longer-term uptime), not that day's raw uptime alone. A day whose raw uptime is at or slightly above your target can still produce a partial credit if the blended measure falls below it.
-6. If uptime missed your reliability target, you receive a **service credit**. That credit can be larger than the SLA fee you paid that day.
+6. If the blended measure fell below your reliability target, you receive a **service credit**. That credit can be larger than the SLA fee you paid that day.
 
 A few things people mix up:
 
@@ -286,7 +286,8 @@ Replace `NEW_CONTRACT` with the id from the rent response. Confirm top-level `ta
 
 | Symptom | Typical response | What to do |
 | --- | --- | --- |
-| Offer has no SLA, target is above the host commitment, target is out of range, or the SLA fee would exceed 1× compute | HTTP 400 `invalid_sla_params` (body includes `ask_id`; message may say "SLA Fee would be N.NNx compute") | Lower the target, or pick an offer with a higher commitment |
+| Target out of range (below 0 or 1 or above) | HTTP 400 `invalid_args` ("target reliability must be greater than or equal to 0 and less than 1") | Send a plain number in `[0, 1)`. |
+| Offer has no SLA, target is above the host commitment, or the SLA fee would exceed 1× compute | HTTP 400 `invalid_sla_params` (body includes `ask_id`; message may say "SLA Fee would be N.NNx compute") | Lower the target, or pick an offer with a higher commitment |
 | SLA not enabled for the account or region | HTTP 403 `sla_disabled` | Contact support |
 | Offer no longer exists | HTTP 400 `invalid_args` (`no_such_ask`; `msg` may contain `error 404/3603`) or HTTP 410 | Re-search and use a fresh offer ID. The HTTP status for a missing offer is 400, not 404. |
 | Ask cannot start now (`cancel_unavail`) | HTTP 410, error `no_such_ask` | Search for a new offer; this is not a transient glitch to retry on the same id |

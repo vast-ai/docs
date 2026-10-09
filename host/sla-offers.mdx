@@ -89,7 +89,7 @@ SLA is an optional reliability promise on **on-demand** rentals. You do not have
 4. The renter pays an **SLA fee** (a service level fee) on top of the GPU price.
 5. Each day, Vast checks how long that rental was actually up.
 6. If the blended measure met their reliability target, you keep the SLA fee. "Met" uses Vast's blended reliability measure (recent and longer-term uptime), not that day's raw uptime alone. A day whose raw uptime is at or slightly above the target can still produce a partial credit if the blended measure falls below it. When the blended measure meets the target, no credit is paid.
-7. If uptime missed their reliability target, the renter receives a **service credit** from your earnings. One bad day can cost more than many days of fees.
+7. If the blended measure fell below their reliability target, the renter receives a **service credit** from your earnings. One bad day can cost more than many days of fees.
 
 What this is not:
 
@@ -219,7 +219,7 @@ For planning, assume a worst-case day costs up to one full day of covered comput
 
 ### SLA on extended contracts
 
-When a rental contract is extended (by moving the offer end date forward at the same or lower price), the original SLA parameters remain in effect for the extended period. Changing SLA parameters on the offer does not alter SLA terms on existing contracts — only new rental contracts pick up updated SLA settings.
+When a rental contract is extended (by moving the offer end date forward at the same or lower price), the original SLA parameters remain in effect for the extended period. Changing SLA parameters on the offer does not alter SLA terms on existing contracts — only new rental contracts pick up updated SLA settings. If the same request would raise the SLA fee on an existing SLA contract (lower commitment, wider confidence, or `sla_r_claim` set to `0`), that contract is not extended, and the response does not say so.
 
 Disabling SLA on the offer (setting `sla_r_claim` to `0`) prevents new SLA-covered contracts but does not terminate SLA on existing active contracts — they continue under their original SLA terms until their rental end date.
 
@@ -276,11 +276,14 @@ SLA listing via CLI/SDK is not available yet — use the REST API below (or cons
 **Not a first listing.** Use this SLA-only body when the machine already has base pricing. For a **first publish**, use a full `create_asks` body from [List Machine](/api-reference/machines/list-machine) (include at least `min_chunk`, disk/bandwidth prices, and `end_date`) or **Set Pricing → SLA** in the console. See [Hosting overview](/host/hosting-overview#offers-and-rental-contracts).
 </Warning>
 
+Omitted fields reset. Read the warning under [Full listing update](#full-listing-update-existing-ask) before you copy a body. `"vol_size": 0` keeps a new volume offer from being created. It does not delete a volume offer you already have.
+
 ```bash
+# "vol_size": 0 keeps volume offers off. Remove it only if this machine should have a volume offer.
 curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"machine": 12345, "price_disk": 0.15, "min_chunk": CURRENT_MIN_CHUNK, "hidden_listing": false, "end_date": CURRENT_END_DATE_UNIX, "sla_r_claim": 0.99, "sla_sigma_x": 0.5}'
+  -d '{"machine": 12345, "price_disk": 0.15, "min_chunk": CURRENT_MIN_CHUNK, "vol_size": 0, "hidden_listing": false, "end_date": CURRENT_END_DATE_UNIX, "sla_r_claim": 0.99, "sla_sigma_x": 0.5}'
 ```
 
 Replace `price_disk` with the machine's current `listed_storage_cost`. Replace `CURRENT_END_DATE_UNIX` with the machine's current `end_date` from `show machines`, as a number with no quotes. Replace `CURRENT_MIN_CHUNK` with `listed_min_gpu_count` (omitting `min_chunk` resets it to 1). Send `duration` as an integer number of seconds if the listing auto-renews (`show machines` returns a float such as `2592000.0`, which the API rejects), otherwise send `end_date`. Never send both. Send `"hidden_listing": true` if the listing is hidden. See the warning below. Do not copy example prices into a first listing.
@@ -302,6 +305,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
     "price_gpu": 3.50,
     "price_disk": 0.15,
     "min_chunk": CURRENT_MIN_CHUNK,
+    "vol_size": 0,
     "hidden_listing": false,
     "sla_r_claim": 0.99,
     "sla_sigma_x": 0.5,
@@ -321,6 +325,7 @@ SLA fields example (existing listing, same limit as the curl above):
   "price_gpu": 3.50,
   "price_disk": 0.15,
   "min_chunk": CURRENT_MIN_CHUNK,
+  "vol_size": 0,
   "hidden_listing": false,
   "end_date": CURRENT_END_DATE_UNIX,
   "sla_r_claim": 0.99,
@@ -338,7 +343,7 @@ This creates an offer with a reliability commitment of `0.99` and confidence spr
 - `duration` is cleared if omitted (a listing created with `vastai list machine -l` stops auto-renewing).
 - `hidden_listing` resets to `false` if omitted (a hidden listing becomes visible). `show machines` does not return this flag, so send `true` when the listing should stay hidden.
 - `min_chunk` resets to **1** if omitted, which can make a whole-GPU listing sliceable. Send the current `listed_min_gpu_count`.
-- `vol_size` omitted on a machine with no volume offer creates one sized at half the free disk. Send `"vol_size": 0` to keep volume offers off.
+- `vol_size` omitted on a machine with no volume offer creates one sized at half the free disk. Send `"vol_size": 0` to keep that from happening. `0` does not delete a volume offer that already exists.
 - Send **either** `duration` (integer seconds; a float such as `2592000.0` returns 400 `Invalid duration`) **or** `end_date`, never both. Sending both returns `400` `Cannot set both duration and end_date`.
 
 Always read the current listing and send `price_disk` plus either `duration` or `end_date`. Map read-side names as follows: `listed_gpu_cost` → `price_gpu`, `listed_storage_cost` → `price_disk`.
@@ -404,6 +409,9 @@ ALLOWLIST="${ALLOWLIST:-}"
 # Hidden listings: show machines does not return hidden_listing, and omitting it
 # makes the listing public. Put every hidden machine ID here, or leave it off ALLOWLIST.
 HIDDEN_IDS="${HIDDEN_IDS:-}"
+# Volume offers: 0 = do not create a volume offer (default). It does not delete one you already have.
+# Set VOL_SIZE="" only if every allowlisted machine should get the server default (half of free disk).
+VOL_SIZE="${VOL_SIZE:-0}"
 DRY_RUN="${DRY_RUN:-1}"
 if [ "$DRY_RUN" = "0" ] && [ -z "$ALLOWLIST" ]; then
   echo "abort: set ALLOWLIST to Listed machine IDs before DRY_RUN=0" >&2; exit 1
@@ -443,13 +451,15 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
   fi
   # sla_sigma_x is omitted on purpose: create_asks keeps each machine's current confidence.
   # price_disk is required: null or omitted resets storage price to 0.10.
-  # Send duration OR end_date, never both (400). duration must be an integer;
-  # show machines returns a float, which the API rejects. hidden_listing must be explicit.
-  body=$(echo "$machine" | jq -c --argjson hidden "$hidden" \
+  # Rolling (-l) listings are included. Resend duration as an integer (whole seconds) so auto-renew stays on.
+  # A float duration returns 400. Send duration OR end_date, never both.
+  # hidden_listing must be explicit. vol_size 0 avoids creating a volume offer.
+  body=$(echo "$machine" | jq -c --argjson hidden "$hidden" --arg vol "$VOL_SIZE" \
     '{machine: (.id|tonumber), price_gpu: .listed_gpu_cost, price_disk: .listed_storage_cost,
       min_chunk: .listed_min_gpu_count, sla_r_claim: .sla_reliability_claim,
       hidden_listing: $hidden}
-     + (if .duration == null then {end_date} else {duration: (.duration | floor)} end)')
+     + (if .duration == null then {end_date} else {duration: (.duration | floor)} end)
+     + (if $vol == "" then {} else {vol_size: ($vol|tonumber)} end)')
   if [ "$DRY_RUN" != "0" ]; then
     echo "dry-run machine_id=$id payload: $body"; continue
   fi
@@ -478,7 +488,7 @@ Fetch the fleet once before the loop — do not call `show machines --raw` insid
 curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"machine": 12345, "price_disk": 0.15, "min_chunk": CURRENT_MIN_CHUNK, "hidden_listing": false, "end_date": CURRENT_END_DATE_UNIX, "sla_r_claim": 0.995, "sla_sigma_x": 0.2}'
+  -d '{"machine": 12345, "price_disk": 0.15, "min_chunk": CURRENT_MIN_CHUNK, "vol_size": 0, "hidden_listing": false, "end_date": CURRENT_END_DATE_UNIX, "sla_r_claim": 0.995, "sla_sigma_x": 0.2}'
 ```
 
 Replace `CURRENT_END_DATE_UNIX` and `CURRENT_MIN_CHUNK` with the current values from `show machines`, as numbers with no quotes. A later `end_date` extends live SLA contracts. Omitting `min_chunk` resets it to 1.
@@ -519,10 +529,11 @@ Replace `CURRENT_END_DATE_UNIX` and `CURRENT_MIN_CHUNK` with the current values 
 ```
 
 - `extended` — integer count of rental contracts extended (read from `results[0]`, not the top level)
-- `new_contracts` / `upd_contracts` — arrays of listing contract IDs, not a signal that locked SLA terms on an active rental changed
+- `new_contracts` — IDs of offers (asks) created by this call
+- `upd_contracts` — IDs of active rental contracts whose end date this call extended. The count matches `extended`.
 
 <Note>
-SLA field updates apply to the **offer** and to **new** rentals only. Existing rental contracts keep their locked reliability target and SLA fee until they end. `upd_contracts` and `new_contracts` describe listing maintenance, not changes to an active renter's locked SLA terms.
+A non-empty `upd_contracts` means this request extended live rentals. Each contract keeps its locked reliability target and SLA fee, but its end date — and your service-credit exposure — now runs later. SLA field updates still apply to the **offer** and to **new** rentals only.
 </Note>
 
 ## Economics walkthrough
