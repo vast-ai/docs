@@ -3,7 +3,7 @@ title: "SDK Rate Limits and Errors"
 sidebarTitle: "Rate Limits"
 ---
 
-The Vast.ai SDK retries some failed requests. Those retries finish in under a second and do not read `Retry-After`. For offer search, rent, and listing calls, add your own spacing. See [SLA API automation](/guides/instances/choosing/sla-coverage#api-automation).
+The Vast.ai SDK retries some failed requests. With the default of 3 attempts, those retries finish in under a second and do not read `Retry-After`. For offer search, rent, and listing calls, add your own spacing. See [SLA API automation](/guides/instances/choosing/sla-coverage#api-automation).
 
 This page covers the error format, how rate limits work, and how to configure retry behavior for each client. For the full details on rate limit mechanics, see the [API Rate Limits and Errors](/api-reference/rate-limits-and-errors) page.
 
@@ -45,7 +45,7 @@ or
 API requests too frequent: endpoint threshold=...
 ```
 
-Some HTTP 429 responses include a `Retry-After` header. The daily search row quota (`error: "search_quota_exceeded"`) does, and its value can be hours. The SDK never reads that header. Its own retries finish in under a second. If your script calls the API directly, wait at least `Retry-After` when it is present.
+Some HTTP 429 responses include a `Retry-After` header. The daily search row quota (`error: "search_quota_exceeded"`) does, and its value can be hours. The SDK never reads that header. With the default of 3 attempts, those retries finish in under a second. If your script calls the API directly, wait at least `Retry-After` when it is present.
 
 ## Built-in Retry Behavior
 
@@ -53,14 +53,14 @@ The SDK includes two clients with different retry strategies.
 
 ### VastAI Client
 
-The main `VastAI` client retries on rate limit responses:
+The main `VastAI` client retries on HTTP 429, 502, 503, and 504, and on connection errors and timeouts:
 
 - `retry` is the **total number of attempts**.
 - **Default:** 3 attempts (one request plus two retries), with delays of about 0.15 s and 0.225 s.
 - **Backoff:** starts at 0.15 seconds, multiplied by 1.5 after each attempt. The SDK does not read `Retry-After`.
 - To send a request once, use `retry=1`. Do not use `retry=0`. It sends no request.
 
-For SLA rentals, a timeout or 5xx retry can send the same rent twice. Set a unique label and check instances for that label before you rent again.
+Any rent can be sent twice if the first request reached the server and the connection then failed. Set a unique `label` and check your instances for it before you rent again. The SDK cannot turn SLA on; SLA rentals use the console or REST. Use the same label check in your own retry logic. See [SLA API automation](/guides/instances/choosing/sla-coverage#api-automation).
 
 ```python
 from vastai import VastAI

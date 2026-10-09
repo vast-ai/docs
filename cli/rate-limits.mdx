@@ -3,7 +3,7 @@ title: "CLI Rate Limits and Errors"
 sidebarTitle: "Rate Limits"
 ---
 
-The Vast.ai CLI retries some failed requests. Those retries finish in under a second and do not read `Retry-After`. For offer search, rent, `create_asks`, and maintenance scheduling, add your own spacing. See [SLA API automation](/guides/instances/choosing/sla-coverage#api-automation).
+The Vast.ai CLI retries some failed requests. With the default of 3 attempts, those retries finish in under a second and do not read `Retry-After`. For offer search, rent, `create_asks`, and maintenance scheduling, add your own spacing. See [SLA API automation](/guides/instances/choosing/sla-coverage#api-automation).
 
 This page covers the error format, how rate limits work, and how to configure the CLI's built-in retry behavior. For the full details on rate limit mechanics, see the [API Rate Limits and Errors](/api-reference/rate-limits-and-errors) page.
 
@@ -43,21 +43,21 @@ or
 API requests too frequent: endpoint threshold=...
 ```
 
-Some HTTP 429 responses include a `Retry-After` header. The daily search row quota (`error: "search_quota_exceeded"`) does, and its value can be hours. The CLI never reads that header. Its own retries finish in under a second. If your script calls the API directly, wait at least `Retry-After` when it is present.
+Some HTTP 429 responses include a `Retry-After` header. The daily search row quota (`error: "search_quota_exceeded"`) does, and its value can be hours. The CLI never reads that header. With the default of 3 attempts, those retries finish in under a second. If your script calls the API directly, wait at least `Retry-After` when it is present.
 
 ## Built-in Retry Behavior
 
-When the CLI receives an HTTP 429 response, it automatically retries the request using exponential backoff:
+The CLI retries a failed request on HTTP 429, 502, 503, and 504, and on connection errors and timeouts. With the default of 3 attempts, those retries finish in under a second. It never reads `Retry-After`.
 
 - `--retry` is the **total number of attempts**, not extra retries after the first try.
 - **Default:** 3 attempts (one request plus two retries), with delays of about 0.15 s and 0.225 s.
 - **Backoff:** starts at 0.15 seconds, multiplied by 1.5 after each attempt. The CLI does not read `Retry-After`.
 - To send a request once, use `--retry 1`. Do not use `--retry 0`. It sends no request and the command fails.
 
-For SLA rentals, a timeout or 5xx retry can send the same rent twice. Set a unique label and check instances for that label before you rent again. See [SLA](/guides/instances/choosing/sla-coverage).
+Any rent can be sent twice if the first request reached the server and the connection then failed. Set a unique `--label` and check your instances for it before you rent again. The CLI and SDK cannot turn SLA on; SLA rentals use the console or REST. Use the same label check in your own retry logic. See [SLA API automation](/guides/instances/choosing/sla-coverage#api-automation).
 
 <Tip>
-The CLI retries 429, 502, 503, and 504. Other HTTP errors are reported immediately.
+The CLI retries 429, 502, 503, 504, connection errors, and timeouts. Other HTTP errors are reported immediately.
 </Tip>
 
 ## Configuring Retries
@@ -68,11 +68,11 @@ Use the `--retry` flag on any command to change the number of retry attempts:
 # Default: 3 attempts
 vastai search offers 'gpu_name=RTX_4090 rentable=true'
 
-# One attempt only (use this when you must not send a rent twice)
+# One attempt only
 vastai search offers 'gpu_name=RTX_4090 rentable=true' --retry 1
 ```
 
-Increasing the retry count is useful for scripts that make many API calls in sequence, where occasional rate limiting is expected.
+Raising `--retry` does not replace your own request spacing. On a rent, each extra attempt can send the request again.
 
 ## Reducing Rate Limit Errors
 
