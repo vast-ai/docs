@@ -43,9 +43,9 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 3. Install the [CLI](/cli/hello-world) if you schedule maintenance or read earnings from the CLI. The console [Set a maintenance window](/host/set-maintenance-window) page can notify renters without the CLI.
 4. Confirm SLA account access: open **Set Pricing → SLA** and confirm the panel is visible (do **not** Save final commitment/confidence yet). If the panel is missing, contact support.
 5. Preview economics (console SLA panel or [backtester](/host/sla-backtester)). Read [Billing vs settlement](#billing-vs-settlement-important) and [Risk scenarios](#risk-scenarios)—GPU billing can continue during outages and SLA credits can exceed many days of SLA fees.
-6. Set and **Save** your reliability commitment and confidence in **Set Pricing → SLA**.
-7. Read [Scheduled maintenance](#scheduled-maintenance) before your first SLA rental (24-hour notice for planned work).
-8. **First publish and verify:** **Save** pricing, then click **LIST** (first publish only). If the machine is already listed, **Save** alone updates the live offer.
+6. Read [Scheduled maintenance](#scheduled-maintenance) before you turn SLA on (24-hour notice for planned work).
+7. Set your reliability commitment and Confidence, confirm the SLA fee preview, then click **Save**. If the machine is already listed from step 2, **Save** publishes SLA immediately.
+8. **Verify:** the machine shows **Listed** on **Host → Machines**. If it was never listed, click **LIST** once.
    - **Console verify:** confirm **Listed** on **Host → Machines** and reopen **Set Pricing → SLA**.
    - **Optional CLI/API:** search with `--storage` matching how renters quote; add `verified=any` if you search your own machine and see no rows (for example `vastai search offers 'machine_id=12345 verified=any has_sla=true expected_reliability>=0.99' --storage 10`). On sliced machines, filter on-demand rows with the jq example in [Search / client-visible fields](#search--client-visible-fields).
 9. **Self-test (after LIST):** With the separate client account from step 2, search by `machine_id`, rent with a **Reliability target**, and verify the SLA (billed like any rental)—see [Testing your own machine](/host/hosting-overview#testing-your-own-machine).
@@ -221,7 +221,7 @@ For planning, assume a worst-case day costs up to one full day of covered comput
 
 ### SLA on extended contracts
 
-When a rental contract is extended (by moving the offer end date forward at the same or lower price), the original SLA parameters remain in effect for the extended period. Changing SLA parameters on the offer does not alter SLA terms on existing contracts — only new rental contracts pick up updated SLA settings. If the same request also raises an existing contract's SLA fee (a lower commitment, wider confidence, or `sla_r_claim` set to `0`), the immediate response skips that contract. A background job extends it shortly afterward anyway, under its original SLA terms. The only reliable way to avoid extending SLA rentals is to not move `end_date` later, or to unlist.
+When a rental contract is extended (by moving the offer end date forward at the same or lower price), the original SLA parameters remain in effect for the extended period. Changing SLA parameters on the offer does not alter SLA terms on existing contracts — only new rental contracts pick up updated SLA settings. Any `end_date` you send, including the offer's current one, extends every active rental that ends sooner, SLA rentals included, under their original terms. The only reliable way to avoid that is to send no `end_date` later than every active rental's end date, or to unlist. Some contracts are extended a few minutes after the response and do not appear in `upd_contracts`. A GPU, disk, or bandwidth price increase blocks that later extension.
 
 Disabling SLA on the offer (setting `sla_r_claim` to `0`) prevents new SLA-covered contracts but does not terminate SLA on existing active contracts — they continue under their original SLA terms until their rental end date.
 
@@ -316,7 +316,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
   }'
 ```
 
-Replace `end_date` with the listing's current Unix timestamp from `show machines`, or with a new future timestamp only if you mean to change the offer end. Past dates expire the offer immediately. A later date at the same or lower price extends live contracts. See [Offer End Date](/host/hosting-overview#offer-end-date). Convert a calendar date to Unix seconds: `date -u -d '2030-01-01' +%s` (Linux) or `date -u -j -f '%Y-%m-%d' '2030-01-01' +%s` (macOS). The CLI also accepts `MM/DD/YYYY` via `-e`.
+Replace `end_date` with the listing's current Unix timestamp from `show machines`, or with a new future timestamp only if you mean to change the offer end. Past dates expire the offer immediately. A later date at the same or lower price extends live contracts. See [Offer End Date](/host/hosting-overview#offer-end-date). Convert a calendar date to Unix seconds: `date -u -d '2030-01-01' +%s` (Linux) or `date -u -j -f '%Y-%m-%d' '2030-01-01' +%s` (macOS). The CLI also accepts `MM/DD/YYYY` via `-e` (parsed in the machine's local time, not UTC). Use a Unix timestamp for an exact UTC end.
 
 <Warning>Open-ended offers (no `end_date`) combined with SLA expose you to indefinite asymmetric service-credit risk. See [Offer End Date](/host/hosting-overview#offer-end-date).</Warning>
 
@@ -375,7 +375,7 @@ Then `PUT /api/v0/machines/create_asks/` with the merged body (read → merge �
 Each live PUT resends the offer's `end_date` (or `duration`). Any active rental that ends **before** that date is extended to it, which also extends your service-credit exposure. This cannot be undone, and `DRY_RUN=1` does not show which contracts will be affected. Re-list only machines whose rentals already end on or after the offer end date, or accept the extension. `show machines` does not list each contract's end date, and `DRY_RUN` does not either, so you cannot check this beforehand. After a live run, read `upd_contracts` in the output.
 </Warning>
 
-Run this only when an SLA listing is missing from search after a daemon update even though **Set Pricing** still shows SLA. Healthy listings do not need a re-list, and every re-list can extend shorter active contracts. It does not turn an SLA on for new machines. Enable an SLA on each machine first (console **Set Pricing → SLA**, or a per-machine `PUT /api/v0/machines/create_asks/` with `sla_r_claim` and `sla_sigma_x`). The loop only considers machines that are `listed` and already have `sla_reliability_claim > 0`.
+Run this only when an SLA listing is missing from search after a daemon update even though **Set Pricing** still shows SLA. A fully rented machine is absent from search too. Do not re-list it for that reason. Healthy listings do not need a re-list, and every re-list can extend shorter active contracts. It does not turn an SLA on for new machines. Enable an SLA on each machine first (console **Set Pricing → SLA**, or a per-machine `PUT /api/v0/machines/create_asks/` with `sla_r_claim` and `sla_sigma_x`). The loop only considers machines that are `listed` and already have `sla_reliability_claim > 0`.
 
 `show machines` returns confidence only as a label, so the loop does **not** send `sla_sigma_x`. On an existing SLA ask, `create_asks` keeps the current confidence when `sla_sigma_x` is omitted, so each machine keeps its exact value. Set a new confidence per machine in the console (or PUT `sla_sigma_x` for that machine) if you want to change it.
 

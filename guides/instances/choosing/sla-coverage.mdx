@@ -39,7 +39,7 @@ Before you start: ensure [Account → Billing](https://cloud.vast.ai/billing/) h
 4. Hover over the offer's price and confirm an **SLA Fee** line in the breakdown, then click **RENT**.
 5. Right after **RENT**, verify under **Instances**: open **price details** and confirm an **SLA Fee** line and your reliability target (see [Viewing SLA on active instances](#viewing-sla-on-active-instances)).
 6. After the prior UTC day has settled (credits usually appear hours after UTC midnight; see [Settlement timing](#settlement-timing)), check credits in **Account → Billing**.
-7. When you are finished, **Destroy** the instance (not only **Stop**) to end ongoing charges—see [If your instance goes down](#if-your-instance-goes-down). Destroy permanently deletes the instance and its disk, so copy off anything you need first.
+7. When you are finished, **Destroy** the instance. On an SLA rental, charges for intended compute, storage, and the SLA fee continue while the instance is unavailable; **Stop** does not end that. Destroy deletes the disk. Whether **Stop** on a healthy instance is billed the same way is not specified. See [What you pay during an outage](#what-you-pay-during-an-outage).
 
 **If you used the CLI to search:** set **Reliability target** again in the console **Search filters** (left bar) before you click **RENT**. CLI filters do not carry over.
 
@@ -326,13 +326,13 @@ Billing continues during downtime. You are still charged for **compute, storage,
 
 **This is different from non-SLA rentals.** Normally you are not charged while a machine is offline (see [Billing](/guides/reference/billing)). On an SLA contract you are billed for the intended compute, and the service credit is the compensation for that downtime.
 
-**Stop vs destroy:** Stopping pauses compute but storage and contract charges can continue. **Destroying the instance** ends future daily charges; final SLA settlement still posts when the contract closes. If you abandon a failed host, destroy only after saving any data you need.
+**Stop vs destroy:** While an SLA instance is unavailable, **Stop** does not end intended compute, storage, or SLA fee charges. Only **Destroy** ends future charges, and Destroy deletes the disk. Whether **Stop** on a healthy instance is billed the same way is not specified. Final SLA settlement still posts when the contract closes. If you abandon a failed host, destroy only after saving any data you need.
 
 If you qualify for compensation, a **service credit** is applied after daily settlement (UTC), typically within a few hours after UTC midnight for the prior day — not in the same hour as the outage.
 
 ### How reliability is measured
 
-Each day, the platform tracks how long your instance was online. Settlement considers **multiple time windows** — from short intervals out to long contract-scale windows — so:
+Each day, the platform tracks how long your instance was online. Whether your own Stop, reboot, or a crash in your container counts as host downtime is not specified. Settlement considers **multiple time windows** — from short intervals out to long contract-scale windows — so:
 
 - A single bad hour hurts, but does not always trigger the maximum credit.
 - A pattern of unreliable uptime produces larger credits over time.
@@ -368,7 +368,7 @@ Production settlement uses the multi-window reliability blend described above, n
 
 1. Save work and check **Instances** for host/maintenance status.
 2. Remember: compute, storage, and SLA fees continue until you destroy the instance. Credits are calculated at the next UTC settlement and apply to the **previous UTC day**, not the current hour.
-3. **Console:** Open **Instances**, select the instance, then **Destroy** to stop future charges. Stopping alone may not end billing for a broken instance—see [Stop vs destroy](#what-you-pay-during-an-outage). Destroy permanently deletes the instance and its disk, so copy off anything you need first.
+3. **Console:** Open **Instances**, select the instance, then **Destroy**. On an unavailable SLA instance, **Stop** does not end the charges in [Stop vs destroy](#what-you-pay-during-an-outage). Destroy deletes the disk, so copy off anything you need first.
 4. After settlement, check **Account → Billing** in the console for SLA line items (not `GET /api/v0/charges/`).
 5. If credits still look wrong **48 hours** after the outage day, contact support via [Discord](https://discord.gg/hSuEbSQ4X8) or [contact@vast.ai](mailto:contact@vast.ai).
 
