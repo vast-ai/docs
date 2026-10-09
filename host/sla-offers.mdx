@@ -152,7 +152,7 @@ When you list or update a machine, set SLA fields via the host console or `PUT /
 | Parameter | API field | Backtester alias | What it means |
 | --- | --- | --- | --- |
 | Reliability commitment | `sla_r_claim` | `r_claim` (the simulated renter target `r_target` defaults to it) | Your advertised belief about machine reliability. Set above `0` to enable SLA. Values are greater than 0 and at most **0.99999** (for example, `0.99` = 99%). Exactly `1.0` is rejected. Set to `0` to disable SLA on new rentals. |
-| Confidence spread | `sla_sigma_x` | `p` (different scale — see [backtester](/host/sla-backtester#confidence-values-p)) | Pricing margin built into the SLA fee. Tight is a smaller fee. Wide is a larger fee. It does not change the credit you owe. Defaults to `0.5` only on a **new** ask. When you first enable SLA on an existing listing, send `sla_sigma_x` yourself. Omitting it leaves the stored value empty, so `show machines` reports no confidence. On an ask that already has a stored value, omitting `sla_sigma_x` keeps that value. |
+| Confidence | `sla_sigma_x` | `p` (different scale — see [backtester](/host/sla-backtester#confidence-values-p)) | Pricing margin built into the SLA fee. **High** is a smaller fee. **Low** is a larger fee. It does not change the credit you owe. Defaults to `0.5` (console **Medium**) only on a **new** ask. When you first enable SLA on an existing listing, send `sla_sigma_x` yourself. Omitting it leaves the stored value empty, so `show machines` reports no confidence. On an ask that already has a stored value, omitting `sla_sigma_x` keeps that value. |
 
 ### Advanced: `sla_max_beta` (optional)
 
@@ -187,11 +187,11 @@ Do not assume the dashboard score equals SLA reliability. Before choosing `sla_r
 
 ### Confidence values
 
-In the console, pick **High**, **Medium**, or **Low**. High is a tight margin (smaller SLA fee). Low is a wide margin (larger SLA fee), not a weak setting. You do not need the table unless you use the API or the backtester.
+In the console, pick **High**, **Medium**, or **Low**. High is a tight margin (smaller SLA fee). Low is a wide margin (larger SLA fee), not a weak setting. The API, `show machines`, and the backtester use other names for the same setting. Use the console label. The table maps it to those other names.
 
 | Console | Band | API `sla_sigma_x` (σ) | Backtester `p` | `show machines` | Pricing effect |
 | --- | --- | --- | --- | --- | --- |
-| High | Tight | `0.2` (band σ ≤ 0.32) | ~0.83 | `high` | Lowest client SLA fees at a given target |
+| High | Tight | `0.2` (band σ ≤ 0.32) | ~0.8333 | `high` | Lowest client SLA fees at a given target |
 | Medium | Normal (default) | `0.5` (band σ ≤ 0.71) | ~0.6667 | `medium` | Balanced |
 | Low | Wide | `1.0` (band σ above 0.71) | ~0.50 | `low` | Highest client SLA fees at a given target |
 
@@ -769,7 +769,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/${MACHINE_ID}/dnotify" \
   -d '{"sdate": START_UNIX_UTC, "duration": 2, "maintenance_category": "software"}'
 ```
 
-`sdate` is Unix epoch seconds (UTC). Use a future time, as far ahead as you can. `duration` is whole hours. `maintenance_category` is one of `power`, `internet`, `disk`, `gpu`, `software`, or `other`. The server stores `maintenance_reason` as empty, so do not rely on that field. There is no public REST endpoint for reading maintenance windows. Even if you schedule or cancel over REST, confirm the result with `vastai show maints --ids 'MACHINE_ID' --raw` or on the console **Maintenance** tab. Each machine should have exactly one window. See [Schedule Maintenance](/api-reference/machines/schedule-maint).
+`sdate` is Unix epoch seconds (UTC). Use a future time, as far ahead as you can. `duration` is whole hours. `maintenance_category` is one of `power`, `internet`, `disk`, `gpu`, `software`, or `other`. The server stores `maintenance_reason` as empty, so do not rely on that field. There is no public REST endpoint for reading maintenance windows. Even if you schedule or cancel over REST, confirm the result with `vastai show maints --ids 'MACHINE_ID' --raw` or on the console **Maintenance** tab. Each planned downtime should have exactly one window. A machine may have several windows for different downtimes. Retries must not create a duplicate of the same one. See [Schedule Maintenance](/api-reference/machines/schedule-maint).
 
 **Cancel or reschedule:** [`vastai cancel maint`](/host/cli/cancel-maint) cancels **every** window you scheduled on that machine, not one window. It also asks `Continue? [y/n]`. In scripts, use `echo y | vastai cancel maint MACHINE_ID`, or call `PUT /api/v0/machines/{id}/cancel_maint/` directly. Confirm the cancel succeeded before you schedule the replacement. Check with `vastai show maints --ids 'MACHINE_ID' --raw` ([show maints](/host/cli/show-maints)), not only the console. In scripts, pass `--retry 1` on `schedule maint` and `cancel maint`. A retried PUT can create a second window if the first one was stored and the response was lost. Confirm exactly one window before you schedule the next machine. Otherwise a failed cancel plus a new window leaves duplicates. Maintenance windows that Vast scheduled are not cancelled. They stay listed as `admin_locked`. To change one window, cancel, then create again every window you still want, as far ahead as you can, and confirm under **Machine Maintenances** (redesigned page) or **Scheduled Maintenances** (classic page).
 
@@ -796,6 +796,7 @@ SLA approval, settlement questions, credit disputes, and locked machines are sep
 - **`sla_disabled`** — SLA is off platform-wide. Do not retry in a loop. See [Getting help with SLA](#getting-help-with-sla).
 - **`sla_daemon_outdated`** — Update the host daemon from the [host setup guide](https://cloud.vast.ai/host/setup/), confirm the machine reconnects on **Host → Machines**, then retry LIST / `create_asks`. If the error persists, contact support with the machine ID.
 - **Unexpected credit** — `sla_earn` is not a per-contract credit record, and the backtester is an estimate, not the settlement. Contact support with the machine ID and the UTC dates.
+<a id="severe-outage"></a>
 - **Severe outage (active SLA contracts):**
 
   **Console**
@@ -923,8 +924,18 @@ When you pass `machid`, use `per_machine[].sla_earn` for that machine's SLA sett
 Call earnings once per UTC day (`sday=eday=D`, no `machid`) for each of the last 7 days, at least 2 seconds apart, and compare `per_machine[].sla_earn` with the value you stored for that machine and day. The backtester is not a per-day audit of `sla_earn`. The two match only when the machine's only rental that day was a single SLA contract at the simulated target. See [Simulation limits](/host/sla-backtester#simulation-limits). Never compare `sla_earn` with the largest single-day credit (`escrow_to_client_balance`). Use `last_days=1` with `machid` only for coarse polling after UTC rollover, not as a match to one settled UTC calendar day.
 
 ```bash
+# Fleet daily record: omit machid. Illustrative only — add HTTP 429 backoff at fleet scale.
+today=$(( $(date -u +%s) / 86400 ))
+for d in $(seq $((today-7)) $((today-1))); do
+  curl -s -H "Authorization: Bearer $VAST_API_KEY" \
+    "https://console.vast.ai/api/v0/users/me/machine-earnings/?sday=$d&eday=$d" \
+    | jq -c --arg d "$d" '.per_machine[] | {day: ($d|tonumber), machine_id, sla_earn}'
+  sleep 2
+done
+```
+
+```bash
 # Spot check: one machine, one UTC day (2026-07-24, sday/eday = 20658).
-# A daily record for the fleet omits machid. See the loop above this example's prose.
 curl -s -H "Authorization: Bearer $VAST_API_KEY" \
   "https://console.vast.ai/api/v0/users/me/machine-earnings/?machid=12345&sday=20658&eday=20658" \
   | jq '.per_machine[] | select(.machine_id == 12345 or .machine_id == "12345") | {machine_id, sla_earn}'
@@ -952,7 +963,7 @@ Do **not** compare `last_days=7` totals to the backtester's largest single-day c
 ## Tips for competitive SLA offers
 
 - **Commit to a level you can sustain.** Clients who choose reliability targets below your reliability commitment see a lower SLA fee and still get a meaningful SLA.
-- **Tighten confidence only when earned.** Use a tighter spread (`sla_sigma_x ≈ 0.2`) after you have a strong reliability track record on that machine.
+- **Move to High only when earned.** Use **High** (`sla_sigma_x ≈ 0.2`) after you have a strong reliability track record on that machine.
 - **Keep the machine online during active contracts.** SLA credits and verification are separate systems, but both respond to downtime.
 - **SLA applies to on-demand rentals only.** It does not apply to interruptible/bid instances or reserved/prepay rentals. When a client starts an on-demand rental on an SLA-enabled offer, SLA terms lock for that rental contract and do not change if you later edit the offer.
 - **Use the [SLA backtester](/host/sla-backtester) (API-only)** to preview how different reliability commitments and confidence levels would have affected past earnings.
