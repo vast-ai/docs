@@ -51,7 +51,7 @@ Use [Web console](#web-console) and [When things go wrong](#when-things-go-wrong
 ## Before you enable SLA
 
 <Warning>
-If you expect downtime during active rentals, notify renters before you take the machine down. Use either the console ([Set a maintenance window](/host/set-maintenance-window)) or the CLI/REST ([`vastai schedule maint`](/host/cli/schedule-maint)). Use one path per window. For SLA service-credit review, follow [Scheduled maintenance](#scheduled-maintenance): at least 24 hours' notice. A service credit is not guaranteed.
+If you expect downtime during active rentals, notify renters before you take the machine down. Use either the console ([Set a maintenance window](/host/set-maintenance-window)) or the CLI/REST ([`vastai schedule maint`](/host/cli/schedule-maint)). Use one path per window. For maintenance forgiveness, follow [Scheduled maintenance](#scheduled-maintenance): at least 24 hours' notice. Forgiveness is not guaranteed, and it is not a service credit paid to you.
 </Warning>
 
 **Pre-flight checklist (before tuning reliability commitment and confidence):**
@@ -131,7 +131,7 @@ SLA reliability is measured at the **rental contract (instance) level** using pl
 - **Instance fails to start** when a client rents → counts against SLA reliability for that contract.
 - **Machine-level outage** while contracts are active → affects settlement for those contracts.
 - **Brief host reboots** during active rentals may count as downtime. Vast does not publish a fixed second-level threshold in host docs — treat unplanned reboots as SLA risk. For planned work, use [Scheduled maintenance](#scheduled-maintenance) with at least 24 hours' notice when possible.
-- **Scheduled maintenance** may receive credit case by case — see [Scheduled maintenance](#scheduled-maintenance).
+- **Scheduled maintenance** may be partly forgiven (counted as uptime) — see [Scheduled maintenance](#scheduled-maintenance). That is not a service credit.
 
 On sliced machines, SLA settles **per rental contract**. If one GPU slice fails but others remain healthy, only contracts on the affected slice are measured for downtime.
 
@@ -279,7 +279,7 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
   -d '{"machine": 12345, "price_disk": 0.15, "sla_r_claim": 0.99, "sla_sigma_x": 0.5}'
 ```
 
-Replace `price_disk` with the machine's current `listed_storage_cost` from `vastai show machines --raw`. Omitting it resets storage to **$0.10/GB/month**. Do not copy example prices or `end_date` into a first listing.
+Replace `price_disk` with the machine's current `listed_storage_cost` from `vastai show machines --raw`. Also send `duration` if the listing auto-renews, otherwise `end_date`, and `"hidden_listing": true` if it is hidden. See the read → merge → PUT warning below. Do not copy example prices into a first listing.
 
 #### Full listing update (existing ask)
 
@@ -325,8 +325,9 @@ This creates an offer with a reliability commitment of `0.99` and confidence spr
 - `price_disk` resets to **$0.10/GB/month** if omitted or `null`.
 - `duration` is cleared if omitted (a listing created with `vastai list machine -l` stops auto-renewing).
 - `hidden_listing` resets to `false` if omitted (a hidden listing becomes visible). `show machines` does not return this flag, so send `true` when the listing should stay hidden.
+- Send **either** `duration` (when `show machines` returns a non-null `duration`) **or** `end_date`, never both. Both together returns `400` `Cannot set both duration and end_date`.
 
-Always read the current listing and send `price_disk` and `duration` back. Map read-side names as follows: `listed_gpu_cost` → `price_gpu`, `listed_storage_cost` → `price_disk`, `end_date` → `end_date`, `duration` → `duration`.
+Always read the current listing and send `price_disk` plus either `duration` or `end_date`. Map read-side names as follows: `listed_gpu_cost` → `price_gpu`, `listed_storage_cost` → `price_disk`.
 </Warning>
 
 Read current listing fields from `vastai show machines --raw`:
@@ -367,6 +368,7 @@ Validate the listed price (`listed_gpu_cost`), `end_date`, and minimum GPU count
 1. Update host daemons fleet-wide per the [host setup guide](https://cloud.vast.ai/host/setup/).
 2. On **Host → Machines**, confirm each machine is healthy (no red error status) and retry **LIST** / `create_asks` after the daemon reconnects.
 3. If listing still returns `sla_daemon_outdated` after an update, contact support with the machine ID — there is no documented `show machines` daemon-version field for a preflight `jq` filter today.
+4. **Hidden listings:** this loop cannot read whether a listing is hidden. Put every hidden machine in `HIDDEN_IDS`, or leave it off `ALLOWLIST`. Otherwise the first live run makes it publicly searchable.
 
 For multiple machines, loop sequentially — do not parallelize without backoff:
 
@@ -385,6 +387,9 @@ export VAST_API_KEY="YOUR_API_KEY"
 # Set DRY_RUN=0 to apply.
 # ALLOWLIST required for DRY_RUN=0 (space-separated listed machine IDs).
 ALLOWLIST="${ALLOWLIST:-}"
+# Hidden listings: show machines does not return hidden_listing, and omitting it
+# makes the listing public. Put every hidden machine ID here, or leave it off ALLOWLIST.
+HIDDEN_IDS="${HIDDEN_IDS:-}"
 DRY_RUN="${DRY_RUN:-1}"
 machines=$(vastai show machines --raw)
 for id in $(echo "$machines" | jq -r '.machines[].id'); do
@@ -403,24 +408,33 @@ for id in $(echo "$machines" | jq -r '.machines[].id'); do
   end=$(echo "$machine" | jq -r '.end_date // empty')
   chunk=$(echo "$machine" | jq -r '.listed_min_gpu_count // empty')
   disk=$(echo "$machine" | jq -r '.listed_storage_cost // empty')
-  if [ -z "$price" ] || [ -z "$end" ] || [ -z "$chunk" ] || [ -z "$disk" ]; then
-    echo "skip $id: missing listed_gpu_cost/end_date/listed_min_gpu_count/listed_storage_cost"; continue
+  dur=$(echo "$machine" | jq -r '.duration // empty')
+  if [ -z "$price" ] || [ -z "$chunk" ] || [ -z "$disk" ]; then
+    echo "skip $id: missing listed_gpu_cost/listed_min_gpu_count/listed_storage_cost"; continue
   fi
-  now=$(date -u +%s)
-  if ! jq -e -n --argjson end "$end" --argjson now "$now" '$end > $now' >/dev/null 2>&1; then
-    echo "skip machine_id=$id: end_date expired"; continue
+  if [ -z "$dur" ]; then
+    if [ -z "$end" ]; then
+      echo "skip $id: missing end_date and duration"; continue
+    fi
+    now=$(date -u +%s)
+    if ! jq -e -n --argjson end "$end" --argjson now "$now" '$end > $now' >/dev/null 2>&1; then
+      echo "skip machine_id=$id: end_date expired"; continue
+    fi
   fi
+  hidden=false
+  if echo "$HIDDEN_IDS" | grep -qw "$id"; then hidden=true; fi
   # Opt-in only: skip machines with no positive reliability commitment (do not invent 0.99)
   if ! echo "$machine" | jq -e '(.sla_reliability_claim // 0) > 0' >/dev/null; then
     echo "skip $id: no positive sla_reliability_claim (enable SLA per machine first)"; continue
   fi
   # sla_sigma_x is omitted on purpose: create_asks keeps each machine's current confidence.
   # price_disk is required: null or omitted resets storage price to 0.10.
-  # duration is sent when set so an auto-renew listing is not cleared.
-  body=$(echo "$machine" | jq -c \
+  # Send duration OR end_date, never both (400). hidden_listing must be explicit.
+  body=$(echo "$machine" | jq -c --argjson hidden "$hidden" \
     '{machine: (.id|tonumber), price_gpu: .listed_gpu_cost, price_disk: .listed_storage_cost,
-      end_date, min_chunk: .listed_min_gpu_count, sla_r_claim: .sla_reliability_claim}
-     + (if .duration == null then {} else {duration} end)')
+      min_chunk: .listed_min_gpu_count, sla_r_claim: .sla_reliability_claim,
+      hidden_listing: $hidden}
+     + (if .duration == null then {end_date} else {duration} end)')
   if [ "$DRY_RUN" != "0" ]; then
     echo "dry-run machine_id=$id payload: $body"; continue
   fi
@@ -586,7 +600,7 @@ Clients pay more because you admit greater uncertainty. Use this if your reliabi
 ### Scheduled maintenance
 
 <Note title="One window, one path">
-Notify renters in the console ([Set a maintenance window](/host/set-maintenance-window)) or with CLI/REST. After you schedule from the CLI or API, confirm the window under **Host → Machines → Settings → Machine Maintenances**. Do not schedule the same downtime twice. SLA service-credit review looks for at least 24 hours of notice. A service credit is not guaranteed.
+Notify renters in the console ([Set a maintenance window](/host/set-maintenance-window)) or with CLI/REST. After you schedule from the CLI or API, confirm the window under **Host → Machines → Settings → Machine Maintenances**. Do not schedule the same downtime twice. Maintenance-forgiveness review looks for at least 24 hours of notice. Forgiveness is not guaranteed, and it does not pay the host.
 </Note>
 
 **Console**
@@ -595,9 +609,9 @@ Notify renters in the console ([Set a maintenance window](/host/set-maintenance-
 2. Set a start at least 24 hours ahead and a duration in whole hours.
 3. Confirm the window is listed in that table before you take the machine down.
 
-**Or use CLI/REST below.** A service credit is not guaranteed either way.
+**Or use CLI/REST below.** Forgiveness is not guaranteed either way.
 
-**Planned SLA maintenance (renters may qualify for a service credit — not guaranteed):** Schedule at least 24 hours in advance with [`vastai schedule maint`](/host/cli/schedule-maint) (or the [REST schedule-maintenance API](/api-reference/machines/schedule-maint)). Include `--sdate`, `--duration`, and `--maintenance_category`. The CLI always sends a category; its default `"not provided"` is rejected with `invalid_args`. Use one of `power`, `internet`, `disk`, `gpu`, `software`, or `other`. Advance notice (not the category value) is what maintenance forgiveness uses. Scheduling earlier counts more of the window as uptime; a longer window counts less. Rescheduling resets the notice clock. Forgiven downtime is not a cash credit to the renter. Renters should check **Instances** for status. It is not a separate field on instance webhooks or `GET /api/v0/charges/`. The CLI does not send `maintenance_reason`; the REST body can.
+**Planned SLA maintenance (may reduce the service credits you owe — not guaranteed).** Schedule at least 24 hours in advance with [`vastai schedule maint`](/host/cli/schedule-maint) (or the [REST schedule-maintenance API](/api-reference/machines/schedule-maint)). Include `--sdate`, `--duration`, and `--maintenance_category`. The CLI always sends a category; its default `"not provided"` is rejected with `invalid_args`. Use one of `power`, `internet`, `disk`, `gpu`, `software`, or `other`. Scheduling maintenance ahead can cause part of the window to count as uptime when the SLA is settled. That reduces the service credits you may owe. It does not pay you or the renter. The longer the window, the smaller the share that is forgiven. Rescheduling resets the notice clock. Renters see maintenance status under **Instances**. Maintenance status is not a separate field on instance webhooks or `GET /api/v0/charges/`. The CLI does not send `maintenance_reason`; the REST body can.
 
 **`sdate` is Unix epoch seconds (UTC)** for both CLI `--sdate` and the REST body. **`--duration` is in hours.** The CLI asks `Continue? [y/n]` before it sends the request; in scripts or cron, pipe the answer (`echo y | vastai schedule maint …`) or call REST directly. Schedule maintenance **sequentially** across a fleet, at least 3 seconds apart (`sleep 3` between machines; the Schedule Maintenance OpenAPI `x-rate-limit` threshold is `2.5`). If you still get HTTP 429, wait longer and retry. See [Rate Limits and Errors](/api-reference/rate-limits-and-errors).
 
@@ -619,7 +633,7 @@ REST equivalent: `PUT /api/v0/machines/{machine_id}/dnotify` with `"sdate"` as U
 See [CLI install](/cli/hello-world) if you have not set up the CLI.
 
 <Warning>
-Planned maintenance credit is not guaranteed. The platform evaluates advance notice (generally at least 24 hours recommended) and maintenance duration when determining credit eligibility. **Treat any scheduled downtime as a potential SLA credit event when modeling risk.** Contact support via [Discord](https://discord.gg/hSuEbSQ4X8) or email [contact@vast.ai](mailto:contact@vast.ai) before extended maintenance on an SLA-listed machine to confirm credit eligibility.
+Maintenance forgiveness is not guaranteed. Advance notice and window length determine how much downtime is forgiven. **Treat any scheduled downtime as a potential service-credit event when modeling risk** (you may still owe the renter). Contact support via [Discord](https://discord.gg/hSuEbSQ4X8) or email [contact@vast.ai](mailto:contact@vast.ai) before extended maintenance on an SLA-listed machine to confirm forgiveness eligibility.
 </Warning>
 
 ## Preview earnings before listing
@@ -677,7 +691,7 @@ vastai show earnings --machine_id <id> --start_date "$(date -u -v-7d +%F)T00:00:
 
 Keep the `T00:00:00Z` suffix: the CLI parses bare dates such as `2026-07-24` in your machine's local time, so append `T00:00:00Z` for an exact UTC day. On Windows, use WSL or the API example below. See [`show earnings`](/cli/reference/show-earnings) for all options.
 
-**Linux (GNU date) — one UTC day (compare to the backtester largest single-day credit):**
+**Linux (GNU date) — one UTC day (exact settlement check):**
 
 ```bash
 # Replace 12345 with your machine ID.
@@ -711,7 +725,7 @@ This endpoint is rate-limited. Poll `GET /api/v0/users/me/machine-earnings/` at 
 When you pass `machid`, use `per_machine[].sla_earn` for that machine's SLA settlement in the window. Do **not** read `per_day[].sla_earn` for single-machine checks — `per_day[]` is always fleet-wide, even with `?machid=`.
 
 **Quick rules:**
-- **One machine, one UTC day:** For exact prior-UTC-day reconciliation (for example vs the backtester largest single-day credit), use `sday`/`eday` with `day = floor(unix_epoch_seconds / 86400)`, or CLI `--start_date` / `--end_date` with an explicit UTC time (`YYYY-MM-DDT00:00:00Z`; bare dates are parsed in local time). Example: `2026-07-24` 00:00 UTC is unix `1784851200` → `sday=eday=20658`. Use `last_days=1` with `machid` only for coarse polling after UTC rollover—not as a strict match to one settled UTC calendar day.
+- **One machine, one UTC day:** Use `sday`/`eday` with `day = floor(unix_epoch_seconds / 86400)`, or CLI `--start_date` / `--end_date` with an explicit UTC time (`YYYY-MM-DDT00:00:00Z`; bare dates are parsed in local time). Example: `2026-07-24` 00:00 UTC is unix `1784851200` → `sday=eday=20658`. To cross-check the backtester, compare `sla_earn` with that day's `escrow_to_host_balance`. Never compare `sla_earn` with the largest single-day credit (`escrow_to_client_balance`). Use `last_days=1` with `machid` only for coarse polling after UTC rollover—not as a strict match to one settled UTC calendar day.
 - **Fleet snapshot (coarse / recent window only):** one request without `machid` returns all machines in `per_machine[]` for the window.
 </Warning>
 

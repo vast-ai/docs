@@ -13,7 +13,7 @@ paths:
       description: |
         Creates or updates ask contracts for a machine to list it for rent on the vast.ai platform.
         Allows setting offer pricing, rental types, end dates, discount rates, and SLA parameters.
-        Unspecified fields generally keep their current values, except `price_disk` (defaults to 0.10), `duration` (cleared if omitted) and `hidden_listing` (defaults to false). Send those explicitly on every update. Read the current offer with show machines before changing pricing or the end date.
+        Unspecified fields generally keep their current values, except `price_disk` (defaults to 0.10), `duration` (cleared if omitted) and `hidden_listing` (defaults to false). Send `price_disk` and `hidden_listing` on every update. Send either `duration` or `end_date`, never both (400). Read the current offer with show machines before changing pricing.
 
         SLA request-body fields (`sla_r_claim`, `sla_sigma_x`, optional `sla_max_beta`) are supported on this REST endpoint. SLA activates when `sla_r_claim > 0`. Host-sent `sla_r_target` / legacy `sla_reliability` are ignored — clients choose a reliability target at search/rent time. The published CLI and SDK do not yet expose SLA fields — use the host console (**Set Pricing → SLA**) or REST/`curl` until CLI/SDK support ships.
 
@@ -59,7 +59,14 @@ paths:
                 end_date:
                   type: number
                   format: float
-                  description: Unix timestamp for when the listing expires
+                  description: Unix timestamp for when the listing expires. Do not send together with `duration` (400 Cannot set both duration and end_date).
+                duration:
+                  type: number
+                  format: float
+                  description: Auto-renew length in seconds. Send this instead of `end_date` for listings created with `vastai list machine -l`. Omitting it on an auto-renew listing turns auto-renew off.
+                hidden_listing:
+                  type: boolean
+                  description: When true, the offer is not shown in search. Defaults to false if omitted, which makes a hidden listing public. `show machines` does not return this flag.
                 credit_discount_max:
                   type: number
                   format: float
