@@ -138,7 +138,7 @@ Each `items[]` entry is one net `type: "sla"` amount for the whole query window 
 
 **Host — list, backtest, and earnings.**
 
-Create the key via [Create API Key](/api-reference/accounts/create-api-key). Do not copy the renter recipe. `machine_write` can change a listing but cannot read current values, backtest, or read earnings. Pair it with `machine_read` so a script can read the current listing, then send a full body, because omitted fields reset. `machine_read` also covers the backtester. Add `billing_read` for earnings. For cron, prefer a `billing_read` key for monitoring and a separate `machine_write` + `machine_read` key for listing changes.
+Create the key via [Create API Key](/api-reference/accounts/create-api-key). Do not copy the renter recipe. `machine_write` can change a listing but cannot read current values, backtest, or read earnings. Pair it with `machine_read` so a script can read the current listing, then send a full body, because omitted fields reset. `machine_read` also covers the backtester. Add `billing_read` for earnings. Add `instance_read` if the key will run `vastai show maints`. For cron, prefer a `billing_read` key for monitoring and a separate `machine_write` + `machine_read` key for listing changes.
 
 **Workflow summary:** Backtest (optional) → `create_asks` with SLA fields → monitor earnings; host-side settlement is separate from marketplace score.
 
@@ -151,7 +151,8 @@ Create the key via [Create API Key](/api-reference/accounts/create-api-key). Do 
   "api": {
     "machine_read": {},
     "machine_write": {},
-    "billing_read": {}
+    "billing_read": {},
+    "instance_read": {}
   }
 }
 ```
@@ -171,6 +172,7 @@ Create the key via [Create API Key](/api-reference/accounts/create-api-key). Do 
 | List or update an SLA offer (`PUT /api/v0/machines/create_asks/`) | `machine_write` | **Set Pricing → SLA** → **Save**. First publish: **Save** → **LIST**. Already listed: **Save** only ([Web console](/host/sla-offers#web-console)) |
 | SLA backtester | `machine_read` | Console SLA preview |
 | Schedule / cancel maintenance | `machine_write` | [Set a maintenance window](/host/set-maintenance-window) (Host → Machines → Settings → Machine Maintenances), or CLI/REST. SLA service-credit rules: [Scheduled maintenance](/host/sla-offers#scheduled-maintenance). |
+| Confirm windows (`vastai show maints`) | `instance_read` | **Machine Maintenances** or **Scheduled Maintenances**. |
 | Monitor `sla_earn` | `billing_read` | Host → Billing / Earnings (console billing needs no API key; API earnings need `billing_read`). Use `per_machine[].sla_earn` for one machine; `per_day[].sla_earn` is fleet-wide even with `machid`. See [Monitoring SLA after listing](/host/sla-offers#monitoring-sla-after-listing). |
 | Verify the listing in search | `misc` (separate key) | **Host → Machines** (no API key). Optional CLI: `vastai search offers 'machine_id=12345 verified=any has_sla=true' --storage 10` (`verified=any` is often required when checking your own machine). |
 
