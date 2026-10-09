@@ -305,10 +305,10 @@ Some omitted fields reset to defaults (for example `price_disk`, `hidden_listing
 curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"machine": 12345, "price_disk": 0.15, "min_chunk": CURRENT_MIN_CHUNK, "vol_size": 0, "hidden_listing": false, "sla_r_claim": 0.99, "sla_sigma_x": 0.5}'
+  -d '{"machine": 12345, "price_disk": CURRENT_STORAGE_PRICE, "min_chunk": CURRENT_MIN_CHUNK, "vol_size": 0, "hidden_listing": CURRENT_HIDDEN, "sla_r_claim": 0.99, "sla_sigma_x": 0.5}'
 ```
 
-Replace `price_disk` with the machine's current `listed_storage_cost`. Replace `CURRENT_MIN_CHUNK` with `listed_min_gpu_count` (it defaults to 1 only when offers are created or re-created). Send `"hidden_listing": true` if the listing is hidden. Do not copy example prices into a first listing. Send `end_date` only in the full listing update below, when you mean to extend.
+Replace every `CURRENT_*` value from `vastai show machines --raw`: `listed_storage_cost`, `listed_min_gpu_count`, and whether the listing is hidden. An unedited paste is not valid JSON. `min_chunk` defaults to 1 only when offers are created or re-created. Send `end_date` only in the full listing update below, when you mean to extend.
 
 <Warning>
 Any active rental that ends **before** the `end_date` you send is extended to that date, unless the same request raises the GPU, disk, or bandwidth price, or changes Claim or Confidence in a way that would raise that contract's SLA fee. A Claim or Confidence change does **not** prevent a later extension (see [SLA on extended contracts](#sla-on-extended-contracts)). Resending the offer's current `end_date` is not a no-op when some rentals end sooner. `upd_contracts` lists only contracts extended immediately. See [Extending rental contracts](/host/hosting-overview#extending-rental-contracts).
@@ -324,11 +324,11 @@ curl -s -X PUT "https://console.vast.ai/api/v0/machines/create_asks/" \
   -H "Content-Type: application/json" \
   -d '{
     "machine": 12345,
-    "price_gpu": 3.50,
-    "price_disk": 0.15,
+    "price_gpu": CURRENT_GPU_PRICE,
+    "price_disk": CURRENT_STORAGE_PRICE,
     "min_chunk": CURRENT_MIN_CHUNK,
     "vol_size": 0,
-    "hidden_listing": false,
+    "hidden_listing": CURRENT_HIDDEN,
     "sla_r_claim": 0.99,
     "sla_sigma_x": 0.5,
     "end_date": CURRENT_END_DATE_UNIX
@@ -348,11 +348,11 @@ SLA fields example (existing listing, no extension). Same fields as the curl abo
 ```json
 {
   "machine": 12345,
-  "price_gpu": 3.50,
-  "price_disk": 0.15,
+  "price_gpu": CURRENT_GPU_PRICE,
+  "price_disk": CURRENT_STORAGE_PRICE,
   "min_chunk": CURRENT_MIN_CHUNK,
   "vol_size": 0,
-  "hidden_listing": false,
+  "hidden_listing": CURRENT_HIDDEN,
   "sla_r_claim": 0.99,
   "sla_sigma_x": 0.5
 }
@@ -403,7 +403,7 @@ Use this loop only to restore SLA offers that no longer appear in search on mach
 Each live PUT resends the offer's `end_date` (or `duration`). Any active rental that ends **before** that date is extended to it, which also extends your service-credit exposure. This cannot be undone, and `DRY_RUN=1` does not show which contracts will be affected. You cannot see per-contract end dates beforehand. Assume a live run extends any shorter rental, and read `upd_contracts` afterwards (it may not list contracts extended a few minutes later).
 </Warning>
 
-The loop needs two keys: a listing key (`machine_write` and `machine_read`, `VAST_API_KEY`) and a separate search key with `misc` (`SEARCH_API_KEY`). Offer search is about 10 requests per minute per IP. The loop runs local checks first and only searches machines that pass them, so skipped machines use none of that budget. If a search fails or is not a JSON array, that machine is skipped. A failed search never becomes a re-list. An empty array can also mean every GPU is rented. The loop skips a machine unless `current_rentals_resident` is `0`. That count includes stopped rentals. A PUT that resends `end_date` extends every shorter rental on the machine, whether its instance is running or stopped. Before `DRY_RUN=0`, confirm on **Host → Machines** that each allowlisted machine has no rentals at all. Stopped rentals count. The loop does not turn an SLA on for new machines. Enable an SLA on each machine first (console **Set Pricing → SLA**, or a per-machine `PUT /api/v0/machines/create_asks/` with `sla_r_claim` and `sla_sigma_x`). The loop only considers machines that are `listed` and already have `sla_reliability_claim > 0`. It skips a machine whose confidence was never stored. Fix those with the check under [Validation rules](#validation-rules) before you re-list.
+The loop needs two keys: a listing key (`machine_write` and `machine_read`, `VAST_API_KEY`) and a separate search key with `misc` (`SEARCH_API_KEY`). Offer search is about 10 requests per minute for the account, not for each API key. See [How rate limits are applied](/api-reference/rate-limits-and-errors#how-rate-limits-are-applied). The loop runs local checks first and only searches machines that pass them, so skipped machines use none of that budget. If a search fails or is not a JSON array, that machine is skipped. A failed search never becomes a re-list. An empty array can also mean every GPU is rented. The loop skips a machine unless `current_rentals_resident` is `0`. That count includes stopped rentals. A PUT that resends `end_date` extends every shorter rental on the machine, whether its instance is running or stopped. Before `DRY_RUN=0`, confirm on **Host → Machines** that each allowlisted machine has no rentals at all. Stopped rentals count. The loop does not turn an SLA on for new machines. Enable an SLA on each machine first (console **Set Pricing → SLA**, or a per-machine `PUT /api/v0/machines/create_asks/` with `sla_r_claim` and `sla_sigma_x`). The loop only considers machines that are `listed` and already have `sla_reliability_claim > 0`. It skips a machine whose confidence was never stored. Fix those with the check under [Validation rules](#validation-rules) before you re-list.
 
 `show machines` returns confidence only as a label, so the loop does **not** send `sla_sigma_x`. On an existing SLA ask, omitting it keeps the current confidence. If the PUT creates a **new** ask, the server sets `sla_sigma_x` to `0.5` unless you send it. Keep your own record of each machine's σ and check **Set Pricing → SLA** after any run that logs a new ask.
 
