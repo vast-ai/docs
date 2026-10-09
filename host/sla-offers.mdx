@@ -195,7 +195,7 @@ Do not assume the dashboard score equals SLA reliability. Before choosing `sla_r
 
 **Never copy backtester `p` into `sla_sigma_x` — the scales are inverted.** See the full mapping on the [backtester page](/host/sla-backtester#confidence-values-p).
 
-**Tighter confidence** (tighter spread; console label **Tight**) → lower client SLA fees (more competitive `dph_total`). **Wider confidence** (console label **Wide**) → higher client SLA fees. Confidence does **not** change the credit formula when a target is missed — use the backtester's [largest single-day credit](/host/sla-backtester#summarize-with-jq) and `r_target` what-ifs for tail-risk planning.
+**Tighter confidence** (tighter spread; console label **Tight**) → lower client SLA fees (more competitive `dph_total`) and less fee income to offset a miss. **Wider confidence** (console label **Wide**) → higher client SLA fees, which is a cushion, not a smaller credit. For a new or volatile machine, start with **Wide**, then move to **Normal** once uptime is stable. Confidence does **not** change the credit formula when a target is missed — use the backtester's [largest single-day credit](/host/sla-backtester#summarize-with-jq) and `r_target` what-ifs for tail-risk planning.
 
 ### Validation rules
 
@@ -234,7 +234,7 @@ Disabling SLA on the offer (setting `sla_r_claim` to `0`) prevents new SLA-cover
 1. Open your machine on the [Host Machines page](https://cloud.vast.ai/host/machines) → **Set Pricing**.
 2. Set base listing fields first (GPU price, offer end date, rental types) if this is a new listing.
 3. Expand **SLA**.
-4. Set your **reliability commitment** (the console control is **Claim**; the API field is `sla_r_claim`). Renters see it as expected reliability on the offer. Set **Confidence** too. For your first listing, choose **Normal** (`sla_sigma_x ≈ 0.5`) unless your uptime history is volatile — see [Confidence values](#confidence-values) for risk tradeoffs.
+4. Set your **reliability commitment** (the console control is **Claim**; the API field is `sla_r_claim`). Renters see it as expected reliability on the offer. Set **Confidence** too. For a new or volatile machine, start with **Wide**. Wider confidence charges a higher SLA fee, which is a cushion against credits; it does not reduce what you owe when a day misses the target. Move to **Normal** (`sla_sigma_x ≈ 0.5`) once uptime is stable. See [Confidence values](#confidence-values).
 5. Save and confirm the SLA fee preview before listing.
 6. After saving pricing, click **LIST** on the Host Machines page (or confirm the machine status changes to **listed**). Saving pricing alone stores your offer settings; listing publishes the offer to search.
 
@@ -371,7 +371,7 @@ Then `PUT /api/v0/machines/create_asks/` with the merged body (read → merge �
 </Note>
 
 <Warning>
-Each live PUT resends the offer's `end_date` (or `duration`). Any active rental that ends **before** that date is extended to it, which also extends your service-credit exposure. This cannot be undone, and `DRY_RUN=1` does not show which contracts will be affected. Re-list only machines whose rentals already end on or after the offer end date, or accept the extension. After a live run, read `upd_contracts` in the output.
+Each live PUT resends the offer's `end_date` (or `duration`). Any active rental that ends **before** that date is extended to it, which also extends your service-credit exposure. This cannot be undone, and `DRY_RUN=1` does not show which contracts will be affected. Re-list only machines whose rentals already end on or after the offer end date, or accept the extension. `show machines` does not list each contract's end date, and `DRY_RUN` does not either, so you cannot check this beforehand. After a live run, read `upd_contracts` in the output.
 </Warning>
 
 Use this loop to republish SLA terms across a fleet, for example after a daemon update. It does not turn an SLA on for new machines. Enable an SLA on each machine first (console **Set Pricing → SLA**, or a per-machine `PUT /api/v0/machines/create_asks/` with `sla_r_claim` and `sla_sigma_x`). The loop only considers machines that are `listed` and already have `sla_reliability_claim > 0`.
