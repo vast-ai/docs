@@ -858,15 +858,20 @@ paths:
           application/json:
             schema:
               type: object
+              required:
+              - search_params
               properties:
-                endpoint_name:
-                  type: string
-                  description: Name of the endpoint group
-                  example: vLLM-Qwen3-8B
                 endpoint_id:
                   type: integer
-                  description: ID of existing endpoint group (alternative to endpoint_name)
+                  description: ID of the endpoint this workergroup belongs to. Either
+                    `endpoint_id` or `endpoint_name` is required.
                   example: 123
+                endpoint_name:
+                  type: string
+                  description: Name of the endpoint this workergroup belongs to. Either
+                    `endpoint_id` or `endpoint_name` is required. If you have no endpoint
+                    with this name, one is created with default parameters.
+                  example: vLLM-Qwen3-8B
                 template_hash:
                   type: string
                   description: Hash ID of template to use for worker instances
@@ -877,48 +882,22 @@ paths:
                   example: 456
                 search_params:
                   type: string
-                  description: Search query for finding worker instances (alternative
-                    to template)
-                  default: verified=true rentable=true rented=false
+                  description: Search filters for the offers that workers are recruited
+                    from, as a query string or JSON object. Combined with any search
+                    filters defined by the template; where both set the same filter,
+                    this value wins.
                   example: gpu_name=RTX_3090 rentable=true
                 launch_args:
                   type: string
                   description: Additional launch arguments for worker instances
                   example: --env VAR=value
-                min_load:
-                  type: number
-                  description: Minimum load threshold for scaling
-                  default: 1.0
-                  example: 1.0
-                target_util:
-                  type: number
-                  description: Target GPU utilization
-                  default: 0.9
-                  example: 0.9
-                cold_mult:
-                  type: number
-                  description: Cold start multiplier
-                  default: 3.0
-                  example: 3.0
-                cold_workers:
-                  type: integer
-                  description: Number of cold workers to maintain
-                  default: 3
-                  example: 3
-                max_workers:
-                  type: integer
-                  description: Maximum number of worker instances
-                  default: 20
-                  example: 20
-                test_workers:
-                  type: integer
-                  description: Number of test workers
-                  default: 3
-                  example: 3
                 gpu_ram:
-                  type: integer
-                  description: Minimum GPU RAM in GB
-                  default: 24
+                  type: number
+                  description: Estimated GPU memory, in GB, that the model needs.
+                    Used to estimate worker load times; to filter offers by GPU memory,
+                    use `search_params`.
+                  default: 8
+                  exclusiveMinimum: 0
                   example: 24
       responses:
         '200':
@@ -1101,36 +1080,89 @@ paths:
             schema:
               type: object
               properties:
+                endpoint_name:
+                  type: string
+                  description: Name of the endpoint. Must be unique among your endpoints.
+                    If omitted, a random 8-character name is generated.
+                  minLength: 1
+                  maxLength: 512
+                  example: my_endpoint
                 min_load:
                   type: number
-                  description: Minimum load for the endpoint.
-                  default: 10.0
+                  description: Minimum active capacity to maintain, in load per second.
+                    `0` allows the endpoint to scale to zero active workers.
+                  default: 0.0
+                  minimum: 0
                   example: 50.0
+                min_cold_load:
+                  type: number
+                  description: Floor on the load used to size the total pool of active
+                    and inactive workers, in load per second.
+                  default: 0.0
+                  minimum: 0
+                  example: 0.0
                 target_util:
                   type: number
-                  description: Target utilization for the endpoint.
+                  description: Target ratio of anticipated load to active capacity.
+                    Lower values keep more spare capacity.
                   default: 0.9
+                  minimum: 0
+                  maximum: 1
                   example: 0.75
                 cold_mult:
                   type: number
-                  description: Multiplier for cold start.
-                  default: 2.5
+                  description: Total capacity (active and inactive) to maintain, as
+                    a multiple of the active capacity target.
+                  default: 3.0
+                  minimum: 0
+                  exclusiveMaximum: 100
                   example: 2.0
                 cold_workers:
                   type: integer
-                  description: Number of cold workers.
+                  description: Minimum number of workers (active and inactive) to
+                    maintain. Shown as **Minimum Workers** in the console. Must not
+                    be greater than `max_workers`.
                   default: 5
+                  minimum: 0
                   example: 5
                 max_workers:
                   type: integer
-                  description: Maximum number of workers.
+                  description: Maximum number of workers (active and inactive) the
+                    serverless engine will recruit.
                   default: 20
+                  minimum: 0
                   example: 20
-                endpoint_name:
+                max_queue_time:
+                  type: number
+                  description: Maximum seconds of expected queue time allowed to build
+                    up on each worker before new requests wait in the endpoint queue.
+                  default: 30.0
+                  exclusiveMinimum: 0
+                  example: 30.0
+                target_queue_time:
+                  type: number
+                  description: Endpoint-wide queue time, in seconds, above which the
+                    serverless engine scales up aggressively. Must not be greater
+                    than `max_queue_time`.
+                  default: 10.0
+                  exclusiveMinimum: 0
+                  example: 10.0
+                inactivity_timeout:
+                  type: number
+                  description: Seconds without queued or in-progress requests after
+                    which active workers are stopped down to the `min_load` floor.
+                    Not set by default. Once set, it can be changed but not removed.
+                  exclusiveMinimum: 0
+                  example: 600
+                endpoint_state:
                   type: string
-                  description: Name of the endpoint.
-                  default: default-endpoint
-                  example: my_endpoint
+                  description: Initial state of the endpoint.
+                  enum:
+                  - active
+                  - suspended
+                  - stopped
+                  default: active
+                  example: active
       responses:
         '200':
           description: Success response
@@ -3098,7 +3130,7 @@ paths:
     put:
       summary: update workergroup
       description: 'Updates the properties of an existing workergroup based on the
-        provided parameters.
+        provided parameters. Fields you omit are left unchanged.
 
 
         CLI Usage: `vastai update workergroup <id> [options]`'
@@ -3118,24 +3150,13 @@ paths:
           application/json:
             schema:
               type: object
+              required:
+              - endpoint_id
               properties:
-                min_load:
-                  type: number
-                  description: Minimum load for the workergroup.
-                  example: 1.0
-                target_util:
-                  type: number
-                  description: Target utilization for the workergroup.
-                  example: 0.9
-                cold_mult:
-                  type: number
-                  description: Cold multiplier for the workergroup.
-                  example: 3.0
-                test_workers:
+                endpoint_id:
                   type: integer
-                  description: Number of test workers for performance estimation.
-                  default: 3
-                  example: 3
+                  description: ID of the endpoint the workergroup belongs to.
+                  example: 123
                 template_hash:
                   type: string
                   description: Template hash for the workergroup.
@@ -3146,9 +3167,9 @@ paths:
                   example: 456
                 search_params:
                   type: string
-                  description: Search parameters for offers (JSON object or query
-                    string).
-                  default: verified=true rentable=true rented=false
+                  description: Search filters for offers, as a query string or JSON
+                    object. Merged into the workergroup's current filters; where both
+                    set the same filter, this value wins.
                   example: gpu_name=RTX_3090 rentable=true
                 launch_args:
                   type: string
@@ -3156,16 +3177,9 @@ paths:
                   example: --env VAR=value
                 gpu_ram:
                   type: number
-                  description: Estimated GPU RAM requirement.
+                  description: Estimated GPU memory, in GB, that the model needs.
+                    Used to estimate worker load times.
                   example: 24
-                endpoint_name:
-                  type: string
-                  description: Deployment endpoint name.
-                  example: vLLM-Qwen3-8B
-                endpoint_id:
-                  type: integer
-                  description: Deployment endpoint ID.
-                  example: 123
       responses:
         '200':
           description: Successfully updated the workergroup.
@@ -3314,6 +3328,8 @@ paths:
     put:
       summary: update endpoint
       description: 'Updates the specified endpoint group with the provided parameters.
+        Fields you omit are left unchanged. For what each parameter controls, see
+        [Endpoint Parameters](/guides/serverless/serverless-parameters).
 
 
         CLI Usage: `vastai update endpoint <id> [options]`'
@@ -3356,6 +3372,41 @@ paths:
                   type: integer
                   description: Max number of workers your endpoint group can have
                   example: 20
+                min_cold_load:
+                  type: number
+                  description: Floor on the load used to size the total pool of active
+                    and inactive workers, in load per second
+                  minimum: 0
+                  example: 0.0
+                max_queue_time:
+                  type: number
+                  description: Maximum seconds of expected queue time allowed to build
+                    up on each worker
+                  exclusiveMinimum: 0
+                  example: 30.0
+                target_queue_time:
+                  type: number
+                  description: Endpoint-wide queue time, in seconds, above which the
+                    serverless engine scales up aggressively
+                  exclusiveMinimum: 0
+                  example: 10.0
+                inactivity_timeout:
+                  type: number
+                  description: Seconds without queued or in-progress requests after
+                    which active workers are stopped down to the `min_load` floor.
+                    Can be changed but not removed once set.
+                  exclusiveMinimum: 0
+                  example: 600
+                endpoint_state:
+                  type: string
+                  description: Set to `suspended` or `stopped` to pause the serverless
+                    engine, or `active` to resume it. See [Pricing](/guides/serverless/pricing)
+                    for how each state is billed.
+                  enum:
+                  - active
+                  - suspended
+                  - stopped
+                  example: active
                 endpoint_name:
                   type: string
                   description: Deployment endpoint name
@@ -4159,7 +4210,11 @@ paths:
       description: 'Retrieves logs for a specific workergroup by ID.
 
 
-        CLI Usage: `vastai get workergroup logs <id> [--tail <num_lines>]`'
+        The response contains one string per log level. Each level keeps up to about
+        16 MB of recent history; use `tail` to choose how much of it to return.
+
+
+        CLI Usage: `vastai get wrkgrp-logs <id> [--level <0-3>] [--tail <bytes>]`'
       security:
       - BearerAuth: []
       requestBody:
@@ -4173,15 +4228,15 @@ paths:
               properties:
                 id:
                   type: integer
-                  description: ID of the worker group
+                  description: ID of the workergroup
                   default: 12345
                   example: 12345
                   minimum: 1
                 tail:
                   type: integer
-                  description: Number of log lines to retrieve from the end
+                  description: Number of bytes to return from the end of each log
                   default: 10000
-                  example: 1000
+                  example: 100000
                   minimum: 1
       responses:
         '200':
@@ -4193,18 +4248,32 @@ paths:
                 - title: Success - Logs Retrieved
                   type: object
                   properties:
-                    logs:
+                    info0:
                       type: string
-                      description: The workergroup logs
-                      example: '2023-10-01 12:00:00 - Workergroup started
+                      description: User log, shown as **User** in the console. Worker
+                        creation, starts, stops, state changes with their reasons,
+                        worker errors, and PyWorker stack traces.
+                      example: 'Worker 67890: model_loading -> idle (received loadtime)
 
-                        2023-10-01 12:01:00 - Instance scaled up'
+                        '
+                    info1:
+                      type: string
+                      description: Info-level engine log, shown as **Info** in the
+                        console. Includes the user log plus additional scaling details.
+                    debug:
+                      type: string
+                      description: Debug-level engine log
+                    trace:
+                      type: string
+                      description: Trace-level engine log, the most detailed level
                 - title: Error Response
-                  type: string
-                  description: Error message when workergroup not found or authentication
-                    fails
-                  example: 'authenticate_workergroup_apikey: invalid api_key or workergroup
-                    12345 not found'
+                  type: object
+                  properties:
+                    error_msg:
+                      type: string
+                      description: Returned when the workergroup does not exist or
+                        the API key does not own it
+                      example: autogroup 12345 not found or unauthorized
       tags:
       - Serverless
       operationId: getWorkergroupLogs
@@ -4221,7 +4290,9 @@ paths:
         usage within a workergroup.
 
 
-        CLI Usage: `vastai get workergroup workers <id>`'
+        The response is a JSON object containing a `workers` array with one object
+        per worker. To receive the same data as a push stream instead of polling,
+        see [Streaming Worker Status](/guides/serverless/worker-status-websocket).'
       security:
       - BearerAuth: []
       requestBody:
@@ -4257,26 +4328,149 @@ paths:
                         properties:
                           id:
                             type: integer
-                            description: Workergroup instance ID
+                            description: Worker instance ID
                             example: 67890
+                          gpu_name:
+                            type: string
+                            description: GPU model of the worker's machine
+                            example: RTX 4090
+                          num_gpus:
+                            type: integer
+                            description: Number of GPUs allocated to the worker
+                            example: 1
+                          perf:
+                            type: number
+                            description: Performance (load per second) the serverless
+                              engine expects from this worker when planning capacity.
+                              Unavailable and Offline workers count for a fraction
+                              of their full performance, and workers that are in Error
+                              or being destroyed count for `0`.
+                            example: 812.4
+                          measured_perf:
+                            type: number
+                            description: Performance (load per second) measured on
+                              this worker. Reported as `0` until the worker has been
+                              ready at least once (`ready_ever`).
+                            example: 830.1
+                          reliability:
+                            type: number
+                            description: Share of routed requests that the worker
+                              has completed, from 0 to 1. Reset to 1 each time the
+                              worker starts.
+                            example: 0.98
+                          dlperf:
+                            type: number
+                            description: DLPerf score of the worker's machine
+                            example: 105.6
+                          cur_perf:
+                            type: number
+                            description: Current throughput of the worker, in load
+                              per second
+                            example: 640.2
+                          new_load:
+                            type: number
+                            description: Load assigned to the worker since its last
+                              status report
+                            example: 0
+                          cur_load:
+                            type: number
+                            description: Load currently assigned to the worker that
+                              has not completed yet
+                            example: 1500
+                          cur_load_rolling_avg:
+                            type: number
+                            description: Smoothed load per second handled by the worker
+                            example: 580.7
+                          reqs_working:
+                            type: integer
+                            description: Number of requests currently assigned to
+                              the worker
+                            example: 3
+                          loaded_at:
+                            type: number
+                            description: Unix timestamp (seconds) when the worker
+                              became ready after its most recent start, or `0` if
+                              it is not ready yet
+                            example: 1760000000.0
+                          ready_ever:
+                            type: boolean
+                            description: Whether the worker has been ready at least
+                              once since it was created or since its last template
+                              update
+                            example: true
+                          started_at:
+                            type: number
+                            description: Unix timestamp (seconds) when the worker
+                              was last started
+                            example: 1759999700.0
+                          disk_usage:
+                            type: number
+                            description: Disk space used by the worker's model, as
+                              reported by the worker
+                            example: 16.2
                           status:
                             type: string
-                            description: Current worker status
-                            example: running
-                          url:
-                            type: string
-                            description: Worker instance URL
-                            example: http://192.168.1.10:8000
-                          created_at:
-                            type: string
-                            description: When the worker was created
-                            example: '2023-10-01T12:00:00Z'
+                            description: Current worker state. See [Worker States](/guides/serverless/worker-states).
+                            enum:
+                            - pending
+                            - creating
+                            - created
+                            - loading
+                            - model_loading
+                            - idle
+                            - starting
+                            - stopping
+                            - stopped
+                            - rebooting
+                            - unavail
+                            - offline
+                            - error
+                            - destroying
+                            - update_ready
+                            - update_rebooting
+                            - update_starting
+                            - unknown
+                            example: idle
+                          available:
+                            type: boolean
+                            description: Whether the worker's machine can currently
+                              run it. An inactive worker whose GPUs are rented by
+                              someone else reports `false`.
+                            example: true
+                          outdated:
+                            type: boolean
+                            description: Whether the worker is running an older PyWorker
+                              version than the latest stable release
+                            example: false
+                          hidden:
+                            type: boolean
+                            description: Whether the worker is a replacement that
+                              is still being prepared. Hidden workers do not receive
+                              requests.
+                            example: false
+                          contract_end_date:
+                            type: number
+                            description: Unix timestamp (seconds) when the worker's
+                              rental contract ends, or `0` if it has no end date
+                            example: 0
+                          replaces_worker_id:
+                            type: integer
+                            description: ID of the worker this worker is replacing
+                              before its contract ends, or `0` if it is not a replacement
+                            example: 0
+                    active_update:
+                      type: boolean
+                      description: Whether a rolling update of the workergroup's workers
+                        is in progress
+                      example: false
                 - title: Error Response
-                  type: string
-                  description: Error message when workergroup not found or authentication
-                    fails
-                  example: 'authenticate_workergroup_apikey: invalid api_key or workergroup
-                    12345 not found'
+                  type: object
+                  properties:
+                    error_msg:
+                      type: string
+                      description: Returned when the workergroup does not exist or
+                        the API key does not own it
+                      example: autogroup 12345 not found or unauthorized
       tags:
       - Serverless
       operationId: getWorkergroupWorkers
@@ -4286,10 +4480,15 @@ paths:
       - url: https://run.vast.ai
         description: Production server
       summary: get endpoint logs
-      description: 'Retrieves logs for a specific endpoint by name.
+      description: 'Retrieves logs for a specific endpoint, identified by ID or by
+        name.
 
 
-        CLI Usage: `vastai get endpoint logs <endpoint_name> [--tail <num_lines>]`'
+        The response contains one string per log level. Each level keeps up to about
+        16 MB of recent history; use `tail` to choose how much of it to return.
+
+
+        CLI Usage: `vastai get endpt-logs <id> [--level <0-3>] [--tail <bytes>]`'
       security:
       - BearerAuth: []
       requestBody:
@@ -4298,18 +4497,23 @@ paths:
           application/json:
             schema:
               type: object
-              required:
-              - endpoint
               properties:
+                id:
+                  type: integer
+                  description: ID of the endpoint. Either `id` or `endpoint` is required.
+                  example: 12345
+                  minimum: 1
                 endpoint:
                   type: string
-                  description: Name of the endpoint
+                  description: Name of the endpoint. Either `id` or `endpoint` is
+                    required.
                   example: vLLM-Qwen3-8B
                 tail:
                   type: integer
-                  description: Number of log lines to retrieve from the end
+                  description: Number of bytes to return from the end of each log
                   default: 10000
-                  example: 1000
+                  example: 100000
+                  minimum: 1
       responses:
         '200':
           description: Successfully retrieved endpoint logs.
@@ -4320,18 +4524,32 @@ paths:
                 - title: Success - Logs Retrieved
                   type: object
                   properties:
-                    logs:
+                    info0:
                       type: string
-                      description: The endpoint logs
-                      example: '2023-10-01 12:00:00 - Worker started
+                      description: User log, shown as **User** in the console. Worker
+                        creation, starts, stops, state changes with their reasons,
+                        worker errors, and PyWorker stack traces.
+                      example: 'Worker 67890: model_loading -> idle (received loadtime)
 
-                        2023-10-01 12:01:00 - Request processed'
+                        '
+                    info1:
+                      type: string
+                      description: Info-level engine log, shown as **Info** in the
+                        console. Includes the user log plus additional scaling details.
+                    debug:
+                      type: string
+                      description: Debug-level engine log
+                    trace:
+                      type: string
+                      description: Trace-level engine log, the most detailed level
                 - title: Error Response
-                  type: string
-                  description: Error message when endpoint not found or authentication
-                    fails
-                  example: 'authenticate_endpoint_apikey: invalid api_key or endpoint
-                    vLLM-Qwen3-8B not found'
+                  type: object
+                  properties:
+                    error_msg:
+                      type: string
+                      description: Returned when the endpoint does not exist or the
+                        API key does not own it
+                      example: endpoint 12345 does not exist or unauthorized
       tags:
       - Serverless
       operationId: getEndpointLogs
@@ -4348,7 +4566,11 @@ paths:
         usage.
 
 
-        CLI Usage: `vastai get endpoint workers <id>`'
+        The response is a JSON array with one object per worker. To receive the same
+        data as a push stream instead of polling, see [Streaming Worker Status](/guides/serverless/worker-status-websocket).
+
+
+        CLI Usage: `vastai get endpt-workers <id>`'
       security:
       - BearerAuth: []
       requestBody:
@@ -4368,42 +4590,154 @@ paths:
                   minimum: 1
       responses:
         '200':
-          description: Successfully retrieved endpoints workers.
+          description: Successfully retrieved endpoint workers.
           content:
             application/json:
               schema:
                 oneOf:
                 - title: Success - Workers Retrieved
+                  type: array
+                  description: List of workers for this endpoint
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        description: Worker instance ID
+                        example: 67890
+                      gpu_name:
+                        type: string
+                        description: GPU model of the worker's machine
+                        example: RTX 4090
+                      num_gpus:
+                        type: integer
+                        description: Number of GPUs allocated to the worker
+                        example: 1
+                      perf:
+                        type: number
+                        description: Performance (load per second) the serverless
+                          engine expects from this worker when planning capacity.
+                          Unavailable and Offline workers count for a fraction of
+                          their full performance, and workers that are in Error or
+                          being destroyed count for `0`.
+                        example: 812.4
+                      measured_perf:
+                        type: number
+                        description: Performance (load per second) measured on this
+                          worker
+                        example: 830.1
+                      reliability:
+                        type: number
+                        description: Share of routed requests that the worker has
+                          completed, from 0 to 1. Reset to 1 each time the worker
+                          starts.
+                        example: 0.98
+                      dlperf:
+                        type: number
+                        description: DLPerf score of the worker's machine
+                        example: 105.6
+                      cur_perf:
+                        type: number
+                        description: Current throughput of the worker, in load per
+                          second
+                        example: 640.2
+                      new_load:
+                        type: number
+                        description: Load assigned to the worker since its last status
+                          report
+                        example: 0
+                      cur_load:
+                        type: number
+                        description: Load currently assigned to the worker that has
+                          not completed yet
+                        example: 1500
+                      cur_load_rolling_avg:
+                        type: number
+                        description: Smoothed load per second handled by the worker
+                        example: 580.7
+                      reqs_working:
+                        type: integer
+                        description: Number of requests currently assigned to the
+                          worker
+                        example: 3
+                      loaded_at:
+                        type: number
+                        description: Unix timestamp (seconds) when the worker became
+                          ready after its most recent start, or `0` if it is not ready
+                          yet
+                        example: 1760000000.0
+                      ready_ever:
+                        type: boolean
+                        description: Whether the worker has been ready at least once
+                          since it was created or since its last template update
+                        example: true
+                      started_at:
+                        type: number
+                        description: Unix timestamp (seconds) when the worker was
+                          last started
+                        example: 1759999700.0
+                      disk_usage:
+                        type: number
+                        description: Disk space used by the worker's model, as reported
+                          by the worker
+                        example: 16.2
+                      status:
+                        type: string
+                        description: Current worker state. See [Worker States](/guides/serverless/worker-states).
+                        enum:
+                        - pending
+                        - creating
+                        - created
+                        - loading
+                        - model_loading
+                        - idle
+                        - starting
+                        - stopping
+                        - stopped
+                        - rebooting
+                        - unavail
+                        - offline
+                        - error
+                        - destroying
+                        - update_ready
+                        - update_rebooting
+                        - update_starting
+                        - unknown
+                        example: idle
+                      available:
+                        type: boolean
+                        description: Whether the worker's machine can currently run
+                          it. An inactive worker whose GPUs are rented by someone
+                          else reports `false`.
+                        example: true
+                      outdated:
+                        type: boolean
+                        description: Whether the worker is running an older PyWorker
+                          version than the latest stable release
+                        example: false
+                      hidden:
+                        type: boolean
+                        description: Whether the worker is a replacement that is still
+                          being prepared. Hidden workers do not receive requests.
+                        example: false
+                      contract_end_date:
+                        type: number
+                        description: Unix timestamp (seconds) when the worker's rental
+                          contract ends, or `0` if it has no end date
+                        example: 0
+                      replaces_worker_id:
+                        type: integer
+                        description: ID of the worker this worker is replacing before
+                          its contract ends, or `0` if it is not a replacement
+                        example: 0
+                - title: Error Response
                   type: object
                   properties:
-                    workers:
-                      type: array
-                      description: List of workers for this endpoint
-                      items:
-                        type: object
-                        properties:
-                          id:
-                            type: integer
-                            description: Worker instance ID
-                            example: 67890
-                          status:
-                            type: string
-                            description: Current worker status
-                            example: running
-                          url:
-                            type: string
-                            description: Worker instance URL
-                            example: http://192.168.1.10:8000
-                          created_at:
-                            type: string
-                            description: When the worker was created
-                            example: '2023-10-01T12:00:00Z'
-                - title: Error Response
-                  type: string
-                  description: Error message when endpoint not found or authentication
-                    fails
-                  example: 'authenticate_endpoint_apikey: invalid api_key or endpoint
-                    vLLM-Qwen3-8B not found'
+                    error_msg:
+                      type: string
+                      description: Returned when the endpoint does not exist or the
+                        API key does not own it
+                      example: endpoint 12345 not found or unauthorized
       tags:
       - Serverless
       operationId: getEndpointWorkers
