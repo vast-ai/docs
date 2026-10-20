@@ -14,6 +14,8 @@ paths:
       description: |
         Retrieves the earnings history for a specified time range and optionally per machine.
 
+        **Note:** `per_day[]` aggregates SLA earnings across your entire fleet for each UTC day, even when `machid` is set. For machine-scoped SLA totals, use `per_machine[].sla_earn`.
+
         CLI Usage: `vastai show earnings [options]`
       security:
       - BearerAuth: []
@@ -22,18 +24,22 @@ paths:
         in: path
         required: true
         schema:
-          type: integer
-        description: The ID of the user.
+          type: string
+        description: Ignored. The API key owner is always used. Pass `me` or your numeric user id.
       - name: sday
         in: query
         schema:
           type: integer
-        description: Start day for the earnings report.
+        description: |
+          Start day for the earnings report as a UTC day index:
+          `floor(unix_epoch_seconds / 86400)`. Prefer `last_days` when you do not need an absolute window.
       - name: eday
         in: query
         schema:
           type: integer
-        description: End day for the earnings report.
+        description: |
+          End day for the earnings report as a UTC day index:
+          `floor(unix_epoch_seconds / 86400)` (inclusive end of the window when used with `sday`).
       - name: machid
         in: query
         schema:
@@ -63,6 +69,9 @@ paths:
                         type: number
                       total_bwd:
                         type: number
+                      total_sla:
+                        type: number
+                        description: Sum of per_machine sla_earn when those rows are present, otherwise the per_day sla_earn values. Escrow released to the host, not fees minus credits. With a machine id this total is that machine, while per_day stays fleet-wide.
                   username:
                     type: string
                   email:
@@ -107,6 +116,9 @@ paths:
                           type: number
                         bwd_earn:
                           type: number
+                        sla_earn:
+                          type: number
+                          description: Escrow released to the host for this machine over the window (net compute plus SLA fee, minus service credits). SLA-contract compute is not included in gpu_earn or sto_earn. Normally positive; negative only when a prior day is corrected.
                   per_day:
                     type: array
                     items:
@@ -122,6 +134,9 @@ paths:
                           type: number
                         bwd_earn:
                           type: number
+                        sla_earn:
+                          type: number
+                          description: Fleet-wide escrow released to the host that UTC day (same meaning as per_machine sla_earn). Not fees-minus-credits, and not a per-machine figure.
         '400':
           description: Bad Request - Invalid input syntax
           content:
@@ -129,15 +144,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '429':
-          description: Too Many Requests
+          description: Too Many Requests. Body follows the Accept header (usually HTML, not the JSON error shape). Retry-After and X-RateLimit-* headers are set.
           content:
-            application/json:
+            text/html:
               schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    example: API requests too frequent endpoint threshold=2.0
+                type: string
+                example: "API requests too frequent: endpoint threshold=2*1"
       tags:
       - Billing
 components:
@@ -158,12 +170,12 @@ components:
 x-rate-limit:
   threshold: 2.0
   per: request
-  description: Maximum request frequency per IP address for this endpoint
+  description: Rate limit per account for a signed-in API key. Unauthenticated calls are limited per IP address.
 x-cli-commands:
 - name: show earnings
   description: Retrieve earnings history for a specified time range and optionally
     per machine.
   endpoint: /api/v0/users/{user_id}/machine-earnings/
   method: GET
-  example: vastai show earnings --start_date 2023-01-01 --end_date 2023-01-31 --machine_id
+  example: vastai show earnings --start_date 2023-01-01T00:00:00Z --end_date 2023-01-31T00:00:00Z --machine_id
     123

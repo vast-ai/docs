@@ -11,7 +11,7 @@ info:
     \ CLI = GB; in REST API = MB (CLI auto-converts)\n- SSH keys must be registered\
     \ BEFORE creating an instance (VM: no recovery; Docker: can add post-create)\n\
     - `onstart` field is limited to 4048 characters -- gzip+base64 for longer scripts\n\
-    - `POST /api/v0/asks/{id}/` (create instance) returns `new_contract` as the instance\
+    - `PUT /api/v0/asks/{id}/` (create instance) returns `new_contract` as the instance\
     \ ID, not `id`\n- Poll trap: if `actual_status` becomes `exited`, `unknown`, or\
     \ `offline` it will never reach `running` -- destroy and retry"
   version: 1.0.0
@@ -298,7 +298,8 @@ paths:
   /api/v0/machines/{machine_id}/cancel_maint:
     put:
       summary: cancel maint
-      description: 'Cancel a scheduled maintenance window for a specified machine.
+      description: 'Cancel every host-scheduled maintenance window on a machine. Vast-scheduled
+        windows are left in place.
 
 
         CLI Usage: `vastai cancel maint <machine_id>`'
@@ -331,6 +332,10 @@ paths:
                     type: string
                     example: deleted 1 scheduled maintenance window(s) on machine
                       1234
+                  admin_locked:
+                    type: integer
+                    description: Number of Vast-scheduled windows left in place.
+                    example: 0
         '404':
           description: Machine not found or does not belong to the user.
           content:
@@ -1579,29 +1584,21 @@ paths:
   /api/v0/asks/{id}:
     put:
       summary: create instance
-      description: 'Creates a new instance by accepting an "ask" contract from a provider.
-
-
-        - Use the search offers endpoint to discover available machines.
-
-        - If `template_id` is provided, those template defaults are either merged
-        or overridden by parameters specified in the request body.
-
-
-        **Template Precedence Rules:**
-
-        - **Scalar fields** (image, disk, runtype, etc.): Request value overrides
-        template value
-
-        - **`env`**: Merged by key. Request values win on key conflicts
-
-        - **`extra_filters`**: Merged by key. Request values win on key conflicts
-
-
-        For detailed template usage, see [Creating and Using Templates with API](/api-reference/creating-and-using-templates-with-api).
-
-
-        CLI Usage: `vastai create instance <offer_id> <image> [options]`'
+      description: "Creates a new instance by accepting an \"ask\" contract from a\
+        \ provider.\n\n- Use the search offers endpoint to discover available machines.\n\
+        - If `template_hash_id` is provided, those template defaults are either merged\
+        \ or overridden by parameters specified in the request body.\n\n**Template\
+        \ Precedence Rules:**\n- **Scalar fields** (image, disk, runtype, etc.): Request\
+        \ value overrides template value\n- **`env`**: Merged by key. Request values\
+        \ win on key conflicts\n- **`extra_filters`**: Merged by key. Request values\
+        \ win on key conflicts\n\nFor detailed template usage, see [Creating and Using\
+        \ Templates with API](/api-reference/creating-and-using-templates-with-api).\n\
+        \n**SLA note:** `target_reliability` is REST-only at rent time. The published\
+        \ CLI and SDK cannot pass this field until support ships. Use the web console\
+        \ or `PUT /api/v0/asks/{id}/` with `target_reliability` in the request body\
+        \ to enable SLA coverage \u2014 see [SLA Coverage](/guides/instances/choosing/sla-coverage).\n\
+        \nCLI Usage: `vastai create instance <offer_id> --image <image> [options]`\
+        \ (no `target_reliability` flag today)"
       security:
       - BearerAuth: []
       tags:
@@ -1619,8 +1616,15 @@ paths:
           application/json:
             schema:
               type: object
-              required:
-              - image
+              description: 'Send `image`, `template_hash_id`, or both. When both are
+                set, the request `image` overrides the template image.
+
+                '
+              anyOf:
+              - required:
+                - image
+              - required:
+                - template_hash_id
               properties:
                 image:
                   type: string
@@ -1646,9 +1650,24 @@ paths:
                 disk:
                   type: number
                   format: float
-                  description: 'Size of local disk partition (in GB)
+                  minimum: 0
+                  description: 'Disk size in GB. Omitted or 0 becomes 10 GB. Values
+                    from 1 through 7 are raised to 8 with no error. Send the same
+                    number you used as allocated_storage in search so the quoted price
+                    matches the bill.
 
                     '
+                target_reliability:
+                  type: number
+                  format: float
+                  minimum: 0
+                  maximum: 1
+                  exclusiveMaximum: true
+                  description: "0 or omitted means no SLA. A value in (0, 1) requests\
+                    \ an SLA at that reliability target.\nValues below 0 or at least\
+                    \ 1 return HTTP 400 `invalid_args`.\n`invalid_sla_params` covers\
+                    \ an offer with no SLA, a target above the host commitment, or\
+                    \ an SLA fee above 1\xD7 compute.\nSee [SLA Coverage](/guides/instances/choosing/sla-coverage).\n"
                 runtype:
                   type: string
                   description: 'Launch mode for the instance. If omitted, defaults
@@ -1774,6 +1793,8 @@ paths:
                         (e.g., `/workspace`)
             example:
               image: vastai/base-image:@vastai-automatic-tag
+              disk: 50
+              target_reliability: 0.95
       responses:
         '200':
           description: Instance created successfully
@@ -1791,7 +1812,13 @@ paths:
                     description: ID of the newly created instance contract
                     example: 1234568
         '400':
-          description: Bad Request
+          description: "Bad Request. Out-of-range `target_reliability` (below 0 or\
+            \ at least 1) is `invalid_args`. `invalid_sla_params` covers no SLA on\
+            \ the offer, a target above the host commitment, or an SLA fee above 1\xD7\
+            \ compute. Also SSH key requirements. A missing offer is HTTP 400 `invalid_args`\
+            \ with `no_such_ask` (`msg` contains `error 404/3603`). A host account\
+            \ renting someone else's offer is also HTTP 400 `invalid_args` (`msg`\
+            \ contains `error 403/3586`). The HTTP status is 400 in both cases.\n"
           content:
             application/json:
               schema:
@@ -1804,6 +1831,7 @@ paths:
                     type: string
                     enum:
                     - invalid_args
+                    - invalid_sla_params
                     - invalid_price
                     - no_ssh_key_for_vm
                   msg:
@@ -1820,7 +1848,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '403':
-          description: Forbidden
+          description: 'Forbidden. SLA is not enabled (`error` is `sla_disabled`).
+            This is a platform-wide switch, not an account or region setting. A host
+            account renting another host''s offer is not 403; that is HTTP 400 with
+            `error 403/3586` inside `msg`.
+
+            '
           content:
             application/json:
               schema:
@@ -1831,34 +1864,17 @@ paths:
                     example: false
                   error:
                     type: string
-                    example: invalid_args
+                    example: sla_disabled
                   msg:
                     type: string
-                    example: 'error 403/3586: Offer 1234567 is not your own. Hosts
-                      can only rent their own machines.'
+                    example: SLA is not enabled.
                   ask_id:
                     type: integer
                     example: 1234567
         '404':
-          description: Offer not found or not available
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  error:
-                    type: string
-                    example: invalid_args
-                  msg:
-                    type: string
-                    example: 'error 404/3603: no_such_ask Instance type by id 1234567
-                      is not available.'
-                  ask_id:
-                    type: integer
-                    example: 1234567
+          description: The offer was taken while the request was in progress. `error`
+            is `no_such_ask` and `msg` contains `error 404/3659`. Re-search and do
+            not retry the same offer ID.
         '410':
           description: Offer no longer available (when cancel_unavail is true and
             instance cannot start)
@@ -1881,15 +1897,14 @@ paths:
                     type: integer
                     example: 1234567
         '429':
-          description: Too Many Requests
+          description: Too Many Requests. Body follows the Accept header (usually
+            HTML, not the JSON error shape). Retry-After and X-RateLimit-* headers
+            are set.
           content:
-            application/json:
+            text/html:
               schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    example: API requests too frequent endpoint threshold=4.5
+                type: string
+                example: 'API requests too frequent: endpoint threshold=4.5*1'
       operationId: createInstance
   /api/v0/ssh:
     post:
@@ -4496,13 +4511,24 @@ paths:
   /api/v0/machines/create_asks:
     put:
       summary: list machine
-      description: 'Creates or updates ask contracts for a machine to list it for
-        rent on the vast.ai platform.
-
-        Allows setting pricing, minimum GPU requirements, end date and discount rates.
-
-
-        CLI Usage: `vastai list machine <machine_id> [options]`'
+      description: "Creates or updates ask contracts for a machine to list it for\
+        \ rent on the vast.ai platform.\nAllows setting offer pricing, rental types,\
+        \ end dates, discount rates, and SLA parameters.\nUnspecified fields generally\
+        \ keep their current values, except `price_disk` (defaults to 0.10), `duration`\
+        \ (cleared if omitted), `hidden_listing` (defaults to false). `min_chunk`\
+        \ defaults to 1 only when offers are created or re-created, not when an existing\
+        \ listing is updated. Omitting `vol_size` on a machine with no volume offer\
+        \ creates one at half the free disk; send `0` to opt out. Send `price_disk`,\
+        \ `hidden_listing`, and `min_chunk` on every update. Send either `duration`\
+        \ or `end_date`, never both (400). Read the current offer with show machines\
+        \ before changing pricing.\n\nSLA request-body fields (`sla_r_claim`, `sla_sigma_x`,\
+        \ optional `sla_max_beta`) are supported on this REST endpoint. SLA activates\
+        \ when `sla_r_claim > 0`. Host-sent `sla_r_target` / legacy `sla_reliability`\
+        \ are ignored \u2014 clients choose a reliability target at search/rent time.\
+        \ The published CLI and SDK do not yet expose SLA fields \u2014 use the host\
+        \ console (**Set Pricing \u2192 SLA**) or REST/`curl` until CLI/SDK support\
+        \ ships.\n\nCLI Usage (non-SLA fields): `vastai list machine <machine_id>\
+        \ [options]`"
       security:
       - BearerAuth: []
       requestBody:
@@ -4524,7 +4550,7 @@ paths:
                 price_disk:
                   type: number
                   format: float
-                  description: Price per GB of disk storage
+                  description: Price per GB of disk storage per month (USD/GB/month).
                 price_inetu:
                   type: number
                   format: float
@@ -4539,16 +4565,92 @@ paths:
                   description: Minimum bid price allowed
                 min_chunk:
                   type: integer
-                  description: Minimum number of GPUs that must be rented together
+                  description: Minimum number of GPUs that must be rented together.
+                    Defaults to 1 when offers are created or re-created (first publish,
+                    or relist after unlist). Omitting it on an already-listed machine
+                    does not change the current minimum. Send listed_min_gpu_count
+                    so a later relist does not slice the machine.
                   default: 1
                 end_date:
                   type: number
                   format: float
-                  description: Unix timestamp for when the listing expires
+                  description: Unix timestamp for when the listing expires. Do not
+                    send together with `duration` (400 Cannot set both duration and
+                    end_date).
+                duration:
+                  type: integer
+                  description: 'Whole seconds until the listing ends (auto-renewing
+                    listings). Floats such as 2592000.0 are rejected with 400 Invalid
+                    duration. Mutually exclusive with end_date. Omitting it on an
+                    auto-renew listing turns auto-renew off.
+
+                    '
+                hidden_listing:
+                  type: boolean
+                  description: When true, the offer is not shown in search. Defaults
+                    to false if omitted, which makes a hidden listing public. `show
+                    machines` does not return this flag.
+                vol_size:
+                  type: integer
+                  minimum: 0
+                  description: Size in GB of a volume offer to create alongside the
+                    machine offer. Send 0 to avoid creating one. Omitting it creates
+                    a volume offer at about half the free disk. Sending 0 does not
+                    delete an existing volume offer.
+                vol_price:
+                  type: number
+                  format: float
+                  description: Price per GB-month for the volume offer created when
+                    vol_size is set.
                 credit_discount_max:
                   type: number
                   format: float
                   description: Maximum discount rate allowed for prepaid credits
+                sla_r_claim:
+                  type: number
+                  format: float
+                  minimum: 0
+                  maximum: 0.99999
+                  description: 'Host reliability claim. Values above 0 enable SLA
+                    on the offer.
+
+                    Must be greater than 0 and at most 0.99999 when enabling SLA;
+                    exactly 1.0 is rejected.
+
+                    Set to 0 to disable SLA on new rentals.
+
+                    '
+                sla_sigma_x:
+                  type: number
+                  format: float
+                  description: "Host confidence spread \u2014 how wide your belief\
+                    \ is around the claim.\nSLA confidence spread. Defaults to 0.5\
+                    \ when an ask is created with SLA. When enabling SLA on an existing\
+                    \ ask, send it explicitly; omitting it keeps the stored value,\
+                    \ which may be empty. In that case show machines returns sla_confidence\
+                    \ null.\n"
+                sla_max_beta:
+                  type: number
+                  format: float
+                  description: "Optional ask term capping how aggressively long-running\
+                    \ contracts may weight recent\nuptime versus longer history in\
+                    \ settlement. Hosts do not set \u03B2 \u2014 the platform derives\n\
+                    \u03B2 from the client's target_reliability at rent. Leave unset\
+                    \ for uncapped. When set,\nmust be in (0, 1) and at least the\
+                    \ default beta derived at your claim.\n"
+                sla_r_target:
+                  type: number
+                  format: float
+                  description: 'Ignored on asks. Client coverage target is supplied
+                    at search/rent time
+
+                    (`target_reliability`), not set by the host.
+
+                    '
+                sla_reliability:
+                  type: number
+                  format: float
+                  description: Legacy alias for sla_r_target; ignored on asks.
       responses:
         '200':
           description: Successful response
@@ -4559,15 +4661,49 @@ paths:
                 properties:
                   success:
                     type: boolean
-                  extended:
-                    type: integer
-                    description: Number of client contracts extended to new end date
-                  msg:
-                    type: string
-                    description: Status message if success is false
+                  you_sent:
+                    type: object
+                    description: Echo of the request body
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        machine_id:
+                          type: integer
+                        user_id:
+                          type: integer
+                        extended:
+                          type: integer
+                          description: Number of rental contracts extended
+                        new_contracts:
+                          type: array
+                          items:
+                            type: integer
+                          description: IDs of asks (offers) created by this request.
+                            A non-empty list means a new ask was created, so new-ask
+                            defaults such as sla_sigma_x 0.5 were applied. These are
+                            not rental contract IDs.
+                        upd_contracts:
+                          type: array
+                          items:
+                            type: integer
+                          description: IDs of active rental contracts whose end date
+                            this request extended. The array length equals extended.
+                            These are not offer IDs.
                 example:
                   success: true
-                  extended: 2
+                  you_sent:
+                    machine: 12345
+                    sla_r_claim: 0.99
+                    sla_sigma_x: 0.5
+                  results:
+                  - machine_id: 12345
+                    user_id: 67890
+                    extended: 1
+                    new_contracts: []
+                    upd_contracts:
+                    - 2000001
         '400':
           description: Bad Request
           content:
@@ -4577,12 +4713,31 @@ paths:
                 properties:
                   error:
                     type: string
-                    example: invalid_args
+                    enum:
+                    - invalid_args
+                    - invalid_sla_params
+                    example: invalid_sla_params
                   msg:
                     type: string
-                    example: Invalid machine id or parameters
+                    example: No such machine(s) for your account
+        '401':
+          description: "Unauthorized \u2014 missing permission or invalid API key"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                  msg:
+                    type: string
+                    example: Your key lacks the machine_write permission group
         '403':
-          description: Forbidden
+          description: "Forbidden \u2014 machine locked, host not approved for SLA,\
+            \ SLA switched off platform-wide, or daemon too old for SLA"
           content:
             application/json:
               schema:
@@ -4590,10 +4745,19 @@ paths:
                 properties:
                   error:
                     type: string
-                    example: not_authorized
+                    enum:
+                    - machine_locked
+                    - sla_not_approved
+                    - sla_disabled
+                    - sla_daemon_outdated
+                    example: machine_locked
                   msg:
                     type: string
-                    example: Only machine owner can create ask contracts
+                    example: Machine is decommissioned or migration-locked
+        '402':
+          description: Machine daemon has not checked in recently. Message is in `results[0].msg`.
+        '429':
+          description: Too many requests. Space calls at least 5 seconds apart.
       tags:
       - Machines
       operationId: listMachine
@@ -6246,7 +6410,12 @@ paths:
 
 
         CLI Usage: `vastai schedule maint <machine_id> --sdate <sdate> --duration
-        <duration>`'
+        <duration> --maintenance_category <category>`
+
+
+        The CLI sends `"not provided"` when `--maintenance_category` is omitted, and
+        that value is rejected with HTTP 400 `invalid_args`. On REST, an omitted `maintenance_category`
+        defaults to `other`.'
       security:
       - BearerAuth: []
       parameters:
@@ -6265,20 +6434,34 @@ paths:
               type: object
               required:
               - sdate
-              - duration
               properties:
                 sdate:
-                  type: string
-                  format: date-time
-                  description: Start date and time of the maintenance window.
-                  example: '2023-10-30T14:00:00Z'
+                  type: number
+                  description: 'Start time of the maintenance window as Unix epoch
+                    seconds (UTC), for example
+
+                    `1785549600` (2026-08-01 02:00 UTC). The CLI `--sdate` flag sends
+                    the same value.
+
+                    '
+                  example: 1785549600
                 duration:
-                  type: integer
-                  description: Duration of the maintenance window in hours.
+                  type: number
+                  description: 'Duration of the maintenance window in hours. If you
+                    omit it, the server uses 1 hour.
+
+                    A fractional value is rounded down, with a minimum of 1 hour.
+
+                    '
                   example: 2
                 maintenance_reason:
                   type: string
-                  description: Reason for the maintenance.
+                  description: 'Accepted on the request schema, but the server currently
+                    stores this
+
+                    field empty. Renters will not see a reason you send.
+
+                    '
                   example: Routine hardware check
                 maintenance_category:
                   type: string
@@ -6324,15 +6507,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '429':
-          description: Too Many Requests
+          description: Too Many Requests. JSON body and a Retry-After header.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait.
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  detail:
+                  error:
                     type: string
-                    example: API requests too frequent endpoint threshold=2.5
+                    example: HTTPTooManyRequests
+                  msg:
+                    type: string
+                    example: API requests too frequent
+                  retry_after:
+                    type: integer
+                    example: 3
       tags:
       - Machines
       operationId: scheduleMaint
@@ -6493,18 +6687,14 @@ paths:
                     eq: true
                 rented:
                   type: object
-                  description: 'When set to true, include offers where the calling
-                    user already has rented GPUs.
-
-                    This is useful for finding offers on machines you''re already
-                    renting.
+                  description: 'Not a server-side filter. The server drops this key.
+                    Each offer still includes a `rented` flag. The packaged CLI does
+                    not filter on it either.
 
                     '
                   properties:
                     eq:
                       type: boolean
-                  default:
-                    eq: false
                 gpu_name:
                   type: object
                   description: 'GPU model name. Example: {"eq": "RTX_4090"} or {"in":
@@ -6519,8 +6709,32 @@ paths:
                       - RTX_4090
                 reliability:
                   type: object
-                  description: 'Machine reliability score (0-1). Example: {"gte":
-                    0.99}'
+                  description: 'Historical machine reliability score (0-1), not the
+                    host reliability commitment. Example: {"gte": 0.99}'
+                target_reliability:
+                  type: number
+                  description: "Reliability target for an SLA. Value must be greater\
+                    \ than 0 and less than 1 (exclusive bounds \u2014\nsame as create-instance).\
+                    \ When set, search prices include the SLA fee in dph_total and\n\
+                    returns search.slaPremiumPerHour (the API name for that fee).\
+                    \ Pass the same target again on PUT /api/v0/asks/{id}/ to\nenable\
+                    \ the SLA. Send a plain number (for example 0.95); an operator\
+                    \ object such as {\"eq\": 0.95} is rejected with 400 bad_request.\n"
+                has_sla:
+                  type: object
+                  description: 'Restrict to offers with SLA enabled (true) or without
+                    (false). Example: {"eq": true}
+
+                    '
+                  properties:
+                    eq:
+                      type: boolean
+                expected_reliability:
+                  type: object
+                  description: 'Host SLA claim on the offer (0-1). Example: {"gte":
+                    0.99}
+
+                    '
                 num_gpus:
                   type: object
                   description: 'Number of GPUs. Example: {"gte": 4} or {"in": [1,
@@ -6707,27 +6921,24 @@ paths:
                     type: array
                     items:
                       type: string
-                  minItems: 2
-                  maxItems: 2
+                    minItems: 2
+                    maxItems: 2
                 allocated_storage:
                   type: number
-                  description: 'Storage allocation size in GB for the instance.
-
-                    This sets the disk size when creating the instance and cannot
-                    be changed later.
-
-                    Default is 8GB.
+                  description: 'Storage size in GB used to price offers in this search
+                    only. It is not carried into rent. Send the same value as `disk`
+                    on `PUT /api/v0/asks/{id}/`. If `disk` is omitted or 0 at rent,
+                    10 GB is allocated. Values below 8 are raised to 8. Disk size
+                    cannot be changed after the instance is created.
 
                     '
             example:
               limit: 100
-              type: on-demand
+              type: ondemand
               verified:
                 eq: true
               rentable:
                 eq: true
-              rented:
-                eq: false
       responses:
         '200':
           description: Successful search response
@@ -6741,9 +6952,15 @@ paths:
                     items:
                       type: object
                       additionalProperties: true
+                  truncated:
+                    type: boolean
+                    description: 'True when the server cut the result short of `limit`.
+                      Narrow the query instead of assuming you saw every offer.
+
+                      '
               example:
                 offers:
-                  id: 12345678
+                - id: 12345678
                   ask_contract_id: 12345678
                   bundle_id: 987654321
                   bundled_results: null
@@ -6819,7 +7036,7 @@ paths:
                   vram_costperhour: 0.009876
                   webpage: null
                   vms_enabled: false
-                  expected_reliability: 0.5
+                  expected_reliability: 0.99
                   is_vm_deverified: false
                   resource_type: gpu
                   cluster_id: null
@@ -6838,12 +7055,14 @@ paths:
                   search:
                     gpuCostPerHour: 0.123456
                     diskHour: 0.123456
+                    slaPremiumPerHour: 0.008
                     totalHour: 0.234567
                     discountTotalHour: 0.01
                     discountedTotalPerHour: 0.224567
                   instance:
                     gpuCostPerHour: 0.01
                     diskHour: 0.02
+                    slaPremiumPerHour: 0.008
                     totalHour: 0.03
                     discountTotalHour: 0.001
                     discountedTotalPerHour: 0.029
@@ -6876,6 +7095,31 @@ paths:
                   msg:
                     type: string
                     example: Invalid user key
+        '429':
+          description: 'Too many requests, or the daily search row quota is exhausted.
+
+            Both `HTTPTooManyRequests` and `search_quota_exceeded` include a `Retry-After`
+            header.
+
+            The quota error''s wait can be hours.
+
+            '
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait. Present on both search 429s.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: search_quota_exceeded
+                  msg:
+                    type: string
+                    example: Daily search row quota exhausted
       tags:
       - Search
       operationId: searchOffers
@@ -7130,9 +7374,10 @@ paths:
   /api/v0/charges:
     get:
       summary: show charges
-      description: 'Shows charges per instance, including GPU, storage, and bandwidth.
-        For invoice/payment records (Stripe top-ups, transfers, payouts), use [show
-        invoices](/api-reference/billing/show-invoices) instead.
+      description: 'Shows charges per instance, including GPU, storage, bandwidth,
+        and the net SLA row (`type: "sla"`). For invoice/payment records (Stripe top-ups,
+        transfers, payouts), use [show invoices](/api-reference/billing/show-invoices)
+        instead.
 
 
         CLI: `vastai show invoices-v1 --charges`'
@@ -7296,8 +7541,8 @@ paths:
                         items:
                           type: array
                           description: Per-charge-type breakdown (`gpu`, `disk`, `bwd`,
-                            `bwu`). Empty for tree-format wrappers above the contract
-                            level.
+                            `bwu`, and `sla` on SLA rentals). Empty for tree-format
+                            wrappers above the contract level.
                           items:
                             type: object
                             properties:
@@ -7314,6 +7559,7 @@ paths:
                                 - disk
                                 - bwd
                                 - bwu
+                                - sla
                                 example: gpu
                               source:
                                 type:
@@ -7326,6 +7572,15 @@ paths:
                               amount:
                                 type: number
                                 format: float
+                                description: 'Charge amount for this item. For type
+                                  "sla", this is the net SLA amount for the whole
+                                  query window (fee minus credit), not one row per
+                                  day. Query one UTC day at a time for a daily figure.
+                                  A positive amount is a net fee. A negative amount
+                                  is a net credit. The console Charges tab shows the
+                                  opposite sign.
+
+                                  '
                                 example: 37.344
                               metadata:
                                 type: object
@@ -7384,15 +7639,26 @@ paths:
                 error: auth_error
                 msg: Invalid user key
         '429':
-          description: Too Many Requests
+          description: Too Many Requests. JSON body and a Retry-After header.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait.
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  detail:
+                  error:
                     type: string
-                    example: API requests too frequent endpoint threshold=1.0
+                    example: HTTPTooManyRequests
+                  msg:
+                    type: string
+                    example: API requests too frequent
+                  retry_after:
+                    type: integer
+                    example: 1
       tags:
       - Billing
       operationId: showCharges
@@ -7742,6 +8008,11 @@ paths:
         optionally per machine.
 
 
+        **Note:** `per_day[]` aggregates SLA earnings across your entire fleet for
+        each UTC day, even when `machid` is set. For machine-scoped SLA totals, use
+        `per_machine[].sla_earn`.
+
+
         CLI Usage: `vastai show earnings [options]`'
       security:
       - BearerAuth: []
@@ -7750,18 +8021,29 @@ paths:
         in: path
         required: true
         schema:
-          type: integer
-        description: The ID of the user.
+          type: string
+        description: Ignored. The API key owner is always used. Pass `me` or your
+          numeric user id.
       - name: sday
         in: query
         schema:
           type: integer
-        description: Start day for the earnings report.
+        description: 'Start day for the earnings report as a UTC day index:
+
+          `floor(unix_epoch_seconds / 86400)`. Prefer `last_days` when you do not
+          need an absolute window.
+
+          '
       - name: eday
         in: query
         schema:
           type: integer
-        description: End day for the earnings report.
+        description: 'End day for the earnings report as a UTC day index:
+
+          `floor(unix_epoch_seconds / 86400)` (inclusive end of the window when used
+          with `sday`).
+
+          '
       - name: machid
         in: query
         schema:
@@ -7791,6 +8073,12 @@ paths:
                         type: number
                       total_bwd:
                         type: number
+                      total_sla:
+                        type: number
+                        description: Sum of per_machine sla_earn when those rows are
+                          present, otherwise the per_day sla_earn values. Escrow released
+                          to the host, not fees minus credits. With a machine id this
+                          total is that machine, while per_day stays fleet-wide.
                   username:
                     type: string
                   email:
@@ -7835,6 +8123,13 @@ paths:
                           type: number
                         bwd_earn:
                           type: number
+                        sla_earn:
+                          type: number
+                          description: Escrow released to the host for this machine
+                            over the window (net compute plus SLA fee, minus service
+                            credits). SLA-contract compute is not included in gpu_earn
+                            or sto_earn. Normally positive; negative only when a prior
+                            day is corrected.
                   per_day:
                     type: array
                     items:
@@ -7850,6 +8145,11 @@ paths:
                           type: number
                         bwd_earn:
                           type: number
+                        sla_earn:
+                          type: number
+                          description: Fleet-wide escrow released to the host that
+                            UTC day (same meaning as per_machine sla_earn). Not fees-minus-credits,
+                            and not a per-machine figure.
         '400':
           description: Bad Request - Invalid input syntax
           content:
@@ -7857,15 +8157,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '429':
-          description: Too Many Requests
+          description: Too Many Requests. Body follows the Accept header (usually
+            HTML, not the JSON error shape). Retry-After and X-RateLimit-* headers
+            are set.
           content:
-            application/json:
+            text/html:
               schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    example: API requests too frequent endpoint threshold=2.0
+                type: string
+                example: 'API requests too frequent: endpoint threshold=2*1'
       tags:
       - Billing
       operationId: showEarnings
@@ -7878,18 +8177,18 @@ paths:
         and sorting.
 
 
-        CLI Usage: `vastai show instances [OPTIONS] [--api-key API_KEY] [--raw]`'
+        CLI Usage: `vastai show instances-v1 [OPTIONS] [--api-key API_KEY] [--raw]`'
       security:
       - BearerAuth: []
       parameters:
       - name: limit
         in: query
         required: false
-        description: "Instances per page. Default 25, max 25. Values \u2264 0 are\
-          \ treated as 5."
+        description: Instances per page. Maximum 25. If omitted, the server starts
+          from 60 and then caps the page at 25. A non-positive limit is treated as
+          5, then capped at 25. Prefer an explicit limit.
         schema:
           type: integer
-          default: 25
           maximum: 25
         example: 25
       - name: after_token
@@ -7926,8 +8225,15 @@ paths:
           `gt`, `gte`, `lt`, `lte`, `in`, `notin`.
 
           Filterable columns: `actual_status`, `gpu_name`, `verification`, `id`, `label`,
-          and other columns stored directly on the contract record. Computed fields
-          (e.g. `dph_total`, `num_gpus`) are not filterable and return 400.
+          and other columns stored directly on the contract record
+
+          (including `sla_r_claim` and `sla_r_target` when present). `target_reliability`
+          is a response field only; sending it as a filter key returns an error. Computed
+          fields (e.g. `dph_total`, `num_gpus`, `has_sla`) are not filterable and
+          return 400.
+
+          To find SLA rentals, filter on `sla_r_target` or filter client-side on `target_reliability
+          > 0`.
 
           '
         schema:
@@ -8235,7 +8541,31 @@ paths:
                         dph_total:
                           type: number
                           format: float
-                          example: 0.8021
+                          description: Total $/hour including storage (and SLA charge
+                            when applicable).
+                          example: 0.8101
+                        target_reliability:
+                          type:
+                          - number
+                          - 'null'
+                          format: float
+                          description: Client SLA coverage target locked at rent time.
+                            Null or 0 when the rental has no SLA.
+                          example: 0.95
+                        sla_r_claim:
+                          type:
+                          - number
+                          - 'null'
+                          format: float
+                          description: Host reliability claim for this SLA contract.
+                          example: 0.99
+                        sla_sigma_x:
+                          type:
+                          - number
+                          - 'null'
+                          format: float
+                          description: Host confidence spread for this SLA contract.
+                          example: 0.5
                         dlperf:
                           type:
                           - number
@@ -8289,20 +8619,41 @@ paths:
                           example: null
                         search:
                           type: object
+                          description: Price breakdown for search-context costs (may
+                            include slaPremiumPerHour).
+                          additionalProperties: true
+                          properties:
+                            slaPremiumPerHour:
+                              type: number
+                              format: float
+                              description: SLA charge rate in $/hour (API field name).
+                              example: 0.008
                           example:
                             gpuCostPerHour: 0.8
                             diskHour: 0.0021
-                            totalHour: 0.8021
+                            slaPremiumPerHour: 0.008
+                            totalHour: 0.8101
                             discountTotalHour: 0
-                            discountedTotalPerHour: 0.8013
+                            discountedTotalPerHour: 0.8101
                         instance:
                           type: object
+                          description: Price breakdown for instance-context costs
+                            (may include slaPremiumPerHour while running).
+                          additionalProperties: true
+                          properties:
+                            slaPremiumPerHour:
+                              type: number
+                              format: float
+                              description: SLA charge rate in $/hour while the instance
+                                is running (API field name).
+                              example: 0.008
                           example:
                             gpuCostPerHour: 0.8
-                            diskHour: 0.0013
-                            totalHour: 0.8021
+                            diskHour: 0.0021
+                            slaPremiumPerHour: 0.008
+                            totalHour: 0.8101
                             discountTotalHour: 0
-                            discountedTotalPerHour: 0.5034
+                            discountedTotalPerHour: 0.8101
                         storage_cost:
                           type: number
                           format: float
@@ -8382,15 +8733,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '429':
-          description: Too Many Requests
+          description: Too Many Requests. Body follows the Accept header (usually
+            HTML, not the JSON error shape). Retry-After and X-RateLimit-* headers
+            are set.
           content:
-            application/json:
+            text/html:
               schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    example: API requests too frequent endpoint threshold=1.0
+                type: string
+                example: 'API requests too frequent: endpoint threshold=1.0*1'
       tags:
       - Instances
       operationId: showInstances
@@ -8713,15 +9063,30 @@ paths:
         user.
 
 
+        `--raw` includes listing state for read-modify-write: `listed`, `listed_gpu_cost`
+        (send as `price_gpu`), `listed_storage_cost` (send as `price_disk`), `end_date`,
+        `duration`, `sla_reliability_claim` (send as `sla_r_claim`) and the `sla_confidence`
+        band label. `sla_sigma_x` is not returned. See [SLA Offers](/host/sla-offers#api-for-automation).
+
+
         CLI Usage: `vastai show machines [--user_id <user_id>]`'
       operationId: getMachines
       parameters:
       - name: user_id
         in: query
-        required: true
-        description: The ID of the user whose machines are being requested.
+        required: false
+        description: Ignored. Results are scoped to the API key owner.
         schema:
           type: string
+      - name: include_offline
+        in: query
+        required: false
+        schema:
+          type: boolean
+        description: 'When true, include this host''s machines that have been offline
+          for up to about 3 days. The default cutoff is about 10 hours.
+
+          '
       responses:
         '200':
           description: A list of machines
@@ -8736,11 +9101,114 @@ paths:
                       type: object
                       properties:
                         id:
-                          type: string
+                          type: integer
                           description: The unique identifier for the machine.
                         name:
                           type: string
                           description: The name of the machine.
+                        listed:
+                          type: boolean
+                          description: true when the machine currently has a published
+                            offer.
+                        listed_gpu_cost:
+                          type:
+                          - number
+                          - 'null'
+                          description: Listed GPU price in $/hour (`price_gpu` on
+                            create_asks). null when not listed.
+                        listed_storage_cost:
+                          type:
+                          - number
+                          - 'null'
+                          description: Listed storage price in $/GB/month (`price_disk`
+                            on create_asks). null when not listed. Omitting `price_disk`
+                            on update resets it to 0.10.
+                        listed_inet_up_cost:
+                          type:
+                          - number
+                          - 'null'
+                          description: Listed upload bandwidth price (`price_inetu`
+                            on create_asks).
+                        listed_inet_down_cost:
+                          type:
+                          - number
+                          - 'null'
+                          description: Listed download bandwidth price (`price_inetd`
+                            on create_asks).
+                        duration:
+                          type:
+                          - number
+                          - 'null'
+                          description: Auto-renew duration. Send it back on create_asks
+                            or the listing stops auto-renewing.
+                        end_date:
+                          type:
+                          - number
+                          - 'null'
+                          description: Offer expiration as Unix timestamp. null when
+                            not listed.
+                        listed_min_gpu_count:
+                          type:
+                          - integer
+                          - 'null'
+                          description: Minimum GPUs rented together (`min_chunk` on
+                            create_asks).
+                        sla_reliability_claim:
+                          type:
+                          - number
+                          - 'null'
+                          description: 'Host reliability commitment (`sla_r_claim`
+                            on create_asks). Returned when SLA terms are visible (listed,
+                            approved, daemon recent enough). `0` means SLA was explicitly
+                            turned off. Null when terms are not visible.
+
+                            '
+                        sla_confidence:
+                          type:
+                          - string
+                          - 'null'
+                          enum:
+                          - high
+                          - medium
+                          - low
+                          description: 'Confidence band for the ask''s `sla_sigma_x`:
+                            high = Tight (sigma_x <= 0.32),
+
+                            medium = Normal (<= 0.71), low = Wide. Same visibility
+                            as `sla_reliability_claim`: present when terms are visible,
+                            null otherwise. `low` is Wide, not low risk.
+
+                            '
+                        current_rentals_resident:
+                          type:
+                          - integer
+                          - 'null'
+                          description: Resident rentals on the machine, including
+                            stopped ones. Null when the summary is missing.
+                        credit_discount_max:
+                          type:
+                          - number
+                          - 'null'
+                          description: Reserved discount on the ask. Null when the
+                            machine is not listed.
+                        min_bid_price:
+                          type:
+                          - number
+                          - 'null'
+                          description: Host-side minimum bid, net of the platform
+                            fee. It does not round-trip as price_min_bid.
+              example:
+                machines:
+                - id: 12345
+                  name: my-h100
+                  listed: true
+                  listed_gpu_cost: 3.5
+                  listed_storage_cost: 0.15
+                  duration: null
+                  end_date: 1735689600
+                  listed_min_gpu_count: 1
+                  sla_reliability_claim: 0.99
+                  sla_confidence: medium
         '401':
           description: Unauthorized - User authentication failed
         '429':
@@ -8989,6 +9457,285 @@ paths:
       tags:
       - Accounts
       operationId: showUser
+  /api/v0/host/sla_backtest:
+    get:
+      summary: sla backtest
+      operationId: slaBacktest
+      description: 'Host only. Replays one machine''s historical compute earnings
+        and uptime through production
+
+        SLA settlement under what-if SLA terms, and returns a per-day ledger of the
+        money that moved
+
+        between the renter, the SLA escrow, and the host. The maximum date range is
+        366 days
+
+        (inclusive); the default lookback is 90 days when custom dates are omitted.
+        Unknown query
+
+        parameters are rejected with `400 bad_request`. Optional `beta` is accepted
+        and ignored for hosts.
+
+
+        Requires `machine_read` permission and ownership of the machine. See
+
+        [SLA Earnings Backtester](/host/sla-backtester) for the usage guide.'
+      security:
+      - BearerAuth: []
+      parameters:
+      - name: machine_id
+        in: query
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+        description: ID of your machine.
+      - name: r_claim
+        in: query
+        required: true
+        schema:
+          type: number
+          format: float
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 0.99999
+        description: Host reliability commitment to simulate (the `sla_r_claim` you
+          plan to list).
+      - name: p
+        in: query
+        schema:
+          type: number
+          format: float
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 1
+          exclusiveMaximum: true
+          default: 0.6667
+        description: 'Host confidence. Uses a different scale from listing `sla_sigma_x`
+
+          (`p = 1 / (1 + sla_sigma_x)`; Tight 0.83, Normal 0.6667, Wide 0.50). Default
+          0.6667 (Normal).
+
+          '
+      - name: r_target
+        in: query
+        schema:
+          type: number
+          format: float
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 0.99999
+        description: Renter reliability target to simulate. Must not exceed `r_claim`.
+          Defaults to `r_claim`.
+      - name: start_date
+        in: query
+        schema:
+          type: number
+        description: Range start as Unix epoch seconds. Default is 90 days before
+          end_date.
+      - name: end_date
+        in: query
+        schema:
+          type: number
+        description: Range end as Unix epoch seconds. Default is now.
+      - name: beta
+        in: query
+        required: false
+        deprecated: true
+        schema:
+          type: number
+          minimum: 0
+          maximum: 1
+        description: Not a host setting. Accepted for compatibility and ignored. The
+          value used is echoed in params.beta.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  machine_id:
+                    type: integer
+                  has_data:
+                    type: boolean
+                    description: false when no day in the range had rental earnings
+                      to replay.
+                  start_day:
+                    type: integer
+                    description: UTC day index (floor(epoch_seconds / 86400)).
+                  end_day:
+                    type: integer
+                    description: UTC day index (floor(epoch_seconds / 86400)).
+                  r_eff:
+                    type:
+                    - number
+                    - 'null'
+                    format: float
+                    description: 'Effective reliability: the constant reliability
+                      that would have produced the
+
+                      service credits paid in the window. null when the window had
+                      no deposits.
+
+                      '
+                  r_be:
+                    type: number
+                    format: float
+                    description: 'Break-even reliability: where SLA fees and service
+                      credits cancel out. If r_eff
+
+                      is above r_be, SLA was net positive for the host over the window.
+
+                      '
+                  days:
+                    type: array
+                    description: One row per UTC day from start_day to end_day. All
+                      flows are non-negative dollar amounts moved that day.
+                    items:
+                      type: object
+                      properties:
+                        day:
+                          type: integer
+                        client_compute_to_escrow:
+                          type: number
+                          format: float
+                          description: Renter compute payment for the day held in
+                            SLA escrow (host net of platform fee).
+                        client_premium_to_escrow:
+                          type: number
+                          format: float
+                          description: SLA fee paid in for the day.
+                        escrow_to_client_balance:
+                          type: number
+                          format: float
+                          description: Service credits paid to the renter that day.
+                        escrow_to_host_balance:
+                          type: number
+                          format: float
+                          description: Amount released from escrow to the host that
+                            day.
+                        reliability:
+                          type:
+                          - number
+                          - 'null'
+                          format: float
+                          description: Measured uptime fraction for the day (0-1);
+                            null when the machine had no rental data that day.
+                  params:
+                    type: object
+                    description: SLA terms the replay used, after defaulting.
+                    properties:
+                      r_claim:
+                        type: number
+                        format: float
+                      r_target:
+                        type: number
+                        format: float
+                      p:
+                        type: number
+                        format: float
+                      beta:
+                        type: number
+                        format: float
+                        description: Recent vs long-term uptime weighting, derived
+                          automatically from r_target. Not a host setting.
+              example:
+                success: true
+                machine_id: 12345
+                has_data: true
+                start_day: 20567
+                end_day: 20657
+                r_eff: 0.9987
+                r_be: 0.996
+                days:
+                - day: 20567
+                  client_compute_to_escrow: 78.12
+                  client_premium_to_escrow: 0.19
+                  escrow_to_client_balance: 0.0
+                  escrow_to_host_balance: 76.4
+                  reliability: 1.0
+                params:
+                  r_claim: 0.99
+                  r_target: 0.99
+                  beta: 0.46
+                  p: 0.6667
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    enum:
+                    - bad_request
+                    - invalid_params
+                    - invalid_range
+                    - range_too_large
+                    description: 'bad_request: missing, out-of-range, or unknown parameter.
+
+                      invalid_params: SLA terms don''t combine (for example r_target
+                      > r_claim).
+
+                      invalid_range: start_date after end_date. range_too_large: more
+                      than 366 days.
+
+                      '
+                  msg:
+                    type: string
+        '401':
+          description: Unauthorized. An unknown or invalid API key returns `error`
+            `auth_error`. A valid key that lacks `machine_read` returns `success`
+            false and a `msg`, with no `error` field.
+        '403':
+          description: Forbidden. `error` is `auth_error` when the Authorization header
+            is missing ("This action requires login."), `not_owner` when the machine
+            belongs to someone else, or `sla_disabled` when SLA is off for the platform.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    enum:
+                    - auth_error
+                    - not_owner
+                    - sla_disabled
+                  msg:
+                    type: string
+        '404':
+          description: Machine not found (`machine_not_found`), or a malformed API
+            key (`auth_error`, "Invalid user key").
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    enum:
+                    - machine_not_found
+                    - auth_error
+                    example: machine_not_found
+        '429':
+          description: "Too Many Requests \u2014 rate limit exceeded"
+      tags:
+      - Host
   /api/v0/deployment/{id}/start:
     post:
       summary: start deployment
