@@ -53,7 +53,7 @@ Templates have two identifiers. Which one you use depends on the operation:
 | Identifier | Type | Used For |
 |------------|------|----------|
 | `id` | integer | Deleting templates (`template_id` parameter) |
-| `hash_id` | string | Creating instances (`template_hash` parameter), editing templates (`HASH_ID` parameter) |
+| `hash_id` | string | Creating instances (`template_hash` parameter), editing templates (`hash_id` parameter) |
 
 <Warning>
 The `hash_id` is derived from the template's content. After editing a template, the `hash_id` changes. Always retrieve the latest `hash_id` from the method return value or by searching for the template.
@@ -100,25 +100,7 @@ result = vast_sdk.create_template(
 )
 ```
 
-### Method Signature
-
-```python
-VastAI.create_template(
-    name: Optional[str] = None,
-    image: Optional[str] = None,
-    image_tag: Optional[str] = None,
-    login: Optional[str] = None,
-    env: Optional[str] = None,
-    ssh: bool = False,
-    jupyter: bool = False,
-    direct: bool = False,
-    jupyter_dir: Optional[str] = None,
-    jupyter_lab: bool = False,
-    onstart_cmd: Optional[str] = None,
-    search_params: Optional[str] = None,
-    disk_space: Optional[str] = None
-) -> str
-```
+See the [create_template reference](/sdk/python/reference/create-template) for the full signature.
 
 ## Search for Templates
 
@@ -251,51 +233,35 @@ The resulting environment will be:
 
 ## Edit a Template
 
-Update an existing template using `update_template()` with the template's `hash_id` as the `HASH_ID` parameter. Include only the parameters you want to change:
+Update an existing template using `update_template()` with the template's `hash_id`. Editing creates a new version of the template. Values from the previous version are not carried over, so pass the full set of parameters the new version should have. The parameters are the same ones `create_template()` accepts:
 
 ```python
 result = vast_sdk.update_template(
-    HASH_ID="5915f1dc1ce881defb572015eb9d8178",
-    name="Updated Template Name",
-    onstart_cmd="echo 'new startup script'"
-)
-print(result)
-```
-
-You can change any of the same parameters available in `create_template()`:
-
-```python
-result = vast_sdk.update_template(
-    HASH_ID="c81e7ab0e928a508510d1979346de10d",
+    hash_id="c81e7ab0e928a508510d1979346de10d",
     name="tgi-llama2-7B-quantized",
     image="ghcr.io/huggingface/text-generation-inference:1.0.3",
     env="-p 3000:3000 -e MODEL_ARGS='--model-id TheBloke/Llama-2-7B-chat-GPTQ --quantize gptq'",
     onstart_cmd="wget -O - https://raw.githubusercontent.com/vast-ai/vast-pyworker/main/scripts/launch_tgi.sh | bash",
+    search_params="gpu_ram>=23 num_gpus=1 gpu_name=RTX_3090 inet_down>128 direct_port_count>3 disk_space>=192",
+    disk_space=16,
     ssh=True,
-    direct=True
+    direct=True,
+    public=True
 )
+print(result["template"]["hash_id"])
 ```
+
+<Warning>
+An omitted parameter takes its default on the new version, not the previous version's value. To change one setting, repeat every other parameter with its current value. Without `public=True` the new version is private, without `hide_readme=True` the readme is visible, without `ssh` or `jupyter` the runtype is `args`, without `search_params` no machine filters are set, and without `disk_space` the recommended disk space is 16 GB.
+
+Fields that have no parameter are not sent at all and are empty on the new version: registry username and password (`login` sets only the registry), `volume_info`, `args_str` and the readme. If the template uses any of these, re-enter them in the console after an SDK edit.
+</Warning>
 
 <Note>
-The `hash_id` changes after editing because it is derived from the template's content. Use the new `hash_id` returned in the result for subsequent operations.
+The new version gets a new `id` and `hash_id` because the hash is derived from the template's content. Use the new `hash_id` returned in the result for subsequent operations. The previous version keeps its identifiers, so running instances and shared links stay valid. A call whose values match the current version exactly creates nothing and returns the existing `hash_id`. An unknown `hash_id` raises `ValueError`.
 </Note>
 
-### Method Signature
-
-```python
-VastAI.update_template(
-    HASH_ID: str,
-    name: Optional[str] = None,
-    image: Optional[str] = None,
-    env: Optional[str] = None,
-    onstart_cmd: Optional[str] = None,
-    search_params: Optional[str] = None,
-    disk: Optional[float] = None,
-    ssh: bool = False,
-    direct: bool = False,
-    jupyter: bool = False
-) -> str
-```
+See the [update_template reference](/sdk/python/reference/update-template) for the full parameter list.
 
 ## Delete a Template
 
@@ -330,7 +296,7 @@ VastAI.delete_template(
   <Accordion title="Using the wrong identifier for the operation">
     Templates have two identifiers and each is used in different contexts:
     - `create_instance(template_hash=...)` takes the **hash_id** (string)
-    - `update_template(HASH_ID=...)` takes the **hash_id** (string)
+    - `update_template(hash_id=...)` takes the **hash_id** (string)
     - `delete_template(template_id=...)` takes the numeric **id** (integer)
 
     If you pass the numeric `id` where a `hash_id` is expected (or vice versa), the operation will fail. You can also call `delete_template(hash_id=...)` with the hash if you don't have the numeric ID.
@@ -377,6 +343,6 @@ VastAI.delete_template(
   </Accordion>
 
   <Accordion title="hash_id changed after editing">
-    This is expected behavior. The `hash_id` is content-based, so any edit produces a new hash. Always capture the new `hash_id` from the `update_template()` return value or search for your template again before referencing it.
+    This is expected behavior. The `hash_id` is content-based, so any edit that changes a value produces a new version with a new hash. Always capture the `hash_id` from the `update_template()` return value or search for your template again before referencing it.
   </Accordion>
 </AccordionGroup>
