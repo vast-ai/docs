@@ -28,36 +28,76 @@ paths:
             schema:
               type: object
               properties:
+                endpoint_name:
+                  type: string
+                  description: Name of the endpoint. Must be unique among your endpoints. If omitted, a random 8-character name is generated.
+                  minLength: 1
+                  maxLength: 512
+                  example: "my_endpoint"
                 min_load:
                   type: number
-                  description: Minimum load for the endpoint.
-                  default: 10.0
+                  description: Minimum active capacity to maintain, in load per second. `0` allows the endpoint to scale to zero active workers.
+                  default: 0.0
+                  minimum: 0
                   example: 50.0
+                min_cold_load:
+                  type: number
+                  description: Floor on the load used to size the total pool of active and inactive workers, in load per second.
+                  default: 0.0
+                  minimum: 0
+                  example: 0.0
                 target_util:
                   type: number
-                  description: Target utilization for the endpoint.
+                  description: Target ratio of anticipated load to active capacity. Lower values keep more spare capacity.
                   default: 0.9
+                  minimum: 0
+                  maximum: 1
                   example: 0.75
                 cold_mult:
                   type: number
-                  description: Multiplier for cold start.
-                  default: 2.5
+                  description: Total capacity (active and inactive) to maintain, as a multiple of the active capacity target.
+                  default: 3.0
+                  minimum: 0
+                  exclusiveMaximum: 100
                   example: 2.0
                 cold_workers:
                   type: integer
-                  description: Number of cold workers.
+                  description: Minimum number of workers (active and inactive) to maintain. Shown as **Minimum Workers** in the console. Must not be greater than `max_workers`.
                   default: 5
+                  minimum: 0
                   example: 5
                 max_workers:
                   type: integer
-                  description: Maximum number of workers.
+                  description: Maximum number of workers (active and inactive) the serverless engine will recruit.
                   default: 20
+                  minimum: 0
                   example: 20
-                endpoint_name:
+                max_queue_time:
+                  type: number
+                  description: Maximum seconds of expected queue time allowed to build up on each worker before new requests wait in the endpoint queue.
+                  default: 30.0
+                  exclusiveMinimum: 0
+                  example: 30.0
+                target_queue_time:
+                  type: number
+                  description: Endpoint-wide queue time, in seconds, above which the serverless engine scales up aggressively. Must not be greater than `max_queue_time`.
+                  default: 10.0
+                  exclusiveMinimum: 0
+                  example: 10.0
+                inactivity_timeout:
+                  type: number
+                  description: Seconds without queued or in-progress requests after which active workers are stopped down to the `min_load` floor. Not set by default. Once set, it can be changed but not removed.
+                  exclusiveMinimum: 0
+                  example: 600
+                endpoint_state:
                   type: string
-                  description: Name of the endpoint.
-                  default: "default-endpoint"
-                  example: "my_endpoint"
+                  description: Initial state of the endpoint.
+                  enum:
+                  - active
+                  - suspended
+                  - stopped
+                  default: active
+                  example: active
       responses:
         '200':
           description: Success response
@@ -132,29 +172,26 @@ x-rate-limit:
   description: Maximum request frequency per IP address for this endpoint
 x-input-validation:
   min_load:
-    max_length: 10
-    pattern: ^[0-9]*\.?[0-9]+$
-    description: Must be a positive number.
+    description: Must be a number greater than or equal to 0.
+  min_cold_load:
+    description: Must be a number greater than or equal to 0.
   target_util:
-    max_length: 10
-    pattern: ^[0-9]*\.?[0-9]+$
-    description: Must be a positive number.
+    description: Must be a number from 0 to 1.
   cold_mult:
-    max_length: 10
-    pattern: ^[0-9]*\.?[0-9]+$
-    description: Must be a positive number.
+    description: Must be a number greater than or equal to 0 and less than 100.
   cold_workers:
-    max_length: 10
-    pattern: ^[0-9]+$
-    description: Must be a non-negative integer.
+    description: Must be a non-negative integer, no greater than max_workers.
   max_workers:
-    max_length: 10
-    pattern: ^[0-9]+$
     description: Must be a non-negative integer.
+  max_queue_time:
+    description: Must be a number greater than 0.
+  target_queue_time:
+    description: Must be a number greater than 0, no greater than max_queue_time.
+  inactivity_timeout:
+    description: Must be a number greater than 0.
   endpoint_name:
-    max_length: 255
-    pattern: ^[a-zA-Z0-9_-]+$
-    description: Must be a valid endpoint name.
+    max_length: 512
+    description: Must be 1 to 512 characters, without shell metacharacters or control characters, and unique among your endpoints.
 x-cli-commands:
 - name: Create Endpoint
   description: Create a new endpoint for job processing.
