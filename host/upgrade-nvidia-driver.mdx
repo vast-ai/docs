@@ -1,0 +1,374 @@
+---
+title: "Upgrade the NVIDIA Driver"
+description: "Move a host machine to the NVIDIA driver version Vast asks for, built by DKMS and held at that version."
+---
+
+<Danger>
+
+Before you start: [schedule a maintenance window](/host/set-maintenance-window) at least **48 hours** in advance.
+
+You are responsible for the maintenance and any resulting interruption. Work performed outside the scheduled maintenance window may be treated as an **operational failure**.
+
+If you are unsure whether this operation could cause data loss, stop here.
+
+</Danger>
+
+Vast asks hosts to run one specific NVIDIA driver version, chosen by GPU
+generation. When Vast changes the version, this table is updated; follow this
+page again to move to it. The steps are the same every time.
+
+| GPUs | Compute capability | Driver version |
+| --- | --- | --- |
+| Turing and newer | 7.5 and higher | 610.57.04 |
+| Maxwell, Pascal and Volta | below 7.5 | 580.178.04 |
+
+This page installs that version from NVIDIA's apt repository, has DKMS build its
+kernel module, and holds it so nothing upgrades it. With DKMS, a kernel update
+rebuilds the same driver for the new kernel instead of changing the driver. A
+driver from Ubuntu's prebuilt modules (`linux-modules-nvidia-*`) or NVIDIA's
+`.run` installer is replaced, even when it is already the right version.
+
+<Warning>
+From step 4 until the reboot in step 7 the GPUs are unusable, and the reboot
+stops every instance on the machine.
+</Warning>
+
+## 1. Check the current driver
+
+```bash
+nvidia-smi --query-gpu=name,compute_cap,driver_version --format=csv,noheader
+```
+
+```text nocopy
+NVIDIA GeForce RTX 4090, 8.9, 595.99.02
+NVIDIA GeForce RTX 4090, 8.9, 595.99.02
+```
+
+The second column is the compute capability. Set the version from the table that
+matches it. The later commands read these two variables, so if you log out, set
+them again before you continue.
+
+Compute capability 7.5 or higher:
+
+```bash
+DRIVER_VERSION=610.57.04; DRIVER_PACKAGE=nvidia-open
+```
+
+Below 7.5:
+
+```bash
+DRIVER_VERSION=580.178.04; DRIVER_PACKAGE=nvidia-driver-580
+```
+
+Check whether the machine already runs that version with a DKMS-built module:
+
+```bash
+[ "$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | sort -u)" = "$DRIVER_VERSION" ] && modinfo -n nvidia 2>/dev/null | grep -q /updates/dkms/ && echo "Already on $DRIVER_VERSION, built by DKMS: nothing to do" || echo "Not on $DRIVER_VERSION with DKMS: continue to step 2"
+```
+
+```text nocopy
+Not on 610.57.04 with DKMS: continue to step 2
+```
+
+If it prints `nothing to do`, run the command in step 6 so the driver is held,
+and stop there.
+
+## 2. Unlist the machine
+
+```bash
+docker ps -a --format '{{.Names}}\t{{.Status}}'
+```
+
+The machine is free when this prints no lines starting with `C.` (client
+instances; `Exited` ones count too) and the machine's card in the
+[console](https://cloud.vast.ai/host/machines/) shows **Occ**, **#Running** and
+**#Stored** at 0. Then unlist it:
+
+```bash
+vastai unlist machine <machine_id>
+```
+
+<Warning>
+If anything is rented, unlist the machine and
+[schedule maintenance](/host/cli/schedule-maint) so renters are notified. Do not
+stop or delete client containers. When the window starts, repeat the checks
+above and continue once they show no instances.
+</Warning>
+
+## 3. Prepare the build and the repository
+
+Each command in this step installs only what is missing.
+
+Kernel headers for the running kernel and for kernels installed later. DKMS
+needs them to build the driver:
+
+```bash
+sudo apt-get install linux-headers-$(uname -r) $(dpkg-query -W -f='${db:Status-Abbrev} ${Package} ${source:Package}\n' 'linux-image-*' 2>/dev/null | awk '$1 ~ /^[hi]i/ && $3 ~ /^linux-meta/ { sub(/^linux-image-(extra-)?/, "linux-headers-", $2); print $2 }' | sort -u)
+```
+
+The compilers your kernels were built with. DKMS builds with the same one, and
+on Ubuntu 22.04 the HWE kernel needs GCC 12, which is not installed by default:
+
+```bash
+sudo apt-get install $(sed -n 's|^CONFIG_CC_VERSION_TEXT="*[^" ]*-\(gcc-[0-9]*\) .*|\1|p' /lib/modules/*/build/.config | sort -u)
+```
+
+NVIDIA's repository
+([NVIDIA driver installation guide](https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/ubuntu.html)):
+
+```bash
+. /etc/os-release; ARCH=$(uname -m | sed 's/aarch64/sbsa/'); wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu${VERSION_ID//./}/$ARCH/cuda-keyring_1.1-1_all.deb
+```
+
+```bash
+sudo dpkg -i cuda-keyring_1.1-1_all.deb && sudo apt-get update
+```
+
+`apt-get update` must finish without `E:` lines. For a `Signed-By` error, see
+[If apt-get update reports a Signed-By conflict](#if-apt-get-update-reports-a-signed-by-conflict).
+
+Confirm NVIDIA publishes the version for this machine:
+
+```bash
+apt-cache policy nvidia-driver-pinning-$DRIVER_VERSION | grep Candidate
+```
+
+```text nocopy
+  Candidate: 610.57.04-1ubuntu1
+```
+
+If it prints nothing, stop: nothing has been removed yet, and the machine keeps
+its current driver.
+
+## 4. Remove the current driver
+
+This removes a driver installed with NVIDIA's `.run` installer, and does nothing
+otherwise:
+
+```bash
+command -v nvidia-installer && sudo nvidia-installer --uninstall
+```
+
+List the installed driver packages from Ubuntu or NVIDIA, including prebuilt
+modules and the pin for a previous version. The NVIDIA container toolkit is not
+in the list:
+
+```bash
+OLD_DRIVER_PACKAGES=$(dpkg-query -W -f='${db:Status-Abbrev}\t${binary:Package}\t${source:Package}\n' | awk -F'\t' '$1 ~ /^[hi]i/ && $3 ~ /^(nvidia-graphics-drivers|nvidia-kmod-open|nvidia-open|cuda-drivers|linux-restricted-(modules|signatures)|nvidia-settings|nvidia-persistenced|nvidia-modprobe|nvidia-xconfig|(nvidia-)?fabric-?manager|libnvidia-nscq|libnvsdm|(nvidia-)?imex|nvlink5|nvidia-driver-pinning)/ { print $2 }'); echo "$OLD_DRIVER_PACKAGES"
+```
+
+If a name in the list contains `fabricmanager`, the machine has NVSwitch; step 5
+installs Fabric Manager again. Remove them:
+
+```bash
+sudo apt-get purge --allow-change-held-packages $OLD_DRIVER_PACKAGES
+```
+
+```text nocopy
+The following packages will be REMOVED:
+  libnvidia-cfg1-595* libnvidia-common-595* libnvidia-compute-595*
+  ...
+  libxnvctrl0* linux-modules-nvidia-595-open-generic* nvidia-driver-595-open*
+  ...
+The following held packages will be changed:
+  nvidia-driver-595-open
+Do you want to continue? [Y/n]
+```
+
+Before you answer, read the `REMOVED` list. Every name must contain `nvidia`,
+`cuda`, `nvlink` or `nvsdm`, or be `libxnvctrl0`, and the list must not include
+`nvidia-container-toolkit`,
+`nvidia-container-toolkit-base`, `libnvidia-container1` or
+`libnvidia-container-tools`. If either rule is broken, answer `n` and stop.
+
+## 5. Install the driver
+
+Pin the version first. NVIDIA's pinning package makes apt install exactly that
+version of every driver package
+([NVIDIA: version locking](https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/version-locking.html)):
+
+```bash
+sudo apt-get install nvidia-driver-pinning-$DRIVER_VERSION
+```
+
+Then the driver:
+
+```bash
+sudo apt-get install $DRIVER_PACKAGE
+```
+
+On NVSwitch machines (HGX and DGX), install the NVSwitch components in the same
+command instead
+([NVIDIA: optional components](https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/optional-components.html)).
+Fabric Manager must match the driver version
+([Fabric Manager user guide](https://docs.nvidia.com/datacenter/tesla/fabric-manager-user-guide/index.html)),
+and the pin keeps all of them there. On ARM64, leave out `libnvsdm`, which
+NVIDIA publishes for x86_64 only:
+
+```bash
+sudo apt-get install $DRIVER_PACKAGE nvidia-fabricmanager libnvidia-nscq libnvsdm nvidia-imex
+```
+
+DKMS builds the module during the install:
+
+```text nocopy
+Loading new nvidia/610.57.04 DKMS files...
+Building for 6.8.0-147-generic
+Building initial module nvidia/610.57.04 for 6.8.0-147-generic
+Installing /lib/modules/6.8.0-147-generic/updates/dkms/nvidia.ko.zst
+```
+
+If the output contains `Error!`, see
+[If the DKMS build fails](#if-the-dkms-build-fails).
+
+Check the module the reboot will load. A reboot normally starts the newest
+kernel in `/boot`, and this prints the driver version built for it:
+
+```bash
+modinfo -k $(ls /boot/vmlinuz-* | sed 's|.*/vmlinuz-||' | sort -V | tail -1) -F version nvidia
+```
+
+```text nocopy
+610.57.04
+```
+
+It must print your `DRIVER_VERSION`. `modinfo: ERROR: Module nvidia not found.`
+means DKMS did not build for that kernel; see
+[If the DKMS build fails](#if-the-dkms-build-fails). Do not reboot until it
+prints the version.
+
+## 6. Hold the driver
+
+```bash
+sudo apt-mark hold $(dpkg-query -W -f='${db:Status-Abbrev}\t${binary:Package}\t${source:Package}\n' | awk -F'\t' '$1 ~ /^[hi]i/ && $3 ~ /^(nvidia-graphics-drivers|nvidia-kmod-open|nvidia-open|cuda-drivers|nvidia-settings|nvidia-persistenced|nvidia-modprobe|nvidia-xconfig|(nvidia-)?fabric-?manager|libnvidia-nscq|libnvsdm|(nvidia-)?imex|nvlink5|nvidia-driver-pinning)/ { print $2 }')
+```
+
+```text nocopy
+libnvidia-cfg1 set on hold.
+libnvidia-compute set on hold.
+...
+nvidia-driver-pinning-610.57.04 set on hold.
+nvidia-open set on hold.
+...
+```
+
+## 7. Reboot, verify and relist
+
+```bash
+sudo reboot
+```
+
+If the machine does not come back, see
+[If the machine does not come back](/host/upgrade-kernel#if-the-machine-does-not-come-back).
+
+```bash
+nvidia-smi --query-gpu=name,driver_version --format=csv,noheader
+```
+
+```text nocopy
+NVIDIA GeForce RTX 4090, 610.57.04
+NVIDIA GeForce RTX 4090, 610.57.04
+```
+
+Every line must show the version from the table. Relist from the
+[Machines page](https://cloud.vast.ai/host/machines/) or with
+[`vastai list machine`](/host/cli/list-machine), then run the self-test, which
+needs the machine listed. Its last line must be `Test completed successfully.`
+([How to self-test](/host/how-to-self-test)):
+
+```bash
+vastai self-test machine <machine_id>
+```
+
+<Check>
+Every GPU on the version from the table, module built by DKMS, driver held,
+machine listed, self-test passed.
+</Check>
+
+---
+
+## Kernel upgrades
+
+When a kernel upgrade installs new headers, DKMS builds the held driver for the
+new kernel as part of the upgrade. Before rebooting into the new kernel, check:
+
+```bash
+dkms status nvidia
+```
+
+```text nocopy
+nvidia/610.57.04, 6.8.0-147-generic, x86_64: installed
+nvidia/610.57.04, 7.0.0-38-generic, x86_64: installed
+```
+
+The new kernel must have a line ending in `installed`. If it has none, do not
+reboot. Run the two install commands at the start of step 3, then build for the
+new kernel, using its version in place of `7.0.0-38-generic`:
+
+```bash
+sudo dkms autoinstall -k 7.0.0-38-generic
+```
+
+---
+
+## Recovery
+
+### If the DKMS build fails
+
+When the kernel's headers are missing, DKMS says so:
+
+```text nocopy
+Error! Your kernel headers for kernel 7.0.0-38-generic cannot be found at /lib/modules/7.0.0-38-generic/build or /lib/modules/7.0.0-38-generic/source.
+```
+
+Otherwise the build log has the cause:
+
+```bash
+grep -m5 error /var/lib/dkms/nvidia/$DRIVER_VERSION/build/make.log
+```
+
+```text nocopy
+cc: error: unrecognized command-line option '-ftrivial-auto-var-init=zero'
+```
+
+That line means the kernel's compiler is missing. For either cause, run the two
+install commands at the start of step 3. Once they install what was missing,
+apt finishes the interrupted driver install and builds the module. Then repeat
+the `modinfo` check at the end of step 5.
+
+### If nvidia-smi fails after the reboot
+
+`NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver`
+means no module loaded for the running kernel:
+
+```bash
+uname -r; dkms status nvidia
+```
+
+If no line for the kernel printed first ends in `installed`, build it and
+reboot:
+
+```bash
+sudo dkms autoinstall -k $(uname -r)
+```
+
+Until it is fixed the machine shows as offline; see
+[Offline Machine](/host/machine-offline).
+
+### If apt-get update reports a Signed-By conflict
+
+```text nocopy
+E: Conflicting values set for option Signed-By regarding source https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/ /: /usr/share/keyrings/cuda-archive-keyring.gpg != /usr/share/keyrings/nvidia-old-keyring.gpg
+```
+
+NVIDIA's repository was already configured with another key file. Find both
+definitions:
+
+```bash
+grep -rl developer.download.nvidia.com/compute/cuda /etc/apt/sources.list /etc/apt/sources.list.d/
+```
+
+Keep `cuda-ubuntu2404-x86_64.list` (`ubuntu2204` on 22.04, `sbsa` on ARM64),
+which `cuda-keyring` installed. Move the other file out of
+`/etc/apt/sources.list.d/`, or comment out the line if it is in
+`/etc/apt/sources.list`, then run `sudo apt-get update` again.
