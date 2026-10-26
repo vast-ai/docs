@@ -4,15 +4,19 @@ info:
   description: API endpoint for editing existing templates
   version: 1.0.0
 paths:
-  /api/v0/template/:
+  /api/v1/template/:
     put:
       summary: edit template
       description: |
-        Edits an existing template in place.
+        Edits an existing template by creating a new version of it.
 
-        Templates are mutable. Use PUT with the template's `hash_id` to update it. You only need to include the fields you want to change - unchanged fields retain their existing values.
+        Template versions are immutable. Send the template's numeric `id` and its current `hash_id` together with the full set of fields the new version should have; fields you leave out are not carried over from the previous version. The response contains the new version with a new numeric `id` and a new content-based `hash_id`. The previous version keeps its `id` and `hash_id`, so running instances and shared links that reference it stay valid.
 
-        Note: The template's `hash_id` will change after editing (since it's content-based), but the numeric `id` stays the same.
+        If the template was created by someone else, the new version is created as your own copy. If the body hashes to the same `hash_id` as the current version, nothing is created and the response reports that no edits were made.
+
+        If a read returned `********` for `docker_login_user` or `docker_login_pass`, sending that placeholder back keeps the stored credential. Only the template's creator can do this.
+
+        `PUT /api/v0/template/` is deprecated and returns `410 Gone`. Use this endpoint instead.
 
         For detailed usage, see [Creating and Using Templates with API](/api-reference/creating-and-using-templates-with-api).
 
@@ -28,31 +32,113 @@ paths:
             schema:
               type: object
               required:
+              - id
               - hash_id
               properties:
+                id:
+                  type: integer
+                  description: Numeric ID of the template version to edit. Must be the version identified by `hash_id`.
                 hash_id:
                   type: string
-                  description: Hash ID of the template to edit. Required for identifying which template to update.
+                  description: Current hash ID of the template version to edit.
                 name:
                   type: string
                   description: Name of the template
                 image:
                   type: string
                   description: Docker image path
-                desc:
+                tag:
                   type: string
-                  description: Short description of the template
+                  description: Docker image tag. Can also be included in the `image` field instead.
+                env:
+                  type: string
+                  description: |
+                    Environment variables and port mappings in Docker flag format.
+
+                    Example: `"-e HF_TOKEN=hf_xxx123456789 -p 8000:8000"`
+                onstart:
+                  type: string
+                  description: Commands to run when the instance starts
+                runtype:
+                  type: string
+                  enum:
+                  - ssh
+                  - jupyter
+                  - args
+                  description: Launch mode for instances created from this template
+                ssh_direct:
+                  type: boolean
+                  description: Enable direct SSH connection
+                use_ssh:
+                  type: boolean
+                  description: Enable SSH access to instances created from this template
+                jup_direct:
+                  type: boolean
+                  description: Enable direct Jupyter connection
+                jupyter_dir:
+                  type: string
+                  description: Directory to launch Jupyter from
+                use_jupyter_lab:
+                  type: boolean
+                  description: Use JupyterLab instead of Jupyter Notebook
+                docker_login_repo:
+                  type: string
+                  description: Name of the private Docker repo (i.e docker.io)
+                docker_login_user:
+                  type: string
+                  description: Username for private Docker repo
+                docker_login_pass:
+                  type: string
+                  description: Access token or password for private Docker repo
+                extra_filters:
+                  type: object
+                  description: |
+                    Additional machine search filters. Example: `{"cuda_max_good": {"gte": 12.6}}`
                 recommended_disk_space:
                   type: number
                   description: Recommended disk space in GB
+                desc:
+                  type: string
+                  description: Short description of the template
+                readme:
+                  type: string
+                  description: Longer documentation/readme content for the template
+                args_str:
+                  type: string
+                  description: Arguments string passed to the container entrypoint when runtype is `args`
+                href:
+                  type: string
+                  description: Link to Docker Hub or image documentation
+                repo:
+                  type: string
+                  description: Repository identifier (e.g., `library/ubuntu`)
+                private:
+                  type: boolean
+                  description: Whether the template is private (not publicly searchable)
+                volume_info:
+                  type: object
+                  nullable: true
+                  description: UI hint for volume configuration
               additionalProperties: true
             example:
+              id: 123456
               hash_id: 5915f1dc1ce881defb572015eb9d8178
+              name: Example Template
               desc: Updated description
+              image: vastai/base-image
+              tag: latest
+              env: "-e MY_VAR=value -p 8000:8000"
+              runtype: ssh
+              ssh_direct: true
+              use_ssh: true
+              docker_login_repo: ""
+              docker_login_user: ""
+              docker_login_pass: ""
               recommended_disk_space: 16
+              private: true
       responses:
         '200':
-          description: Template updated successfully
+          description: New template version created, or no edits were needed
           content:
             application/json:
               schema:
@@ -60,19 +146,57 @@ paths:
                 properties:
                   success:
                     type: boolean
+                    description: Whether the operation was successful
+                  msg:
+                    type: string
+                    description: Status message
+                    example: "Created an Edited Copy of Template 123456. New Template ID: 123457"
                   template:
                     type: object
+                    description: The new template version
                     properties:
                       id:
                         type: integer
-                        description: Template numeric ID (unchanged after edit)
+                        description: Numeric ID of the new version
                       hash_id:
                         type: string
-                        description: Updated template hash ID (changes based on content)
+                        description: Content-based hash ID of the new version
+        '400':
+          description: Bad request - missing `id` or `hash_id`, or invalid parameters
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: invalid_args
+                  msg:
+                    type: string
+                    example: Template ID is required for update
         '401':
           description: Unauthorized - invalid or missing API key
         '404':
-          description: Template not found
+          description: Template not found - no template has this `id` and `hash_id`, or it was deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: invalid_template
+                  msg:
+                    type: string
+                    example: "error 404: Template not found"
+        '429':
+          description: Rate limit exceeded
 components:
   securitySchemes:
     BearerAuth:

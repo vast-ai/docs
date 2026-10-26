@@ -197,15 +197,7 @@ The resulting environment will be:
 
 ## Edit a Template
 
-Update an existing template using `vastai update template` with the template's `hash_id` as the positional argument. Include only the flags you want to change:
-
-```bash
-vastai update template 5915f1dc1ce881defb572015eb9d8178 \
-  --desc "Updated description" \
-  --disk_space 16
-```
-
-You can change any of the same flags available in `create template`:
+Update an existing template using `vastai update template` with the template's `hash_id` as the positional argument. Editing creates a new version of the template. Values from the previous version are not carried over, so pass the full set of flags the new version should have. The flags are the same ones `create template` accepts:
 
 ```bash
 vastai update template c81e7ab0e928a508510d1979346de10d \
@@ -213,11 +205,19 @@ vastai update template c81e7ab0e928a508510d1979346de10d \
   --image "ghcr.io/huggingface/text-generation-inference:1.0.3" \
   --env "-p 3000:3000 -e MODEL_ARGS='--model-id TheBloke/Llama-2-7B-chat-GPTQ --quantize gptq'" \
   --onstart-cmd 'wget -O - https://raw.githubusercontent.com/vast-ai/vast-pyworker/main/scripts/launch_tgi.sh | bash' \
-  --ssh --direct
+  --search_params "gpu_ram>=23 num_gpus=1 gpu_name=RTX_3090 inet_down>128 direct_port_count>3 disk_space>=192" \
+  --disk_space 16 \
+  --ssh --direct --public
 ```
 
+<Warning>
+An omitted flag takes its default on the new version, not the previous version's value. To change one setting, repeat every other flag with its current value. Without `--public` the new version is private, without `--hide-readme` the readme is visible, without `--ssh` or `--jupyter` the runtype is `args`, without `--search_params` the default machine filters are used, and without `--disk_space` the recommended disk space is 16 GB.
+
+Fields that have no flag are not sent at all and are empty on the new version: registry username and password (`--login` sets only the registry), `volume_info`, `args_str` and the readme. If the template uses any of these, re-enter them in the console after a CLI edit.
+</Warning>
+
 <Note>
-The `hash_id` changes after editing because it is derived from the template's content. Use the new `hash_id` returned in the output for subsequent operations.
+The new version gets a new `id` and `hash_id` because the hash is derived from the template's content. Use the new `hash_id` returned in the output for subsequent operations. The previous version keeps its identifiers, so running instances and shared links stay valid. A command whose values match the current version exactly creates nothing and returns the existing `hash_id`.
 </Note>
 
 ## Delete a Template
@@ -284,6 +284,6 @@ Deleting a template removes your relationship to it. It does not destroy the und
   </Accordion>
 
   <Accordion title="hash_id changed after editing">
-    This is expected behavior. The `hash_id` is content-based, so any edit produces a new hash. Always capture the new `hash_id` from the update command output or search for your template again before referencing it.
+    This is expected behavior. The `hash_id` is content-based, so any edit that changes a value produces a new version with a new hash. Always capture the `hash_id` from the update command output or search for your template again before referencing it.
   </Accordion>
 </AccordionGroup>
