@@ -1,6 +1,6 @@
 ---
 title: "Upgrade the NVIDIA Driver"
-description: "Move a host machine to the NVIDIA driver version Vast asks for, built by DKMS and held at that version."
+description: "Bring a host machine up to the minimum NVIDIA driver version Vast asks for, built by DKMS and held at that version."
 ---
 
 <Danger>
@@ -13,24 +13,34 @@ If you are unsure whether this operation could cause data loss, stop here.
 
 </Danger>
 
-Vast asks hosts to run one specific NVIDIA driver version, chosen by GPU
-generation. When Vast changes the version, this table is updated; follow this
-page again to move to it. The steps are the same every time.
+Vast asks hosts to run at least a minimum NVIDIA driver version, set by GPU
+generation and, on Turing and newer, by the driver the machine runs now. When
+Vast raises a minimum, this table is updated; follow this page again to move to
+it. The steps are the same every time.
 
-| GPUs | Compute capability | Driver version |
-| --- | --- | --- |
-| Turing and newer | 7.5 and higher | 610.57.04 |
-| Maxwell, Pascal and Volta | below 7.5 | 580.178.04 |
+| GPUs | Compute capability | Current driver | Minimum driver version |
+| --- | --- | --- | --- |
+| Turing and newer | 7.5 and higher | 595.xx | 595.91.07 |
+| Turing and newer | 7.5 and higher | Any other | 610.57.04 |
+| Maxwell, Pascal and Volta | below 7.5 | Any | 580.178.04 |
 
-This page installs that version from NVIDIA's apt repository, has DKMS build its
-kernel module, and holds it so nothing upgrades it. With DKMS, a kernel update
-rebuilds the same driver for the new kernel instead of changing the driver. A
-driver from Ubuntu's prebuilt modules (`linux-modules-nvidia-*`) or NVIDIA's
-`.run` installer is replaced, even when it is already the right version.
+A machine at or above its minimum needs nothing from this page. For a machine
+below it, this page installs the minimum version from NVIDIA's apt repository,
+has DKMS build its kernel module, and holds it so nothing upgrades it. With
+DKMS, a kernel update rebuilds the same driver for the new kernel instead of
+changing the driver.
+
+<Note>
+Driver branches newer than the ones in the table, such as 620, are not directly
+supported yet, though a machine on one may still run on the platform. Hosts on
+an unlisted branch are expected to keep the driver on the newest release of that
+branch, for its latest security fixes. This page does not change it.
+</Note>
 
 <Warning>
-From step 4 until the reboot in step 7 the GPUs are unusable, and the reboot
-stops every instance on the machine.
+Before step 3, [unlist the machine](/host/cli/unlist-machine) and make sure it
+has no instances; a maintenance window does neither. From step 3 until the
+reboot in step 6 the GPUs are unusable, and the reboot stops every instance.
 </Warning>
 
 ## 1. Check the current driver
@@ -40,15 +50,22 @@ nvidia-smi --query-gpu=name,compute_cap,driver_version --format=csv,noheader
 ```
 
 ```text nocopy
-NVIDIA GeForce RTX 4090, 8.9, 595.99.02
-NVIDIA GeForce RTX 4090, 8.9, 595.99.02
+NVIDIA GeForce RTX 4090, 8.9, 580.178.04
+NVIDIA GeForce RTX 4090, 8.9, 580.178.04
 ```
 
-The second column is the compute capability. Set the version from the table that
-matches it. The later commands read these two variables, so if you log out, set
-them again before you continue.
+The second column is the compute capability and the third is the current driver.
+Set the minimum from the table row that matches both; it is also the version
+this page installs. The later commands read these two variables, so if you log
+out, set them again before you continue.
 
-Compute capability 7.5 or higher:
+Compute capability 7.5 or higher, current driver 595.xx:
+
+```bash
+DRIVER_VERSION=595.91.07; DRIVER_PACKAGE=nvidia-open
+```
+
+Compute capability 7.5 or higher, any other driver:
 
 ```bash
 DRIVER_VERSION=610.57.04; DRIVER_PACKAGE=nvidia-open
@@ -60,42 +77,19 @@ Below 7.5:
 DRIVER_VERSION=580.178.04; DRIVER_PACKAGE=nvidia-driver-580
 ```
 
-Check whether the machine already runs that version with a DKMS-built module:
+Check whether the machine already meets the minimum:
 
 ```bash
-[ "$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | sort -u)" = "$DRIVER_VERSION" ] && modinfo -n nvidia 2>/dev/null | grep -q /updates/dkms/ && echo "Already on $DRIVER_VERSION, built by DKMS: nothing to do" || echo "Not on $DRIVER_VERSION with DKMS: continue to step 2"
+dpkg --compare-versions "$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | sort -u)" ge "$DRIVER_VERSION" && echo "At or above $DRIVER_VERSION: nothing to do" || echo "Below $DRIVER_VERSION: continue to step 2"
 ```
 
 ```text nocopy
-Not on 610.57.04 with DKMS: continue to step 2
+Below 610.57.04: continue to step 2
 ```
 
-If it prints `nothing to do`, run the command in step 6 so the driver is held,
-and stop there.
+If it prints `nothing to do`, stop here.
 
-## 2. Unlist the machine
-
-```bash
-docker ps -a --format '{{.Names}}\t{{.Status}}'
-```
-
-The machine is free when this prints no lines starting with `C.` (client
-instances; `Exited` ones count too) and the machine's card in the
-[console](https://cloud.vast.ai/host/machines/) shows **Occ**, **#Running** and
-**#Stored** at 0. Then unlist it:
-
-```bash
-vastai unlist machine <machine_id>
-```
-
-<Warning>
-If anything is rented, unlist the machine and
-[schedule maintenance](/host/cli/schedule-maint) so renters are notified. Do not
-stop or delete client containers. When the window starts, repeat the checks
-above and continue once they show no instances.
-</Warning>
-
-## 3. Prepare the build and the repository
+## 2. Prepare the build and the repository
 
 Each command in this step installs only what is missing.
 
@@ -140,7 +134,7 @@ apt-cache policy nvidia-driver-pinning-$DRIVER_VERSION | grep Candidate
 If it prints nothing, stop: nothing has been removed yet, and the machine keeps
 its current driver.
 
-## 4. Remove the current driver
+## 3. Remove the current driver
 
 This removes a driver installed with NVIDIA's `.run` installer, and does nothing
 otherwise:
@@ -157,7 +151,7 @@ in the list:
 OLD_DRIVER_PACKAGES=$(dpkg-query -W -f='${db:Status-Abbrev}\t${binary:Package}\t${source:Package}\n' | awk -F'\t' '$1 ~ /^[hi]i/ && $3 ~ /^(nvidia-graphics-drivers|nvidia-kmod-open|nvidia-open|cuda-drivers|linux-restricted-(modules|signatures)|nvidia-settings|nvidia-persistenced|nvidia-modprobe|nvidia-xconfig|(nvidia-)?fabric-?manager|libnvidia-nscq|libnvsdm|(nvidia-)?imex|nvlink5|nvidia-driver-pinning)/ { print $2 }'); echo "$OLD_DRIVER_PACKAGES"
 ```
 
-If a name in the list contains `fabricmanager`, the machine has NVSwitch; step 5
+If a name in the list contains `fabricmanager`, the machine has NVSwitch; step 4
 installs Fabric Manager again. Remove them:
 
 ```bash
@@ -166,12 +160,13 @@ sudo apt-get purge --allow-change-held-packages $OLD_DRIVER_PACKAGES
 
 ```text nocopy
 The following packages will be REMOVED:
-  libnvidia-cfg1-595* libnvidia-common-595* libnvidia-compute-595*
+  libnvidia-cfg1-580* libnvidia-common-580* libnvidia-compute-580*
   ...
-  libxnvctrl0* linux-modules-nvidia-595-open-generic* nvidia-driver-595-open*
+  linux-modules-nvidia-580-open-generic* nvidia-compute-utils-580*
+  nvidia-driver-580-open* nvidia-firmware-580-580.178.04*
   ...
 The following held packages will be changed:
-  nvidia-driver-595-open
+  nvidia-driver-580-open
 Do you want to continue? [Y/n]
 ```
 
@@ -181,7 +176,7 @@ Before you answer, read the `REMOVED` list. Every name must contain `nvidia`,
 `nvidia-container-toolkit-base`, `libnvidia-container1` or
 `libnvidia-container-tools`. If either rule is broken, answer `n` and stop.
 
-## 5. Install the driver
+## 4. Install the driver
 
 Pin the version first. NVIDIA's pinning package makes apt install exactly that
 version of every driver package
@@ -237,7 +232,7 @@ means DKMS did not build for that kernel; see
 [If the DKMS build fails](#if-the-dkms-build-fails). Do not reboot until it
 prints the version.
 
-## 6. Hold the driver
+## 5. Hold the driver
 
 ```bash
 sudo apt-mark hold $(dpkg-query -W -f='${db:Status-Abbrev}\t${binary:Package}\t${source:Package}\n' | awk -F'\t' '$1 ~ /^[hi]i/ && $3 ~ /^(nvidia-graphics-drivers|nvidia-kmod-open|nvidia-open|cuda-drivers|nvidia-settings|nvidia-persistenced|nvidia-modprobe|nvidia-xconfig|(nvidia-)?fabric-?manager|libnvidia-nscq|libnvsdm|(nvidia-)?imex|nvlink5|nvidia-driver-pinning)/ { print $2 }')
@@ -252,7 +247,7 @@ nvidia-open set on hold.
 ...
 ```
 
-## 7. Reboot, verify and relist
+## 6. Reboot and verify
 
 ```bash
 sudo reboot
@@ -270,19 +265,10 @@ NVIDIA GeForce RTX 4090, 610.57.04
 NVIDIA GeForce RTX 4090, 610.57.04
 ```
 
-Every line must show the version from the table. Relist from the
-[Machines page](https://cloud.vast.ai/host/machines/) or with
-[`vastai list machine`](/host/cli/list-machine), then run the self-test, which
-needs the machine listed. Its last line must be `Test completed successfully.`
-([How to self-test](/host/how-to-self-test)):
-
-```bash
-vastai self-test machine <machine_id>
-```
+Every line must show the minimum you set in step 1.
 
 <Check>
-Every GPU on the version from the table, module built by DKMS, driver held,
-machine listed, self-test passed.
+Every GPU on the minimum driver version, module built by DKMS, driver held.
 </Check>
 
 ---
@@ -302,7 +288,7 @@ nvidia/610.57.04, 7.0.0-38-generic, x86_64: installed
 ```
 
 The new kernel must have a line ending in `installed`. If it has none, do not
-reboot. Run the two install commands at the start of step 3, then build for the
+reboot. Run the two install commands at the start of step 2, then build for the
 new kernel, using its version in place of `7.0.0-38-generic`:
 
 ```bash
@@ -332,9 +318,9 @@ cc: error: unrecognized command-line option '-ftrivial-auto-var-init=zero'
 ```
 
 That line means the kernel's compiler is missing. For either cause, run the two
-install commands at the start of step 3. Once they install what was missing,
+install commands at the start of step 2. Once they install what was missing,
 apt finishes the interrupted driver install and builds the module. Then repeat
-the `modinfo` check at the end of step 5.
+the `modinfo` check at the end of step 4.
 
 ### If nvidia-smi fails after the reboot
 
