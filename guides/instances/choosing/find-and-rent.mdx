@@ -8,7 +8,7 @@ description: Find and rent GPU instances on Vast.ai. Learn how to search, filter
 The search page is the main portal for finding good machines and creating instances on them.
 
 <Note>
-Before renting an instance, you'll need to select a template that defines your Docker image and connection method. If you haven't already, review [Choosing a Template](/guides/instances/choosing/templates) to understand your options.
+Before renting an instance, you'll need to select a template that defines your Docker image and connection method. If you haven't already, review [Choosing a Template](/guides/instances/choosing/templates) to understand your options. Add a payment method or account credit under **Account → Billing** if rent fails for lack of balance.
 </Note>
 
 # Page Walkthrough
@@ -19,9 +19,9 @@ You will find various search options on the top and left control bars that allow
 
 ## Offer card
 
-The offer card shows the details of a machine available for rent, including specs, pricing, and the maximum rental duration. When you rent an instance, a rental contract is created between you and the host based on the offer's current terms. The offer remains available for other clients until it reaches its end date or is unlisted by the host.
+The offer card shows the details of a machine available for rent, including specs, pricing, and the maximum rental duration. When you rent an instance, a rental contract is created between you and the host based on the offer's current terms. For an on-demand rental, the GPUs stay reserved while the instance is running. If you stop it, those GPUs may be rented to someone else, and resuming can fail until they free up. Interruptible rentals can be outbid at any time. The host's listing may keep offering the machine's remaining GPUs to other renters until its end date or until the host unlists it.
 
-Most of the items on the offer card can be filtered using the search filters. Some of the important parts are the price and the maximum rental duration. Hovering over the price details the different prices for GPU rental, storage and bandwidth.
+Most of the items on the offer card can be filtered using the search filters. Some of the important parts are the price and the maximum rental duration. Hovering over the price shows the different prices for GPU rental, storage, and bandwidth.
 
 ### Machine Tiers
 
@@ -46,7 +46,7 @@ All stats shown are the portion of the total machine rented.
 - Motherboard: The name of the motherboard manufacturer and type
 - Motherboard details: PCIE version and number of lanes along with maximum theoretical PCIE bandwidth in GB/s
 - CPU: The CPU type
-- CPU Cores: the number of cores allocated for this offer divided total
+- CPU Cores: the number of cores allocated for this offer divided by the total
 - System RAM: system RAM allocated for this offer divided by the total
 - Network Bandwidth: Given in Mbps for upload/download
 - Network Ports: number of potential ports available
@@ -54,16 +54,23 @@ All stats shown are the portion of the total machine rented.
 - Disk speed: The speed of the local storage on the machine in MB/s
 - Total available disk: The maximum amount of disk space available
 - DLPERF score: A custom deep learning performance score
-- Price: The GPU rental price plus the hourly cost of the storage allocated. Hover over the price for a breakdown and for the price of bandwidth.
+- Price: The GPU rental price plus the hourly cost of the storage allocated. Hover over the price for a breakdown and for the price of bandwidth. When you set a **Reliability target**, the breakdown on SLA listings also shows an **SLA Fee** line — see [SLA](/guides/instances/choosing/sla-coverage).
 - Max Duration: The maximum length of a rental contract on this machine
-- Reliability Score: A measure of the machine's historical uptime and health. All machines start at 60%.
-  Rental Option: RENT Button
+- Reliability Score: A measure of the machine's historical uptime and health. All machines start at 60%. This is **not** the host's reliability commitment. On an SLA offer, that commitment is **expected reliability**. Your **Reliability target** must be at or below the host's **expected reliability**, not this score. Search hides offers whose commitment is below your target.
+- Rental Option: RENT button
+- **SLA (optional):** On-demand offers may include an optional SLA (interruptible/spot has no SLA). Set **Reliability target** in the left Search filters before you click **RENT**. Then confirm an **SLA Fee** line in the price breakdown. An offer that shows the host's reliability commitment does not put you on the SLA until you rent with that target set. See [SLA](/guides/instances/choosing/sla-coverage#in-the-web-console).
+
+<Note>
+To rent with an SLA, set **Reliability target** in **Search filters** (left bar), confirm the price breakdown shows an **SLA Fee** line, then click **RENT**. To rent without an SLA, clear **Reliability target**. While it is set, offers without an SLA are hidden. No **SLA Fee** line means no SLA. If that line is missing on every offer, contact support. CLI/API query settings do not carry over into the console. For CLI and API limits, see [SLA](/guides/instances/choosing/sla-coverage).
+</Note>
 
 ## Instance Disk Size
 
-The storage slider is both a search filter and a parameter input which determines the storage allocation size - it's important to size this correctly before creating any instance.
+The storage slider is both a search filter and a parameter input which determines the storage allocation size — size it correctly before you create an instance.
 
-When the instance is created, the disk size is set and cannot be modified. It is important to estimate how much disk you will need and then to move the slider to the desired disk size. The default disk size for an instance is 10GB. Use the slider to allocate more or less, taking into consideration that providers charge for disk allocation even when the instance is stopped.
+When the instance is created, the disk size is set and cannot be modified. Estimate how much disk you need, then move the slider to that size. The default disk size in the console is 10GB. Hosts charge for disk allocation even when the instance is stopped.
+
+If you compare prices across the console, CLI, and REST, match disk size first. Defaults differ: console 10 GB, REST search 8 GB, CLI search 5 GiB. See [SLA → API automation](/guides/instances/choosing/sla-coverage#api-automation).
 
 <Frame caption="Disk Space">
 ![Diskspace](/images/find-and-rent-diskspace.webp)
@@ -71,7 +78,7 @@ When the instance is created, the disk size is set and cannot be modified. It is
 
 ## Instance Configuration
 
-Vast.ai provides out Linux docker instances. One key step during setup is specifying what Linux docker image to load. You can also specify Docker run commands, an on-start script that executes bash commands on instance start and a launch mode to connect to the instance.
+Vast.ai provides Linux Docker instances. One key step during setup is specifying what Linux docker image to load. You can also specify Docker run commands, an on-start script that executes bash commands on instance start and a launch mode to connect to the instance.
 
 The instance configuration menu is accessible in the upper left of the create instance interface. The current template is always displayed in the upper left.
 Click on the "Change Template" button to bring up the template config menu that allows selecting and editing templates. For a quick overview, see [Choosing a Template](/guides/instances/choosing/templates). For detailed template creation and Docker configuration, see the main [Templates documentation](/guides/templates/introduction)
@@ -79,6 +86,8 @@ Click on the "Change Template" button to bring up the template config menu that 
 <Frame caption="Edit">
 ![Edit](/images/find-and-rent-edit.webp)
 </Frame>
+
+Some offers include an optional **SLA** reliability commitment. It pays a daily service credit that grows as measured uptime falls toward and below your target. It does not keep the machine up. To filter and compare SLA-backed rentals, see [SLA](/guides/instances/choosing/sla-coverage).
 
 ## Common Questions
 
@@ -103,5 +112,7 @@ If you get this error when clicking the RENT button, the specific machine/GPU sl
 Startup time depends on the template and is usually under 5 minutes. If waiting over 20 minutes:
 - Ensure you're using a recommended template
 - Try a different machine
-- Note: You're not charged while instances are loading
+- Note: On a rental without an SLA, you are not charged for GPU time while the instance is **Loading**. Storage is still charged. On an SLA rental, budget as if Loading time is charged. If you do not want to keep waiting, **Destroy** the instance and rent a different offer. Destroy deletes the disk. See [Stop vs destroy](/guides/instances/choosing/sla-coverage#what-you-pay-during-an-outage).
 - With slow internet and large images, downloads can take an hour or more
+
+If the instance never becomes healthy, open **Instances**, select the rental, and choose **Destroy**. Destroy ends the rental and permanently deletes the instance and its disk, so copy off anything you need first. If you rented with an SLA, see [Stop vs destroy](/guides/instances/choosing/sla-coverage#what-you-pay-during-an-outage).

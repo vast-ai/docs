@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Vast.ai Show Charges API
-  description: API endpoint to retrieve per-instance billing charges (GPU, storage, and bandwidth).
+  description: API endpoint to retrieve per-instance billing charges (GPU, storage, bandwidth, and the net SLA row).
   version: 1.0.0
 
 servers:
@@ -13,7 +13,7 @@ paths:
     get:
       summary: show charges
       description: |
-        Shows charges per instance, including GPU, storage, and bandwidth. For invoice/payment records (Stripe top-ups, transfers, payouts), use [show invoices](/api-reference/billing/show-invoices) instead.
+        Shows charges per instance, including GPU, storage, bandwidth, and the net SLA row (`type: "sla"`). For invoice/payment records (Stripe top-ups, transfers, payouts), use [show invoices](/api-reference/billing/show-invoices) instead.
 
         CLI: `vastai show invoices-v1 --charges`
       security:
@@ -147,7 +147,7 @@ paths:
                               example: 25355
                         items:
                           type: array
-                          description: Per-charge-type breakdown (`gpu`, `disk`, `bwd`, `bwu`). Empty for tree-format wrappers above the contract level.
+                          description: Per-charge-type breakdown (`gpu`, `disk`, `bwd`, `bwu`, and `sla` on SLA rentals). Empty for tree-format wrappers above the contract level.
                           items:
                             type: object
                             properties:
@@ -159,7 +159,7 @@ paths:
                                 example: 1730678400
                               type:
                                 type: string
-                                enum: [gpu, disk, bwd, bwu]
+                                enum: [gpu, disk, bwd, bwu, sla]
                                 example: gpu
                               source:
                                 type: string
@@ -171,6 +171,12 @@ paths:
                               amount:
                                 type: number
                                 format: float
+                                description: >
+                                  Charge amount for this item. For type "sla", this is the net SLA amount
+                                  for the whole query window (fee minus credit), not one row per day.
+                                  Query one UTC day at a time for a daily figure. A positive amount
+                                  is a net fee. A negative amount is a net credit. The console Charges
+                                  tab shows the opposite sign.
                                 example: 37.344
                               metadata:
                                 type: object
@@ -224,15 +230,26 @@ paths:
                 error: auth_error
                 msg: Invalid user key
         '429':
-          description: Too Many Requests
+          description: Too Many Requests. JSON body and a Retry-After header.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait.
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  detail:
+                  error:
                     type: string
-                    example: API requests too frequent endpoint threshold=1.0
+                    example: HTTPTooManyRequests
+                  msg:
+                    type: string
+                    example: API requests too frequent
+                  retry_after:
+                    type: integer
+                    example: 1
       tags:
         - Billing
 
@@ -261,7 +278,7 @@ components:
 x-rate-limit:
   threshold: 1.0
   per: request
-  description: Maximum request frequency per IP address
+  description: Rate limit per account for a signed-in API key. Unauthenticated calls are limited per IP address.
 
 x-cli-commands:
   - name: show invoices-v1

@@ -162,7 +162,7 @@ def build_master_doc():
                 "- `gpu_ram` in CLI = GB; in REST API = MB (CLI auto-converts)\n"
                 "- SSH keys must be registered BEFORE creating an instance (VM: no recovery; Docker: can add post-create)\n"
                 "- `onstart` field is limited to 4048 characters -- gzip+base64 for longer scripts\n"
-                "- `POST /api/v0/asks/{id}/` (create instance) returns `new_contract` as the instance ID, not `id`\n"
+                "- `PUT /api/v0/asks/{id}/` (create instance) returns `new_contract` as the instance ID, not `id`\n"
                 "- Poll trap: if `actual_status` becomes `exited`, `unknown`, or `offline` it will never reach `running` -- destroy and retry"
             ),
             'version': '1.0.0',

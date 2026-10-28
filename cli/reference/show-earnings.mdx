@@ -3,7 +3,15 @@ title: "vastai show earnings"
 sidebarTitle: "show earnings"
 ---
 
-Get machine earning history reports
+Get machine earnings history reports. With no dates, the server returns the previous UTC day. For a settlement check, pass explicit `T00:00:00Z` dates.
+
+<Note>
+Host settlement command. For SLA contracts, `sla_earn` is the escrow released to the host that day, not a credit balance and not renter credits. Releases are spread over time, so one low day is not by itself a service credit. SLA-contract compute is omitted from `gpu_earn`. Renters: [Account → Billing](https://cloud.vast.ai/billing/) — see [Where do I see historical SLA credits?](/guides/instances/choosing/sla-coverage#where-do-i-see-historical-sla-credits).
+</Note>
+
+<Note>
+Host SLA settlement monitoring is rate-limited (safe default: about once every two seconds; back off on **429**). Use a key with `billing_read`. See [Monitoring SLA after listing](/host/sla-offers#monitoring-sla-after-listing) and [Show Earnings](/api-reference/billing/show-earnings).
+</Note>
 
 ## Usage
 
@@ -22,17 +30,24 @@ vastai show earnings [OPTIONS]
 </ParamField>
 
 <ParamField path="-e" type="string">
-  end date and time for report. Many formats accepted  (alias: `--end_date`)
+  end date and time for report. Many formats accepted (alias: `--end_date`)
 </ParamField>
 
 <ParamField path="-m" type="integer">
   Machine id (optional) (alias: `--machine_id`)
 </ParamField>
 
+`--raw` is the same JSON as [Show Earnings](/api-reference/billing/show-earnings). Host SLA settlement is `per_machine[].sla_earn` (field `machine_id`, not query param `machid`; not fleet-wide `per_day[].sla_earn`). `--start_date` and `--end_date` are convenience options. The CLI parses bare dates such as `2026-07-24` in the local time zone of the computer running the CLI, not UTC, so append `T00:00:00Z` for an exact UTC day. For REST-only query params `last_days`, `sday`, and `eday` (for example `last_days=1` polling or exact UTC day index), see [Monitoring SLA after listing](/host/sla-offers#monitoring-sla-after-listing) or [Show Earnings](/api-reference/billing/show-earnings).
+
 ## Examples
 
 ```bash
 vastai show earnings
+vastai show earnings --raw | jq '.per_machine[] | {machine_id, sla_earn}'
+# One machine, one UTC day (prefer --machine_id for SLA settlement checks). Linux (GNU date);
+# on macOS (BSD date) use $(date -u -v-1d +%F) for yesterday.
+vastai show earnings --machine_id 12345 --start_date "$(date -u -d 'yesterday' +%F)T00:00:00Z" --end_date "$(date -u -d 'yesterday' +%F)T00:00:00Z" --raw \
+  | jq '.per_machine[] | select(.machine_id == 12345 or .machine_id == "12345") | {machine_id, sla_earn}'
 ```
 
 ## Global Options
@@ -42,7 +57,7 @@ The following options are available for all commands:
 | Option | Description |
 | --- | --- |
 | `--url URL` | Server REST API URL |
-| `--retry N` | Retry limit |
+| `--retry N` | Total attempts (default 3; use 1 for a single request; 0 sends nothing) |
 | `--raw` | Output machine-readable JSON |
 | `--explain` | Verbose explanation of API calls |
 | `--api-key KEY` | API key (defaults to `~/.config/vastai/vast_api_key`) |

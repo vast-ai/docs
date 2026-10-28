@@ -3,7 +3,7 @@ title: "SDK Rate Limits and Errors"
 sidebarTitle: "Rate Limits"
 ---
 
-The Vast.ai SDK automatically retries rate-limited requests. You do not need to implement your own retry logic -- both the `VastAI` client and the serverless client handle retries with exponential backoff out of the box.
+The Vast.ai SDK retries some failed requests. With the default of 3 attempts, those retries finish in under a second and do not read `Retry-After`. For offer search, rent, and listing calls, add your own spacing. See [SLA API automation](/guides/instances/choosing/sla-coverage#api-automation).
 
 This page covers the error format, how rate limits work, and how to configure retry behavior for each client. For the full details on rate limit mechanics, see the [API Rate Limits and Errors](/api-reference/rate-limits-and-errors) page.
 
@@ -21,11 +21,11 @@ The underlying API error shape is:
 
 Some endpoints omit `success` or `error` and return only `msg` or `message`.
 
-The `VastAI` client returns the error as a dictionary when `raw=True` is set, or prints the message otherwise. The serverless client raises an exception after exhausting all retries.
+After its built-in retries are used up, the `VastAI` client raises `requests.HTTPError` for a non-2xx response. Read the status with `err.response.status_code` and the body with `err.response.json()`. `raw=True` only changes successful return values. The serverless client also raises after its retries are used up.
 
 ## How Rate Limits Work
 
-Vast.ai applies rate limits **per endpoint** and **per identity**. The identity is determined by your bearer token, session user, `api_key` parameter, and client IP.
+Vast.ai applies rate limits **per endpoint**. For an API key, the limit is on that key's account. Extra keys on the same account share it. The client IP is used only when a request does not resolve to an account.
 
 Some endpoints also enforce **method-specific** limits (GET vs POST) and **max-calls-per-period** limits for short bursts.
 
@@ -33,37 +33,32 @@ For the full breakdown, see [How rate limits are applied](/api-reference/rate-li
 
 ## Rate Limit Response
 
-When you hit a rate limit, the API returns **HTTP 429** with a message like:
+HTTP 429 comes in two families. See [Rate Limits and Errors](/api-reference/rate-limits-and-errors#rate-limit-response-behavior).
 
-```
-API requests too frequent
-```
+- Rent, show-instances, `create_asks`, and machine earnings do not return the JSON `{"error": …}` body. With a default Accept header the body is usually HTML. Search, charges, the other earnings routes, schedule maintenance, and the SLA backtester return JSON. A short limit uses `"error": "HTTPTooManyRequests"`. A daily search quota hit uses `"error": "search_quota_exceeded"` and a `Retry-After` that can be hours.
+- Both kinds include a `Retry-After` header. Detect a limit by HTTP status 429. The SDK never reads `Retry-After`.
 
-or
-
-```
-API requests too frequent: endpoint threshold=...
-```
-
-The API does not return a `Retry-After` header. The SDK handles this automatically using its built-in retry logic.
+The SDK never reads `Retry-After`. With the default of 3 attempts, its retries finish in under a second. If your script calls the API directly, wait at least `Retry-After` when it is present.
 
 ## Built-in Retry Behavior
 
-The SDK includes two clients with different retry strategies.
+The `VastAI` client and the serverless client retry. `SyncClient` and `AsyncClient` call the API directly and do not retry, so add your own backoff.
 
 ### VastAI Client
 
-The main `VastAI` client retries on rate limit responses:
+The main `VastAI` client retries on HTTP 429, 502, 503, and 504, and on connection errors and timeouts:
 
-- **Retried status codes:** 429 only
-- **Default retries:** 3
-- **Backoff strategy:** starts at 0.15 seconds, multiplied by 1.5x after each attempt
-- **Retry delays:** ~0.15s, ~0.225s, ~0.34s
+- `retry` is the **total number of attempts**.
+- **Default:** 3 attempts (one request plus two retries), with delays of about 0.15 s and 0.225 s.
+- **Backoff:** starts at 0.15 seconds, multiplied by 1.5 after each attempt. The SDK does not read `Retry-After`.
+- To send a request once, use `retry=1`. Do not use `retry=0`. It sends no request.
+
+Any rent can be sent twice if the first request reached the server and the connection then failed. Set a unique `label` and check your instances for it before you rent again. The SDK cannot turn SLA on; SLA rentals use the console or REST. Use the same label check in your own retry logic. See [SLA API automation](/guides/instances/choosing/sla-coverage#api-automation).
 
 ```python
 from vastai import VastAI
 
-# Uses default retry behavior (3 retries)
+# Default: 3 attempts (2 retries)
 vast = VastAI(api_key="your-api-key")
 vast.search_offers(query="gpu_name=RTX_4090 rentable=true")
 ```
@@ -87,16 +82,13 @@ The serverless client retries on a wider range of errors than the `VastAI` clien
 
 ### VastAI Client
 
-Pass the `retry` parameter to the constructor to change the number of retry attempts:
+Pass the `retry` parameter to the constructor to change the total number of attempts:
 
 ```python
 from vastai import VastAI
 
-# Increase to 6 retries for a batch script
-vast = VastAI(api_key="your-api-key", retry=6)
-
-# Disable retries entirely
-vast = VastAI(api_key="your-api-key", retry=0)
+# One attempt only
+vast = VastAI(api_key="your-api-key", retry=1)
 ```
 
 The retry count applies to all requests made through that client instance.

@@ -1,6 +1,10 @@
-List details of a single machine with optional pricing and configuration parameters.
+Lists a machine for rent with optional pricing and configuration parameters.
 
 <Note>This is a **host** method, used for managing machines you are renting out on Vast.ai.</Note>
+
+<Note>
+`list_machine()` cannot set SLA fields. Use the console (**Set Pricing → SLA**) or REST `PUT /api/v0/machines/create_asks/` ([SLA Offers](/host/sla-offers#api-for-automation)). On an already-listed SLA machine, `list_machine()` does not send SLA fields, so the **Reliability Commitment** (`sla_r_claim`) and **Confidence** stay. After an unlist, a relist creates a new ask **without** SLA. `list_machine()` cannot send `hidden_listing`, so a reprice makes a hidden listing public. It also sends `vol_size` and `duration` as `null` unless you pass them: null `vol_size` can create a volume offer at half the free disk, and null `duration` clears auto-renew. Pass `vol_size=0` to skip a new volume offer. To keep auto-renew, pass `duration` again (seconds or a string such as `"30 days"`) on every call. Never pass `duration` together with `end_date`. Pass `min_chunk` as well. If you omit it, the SDK sends null and the server returns HTTP 400. The packaged CLI instead defaults `-m` to 1, which on a new ask splits the machine into single-GPU offers. `end_date` must be a Unix timestamp in seconds (`int` or `float`). Date strings such as `MM/DD/YYYY` are only converted by the CLI's `-e` flag. Update hidden SLA listings with REST and send `hidden_listing` explicitly.
+</Note>
 
 ## Signature
 
@@ -13,47 +17,67 @@ VastAI.list_machine(
     price_inetd: Optional[float] = None,
     discount_rate: Optional[float] = None,
     min_chunk: Optional[int] = None,
-    end_date: Optional[str] = None
-) -> str
+    price_min_bid: Optional[float] = None,
+    end_date: Optional[float] = None,
+    duration: Optional[Union[str, int]] = None,
+    vol_size: Optional[int] = None,
+    vol_price: Optional[float] = None,
+) -> dict
 ```
 
 ## Parameters
 
 <ParamField path="id" type="int" required>
-  id
+  Machine ID to list.
 </ParamField>
 
 <ParamField path="price_gpu" type="Optional[float]">
-  price_gpu
+  GPU rental price in $/hour for active instances.
 </ParamField>
 
 <ParamField path="price_disk" type="Optional[float]">
-  price_disk
+  Storage price in $/GB/month for inactive instances.
 </ParamField>
 
 <ParamField path="price_inetu" type="Optional[float]">
-  price_inetu
+  Upload bandwidth price in $/GB.
 </ParamField>
 
 <ParamField path="price_inetd" type="Optional[float]">
-  price_inetd
+  Download bandwidth price in $/GB.
 </ParamField>
 
 <ParamField path="discount_rate" type="Optional[float]">
-  discount_rate
+  Max long-term prepay discount rate fraction (default 0.4).
 </ParamField>
 
 <ParamField path="min_chunk" type="Optional[int]">
-  min_chunk
+  Minimum GPUs that must be rented together (GPU slicing).
 </ParamField>
 
-<ParamField path="end_date" type="Optional[str]">
-  end_date
+<ParamField path="price_min_bid" type="Optional[float]">
+  Per-GPU minimum bid (host-side). The value you read back as `min_bid_price` can differ slightly from what you sent.
+</ParamField>
+
+<ParamField path="end_date" type="Optional[float]">
+  Unix timestamp (UTC seconds). Do not pass a date string. Do not pass together with `duration`. Sending it extends shorter active rentals.
+</ParamField>
+
+<ParamField path="duration" type="Optional[Union[str, int]]">
+  Auto-renew window (seconds, or a string such as `"30 days"`). Pass it on every call to keep auto-renew. Omitting it turns auto-renew off. Do not pass together with `end_date`. While it is set, Vast keeps moving the offer end date forward and extends active rentals created from that offer.
+</ParamField>
+
+<ParamField path="vol_size" type="Optional[int]">
+  Volume offer size in GB. Omitting it can create a volume offer at half the free disk. Pass `0` to skip that. `0` does not delete a volume offer you already have.
+</ParamField>
+
+<ParamField path="vol_price" type="Optional[float]">
+  Price for the volume offer, if one is created.
 </ParamField>
 
 ## Returns
 
-`str`, Result from the API call.
+`dict` — the parsed JSON response body. On HTTP errors the SDK raises `requests.HTTPError`.
 
 ## Example
 
@@ -61,6 +85,9 @@ VastAI.list_machine(
 from vastai import VastAI
 
 client = VastAI(api_key="YOUR_API_KEY")
-result = client.list_machine(id=12345)
+# Replace CURRENT_* from vastai show machines --raw. An unedited paste should fail.
+# Reprice without extending rentals. Do not pass end_date unless you mean to extend.
+# Pass duration again only if this listing auto-renews.
+result = client.list_machine(id=12345, price_gpu=CURRENT_GPU_PRICE, price_disk=CURRENT_STORAGE_PRICE, min_chunk=CURRENT_MIN_CHUNK, vol_size=0)
 print(result)
 ```
