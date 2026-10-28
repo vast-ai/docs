@@ -1,0 +1,161 @@
+---
+title: Streaming Worker Status
+description: Subscribe to live worker status for a Serverless endpoint or workergroup over a WebSocket connection instead of polling.
+"canonical": "/guides/serverless/worker-status-websocket"
+---
+
+
+The serverless engine can push the status of your workers to you over a WebSocket connection. Each update carries the same worker objects returned by [get endpoint workers](/api-reference/serverless/get-endpoint-workers) and [get workergroup workers](/api-reference/serverless/get-workergroup-workers), so you can build dashboards or automation without polling those APIs. The Vast console uses this connection for its live worker view.
+
+## Connecting
+
+Open a WebSocket connection to:
+
+```text
+wss://run.vast.ai/ws/workers/
+```
+
+Authenticate with your Vast API key in one of two ways:
+
+- An `Authorization: Bearer <API_KEY>` header on the connection request
+- An `api_key` query parameter, for example `wss://run.vast.ai/ws/workers/?api_key=<API_KEY>`. Browsers cannot set headers on WebSocket connections, so use this form from browser code.
+
+If the key is missing or invalid, the server rejects the connection with HTTP `401` and a JSON body such as `{"error_msg": "invalid API key"}`.
+
+## Subscribing
+
+After the connection opens, send a JSON text message to subscribe to an endpoint or a workergroup:
+
+```json
+{"action": "subscribe", "type": "endpoint", "id": 12345}
+```
+
+| Field | Description |
+|-------|-------------|
+| `action` | `subscribe` or `unsubscribe` |
+| `type` | `endpoint` or `workergroup` |
+| `id` | ID of the endpoint or workergroup |
+
+The server confirms each subscription:
+
+```json
+{"status": "subscribed", "topic": "ept:12345"}
+```
+
+Workergroup topics use the form `ag:<id>`. A single connection can hold any number of subscriptions. Send the same message with `"action": "unsubscribe"` to stop receiving updates for that endpoint or workergroup; the server replies with `{"status": "unsubscribed", "topic": "..."}`.
+
+You can only subscribe to endpoints and workergroups owned by the account of the API key you connected with.
+
+## Update Messages
+
+For every subscription, the server sends an update about once per second.
+
+Endpoint updates contain a `workers` array:
+
+```json
+{
+  "type": "endpoint_workers",
+  "id": 12345,
+  "timestamp": 1760000000.0,
+  "workers": [
+    {
+      "id": 67890,
+      "gpu_name": "RTX 4090",
+      "num_gpus": 1,
+      "status": "idle",
+      "reqs_working": 3,
+      "measured_perf": 830.1,
+      "...": "..."
+    }
+  ]
+}
+```
+
+Workergroup updates also include `active_update`, which is `true` while a rolling update of the workergroup's workers is in progress:
+
+```json
+{
+  "type": "autogroup_workers",
+  "id": 678,
+  "timestamp": 1760000000.0,
+  "workers": [],
+  "active_update": false
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `type` | `endpoint_workers` or `autogroup_workers` |
+| `id` | ID of the endpoint or workergroup |
+| `timestamp` | Unix timestamp (seconds) when the update was generated |
+| `workers` | Worker objects with the same fields as [get endpoint workers](/api-reference/serverless/get-endpoint-workers) |
+| `active_update` | Workergroup updates only. Whether a rolling update is in progress |
+
+Endpoint updates are only sent while the endpoint is in the `active` state. A suspended or stopped endpoint stays subscribed but receives no updates until it is active again.
+
+For the meaning of each `status` value, see [Worker States](/guides/serverless/worker-states).
+
+## Errors
+
+If a message cannot be processed, the server replies with a JSON object containing an `error` field and keeps the connection open:
+
+| Error | Cause |
+|-------|-------|
+| `not authorized for ept:<id>` or `not authorized for ag:<id>` | The endpoint or workergroup does not exist, or the API key does not own it |
+| `must specify type and id` | The message is missing `type` or `id` |
+| `unknown type, use endpoint or autogroup` | `type` is not `endpoint` or `workergroup` |
+| `unknown action, use subscribe or unsubscribe` | `action` is not `subscribe` or `unsubscribe` |
+| `invalid JSON` | The message is not valid JSON |
+| `only text frames accepted` | The message was sent as a binary frame |
+
+## Connection Limits
+
+- Messages sent to the server can be at most 4 KB.
+- The server sends WebSocket pings automatically and closes connections that have been silent for 120 seconds. Standard WebSocket clients answer pings on their own, so no application-level keepalive is needed.
+
+## Examples
+
+<CodeGroup>
+```python Python
+import asyncio
+import json
+import os
+
+import websockets
+
+
+async def main():
+    headers = {"Authorization": f"Bearer {os.environ['VAST_API_KEY']}"}
+    async with websockets.connect("wss://run.vast.ai/ws/workers/", additional_headers=headers) as ws:
+        await ws.send(json.dumps({"action": "subscribe", "type": "endpoint", "id": 12345}))
+        async for raw in ws:
+            msg = json.loads(raw)
+            if msg.get("type") == "endpoint_workers":
+                states = [w["status"] for w in msg["workers"]]
+                print(msg["timestamp"], states)
+            else:
+                print(msg)
+
+
+asyncio.run(main())
+```
+
+```javascript JavaScript
+const ws = new WebSocket(`wss://run.vast.ai/ws/workers/?api_key=${apiKey}`);
+
+ws.onopen = () => {
+  ws.send(JSON.stringify({ action: "subscribe", type: "endpoint", id: 12345 }));
+};
+
+ws.onmessage = (event) => {
+  const msg = JSON.parse(event.data);
+  if (msg.type === "endpoint_workers") {
+    console.log(msg.timestamp, msg.workers.map((w) => w.status));
+  } else {
+    console.log(msg);
+  }
+};
+```
+</CodeGroup>
+
+The Python example uses the [`websockets`](https://websockets.readthedocs.io/) library, version 14 or later.

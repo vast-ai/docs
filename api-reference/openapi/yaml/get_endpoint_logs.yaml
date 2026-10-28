@@ -11,9 +11,11 @@ paths:
         description: Production server
       summary: get endpoint logs
       description: |
-        Retrieves logs for a specific endpoint by name.
+        Retrieves logs for a specific endpoint, identified by ID or by name.
 
-        CLI Usage: `vastai get endpoint logs <endpoint_name> [--tail <num_lines>]`
+        The response contains one string per log level. Each level keeps up to about 16 MB of recent history; use `tail` to choose how much of it to return.
+
+        CLI Usage: `vastai get endpt-logs <id> [--level <0-3>] [--tail <bytes>]`
       security:
       - BearerAuth: []
       requestBody:
@@ -22,18 +24,22 @@ paths:
           application/json:
             schema:
               type: object
-              required:
-              - endpoint
               properties:
+                id:
+                  type: integer
+                  description: ID of the endpoint. Either `id` or `endpoint` is required.
+                  example: 12345
+                  minimum: 1
                 endpoint:
                   type: string
-                  description: Name of the endpoint
+                  description: Name of the endpoint. Either `id` or `endpoint` is required.
                   example: vLLM-Qwen3-8B
                 tail:
                   type: integer
-                  description: Number of log lines to retrieve from the end
+                  description: Number of bytes to return from the end of each log
                   default: 10000
-                  example: 1000
+                  example: 100000
+                  minimum: 1
       responses:
         '200':
           description: Successfully retrieved endpoint logs.
@@ -44,14 +50,26 @@ paths:
                 - title: Success - Logs Retrieved
                   type: object
                   properties:
-                    logs:
+                    info0:
                       type: string
-                      description: The endpoint logs
-                      example: "2023-10-01 12:00:00 - Worker started\n2023-10-01 12:01:00 - Request processed"
+                      description: User log, shown as **User** in the console. Worker creation, starts, stops, state changes with their reasons, worker errors, and PyWorker stack traces.
+                      example: "Worker 67890: model_loading -> idle (received loadtime)\n"
+                    info1:
+                      type: string
+                      description: Info-level engine log, shown as **Info** in the console. Includes the user log plus additional scaling details.
+                    debug:
+                      type: string
+                      description: Debug-level engine log
+                    trace:
+                      type: string
+                      description: Trace-level engine log, the most detailed level
                 - title: Error Response
-                  type: string
-                  description: Error message when endpoint not found or authentication fails
-                  example: "authenticate_endpoint_apikey: invalid api_key or endpoint vLLM-Qwen3-8B not found"
+                  type: object
+                  properties:
+                    error_msg:
+                      type: string
+                      description: Returned when the endpoint does not exist or the API key does not own it
+                      example: "endpoint 12345 does not exist or unauthorized"
       tags:
       - Serverless
 components:
@@ -61,8 +79,8 @@ components:
       scheme: bearer
       description: API key must be provided in the Authorization header
 x-cli-commands:
-- name: get endpoint logs
+- name: get endpt-logs
   description: Retrieve logs for a specific endpoint
   endpoint: /get_endpoint_logs/
   method: POST
-  example: 'curl -X POST https://run.vast.ai/get_endpoint_logs/ -H "Authorization: Bearer YOUR_API_KEY" -H "Content-Type: application/json" -d ''{"endpoint": "your_endpoint_name", "tail": 1000}'''
+  example: 'curl -X POST https://run.vast.ai/get_endpoint_logs/ -H "Authorization: Bearer YOUR_API_KEY" -H "Content-Type: application/json" -d ''{"id": 12345, "tail": 100000}'''

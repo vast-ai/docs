@@ -16,13 +16,16 @@ When creating or editing an endpoint, parameters are split into two sections. Th
 
 ### Max Workers (`max_workers`)
 
-A hard upper limit on the total number of workers (active and inactive) that the endpoint can have at any given time.
+The upper limit on the total number of workers (active and inactive) that the serverless engine will recruit for the endpoint. The worker count can briefly exceed this limit in two cases:
 
-If not specified during endpoint creation, the default value is `16`.
+- During a rolling update, the engine may add up to 10% more workers (at least one) so the endpoint keeps its capacity while workers are replaced.
+- A replacement worker that is being prepared for a worker whose rental contract is ending is not counted until it takes over. See [Workers with a Contract End Date](/guides/serverless/managing-scale#workers-with-a-contract-end-date).
 
-### Minimum Workers (`min_workers`)
+If not specified during endpoint creation, the default value is `20`. The console pre-fills `16`.
 
-The minimum number of workers (workers with the model loaded) that the serverless engine will maintain. This includes active and inactive workers.
+### Minimum Workers (`cold_workers`)
+
+The minimum number of workers that the serverless engine will maintain. This includes active and inactive workers. When scaling down, the engine never destroys workers below this number.
 
 If not specified during endpoint creation, the default value is `5`.
 
@@ -40,13 +43,15 @@ During endpoint configuration, `min_load` is used to set the target minimum numb
 
 ### Best practice for setting `min_load`
 
-- Start with `min_load = 1` (the default), which guarantees at least one active worker
+- Start with `min_load = 1` (the value the console pre-fills), which guarantees at least one active worker
 - Run the benchmark test to determine measured performance
 - Update `min_load` using the following formula:
 
 ```
 measured_performance × minimum_parallel_requests
 ```
+
+If not specified during endpoint creation, the default value is `0`, which allows the endpoint to scale to zero active workers. The console pre-fills `1`.
 
 ### Target Utilization (`target_util`)
 
@@ -76,7 +81,7 @@ The following parameters are available under the **Advanced** section of the end
 
 ### Cold Multiplier (`cold_mult`)
 
-While `min_workers` is fixed regardless of traffic patterns, `cold_mult` defines inactive capacity as a multiplier of the current active workload.
+While `cold_workers` is fixed regardless of traffic patterns, `cold_mult` defines inactive capacity as a multiplier of the current active workload.
 
 #### Example
 
@@ -89,37 +94,33 @@ For an active load of `100` and `cold_mult = 2`:
 
 If the active load increases to `150` with `cold_mult = 2`, the serverless engine will attempt to maintain `150` inactive load.
 
-If not specified during endpoint creation, the default value is `3`.
+If not specified during endpoint creation, the default value is `3`. The `vastai create endpoint` CLI command and the SDK's `create_endpoint()` send `2.5` unless you set a value.
 
 ### Minimum Cold Load (`min_cold_load`)
 
-`min_cold_load` sets the total capacity target directly, independent of `cold_mult`.
+`min_cold_load` sets a floor on the load used to size the total pool of workers (active and inactive). The serverless engine sizes the total pool from the larger of the endpoint's long-term average load, `min_load`, and `min_cold_load`, then applies `target_util` and `cold_mult` to it.
 
 #### Example
 
-For an active load of `100` and `min_cold_load = 300`:
+With `min_cold_load = 300`, `target_util = 1`, and `cold_mult = 2`, while the long-term average load is below `300`:
 
 ```
-300 − 100 = 200 inactive load
+300 (min_cold_load) × 2 (cold_mult) = 600 total capacity
 ```
 
-If active load increases to `150` with the same `min_cold_load`, inactive capacity becomes `150`.
+Once the long-term average load rises above `300`, it replaces `min_cold_load` in this calculation.
 
 If not specified during endpoint creation, the default value is `0`.
 
 ### Inactivity Timeout (`inactivity_timeout`)
 
-An optional value (in seconds) that gates scaling to zero on the time elapsed since the last activity on the endpoint. After the specified duration of inactivity, the serverless engine is permitted to scale down to zero active workers or zero total workers, depending on your other parameter settings:
+An optional number of seconds, greater than `0`. Once the endpoint has had no queued or in-progress requests for this long, the serverless engine treats its short-term demand as zero and stops active workers down to the `min_load` floor. With `min_load = 0`, this means zero active workers.
 
-- If `cold_workers` is set (e.g., `5`), the endpoint will never scale below that number of total workers, but can reach zero **active** workers after the timeout.
-- If `min_load` is greater than `0`, you will not reach zero active workers even after the timeout, `min_load` still acts as a floor.
-- If both `cold_workers = 0` and `min_load = 0`, the endpoint can scale to **zero total workers** after the inactivity timeout.
+The timeout only affects active workers. The number of inactive workers is based on the endpoint's long-term average demand, `cold_workers`, and `min_cold_load`, so inactive workers are removed gradually afterward rather than at the timeout. See [Scaling to Zero](/guides/serverless/managing-scale#scaling-to-zero).
 
-Special values:
-- `0`, Disable inactivity gating entirely. The endpoint scales purely based on normal autoscaling decisions.
-- Negative value (e.g., `-1`), Never allow scaling to zero, even if `min_load` and `cold_workers` would otherwise permit it.
+Without an inactivity timeout, active workers still scale down as short-term demand fades after traffic stops. Setting a timeout guarantees that no active capacity above `min_load` is kept once the endpoint has been idle for that long.
 
-If not specified during endpoint creation, this parameter is not applied.
+If not specified during endpoint creation, no inactivity timeout is applied. Once set, the timeout can be changed to another positive value but cannot be removed.
 
 ### Max Queue Time (`max_queue_time`)
 
@@ -127,7 +128,7 @@ The maximum number of seconds of expected queue time allowed to build up on each
 
 This parameter controls how much work can be buffered on each worker before the system considers the worker "full" for routing purposes.
 
-If not specified during endpoint creation, a system default is applied.
+If not specified during endpoint creation, the default value is `30` seconds.
 
 ### Target Queue Time (`target_queue_time`)
 
@@ -138,4 +139,4 @@ In practice, `max_queue_time` defines how much each worker can absorb, while `ta
 - **`max_queue_time`**, Per-worker routing limit. "How full can each worker get?"
 - **`target_queue_time`**, Endpoint-wide scaling trigger. "At what queue time do we start adding workers?"
 
-If not specified during endpoint creation, a system default is applied.
+If not specified during endpoint creation, the default value is `10` seconds. `target_queue_time` must not be greater than `max_queue_time`.

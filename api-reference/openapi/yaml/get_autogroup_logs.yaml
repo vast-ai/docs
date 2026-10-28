@@ -13,7 +13,9 @@ paths:
       description: |
         Retrieves logs for a specific workergroup by ID.
 
-        CLI Usage: `vastai get workergroup logs <id> [--tail <num_lines>]`
+        The response contains one string per log level. Each level keeps up to about 16 MB of recent history; use `tail` to choose how much of it to return.
+
+        CLI Usage: `vastai get wrkgrp-logs <id> [--level <0-3>] [--tail <bytes>]`
       security:
       - BearerAuth: []
       requestBody:
@@ -27,15 +29,15 @@ paths:
               properties:
                 id:
                   type: integer
-                  description: ID of the worker group
+                  description: ID of the workergroup
                   default: 12345
                   example: 12345
                   minimum: 1
                 tail:
                   type: integer
-                  description: Number of log lines to retrieve from the end
+                  description: Number of bytes to return from the end of each log
                   default: 10000
-                  example: 1000
+                  example: 100000
                   minimum: 1
       responses:
         '200':
@@ -47,14 +49,26 @@ paths:
                 - title: Success - Logs Retrieved
                   type: object
                   properties:
-                    logs:
+                    info0:
                       type: string
-                      description: The workergroup logs
-                      example: "2023-10-01 12:00:00 - Workergroup started\n2023-10-01 12:01:00 - Instance scaled up"
+                      description: User log, shown as **User** in the console. Worker creation, starts, stops, state changes with their reasons, worker errors, and PyWorker stack traces.
+                      example: "Worker 67890: model_loading -> idle (received loadtime)\n"
+                    info1:
+                      type: string
+                      description: Info-level engine log, shown as **Info** in the console. Includes the user log plus additional scaling details.
+                    debug:
+                      type: string
+                      description: Debug-level engine log
+                    trace:
+                      type: string
+                      description: Trace-level engine log, the most detailed level
                 - title: Error Response
-                  type: string
-                  description: Error message when workergroup not found or authentication fails
-                  example: "authenticate_workergroup_apikey: invalid api_key or workergroup 12345 not found"
+                  type: object
+                  properties:
+                    error_msg:
+                      type: string
+                      description: Returned when the workergroup does not exist or the API key does not own it
+                      example: "autogroup 12345 not found or unauthorized"
       tags:
       - Serverless
 components:
@@ -64,8 +78,8 @@ components:
       scheme: bearer
       description: API key must be provided in the Authorization header
 x-cli-commands:
-- name: get workergroup logs
+- name: get wrkgrp-logs
   description: Retrieve logs for a specific workergroup
   endpoint: /get_workergroup_logs/
   method: POST
-  example: 'curl -X POST https://run.vast.ai/get_workergroup_logs/ -H "Authorization: Bearer YOUR_API_KEY" -H "Content-Type: application/json" -d ''{"id": 12345, "tail": 1000}'''
+  example: 'curl -X POST https://run.vast.ai/get_workergroup_logs/ -H "Authorization: Bearer YOUR_API_KEY" -H "Content-Type: application/json" -d ''{"id": 12345, "tail": 100000}'''
