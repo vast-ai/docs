@@ -670,6 +670,142 @@ paths:
       tags:
       - Machines
       operationId: cleanupMachine
+  /api/v0/machines/overrides/clear:
+    post:
+      summary: clear machine override
+      operationId: clearMachineOverride
+      description: 'Removes a value set with `set machine override`. For `geolocation`
+        the detected location is restored
+
+        immediately; `inet_up` and `inet_down` return to the latest speed test. A
+        value set by an admin can only
+
+        be cleared by an admin.
+
+
+        CLI Usage: `vastai clear machine-override <field> [--ids 1,2] [--host-id ID]
+        [--reason TEXT]`'
+      security:
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - field
+              properties:
+                field:
+                  type: string
+                  enum:
+                  - geolocation
+                  - inet_up
+                  - inet_down
+                  description: The machine field. `geolocation` can be set by the
+                    machine's host; `inet_up` and `inet_down` (Mbps) need an admin.
+                machine_ids:
+                  type: array
+                  items:
+                    type: integer
+                  minItems: 1
+                  description: The machines to change. Omit to apply to all of the
+                    host's machines. IDs that are not the host's are skipped and listed
+                    in `skipped_machine_ids`.
+                host_id:
+                  type: integer
+                  description: The host whose machines to change. Defaults to the
+                    caller; another host's machines need an admin.
+                reason:
+                  type: string
+                  maxLength: 500
+                  description: Why the value is changed. Required when an admin makes
+                    the change; recorded in the audit log.
+            example:
+              field: geolocation
+              machine_ids:
+              - 12345
+      responses:
+        '200':
+          description: Success response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  field:
+                    type: string
+                    example: geolocation
+                  machine_ids:
+                    type: array
+                    items:
+                      type: integer
+                    description: Machines whose override was removed.
+                    example:
+                    - 12345
+                  target_machine_ids:
+                    type: array
+                    items:
+                      type: integer
+                    description: All machines the request targeted.
+                  restored:
+                    type: object
+                    additionalProperties: true
+                    description: The automatic value restored per machine ID, where
+                      it could be re-derived now (geolocation).
+                  locked_machine_ids:
+                    type: array
+                    items:
+                      type: integer
+                    description: Machines whose value was set by Vast support; a host
+                      cannot change or clear it.
+                  skipped_machine_ids:
+                    type: array
+                    items:
+                      type: integer
+                    description: Requested IDs that are not the host's machines.
+                  msg:
+                    type: string
+                    example: Cleared the geolocation override on 1 machine(s).
+        '400':
+          description: "Bad Request \u2014 an unknown field, a value of the wrong\
+            \ type, a geolocation that is not \"Region, CC\", an admin write without\
+            \ `reason`, or no matching machines."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: "Forbidden \u2014 another host's machines, or `inet_up`/`inet_down`,\
+            \ need an admin."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: "Conflict \u2014 the machines' overrides changed while the\
+            \ request ran; retry."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      tags:
+      - Machines
   /api/v0/auth/apikeys:
     post:
       summary: create api-key
@@ -7202,6 +7338,149 @@ paths:
       tags:
       - Machines
       operationId: setDefjob
+  /api/v0/machines/overrides/set:
+    post:
+      summary: set machine override
+      operationId: setMachineOverride
+      description: "Sets a manual value for a machine field. A machine's location\
+        \ normally comes from an IP lookup of its\nconnection, and its bandwidth from\
+        \ speed tests; an override replaces that value everywhere it is shown\nand\
+        \ searched, and automatic updates keep it until it is cleared.\n\n- `geolocation`:\
+        \ the machine's host can set it, e.g. when the machine connects through a\
+        \ VPN or proxy\n  and is listed in the wrong place. The value is `\"Region,\
+        \ CC\"` for the US, China, Canada and Russia\n  (e.g. `\"Guangdong, CN\"`)\
+        \ or `\"Country, CC\"` elsewhere (e.g. `\"Germany, DE\"`).\n- `inet_up` /\
+        \ `inet_down`: upload and download bandwidth in Mbps; admins only.\n\nA value\
+        \ an admin sets is locked: the host cannot change or clear it. Every change\
+        \ is recorded in the\naudit log.\n\nCLI Usage: `vastai set machine-override\
+        \ <field> <value> [--ids 1,2] [--host-id ID] [--reason TEXT]`"
+      security:
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - field
+              - value
+              properties:
+                field:
+                  type: string
+                  enum:
+                  - geolocation
+                  - inet_up
+                  - inet_down
+                  description: The machine field. `geolocation` can be set by the
+                    machine's host; `inet_up` and `inet_down` (Mbps) need an admin.
+                machine_ids:
+                  type: array
+                  items:
+                    type: integer
+                  minItems: 1
+                  description: The machines to change. Omit to apply to all of the
+                    host's machines. IDs that are not the host's are skipped and listed
+                    in `skipped_machine_ids`.
+                host_id:
+                  type: integer
+                  description: The host whose machines to change. Defaults to the
+                    caller; another host's machines need an admin.
+                reason:
+                  type: string
+                  maxLength: 500
+                  description: Why the value is changed. Required when an admin makes
+                    the change; recorded in the audit log.
+                value:
+                  oneOf:
+                  - type: string
+                  - type: number
+                  description: The value. A string `"Region, CC"` or `"Country, CC"`
+                    for `geolocation`; a number of Mbps (greater than 0, below 100000)
+                    for `inet_up`/`inet_down`.
+                  example: Guangdong, CN
+            example:
+              field: geolocation
+              value: Guangdong, CN
+              machine_ids:
+              - 12345
+              - 12346
+      responses:
+        '200':
+          description: Success response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  field:
+                    type: string
+                    example: geolocation
+                  value:
+                    description: The stored value, normalized (e.g. a country name
+                      filled in from its code).
+                    example: Guangdong, CN
+                  machine_ids:
+                    type: array
+                    items:
+                      type: integer
+                    description: Machines the value was set on.
+                    example:
+                    - 12345
+                    - 12346
+                  locked_machine_ids:
+                    type: array
+                    items:
+                      type: integer
+                    description: Machines whose value was set by Vast support; a host
+                      cannot change or clear it.
+                  skipped_machine_ids:
+                    type: array
+                    items:
+                      type: integer
+                    description: Requested IDs that are not the host's machines.
+                  msg:
+                    type: string
+                    example: Set geolocation to 'Guangdong, CN' on 2 machine(s).
+        '400':
+          description: "Bad Request \u2014 an unknown field, a value of the wrong\
+            \ type, a geolocation that is not \"Region, CC\", an admin write without\
+            \ `reason`, or no matching machines."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: "Forbidden \u2014 another host's machines, or `inet_up`/`inet_down`,\
+            \ need an admin."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: "Conflict \u2014 the machines' overrides changed while the\
+            \ request ran; retry."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      tags:
+      - Machines
   /api/v0/machines/{machine_id}/minbid:
     put:
       summary: set min-bid

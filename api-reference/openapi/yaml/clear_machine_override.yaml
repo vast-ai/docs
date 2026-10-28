@@ -1,0 +1,150 @@
+openapi: 3.0.0
+info:
+  title: Vast.ai Machine Overrides API
+  description: Remove a manual machine field value so automatic detection takes over again.
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/machines/overrides/clear/:
+    post:
+      summary: clear machine override
+      operationId: clearMachineOverride
+      description: |
+        Removes a value set with `set machine override`. For `geolocation` the detected location is restored
+        immediately; `inet_up` and `inet_down` return to the latest speed test. A value set by an admin can only
+        be cleared by an admin.
+
+        CLI Usage: `vastai clear machine-override <field> [--ids 1,2] [--host-id ID] [--reason TEXT]`
+      security:
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [field]
+              properties:
+                field:
+                  type: string
+                  enum: [geolocation, inet_up, inet_down]
+                  description: The machine field. `geolocation` can be set by the machine's host; `inet_up` and `inet_down` (Mbps) need an admin.
+                machine_ids:
+                  type: array
+                  items:
+                    type: integer
+                  minItems: 1
+                  description: The machines to change. Omit to apply to all of the host's machines. IDs that are not the host's are skipped and listed in `skipped_machine_ids`.
+                host_id:
+                  type: integer
+                  description: The host whose machines to change. Defaults to the caller; another host's machines need an admin.
+                reason:
+                  type: string
+                  maxLength: 500
+                  description: Why the value is changed. Required when an admin makes the change; recorded in the audit log.
+            example:
+              field: geolocation
+              machine_ids: [12345]
+      responses:
+        '200':
+          description: Success response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  field:
+                    type: string
+                    example: geolocation
+                  machine_ids:
+                    type: array
+                    items:
+                      type: integer
+                    description: Machines whose override was removed.
+                    example: [12345]
+                  target_machine_ids:
+                    type: array
+                    items:
+                      type: integer
+                    description: All machines the request targeted.
+                  restored:
+                    type: object
+                    additionalProperties: true
+                    description: The automatic value restored per machine ID, where it could be re-derived now (geolocation).
+                  locked_machine_ids:
+                    type: array
+                    items:
+                      type: integer
+                    description: Machines whose value was set by Vast support; a host cannot change or clear it.
+                  skipped_machine_ids:
+                    type: array
+                    items:
+                      type: integer
+                    description: Requested IDs that are not the host's machines.
+                  msg:
+                    type: string
+                    example: Cleared the geolocation override on 1 machine(s).
+        '400':
+          description: Bad Request — an unknown field, a value of the wrong type, a geolocation that is not "Region, CC", an admin write without `reason`, or no matching machines.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden — another host's machines, or `inet_up`/`inet_down`, need an admin.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict — the machines' overrides changed while the request ran; retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      tags:
+      - Machines
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: API key must be provided in the Authorization header
+  schemas:
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+        msg:
+          type: string
+x-rate-limit:
+  threshold: 2
+  per: request
+  description: Maximum request frequency per IP address for this endpoint
+x-cli-commands:
+- name: clear machine-override
+  description: Remove a manual machine field value so automatic detection takes over.
+  endpoint: /api/v0/machines/overrides/clear/
+  method: post
+  example: vastai clear machine-override geolocation --ids 12345
