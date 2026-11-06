@@ -1,0 +1,124 @@
+---
+title: "Custom Docker images for GB200"
+---
+
+GB200 systems pair Blackwell GPUs with Arm-based Grace CPUs. This guide shows how to check your Docker image, publish an Arm version alongside your existing x86 version, and test it on GB200.
+
+**Draft for technical review.** The commands have been checked against documentation. This example has not yet been built or tested on GB200.
+
+## **Prerequisites**
+
+- Docker with Buildx and a builder configured for linux/amd64 and linux/arm64.
+- A container registry account with permission to publish your image.
+- Your application files and Dockerfile.
+- A [Vast.ai](http://Vast.ai) account for testing on a GB200 instance.
+
+## **1- Check your existing image**
+
+On your development machine, inspect the exact image tag you use. Replace the example name below with your own registry namespace, image and tag.
+
+**Bash**
+
+docker buildx imagetools inspect your-account/your-image:tag
+
+Look for linux/arm64 in the listed platforms. linux/amd64 is the x86 version. If Arm is already listed, you can move to runtime testing, but still check that your framework and dependencies support Blackwell GPUs.
+
+A multi-platform image stores both versions under one tag. Docker automatically selects the version that matches the machine.
+
+## **2- Choose a base image with Arm support**
+
+Vast provides PyTorch images with AMD64 and ARM64 support. Start from a compatible image and add your application dependencies. This minimal Dockerfile follows the pattern in[ <u>Vast’s PyTorch image documentation</u>](https://github.com/vast-ai/base-image/blob/main/derivatives/pytorch/README.md).
+
+**Dockerfile**
+
+FROM vastai/pytorch:cuda-12.8.1-auto
+
+<br />
+
+RUN . /venv/main/bin/activate && \\
+
+    pip install --no-cache-dir transformers accelerate
+
+Save this as Dockerfile in your build directory, then add the files and packages your application needs. Check the exact base tag’s platforms before building.
+
+For a reproducible release, pin your dependencies and replace the moving auto tag with a tested image digest. Arm support alone does not guarantee that every CUDA or framework version supports GB200.
+
+## **3- Review your dependencies**
+
+A compatible base image is the starting point. Review your Dockerfile and setup scripts for software that assumes an x86 machine.
+
+- **Downloaded executables.** Names containing x86_64 or amd64 often identify an x86 build. Select the corresponding Arm release for the Arm image.
+- **Python packages with compiled components.** Confirm that your selected versions provide Linux Arm64 builds, or check what is required to compile them from source.
+- **Files copied from your computer.** Copied binaries must match the target architecture. Rebuild native components for each target instead of copying an x86 build into both images.
+- **Custom CUDA extensions.** Check compatibility with the Blackwell GPU architecture as well as the Arm CPU architecture.
+
+Simple applications may need only packaging changes. An application with unsupported native dependencies can require additional development work.
+
+## **4- Build and publish both versions**
+
+Use a Docker Buildx builder configured for both target platforms. Docker Desktop includes emulation support; other environments may need builder setup. See[ <u>Docker’s multi-platform build guide</u>](https://docs.docker.com/build/building/multi-platform/).
+
+Sign in to your container registry, then run this command from the directory containing your Dockerfile. Replace the image name with a registry location you can publish to.
+
+**Bash**
+
+docker buildx build \\
+
+  --platform linux/amd64,linux/arm64 \\
+
+  -t your-account/your-image:tag \\
+
+  --push .
+
+This command builds and uploads both versions. Builds that compile dependencies under emulation can take substantially longer than native builds.
+
+Inspect the published tag to confirm that both platforms are present.
+
+**Bash**
+
+docker buildx imagetools inspect your-account/your-image:tag
+
+Next, use the published image in your Vast template. Successful builds confirm packaging; the next step checks execution on the actual hardware.
+
+## **5- Test on GB200**
+
+Launch a GB200 instance using your published image and an appropriate Vast template. For an image derived from Vast’s PyTorch image, run the following inside the instance.
+
+**Bash**
+
+```bash
+. /venv/main/bin/activate
+
+python - <<'PY'
+import platform
+import torch
+
+print("CPU architecture:", platform.machine())
+print("PyTorch:", torch.__version__)
+assert torch.cuda.is_available(), "CUDA is unavailable"
+
+print("GPU:", torch.cuda.get_device_name(0))
+x = torch.randn(64, 64, device="cuda")
+result = x @ x
+torch.cuda.synchronize()
+print("GPU operation passed:", tuple(result.shape))
+PY
+```
+
+Expect an Arm architecture such as aarch64, the GPU name and a successful matrix operation. Then run a representative task in your application. A CUDA check alone does not validate every dependency or workload.
+
+## **Troubleshooting**
+
+| **Symptom** | **What to check** |
+| :-- | :-- |
+| No matching manifest | The exact image tag may lack an Arm version. |
+| Exec format error | An executable or script interpreter may target the wrong architecture. |
+| Package will not install | The package version may lack Arm support or require a source build. |
+| GPU operations fail | Check the framework, CUDA and custom extensions for Blackwell compatibility. |
+
+## **Additional resources**
+
+- [<u>Vast PyTorch image documentation</u>](https://github.com/vast-ai/base-image/blob/main/derivatives/pytorch/README.md)
+- [<u>Docker multi-platform builds</u>](https://docs.docker.com/build/building/multi-platform/)
+- [<u>Docker image inspection reference</u>](https://docs.docker.com/reference/cli/docker/buildx/imagetools/inspect/)
+- [<u>NVIDIA framework support matrix</u>](https://docs.nvidia.com/deeplearning/frameworks/support-matrix/)
