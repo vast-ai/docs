@@ -2,7 +2,7 @@
 title: "Migrate from Runpod to Vast.ai"
 slug: "migrate-from-runpod"
 createdAt: "Mon Mar 17 2026 16:00:00 GMT+0000 (Coordinated Universal Time)"
-updatedAt: "Tue Mar 18 2026 16:00:00 GMT+0000 (Coordinated Universal Time)"
+updatedAt: "Tue Oct 27 2026 16:00:00 GMT+0000 (Coordinated Universal Time)"
 ---
 
 
@@ -20,13 +20,18 @@ A guide for users moving GPU workloads from Runpod to Vast.ai. Whether you use R
 5. **Often lower prices for the same GPU performance.** Marketplace competition drives prices down. You'll frequently find the same hardware at lower rates than fixed-tier providers.
 </Note>
 
+<Warning>
+Runpod is retiring the APIs that automation scripts use: rate limits on its GraphQL API start October 27, 2026, REST API v1 stops working November 15, 2026, and the GraphQL API stops working in January 2027. If your code calls these APIs, see [Migrating API Code](#migrating-api-code).
+</Warning>
+
 ## In This Guide
 
 1. [Concept Mapping](#concept-mapping): Runpod terms → Vast equivalents
 2. [Account Setup](#account-setup)
 3. **[Migrating from Pods](#migrating-from-pods)**: instances, Docker config, storage, networking, SSH, logs, lifecycle/cost
 4. **[Migrating from Serverless](#migrating-from-serverless)**: endpoints, PyWorker
-5. [CLI Reference](#cli-reference): full side-by-side table
+5. **[Migrating API Code](#migrating-api-code)**: Runpod API retirement, four-step migration, tested examples, reference tables, instructions for AI agents
+6. [CLI Reference](#cli-reference): full side-by-side table
 
 ## Concept Mapping
 
@@ -687,6 +692,503 @@ asyncio.run(main())
   </Card>
 </CardGroup>
 
+## Migrating API Code
+
+Runpod is retiring its REST API v1 and its GraphQL API, so code that calls either one has to be updated. This section shows how to move that code to Vast.ai using the `vastai` CLI, the Python SDK or the REST API. Commands were checked against `vastai` 1.9.1.
+
+**Scope:** this section covers code that manages Runpod **pods** (Vast calls them **instances**): finding a GPU, creating it, running work on it, moving files and deleting it. Moving **Serverless endpoints** or **network volumes** takes separate work; see [Migrating from Serverless](#migrating-from-serverless) and [Storage](#storage).
+
+Requests to a running Runpod Serverless endpoint don't use the retiring APIs, but creating and managing endpoints through REST v1 or GraphQL does.
+
+### What Runpod Is Changing
+
+| Date | Change |
+|---|---|
+| October 27, 2026 | Rate limits start on the GraphQL API (`api.runpod.io/graphql`) |
+| November 15, 2026 | REST API v1 (`rest.runpod.io/v1`) stops serving requests |
+| January 2027 | The GraphQL API stops serving requests |
+
+Pods and endpoints that are already running are not affected; only code that calls these APIs is. Runpod's replacement, REST API v2, has new paths and response shapes, so the code has to be rewritten either way. Recent versions of the `runpod` Python SDK already use the new API for pod commands, and `runpodctl` has a new command set, so if you only use those tools, updating them may be enough. Sources: [Runpod Q3 2026 update](https://www.runpod.io/blog/runpod-q3-2026-releases), [Runpod migration guide](https://docs.runpod.io/api-reference-v2/migrate-from-v1).
+
+### Use a Coding Agent
+
+Open your project in your coding agent (Claude Code, Codex, Cursor or another agent) and paste:
+
+```text
+Migrate this project's Runpod integration to Vast.ai using
+https://docs.vast.ai/examples/migrations/runpod-to-vast#migrating-api-code
+Follow the "Instructions for AI agents" part of that section.
+Keep the program's behavior the same.
+Ask me before you rent any GPU, and tell me the hourly price first.
+```
+
+### Migrate in Four Steps
+
+#### Step 1: Set Up Your Account
+
+1. Create an account at [cloud.vast.ai](https://cloud.vast.ai) and add credit on the [Billing page](https://cloud.vast.ai/billing/). Vast is prepaid and bills per second.
+2. Create a new API key on the [Keys page](https://cloud.vast.ai/manage-keys/). Your Runpod key does not work on Vast.
+3. Install the CLI (it includes the Python SDK), sign in and register your SSH public key:
+
+```bash
+pip install vastai
+vastai set api-key YOUR_VAST_API_KEY
+vastai show user                                        # confirms the key works and shows your balance
+vastai create ssh-key "$(cat ~/.ssh/id_ed25519.pub)"    # pass the key's contents, not the file name
+```
+
+In scripts and CI, store the Vast key as the `VAST_API_KEY` environment variable or secret.
+
+#### Step 2: Try One Instance
+
+```bash
+# Find offers under $0.60/hour, priced with a 30 GB disk. The first column is the offer ID.
+vastai search offers 'gpu_name=RTX_4090 num_gpus=1 reliability>0.98 direct_port_count>=1 dph_total<=0.60' --storage 30 -o dph_total --limit 5
+
+# Rent one. The reply's "new_contract" value is your instance ID.
+vastai create instance OFFER_ID --image vastai/pytorch:@vastai-automatic-tag --disk 30 --ssh --direct --cancel-unavail
+
+# Repeat until the status is "running", then print the SSH command
+vastai show instance INSTANCE_ID
+vastai ssh-url INSTANCE_ID
+
+# Delete it, then confirm it no longer appears in your list
+vastai destroy instance INSTANCE_ID -y
+vastai show instances
+```
+
+#### Step 3: Update Your Code
+
+On Runpod, one call finds a GPU and creates the pod. On Vast it takes two calls:
+
+1. `search offers` lists machines that match your requirements and price limit.
+2. `create instance` rents one of them.
+
+Search every time you launch, because an offer disappears once someone rents it. The [example migration](#example-migration-before-and-after) shows a complete Runpod program and its Vast replacement. Translate the rest of your calls with the [task map](#task-map).
+
+#### Step 4: Test, Then Clean Up
+
+Run your updated code once with one inexpensive GPU. Confirm that it creates the instance, reaches `running`, does its work, saves its results and deletes the instance. Then run `vastai show instances` and confirm nothing from the test is left, including stopped instances, which still bill for storage.
+
+### Example Migration: Before and After
+
+A small program that rents a GPU with a given image, environment variable, start command and HTTP port, waits for the job's output, saves it and deletes the GPU.
+
+#### Before: Runpod REST API v1
+
+```python
+import os, time, requests
+
+API = "https://rest.runpod.io/v1"
+HEADERS = {"Authorization": f"Bearer {os.environ['RUNPOD_API_KEY']}"}
+IMAGE = "pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime"
+START = ('mkdir -p /workspace/out && cd /workspace/out && '
+         'python -c "import torch; print(torch.cuda.get_device_name(0))" > report.txt && '
+         'echo "mode=$MODE" >> report.txt && python -m http.server 8000')
+
+pod = requests.post(f"{API}/pods", headers=HEADERS, json={
+    "name": "report-job",
+    "imageName": IMAGE,
+    "gpuTypeIds": ["NVIDIA GeForce RTX 4090"],
+    "gpuCount": 1,
+    "containerDiskInGb": 30,
+    "env": {"MODE": "fast"},
+    "ports": ["8000/http"],
+    "dockerStartCmd": ["bash", "-c", START],
+}).json()
+pod_id = pod["id"]
+
+try:
+    url = f"https://{pod_id}-8000.proxy.runpod.net/report.txt"
+    for _ in range(120):
+        try:
+            r = requests.get(url, timeout=10)
+            if r.ok:
+                open("report.txt", "w").write(r.text)
+                break
+        except requests.RequestException:
+            pass
+        time.sleep(10)
+finally:
+    requests.delete(f"{API}/pods/{pod_id}", headers=HEADERS)
+```
+
+#### After: Vast.ai Python SDK
+
+What changed: the search and the price limit (Runpod picks the machine for you), the unique label, `env` and `-p` instead of `env` and `ports`, `args` instead of `dockerStartCmd`, the port lookup instead of the proxy URL, and the checks that the instance started and was deleted.
+
+```python
+import os, secrets, time, requests
+from vastai import VastAI
+
+v = VastAI(api_key=os.environ["VAST_API_KEY"])
+IMAGE = "pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime"
+START = ('mkdir -p /workspace/out && cd /workspace/out && '
+         'python -c "import torch; print(torch.cuda.get_device_name(0))" > report.txt && '
+         'echo "mode=$MODE" >> report.txt && python -m http.server 8000')
+MAX_PRICE = 0.60                                   # dollars per hour, including the disk
+DISK_GB = 30
+LABEL = f"report-job-{secrets.token_hex(4)}"       # unique per run, so we can always find what we rented
+
+def my_instance_ids():
+    return [i["id"] for i in v.show_instances() if i.get("label") == LABEL]
+
+def rent():
+    offers = v.search_offers(
+        query=f"gpu_name=RTX_4090 num_gpus=1 reliability>0.98 direct_port_count>=1 dph_total<={MAX_PRICE}",
+        order="dph_total", limit=5, storage=DISK_GB)        # storage= prices the real disk size
+    for offer in offers:
+        try:
+            r = v.create_instance(id=offer["id"], image=IMAGE, disk=DISK_GB, label=LABEL,
+                                  env="-e MODE=fast -p 8000:8000", args=["bash", "-c", START],
+                                  cancel_unavail=True)
+            if r.get("new_contract"):
+                return r["new_contract"]
+            continue                                # Vast declined this offer: nothing was rented
+        except requests.HTTPError as e:
+            if e.response is not None and 400 <= e.response.status_code < 500:
+                continue                            # Vast declined this offer: nothing was rented
+        except requests.RequestException:
+            pass
+        # An uncertain create may have succeeded: look before renting again.
+        time.sleep(20)
+        found = my_instance_ids()
+        if found:
+            return found[0]
+        raise SystemExit(f"Rental result unknown and no instance labeled {LABEL} was found. "
+                         "Check https://cloud.vast.ai/instances/ before running again.")
+    raise SystemExit(f"No offer at or under ${MAX_PRICE}/hour could be rented")
+
+def destroy(instance_id):
+    v.destroy_instance(id=instance_id)
+    for _ in range(12):                             # confirm it's gone; a stopped instance still bills
+        if instance_id not in [i["id"] for i in v.show_instances()]:
+            return
+        time.sleep(5)
+    raise RuntimeError(f"Instance {instance_id} still exists. Check https://cloud.vast.ai/instances/")
+
+instance_id = rent()
+print(f"Rented instance {instance_id} ({LABEL})")
+try:
+    deadline = time.time() + 20 * 60                # give up after 20 minutes
+    saved = False
+    while not saved and time.time() < deadline:
+        inst = v.show_instance(id=instance_id) or {}
+        status = inst.get("actual_status")
+        if status in ("exited", "unknown", "offline"):
+            raise RuntimeError(f"Instance {instance_id} failed: {status}")
+        port = (inst.get("ports") or {}).get("8000/tcp")
+        if status == "running" and port:
+            url = f"http://{inst['public_ipaddr'].strip()}:{port[0]['HostPort']}/report.txt"
+            try:
+                r = requests.get(url, timeout=10)
+                if r.ok:
+                    open("report.txt", "w").write(r.text)
+                    saved = True
+            except requests.RequestException:
+                pass
+        if not saved:
+            time.sleep(10)
+    if not saved:
+        raise RuntimeError("Timed out waiting for report.txt")
+finally:
+    destroy(instance_id)    # this report is quick to recreate; see the bash example for keeping results
+print(open("report.txt").read())
+```
+
+This deletes the GPU even if the download failed, which is fine for a report you can recreate. For results that are expensive to rerun, keep the instance on failure, like the bash example does.
+
+### Example: Bash Batch Job
+
+Uploads sample input, runs a GPU job, downloads results and deletes the instance. Job/download failures keep the instance for recovery. Requires `vastai`, `jq`, `python3`, `ssh` and `scp`. Each transfer has a portable 1,800-second Python timeout; no local `timeout` utility is needed.
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+MAX_PRICE=0.60                  # dollars per hour, including the disk
+DISK_GB=30
+JOB_SECONDS=3600                # the job is stopped after this long
+QUERY="gpu_name=RTX_4090 num_gpus=1 reliability>0.98 direct_port_count>=1 dph_total<=$MAX_PRICE"
+IMAGE='vastai/pytorch:@vastai-automatic-tag'
+LABEL="my-job-$(date +%s)-$RANDOM"   # unique per run, so we can always find what we rented
+OPTS=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -o ServerAliveInterval=30 -o ServerAliveCountMax=4)
+mkdir -p inputs && echo "hello" > inputs/example.txt     # sample input: replace with your files
+
+scp_timeout() {
+  python3 -c 'import subprocess, sys; subprocess.run(["scp", *sys.argv[1:]], timeout=1800, check=True)' "$@"
+}
+
+mine() { vastai show instances --raw | jq -r --arg L "$LABEL" '.[] | select(.label == $L) | .id'; }
+
+# 1. Rent the cheapest offer under MAX_PRICE
+ID=""
+for OFFER in $(vastai search offers "$QUERY" --storage "$DISK_GB" -o dph_total --limit 5 --raw | jq -r '.[].id'); do
+  OUT=$(vastai create instance "$OFFER" --image "$IMAGE" --disk "$DISK_GB" --ssh --direct \
+          --cancel-unavail --label "$LABEL" --raw 2>&1) || true
+  ID=$(jq -r '.new_contract // empty' <<<"$OUT" 2>/dev/null) || true
+  [ -n "$ID" ] && break
+  # Vast declined the offer (for example, it was just taken): nothing was rented
+  if jq -e '.success == false or ((.status_code // 0) >= 400 and .status_code < 500)' <<<"$OUT" >/dev/null 2>&1; then
+    continue
+  fi
+  # An uncertain create may have succeeded: look before renting again.
+  sleep 20
+  ID=$(mine | head -n 1)
+  [ -n "$ID" ] && break
+  echo "Rental result unknown and no instance labeled $LABEL was found." >&2
+  echo "Check https://cloud.vast.ai/instances/ before running again." >&2
+  exit 1
+done
+[ -n "$ID" ] || { echo "No offer at or under \$$MAX_PRICE/hour could be rented" >&2; exit 1; }
+PRICE=$(vastai show instance "$ID" --raw | jq -r '.dph_total * 1000 | round / 1000')
+echo "Rented instance $ID ($LABEL) at \$$PRICE/hour"
+
+# 2. On exit, confirm deletion unless results need recovery
+KEEP=0
+cleanup() {
+  if [ "$KEEP" = 1 ]; then
+    echo "Kept instance $ID because its results weren't downloaded. It bills \$$PRICE/hour until you delete it." >&2
+    echo "Copy /workspace/outputs off it soon, then run: vastai destroy instance $ID -y" >&2
+    return
+  fi
+  vastai destroy instance "$ID" -y >/dev/null || true
+  CHECK=unknown
+  for _ in $(seq 12); do
+    LIST=$(vastai show instances --raw 2>/dev/null) || LIST=""
+    CHECK=unknown
+    if jq -e 'type == "array" and all(.[]; type == "object" and (.id | type == "number"))' <<<"$LIST" >/dev/null 2>&1; then
+      CHECK=listed
+      jq -e --argjson I "$ID" 'any(.[]; .id == $I)' <<<"$LIST" >/dev/null || return 0
+    fi
+    sleep 5
+  done
+  echo "Deletion not confirmed for instance $ID (last check: $CHECK). It may still bill. Check https://cloud.vast.ai/instances/" >&2
+  exit 1
+}
+trap cleanup EXIT
+
+# 3. Wait for "running" (up to 15 minutes)
+STATUS=""
+for _ in $(seq 90); do
+  STATUS=$(vastai show instance "$ID" --raw | jq -r '.actual_status')
+  [ "$STATUS" = "running" ] && break
+  case "$STATUS" in exited|unknown|offline) echo "Instance failed: $STATUS" >&2; exit 1;; esac
+  sleep 10
+done
+[ "$STATUS" = "running" ] || { echo "Timed out waiting for instance" >&2; exit 1; }
+
+# 4. Wait for SSH (up to 18 attempts, then a final check)
+read -r HOST PORT < <(vastai show instance "$ID" --raw | jq -r '"\(.ssh_host) \(.ssh_port)"')
+for _ in $(seq 18); do ssh "${OPTS[@]}" -p "$PORT" "root@$HOST" true 2>/dev/null && break; sleep 10; done
+ssh "${OPTS[@]}" -p "$PORT" "root@$HOST" true || { echo "SSH never came up on instance $ID" >&2; exit 1; }
+
+# 5. Upload, run the job with a time limit, download the results
+ssh "${OPTS[@]}" -p "$PORT" "root@$HOST" 'mkdir -p /workspace'    # not every image has /workspace
+scp_timeout "${OPTS[@]}" -P "$PORT" -r ./inputs "root@$HOST:/workspace/"
+KEEP=1
+ssh "${OPTS[@]}" -p "$PORT" "root@$HOST" "timeout $JOB_SECONDS bash -c \
+  'cd /workspace && mkdir -p outputs && nvidia-smi > outputs/gpu.txt && cp inputs/* outputs/'"
+scp_timeout "${OPTS[@]}" -P "$PORT" -r "root@$HOST:/workspace/outputs" ./
+KEEP=0
+echo "Results are in ./outputs"
+```
+
+### Reference Tables
+
+#### Task Map
+
+`ID` is a Vast instance ID (an integer). `OFFER_ID` comes from `search offers`. In Python, `v = VastAI()`.
+
+| Task | Runpod | Vast CLI | Vast Python SDK |
+|---|---|---|---|
+| Authenticate | `Authorization: Bearer KEY` · `runpod.api_key` | `vastai set api-key KEY`, or env `VAST_API_KEY` | `VastAI(api_key=KEY)`, or env `VAST_API_KEY` |
+| Find a GPU | GraphQL `gpuTypes` · `runpod.get_gpus()` | `vastai search offers 'gpu_name=RTX_4090 num_gpus=1 dph_total<=0.60' --storage 30 -o dph_total --raw` | `v.search_offers(query="gpu_name=RTX_4090 num_gpus=1 dph_total<=0.60", storage=30, order="dph_total")` |
+| Create a pod | `POST /v1/pods` · `podFindAndDeployOnDemand` · `runpod.create_pod()` · `runpodctl pod create` | `vastai create instance OFFER_ID --image IMG --disk 30 --ssh --direct --cancel-unavail --label NAME --raw` | `v.create_instance(id=OFFER_ID, image=IMG, disk=30, ssh=True, direct=True, cancel_unavail=True, label=NAME)` |
+| Create a spot pod | `"interruptible": true` · `podRentInterruptable` | `vastai search offers '...' --type bid --raw`, then `vastai create instance OFFER_ID --image IMG --bid_price MIN_BID` | `offer = v.search_offers(query=..., type="bid")[0]`, then `v.create_instance(..., bid_price=offer["min_bid"])` |
+| List pods | `GET /v1/pods` · `myself { pods }` · `runpod.get_pods()` · `runpodctl pod list` | `vastai show instances --raw` | `v.show_instances()` |
+| Get one pod | `GET /v1/pods/{podId}` · `pod(input: {podId})` · `runpod.get_pod()` · `runpodctl pod get` | `vastai show instance ID --raw` | `v.show_instance(id=ID)` |
+| Stop | `POST /v1/pods/{podId}/stop` · `podStop` · `runpod.stop_pod()` · `runpodctl pod stop` | `vastai stop instance ID` | `v.stop_instance(id=ID)` |
+| Start or resume | `POST /v1/pods/{podId}/start` · `podResume` · `runpod.resume_pod()` · `runpodctl pod start` | `vastai start instance ID` | `v.start_instance(id=ID)` |
+| Restart | `POST /v1/pods/{podId}/restart` | `vastai reboot instance ID` | `v.reboot_instance(id=ID)` |
+| Terminate | `DELETE /v1/pods/{podId}` · `podTerminate` · `runpod.terminate_pod()` · `runpodctl pod delete` | `vastai destroy instance ID -y`, then confirm it's gone with `vastai show instances --raw` | `v.destroy_instance(id=ID)`, then check `v.show_instances()` |
+| Rename | `PATCH /v1/pods/{podId}` with `name` | `vastai label instance ID NAME` | `v.label_instance(id=ID, label=NAME)` |
+| Change image or settings | `POST /v1/pods/{podId}/update` | `vastai update instance ID --image IMG` (recreates the container; see `--help` for env and onstart options) | `v.update_instance(id=ID, image=IMG)` |
+| View logs | Runpod console | `vastai logs ID --tail 100` | `v.logs(instance_id=ID, tail="100")` |
+| Get SSH details | Connect tab, or `publicIp` + `portMappings` | `vastai ssh-url ID` | `v.ssh_url(id=ID)` |
+| Run a command | SSH | `ssh -p PORT root@HOST 'COMMAND'` | `subprocess.run(["ssh", "-p", PORT, f"root@{HOST}", COMMAND])` |
+| Upload or download files | `runpodctl send` / `receive` | `scp -P PORT -r SRC DST`, or `vastai copy local:./data C.ID:/workspace/data` | `subprocess.run(["scp", "-P", PORT, "-r", SRC, DST])` |
+| Use a template | `templateId` | `vastai search templates 'pytorch'`, then `--template_hash HASH` | `v.create_instance(..., template_hash=HASH)` |
+| Account and balance | GraphQL `myself` · `runpod.get_user()` | `vastai show user` | `v.show_user()` |
+| Billing history | `GET /v1/billing/pods` | `vastai show invoices-v1` | `v.show_invoices_v1()` |
+
+- Add `--raw` to CLI commands for JSON output. `vastai COMMAND --help` lists every option.
+- Run `vastai show user` successfully once without `--curl` before using `--curl` to inspect a request. On a fresh configuration, role detection otherwise prints its account lookup and exits before reaching your command. After that initialization, `--curl` prints the command request without sending it; redact the API key before sharing the output.
+- `dph_total` in search results includes the disk only at the size you pass with `--storage` (default 5 GB). Pass your real disk size. Bandwidth is billed separately.
+- With `--raw`, a failed command prints `{"error": true, "status_code": ..., "msg": ...}` to stderr.
+- `vastai` exits with code 0 even when the request fails. Check the JSON (`new_contract`, `success`, `error`), not the exit code.
+- The CLI and SDK try each request up to 3 times when it times out, can't connect, or gets a 429, 502, 503 or 504 response, waiting as long as the server's `Retry-After` asks (up to 60 seconds). A 429 for the daily search quota is not retried; it resets at midnight UTC. If `create instance` still fails without a clear error, check for an instance with your label before you rent again.
+- `vastai execute` runs only `ls`, `rm` and `du`. Use SSH to run anything else.
+- The Python SDK's `copy()` does not transfer files to or from your computer. Use `scp`, or call the `vastai copy` CLI.
+
+#### REST API
+
+Base URL `https://console.vast.ai/api/v0`. Header `Authorization: Bearer $VAST_API_KEY`. To inspect a request, initialize the CLI with `vastai show user` once, then run the command with `--curl` (see the first-use caveat above).
+
+| Task | Request |
+|---|---|
+| Search offers | `POST /bundles/` with `{"gpu_name": {"eq": "RTX 4090"}, "num_gpus": {"eq": 1}, "dph_total": {"lte": 0.6}, "rentable": {"eq": true}, "verified": {"eq": true}, "external": {"eq": false}, "order": [["dph_total", "asc"]], "type": "on-demand", "allocated_storage": 30, "limit": 5}` |
+| Create an instance | `PUT /asks/{OFFER_ID}/` with `{"client_id": "me", "image": "IMAGE", "disk": 30, "env": {"KEY": "value", "-p 8000:8000": "1"}, "label": "NAME", "onstart": "COMMANDS", "runtype": "ssh_direc ssh_proxy", "cancel_unavail": true}`. Returns `{"success": true, "new_contract": ID}`. `ssh_direc` is spelled this way on purpose |
+| List instances | `GET https://console.vast.ai/api/v1/instances/` (note `v1`). Results are paged: pass the returned `next_token` back as `after_token` |
+| Get an instance | `GET /instances/{ID}/?owner=me` (the instance is in the `instances` field) |
+| Stop or start | `PUT /instances/{ID}/` with `{"state": "stopped"}` or `{"state": "running"}` |
+| Rename | `PUT /instances/{ID}/` with `{"label": "NAME"}` |
+| Destroy | `DELETE /instances/{ID}/` |
+| Change a spot bid | `PUT /instances/bid_price/{ID}/` with `{"client_id": "me", "price": 0.20}` |
+
+#### Pod Settings
+
+`N` is the number of GPUs. Runpod sets some limits per GPU; Vast filters on the machine total, so multiply.
+
+| Runpod field | Vast equivalent |
+|---|---|
+| `imageName` | `--image IMAGE` |
+| `name` | `--label NAME` |
+| `gpuTypeIds` | `gpu_name=...` in the search query ([GPU names](#gpu-names)) |
+| `gpuCount` | `num_gpus=N` in the search query |
+| `containerDiskInGb` | `--disk GB`, and the same number in the search's `--storage` so prices include it. It cannot be resized later |
+| `volumeInGb`, `volumeMountPath` | A larger `--disk`, or a Vast volume: `--create-volume VOLUME_OFFER_ID --volume-size GB --mount-path /data` |
+| `networkVolumeId` | No direct equivalent ([Differences](#differences-from-runpod)) |
+| `env` | `--env '-e KEY=value -e OTHER=value'` |
+| `ports` | `--env '-p 8000:8000'`. `--ssh` opens port 22 for you |
+| `dockerStartCmd` | Without `--ssh`: `--args ...` (must be the last option; SDK `args=[...]`). With `--ssh`: `--onstart-cmd 'COMMANDS'` |
+| `dockerEntrypoint` | `--entrypoint COMMAND` (CLI only, without `--ssh` or `--jupyter`) |
+| `templateId` | `--template_hash HASH` ([templates](https://cloud.vast.ai/templates/)) |
+| `containerRegistryAuthId` | `--login '-u USER -p TOKEN REGISTRY'` |
+| `cloudType: "SECURE"` | `datacenter=true` in the search query. This limits results to machines in datacenters. Check host requirements separately; this is not a one-to-one mapping to Runpod Secure Cloud |
+| `cloudType: "COMMUNITY"` | The default search |
+| `interruptible: true` | Search with `--type bid`, then create with `--bid_price` of at least the offer's `min_bid` |
+| `countryCodes`, `dataCenterIds` | `geolocation in [US,CA]` in the search query |
+| `allowedCudaVersions` | `cuda_vers>=12.4` in the search query |
+| `vcpuCount` | `cpu_cores_effective>=vcpuCount` |
+| `minVCPUPerGPU` | `cpu_cores_effective>=` (minVCPUPerGPU × N) |
+| `minRAMPerGPU` | `cpu_ram>=` (minRAMPerGPU × N), in GB |
+| `minDownloadMbps`, `minUploadMbps` | `inet_down>=...`, `inet_up>=...` |
+| `minDiskBandwidthMBps` | `disk_bw>=...` |
+| `supportPublicIp` | `direct_port_count>=1` in the search query, and `--direct` when you create |
+
+#### GPU Names
+
+Write GPU names with `_` in place of spaces. To pick a memory size, add `gpu_ram` (GB). To accept several models, use `gpu_name in [RTX_4090,RTX_5090]`.
+
+| Runpod `gpuTypeId` | Vast search query |
+|---|---|
+| `NVIDIA GeForce RTX 3090` / `4090` / `5090` | `gpu_name=RTX_3090` / `RTX_4090` / `RTX_5090` |
+| `NVIDIA RTX A6000` | `gpu_name=RTX_A6000` |
+| `NVIDIA RTX 6000 Ada Generation` | `gpu_name=RTX_6000Ada` |
+| `NVIDIA RTX PRO 6000 Blackwell Server Edition` | `gpu_name=RTX_PRO_6000_S` |
+| `NVIDIA RTX PRO 6000 Blackwell Workstation Edition` | `gpu_name=RTX_PRO_6000_WS` |
+| `NVIDIA RTX PRO 6000 Blackwell Max-Q Workstation Edition` | `gpu_name=RTX_PRO_6000_Max-Q` |
+| `NVIDIA L4` / `L40` / `L40S` | `gpu_name=L4` / `L40` / `L40S` |
+| `NVIDIA A40` | `gpu_name=A40` |
+| `NVIDIA A100 80GB PCIe` | `gpu_name=A100_PCIE gpu_ram>=79` |
+| `NVIDIA A100-SXM4-80GB` | `gpu_name=A100_SXM4 gpu_ram>=79` |
+| `NVIDIA A100-SXM4-40GB` | `gpu_name=A100_SXM4 gpu_ram<79` |
+| `NVIDIA H100 80GB HBM3` | `gpu_name=H100_SXM` |
+| `NVIDIA H100 PCIe` / `H100 NVL` | `gpu_name=H100_PCIE` / `H100_NVL` |
+| `NVIDIA H200` / `H200 NVL` | `gpu_name=H200` / `H200_NVL` |
+| `NVIDIA B200` / `B300 SXM6 AC` | `gpu_name=B200` / `B300` |
+
+If a query returns no offers, check the exact name in the GPU filter at [cloud.vast.ai/create](https://cloud.vast.ai/create/). A correct name can also return nothing when every machine with that GPU is rented; try again later or widen the search.
+
+#### Instance Fields and Status
+
+| Runpod pod field | Vast instance field (`show instance --raw`) |
+|---|---|
+| `id` (string) | `id` (integer). `create instance` returns it as `new_contract` |
+| `desiredStatus` (the state you asked for) | `intended_status` (the state you asked for) |
+| Pod is ready | `actual_status` is `running` (the state the machine reports; see below) |
+| `publicIp` | `public_ipaddr` |
+| `portMappings: {"8000": 41234}` | `ports: {"8000/tcp": [{"HostIp": "...", "HostPort": "41234"}]}` |
+| SSH host and port | `ssh_host`, `ssh_port` |
+| `costPerHr` | `dph_total` (dollars per hour) |
+| `name` | `label` |
+
+Always decide from `actual_status`. `intended_status` only says what was requested.
+
+| `actual_status` | Meaning | What to do |
+|---|---|---|
+| `null`, `created`, `loading` | Starting up | Keep waiting, with a time limit |
+| `running` | Ready. GPU charges apply | Connect |
+| `stopped` | Stopped. Storage still bills | Start it or destroy it |
+| `exited`, `unknown`, `offline` | Failed. It will not reach `running` | Destroy it and try another offer |
+
+#### Environment Variables Inside the Instance
+
+Vast documents these predefined variables in its [Docker execution environment guide](https://docs.vast.ai/guides/instances/docker-environment). Map the values your application needs rather than assuming Runpod's names also exist on Vast.
+
+| Runpod information | Vast variable |
+|---|---|
+| `RUNPOD_POD_ID` | `CONTAINER_ID` |
+| `RUNPOD_PUBLIC_IP` | `PUBLIC_IPADDR` (captured at startup; query instance metadata for a current address) |
+| `RUNPOD_TCP_PORT_22` | `VAST_TCP_PORT_22`; other mapped TCP ports use `VAST_TCP_PORT_X` |
+| `RUNPOD_GPU_COUNT` | `GPU_COUNT` |
+| CLI access from inside the instance | `CONTAINER_API_KEY`, scoped to that instance; not a replacement for your account key |
+| Datacenter or volume ID | No automatic mapping; review placement and storage separately |
+
+Set application variables explicitly, for example `--env '-e MODE=fast'`. In SSH/Jupyter launch modes, variables reach onstart but may be missing from login sessions. The documented onstart workaround is `env | grep _ >> /etc/environment;` for names containing underscores (or `env >> /etc/environment;` for all names). Vast-published images handle this in their entrypoint. Persist only the variables the session needs; do not print credentials to logs.
+
+#### Differences from Runpod
+
+1. **You choose the machine and the price.** Each offer has its own price, reliability, network speed and location. Put a price limit in the search (`dph_total<=...`) and pass your disk size with `--storage` so the price includes it.
+2. **Unavailable offers.** An offer can be rented by someone else between your search and your create. Pass `--cancel-unavail` so the create fails right away instead of leaving a stopped instance that bills for storage, then try the next offer.
+3. **SSH mode replaces the image's start command.** With `--ssh` or `--jupyter`, put your start command in `--onstart-cmd`. If your image needs its own entrypoint, leave out `--ssh` and use `--args` or `--entrypoint`.
+4. **Ports.** Runpod serves HTTP ports at `https://POD_ID-PORT.proxy.runpod.net`. Vast maps each port you open with `-p` to a public port on the machine's IP, over plain HTTP. Read the mapping from `ports` in `show instance --raw` or `VAST_TCP_PORT_X` inside the instance. The [Docker execution environment docs](https://docs.vast.ai/guides/instances/docker-environment#custom-ports) specify a limit of 64 total open ports per instance; the offer must also provide enough directly accessible ports.
+5. **Storage.** A Vast volume stays on the machine where it was created, so there is no network-volume equivalent. Keep data you need on any machine in object storage (S3, R2, GCS or Hugging Face), or use `vastai cloud copy`.
+6. **Billing.** Storage bills from creation and GPU time while `running`. A stopped instance still bills for storage; only destroying it stops all charges. Each machine sets its own bandwidth price (`inet_up_cost`, `inet_down_cost` in the offer).
+7. **Kept instances.** An instance you keep (for example, to recover results after a failed download) runs and bills until you destroy it. It can also end if the machine goes offline or its maximum rental period runs out (`duration` in the offer), so copy results off soon.
+8. **Spot instances.** You get a spot instance only when you pass `--bid_price`. If you are outbid, the instance stops (it is not deleted) and storage keeps billing. Change the bid with `vastai change bid ID --price PRICE`.
+9. **Images.** Most Runpod images run on Vast unchanged. Runpod pods mount `/workspace` for you; on Vast it exists only if the image creates it, so create it (`mkdir -p /workspace`) before you copy files there. Vast's images (`vastai/pytorch`, `vastai/vllm`, `vastai/comfy`, `vastai/base-image`) start fastest, and the `@vastai-automatic-tag` tag picks the right CUDA build for each machine.
+
+
+### Instructions for AI Agents
+
+Follow these instructions when you migrate a project from Runpod, or when you rent and manage Vast instances for a user.
+
+#### Rules for Managing Vast for a User
+
+1. **Get approval before spending.** Before creating an instance, show the user the GPU, the hourly price (`dph_total`, searched with `--storage` set to the real disk size), the expected run time and the most it can cost, and wait for a yes. Put the approved price limit in the search (`dph_total<=...`) so a fallback offer can't cost more. Stay within any budget the user gives.
+2. **Use the user's account API key and keep it secret.** The user creates a new key at [cloud.vast.ai/manage-keys](https://cloud.vast.ai/manage-keys/); Runpod keys don't work, and `CONTAINER_API_KEY` from inside an instance is not an account key. Read the key from `VAST_API_KEY` or the CLI's saved key. Never print it, log it, or write it into code or commits.
+3. **Give every run a unique label** (`--label`), record every instance ID, and report the IDs to the user.
+4. **Retry only clear refusals.** Create with `--cancel-unavail`. If Vast declines an offer (`"success": false`, or a 4xx error), try the next offer. If the result is unclear (timeout, 5xx, crash), list instances with your label first, use the instance if it exists, and otherwise stop and tell the user instead of renting again.
+5. **Bound every wait.** Polling, the job itself and file transfers all need time limits. Treat `exited`, `unknown` and `offline` as failures. Decide from `actual_status`, never from `intended_status`.
+6. **Protect the user's results.** Download results before destroying an instance. If a download fails, keep the instance and tell the user its ID, its hourly price and that it bills until deleted.
+7. **Always clean up, then confirm.** Destroy instances when their work is done and results are safe, including after errors. Then confirm each one no longer appears in `vastai show instances --raw`. Stopped instances count: they still bill for storage.
+8. **Only destroy instances you created**, unless the user names one.
+9. **Use machine-readable output.** Add `--raw` to CLI commands and parse the JSON. Pass `-y` to `vastai destroy instance`.
+10. **Run commands over SSH and copy files with `scp`**, not with `vastai execute` or the SDK's `copy()`.
+11. **Finish with a report.** Tell the user what ran, on which instance IDs, for how long, what it cost, and that nothing you created is left (or what was kept and why).
+
+#### Procedure for Migrating a Project
+
+Run this from the project root to find every Runpod touchpoint:
+
+```bash
+grep -rnE "rest\.runpod\.io|api\.runpod\.io|api\.runpod\.ai|(^|[^[:alnum:]_])runpod([^[:alnum:]_]|$)|runpodctl|RUNPOD_" . \
+  --include='*.py' --include='*.ipynb' --include='*.sh' --include='*.js' --include='*.ts' --include='*.go' \
+  --include='*.yml' --include='*.yaml' --include='*.toml' --include='*.json' --include='*.md' \
+  --include='Dockerfile*' --include='requirements*.txt' --include='.env*'
+```
+
+1. **List every match** from the search above and what it does. If the project manages Serverless endpoints or network volumes, tell the user those need separate work ([Scope](#migrating-api-code)).
+2. **Choose one interface.** Python: the `VastAI` class. Shell and CI: the `vastai` CLI with `--raw` and `jq`. Other languages: the [REST API](#rest-api).
+3. **Replace each call** using the [Reference Tables](#reference-tables). Each Runpod "create pod" becomes a search with a price limit, followed by a create. Base the lifecycle code on the [example migration](#example-migration-before-and-after) and the [bash example](#example-bash-batch-job).
+4. **Replace the credential.** Remove `RUNPOD_API_KEY` from code and CI secrets. Read the key from `VAST_API_KEY`, and in `.env.example` write only a placeholder: `VAST_API_KEY=your-vast-api-key`. The user sets the real value.
+5. **Move start commands.** `dockerStartCmd` becomes `args` (or `--onstart-cmd` with `--ssh`).
+6. **List the gaps.** Note anything without a Vast equivalent (network volumes, Runpod proxy URLs, pod reset) with a workaround from [Differences from Runpod](#differences-from-runpod).
+7. **Ask before testing.** Show the user the changes and the test command, with the GPU, hourly price and price limit. After approval, run one end-to-end test on one inexpensive GPU, following the rules above.
+8. **Report back:** the files changed, the test result and its cost, the gaps, and confirmation that no test instance is left. The migration is done when no Runpod API calls remain (unless the user chose to keep some), the test passed, its results were saved, and no test instance is left.
+
 ## CLI Reference
 
 | Task | Runpod | Vast CLI |
@@ -710,6 +1212,7 @@ For programmatic usage, the Vast CLI supports `--raw` for JSON output that can b
 ## Next Steps
 
 - [CLI Reference](/cli/hello-world): full command reference for the `vastai` CLI
+- [Python SDK](/sdk/python/quickstart): use Vast from Python
 - [FAQ](/guides/reference/faq/index): common questions and troubleshooting
 - [Community Discord](https://discord.gg/vast): get help from the Vast.ai community
 - [24/7 Technical Support](https://cloud.vast.ai): live chat support available around the clock from the Vast console
