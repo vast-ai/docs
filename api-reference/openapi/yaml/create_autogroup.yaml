@@ -22,15 +22,17 @@ paths:
           application/json:
             schema:
               type: object
+              required:
+              - search_params
               properties:
-                endpoint_name:
-                  type: string
-                  description: Name of the endpoint group
-                  example: vLLM-Qwen3-8B
                 endpoint_id:
                   type: integer
-                  description: ID of existing endpoint group (alternative to endpoint_name)
+                  description: ID of the endpoint this workergroup belongs to. Either `endpoint_id` or `endpoint_name` is required.
                   example: 123
+                endpoint_name:
+                  type: string
+                  description: Name of the endpoint this workergroup belongs to. Either `endpoint_id` or `endpoint_name` is required. If you have no endpoint with this name, one is created with default parameters.
+                  example: vLLM-Qwen3-8B
                 template_hash:
                   type: string
                   description: Hash ID of template to use for worker instances
@@ -41,48 +43,17 @@ paths:
                   example: 456
                 search_params:
                   type: string
-                  description: Search query for finding worker instances (alternative
-                    to template)
-                  default: 'verified=true rentable=true rented=false'
+                  description: Search filters for the offers that workers are recruited from, as a query string or JSON object. Combined with any search filters defined by the template; where both set the same filter, this value wins.
                   example: gpu_name=RTX_3090 rentable=true
                 launch_args:
                   type: string
                   description: Additional launch arguments for worker instances
                   example: "--env VAR=value"
-                min_load:
-                  type: number
-                  description: Minimum load threshold for scaling
-                  default: 1.0
-                  example: 1.0
-                target_util:
-                  type: number
-                  description: Target GPU utilization
-                  default: 0.9
-                  example: 0.9
-                cold_mult:
-                  type: number
-                  description: Cold start multiplier
-                  default: 3.0
-                  example: 3.0
-                cold_workers:
-                  type: integer
-                  description: Number of cold workers to maintain
-                  default: 3
-                  example: 3
-                max_workers:
-                  type: integer
-                  description: Maximum number of worker instances
-                  default: 20
-                  example: 20
-                test_workers:
-                  type: integer
-                  description: Number of test workers
-                  default: 3
-                  example: 3
                 gpu_ram:
-                  type: integer
-                  description: Minimum GPU RAM in GB
-                  default: 24
+                  type: number
+                  description: Estimated GPU memory, in GB, that the model needs. Used to estimate worker load times; to filter offers by GPU memory, use `search_params`.
+                  default: 8
+                  exclusiveMinimum: 0
                   example: 24
       responses:
         '200':
@@ -161,4 +132,3 @@ x-cli-commands:
   endpoint: /api/v0/workergroups/
   method: POST
   example: vast-ai create workergroup --template_hash abc123 --endpoint_name "vLLM-Qwen3-8B"
-    --test_workers 5

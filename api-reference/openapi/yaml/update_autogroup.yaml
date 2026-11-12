@@ -11,7 +11,7 @@ paths:
     put:
       summary: update workergroup
       description: |
-        Updates the properties of an existing workergroup based on the provided parameters.
+        Updates the properties of an existing workergroup based on the provided parameters. Fields you omit are left unchanged.
 
         CLI Usage: `vastai update workergroup <id> [options]`
       security:
@@ -30,24 +30,13 @@ paths:
           application/json:
             schema:
               type: object
+              required:
+              - endpoint_id
               properties:
-                min_load:
-                  type: number
-                  description: Minimum load for the workergroup.
-                  example: 1.0
-                target_util:
-                  type: number
-                  description: Target utilization for the workergroup.
-                  example: 0.9
-                cold_mult:
-                  type: number
-                  description: Cold multiplier for the workergroup.
-                  example: 3.0
-                test_workers:
+                endpoint_id:
                   type: integer
-                  description: Number of test workers for performance estimation.
-                  default: 3
-                  example: 3
+                  description: ID of the endpoint the workergroup belongs to.
+                  example: 123
                 template_hash:
                   type: string
                   description: Template hash for the workergroup.
@@ -58,8 +47,7 @@ paths:
                   example: 456
                 search_params:
                   type: string
-                  description: Search parameters for offers (JSON object or query string).
-                  default: 'verified=true rentable=true rented=false'
+                  description: Search filters for offers, as a query string or JSON object. Merged into the workergroup's current filters; where both set the same filter, this value wins.
                   example: gpu_name=RTX_3090 rentable=true
                 launch_args:
                   type: string
@@ -67,16 +55,8 @@ paths:
                   example: "--env VAR=value"
                 gpu_ram:
                   type: number
-                  description: Estimated GPU RAM requirement.
+                  description: Estimated GPU memory, in GB, that the model needs. Used to estimate worker load times.
                   example: 24
-                endpoint_name:
-                  type: string
-                  description: Deployment endpoint name.
-                  example: vLLM-Qwen3-8B
-                endpoint_id:
-                  type: integer
-                  description: Deployment endpoint ID.
-                  example: 123
       responses:
         '200':
           description: Successfully updated the workergroup.
