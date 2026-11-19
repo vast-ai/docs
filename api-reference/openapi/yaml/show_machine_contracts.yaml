@@ -1,0 +1,274 @@
+openapi: 3.0.0
+info:
+  title: Machine Contracts API
+  description: API endpoint to list the active contracts (rentals) on a hosted machine
+  version: 1.0.0
+servers:
+- url: https://console.vast.ai
+  description: Production server
+paths:
+  /api/v0/machines/{machine_id}/contracts:
+    get:
+      summary: show machine contracts
+      description: |
+        Lists the active client contracts on a machine you own: running instances, stopped (storage-only) instances, and standalone storage or volume contracts. Your own instances on the machine are not included, and neither are contracts whose `end_date` has passed.
+
+        Contracts are ordered by `end_date`, latest first. Contracts with no end date come first.
+
+        All prices are what you earn as the host, after the platform fee.
+
+        **Storage and volumes.** A standalone storage or volume contract reports its size under `disk_size_gb` / `disk_price_dpgbm`, with `"disk"` in `charge_types`. A network volume attached to an instance is reported on that instance's row instead, under `vol_size_gb` / `vol_price_dpgbm`, with `"volume"` in `charge_types`. A local volume attached to an instance still appears as its own row.
+
+        **Earnings.** `earn_day` is the host earnings billed for the previous complete UTC day. For a contract that started today, it is an estimate from the contract's rates: GPU earnings count only while the instance is running, and bandwidth is not included. It is `null` when billing data for the contract is not available yet.
+
+        **Incomplete responses.** At most 500 contracts are returned, and `truncated` is `true` when there were more. If a single contract cannot be loaded, it is left out and its ID is listed in `omitted_contract_ids`. `billing_degraded` and `aggregation_degraded` flag responses where billing or GPU/volume data could not be read. In that case the affected fields are `null` or empty rather than the request failing.
+
+        CLI Usage: `vastai show machine-contracts <machine_id>`
+      security:
+      - BearerAuth: []
+      parameters:
+      - name: machine_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+        description: ID of a machine you own.
+        example: 1234
+      responses:
+        '200':
+          description: Active contracts on the machine.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contracts:
+                    type: array
+                    description: One entry per active contract.
+                    items:
+                      $ref: '#/components/schemas/MachineContract'
+                  truncated:
+                    type: boolean
+                    description: '`true` when the machine has more than 500 active contracts and only the first 500 are returned.'
+                    example: false
+                  omitted_count:
+                    type: integer
+                    description: Number of contracts left out because they could not be loaded.
+                    example: 0
+                  omitted_contract_ids:
+                    type: array
+                    items:
+                      type: integer
+                    description: IDs of the contracts that were left out.
+                    example: []
+                  billing_degraded:
+                    type: boolean
+                    description: '`true` when billing data could not be read. `earn_day` estimates for contracts that started today are suppressed. Contracts with billed earnings still report them.'
+                    example: false
+                  aggregation_degraded:
+                    type: boolean
+                    description: '`true` when GPU or volume details could not be read. Affected contracts show `num_gpus: 0` and no volume fields.'
+                    example: false
+              example:
+                contracts:
+                - contract_id: 9876543
+                  machine_id: 1234
+                  rental_type: ondemand
+                  ask_duration: null
+                  state: running
+                  start_date: 1767225600.0
+                  end_date: 1769904000.0
+                  charge_types:
+                  - gpu
+                  - disk
+                  earn_hour: 0.52
+                  earn_day: 12.48
+                  auto_renew: false
+                  gpu_price_dph: 0.25
+                  num_gpus: 2
+                  gpu_slots:
+                  - 0
+                  - 1
+                  disk_size_gb: 50.0
+                  disk_price_dpgbm: 0.1
+                  vol_size_gb: null
+                  vol_price_dpgbm: null
+                  inet_up_cost: 2.0
+                  inet_down_cost: 1.0
+                truncated: false
+                omitted_count: 0
+                omitted_contract_ids: []
+                billing_degraded: false
+                aggregation_degraded: false
+        '400':
+          description: '`machine_id` is not a positive integer.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid API key.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: The machine belongs to another user, or the account is blocked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                msg: 'error: only the owner can access this machine.'
+                machine_id: 1234
+        '404':
+          description: No machine with this ID exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                msg: No such machine id
+                machine_id: 1234
+        '429':
+          description: Too many requests.
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: API requests too frequent
+      tags:
+      - Machines
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: API key must be provided in the Authorization header
+  schemas:
+    MachineContract:
+      type: object
+      properties:
+        contract_id:
+          type: integer
+          description: Contract ID. For instances, this is the instance ID.
+          example: 9876543
+        machine_id:
+          type: integer
+          description: ID of the machine.
+          example: 1234
+        rental_type:
+          type: string
+          enum:
+          - ondemand
+          - reserved
+          - interruptible
+          description: '`reserved` for prepaid contracts with credit remaining, `ondemand` for other on-demand contracts, `interruptible` for bid contracts.'
+        ask_duration:
+          type: number
+          nullable: true
+          description: Fixed term of the contract in seconds, or `null` if it has none.
+        state:
+          type: string
+          nullable: true
+          description: Requested state of the instance, such as `running` or `stopped`. For display only; it can differ from what the machine reports.
+          example: running
+        start_date:
+          type: number
+          nullable: true
+          description: Contract start time (Unix timestamp).
+        end_date:
+          type: number
+          nullable: true
+          description: Contract end time (Unix timestamp), or `null` if the contract has no end date.
+        charge_types:
+          type: array
+          items:
+            type: string
+            enum:
+            - gpu
+            - disk
+            - volume
+          description: What the contract is charged for.
+        earn_hour:
+          type: number
+          nullable: true
+          description: '`earn_day` divided by 24.'
+        earn_day:
+          type: number
+          nullable: true
+          description: Host earnings in $ per day. See the endpoint description for how it is calculated.
+        auto_renew:
+          type: boolean
+          description: '`true` when the contract has a fixed term (`ask_duration` is set).'
+        gpu_price_dph:
+          type: number
+          nullable: true
+          description: Host price per GPU in $/hour.
+        num_gpus:
+          type: integer
+          description: Number of GPUs on the contract. `0` for storage and volume contracts.
+        gpu_slots:
+          type: array
+          items:
+            type: integer
+          description: Indexes of the GPUs on the machine used by this contract.
+        disk_size_gb:
+          type: number
+          nullable: true
+          description: Disk size in GB.
+        disk_price_dpgbm:
+          type: number
+          nullable: true
+          description: Host disk price in $/GB/month.
+        vol_size_gb:
+          type: number
+          nullable: true
+          description: Total size in GB of the network volumes attached to the instance.
+        vol_price_dpgbm:
+          type: number
+          nullable: true
+          description: Host price of the attached network volumes in $/GB/month.
+        inet_up_cost:
+          type: number
+          nullable: true
+          description: Host upload bandwidth price in $/TB. Note that the machine listing endpoints report bandwidth in $/GB.
+        inet_down_cost:
+          type: number
+          nullable: true
+          description: Host download bandwidth price in $/TB.
+        sla_reliability_claim:
+          type: number
+          nullable: true
+          description: Reliability claimed by the host's SLA. Only present when SLAs are enabled.
+        sla_confidence:
+          type: string
+          nullable: true
+          enum:
+          - high
+          - medium
+          - low
+          description: Confidence level of the host's SLA. Only present when SLAs are enabled.
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+        msg:
+          type: string
+x-rate-limit:
+  threshold: 2.0
+  per: request
+  description: Maximum request frequency per IP address for this endpoint
+x-cli-commands:
+- name: show machine-contracts
+  description: Show active contracts (rentals) on a hosted machine
+  endpoint: /api/v0/machines/{machine_id}/contracts
+  method: GET
+  example: vastai show machine-contracts 1234
