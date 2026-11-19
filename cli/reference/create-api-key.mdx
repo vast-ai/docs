@@ -8,7 +8,7 @@ Create a new api-key with restricted permissions. Can be sent to other users and
 ## Usage
 
 ```bash
-vastai create api-key --name NAME --permission_file PERMISSIONS
+vastai create api-key --name NAME --permission_file PERMISSIONS [--lifetime_sec SECONDS] [--key_params JSON]
 ```
 
 ## Options
@@ -22,7 +22,11 @@ vastai create api-key --name NAME --permission_file PERMISSIONS
 </ParamField>
 
 <ParamField path="--key_params" type="string">
-  optional wildcard key params for advanced keys
+  JSON object binding the `$name` parameters the permissions mention, e.g. `'{"$instance_id": 1234}'`
+</ParamField>
+
+<ParamField path="--lifetime_sec" type="number">
+  seconds the key lives (60 or more); it ends no later than the key it is created with. Default: no expiry of its own
 </ParamField>
 
 ## Description
@@ -30,10 +34,18 @@ vastai create api-key --name NAME --permission_file PERMISSIONS
 In order to create api keys you must understand how permissions must be sent via json format.
 You can find more information about permissions here: https://vast.ai/docs/cli/roles-and-permissions
 
+`--lifetime_sec` gives the key an expiry. A key created with a key that expires ends when that key does, whatever lifetime is asked. The response includes `expires_at`, a Unix time, or `null` for a key with no expiry.
+
+`--key_params` binds the `$name` parameters used in the permissions file. A constraint such as `{"id": {"eq": "$instance_id"}}` with `--key_params '{"$instance_id": 1234}'` pins the key to instance 1234. Every `$name` the permissions mention must be bound, and a key created with a pinned key keeps its pins.
+
 ## Examples
 
 ```bash
-vastai create api-key
+# A key that expires in an hour
+vastai create api-key --name ci --permission_file perms.json --lifetime_sec 3600
+
+# A key pinned to one instance
+vastai create api-key --name one-instance --permission_file instance.json --key_params '{"$instance_id": 1234}'
 ```
 
 ## Global Options

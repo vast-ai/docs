@@ -677,8 +677,15 @@ paths:
         user.
 
 
+        A key may be given a lifetime, and may bind the `$name` parameters its permissions
+        mention.
+
+        A key created with another key ends no later than that key and keeps that
+        key''s parameter bindings.
+
+
         CLI Usage: `vastai create api-key --name <name> --permission_file <permissions_file>
-        [--key_params <params>]`'
+        [--lifetime_sec <seconds>] [--key_params <json>]`'
       security:
       - BearerAuth: []
       requestBody:
@@ -702,10 +709,21 @@ paths:
                     write: false
                 key_params:
                   type: object
-                  description: Optional wildcard parameters for advanced keys
+                  description: 'Binds the `$name` parameters the permissions mention.
+                    A constraint `{"id": {"eq": "$instance_id"}}` with `{"$instance_id":
+                    1234}` pins the key to instance 1234. Names start with `$`. Every
+                    `$name` in the permissions must be bound. A key created with a
+                    key that already binds a name keeps that key''s value.'
+                  additionalProperties: true
                   example:
-                    ip_whitelist:
-                    - 1.2.3.4
+                    $instance_id: 1234
+                lifetime_sec:
+                  type: number
+                  minimum: 60
+                  maximum: 315360000
+                  description: Seconds the key lives. The key ends no later than the
+                    key it is created with. Omit for a key with no expiry of its own.
+                  example: 3600
       responses:
         '200':
           description: API key created successfully
@@ -722,6 +740,13 @@ paths:
                     type: string
                     description: The newly generated API key
                     example: vast-123456789abcdef
+                  expires_at:
+                    type:
+                    - number
+                    - 'null'
+                    description: Unix time at which the key stops working, or null
+                      for a key with no expiry
+                    example: 1767229200.0
                   permissions:
                     anyOf:
                     - type: boolean
@@ -747,6 +772,8 @@ paths:
                     enum:
                     - invalid_permissions
                     - missing_permissions
+                    - unbound_key_param
+                    - invalid_key_params
                   msg:
                     type: string
                     example: Invalid permission format
@@ -2872,6 +2899,12 @@ paths:
       description: 'Deletes an existing API key belonging to the authenticated user.
 
         The API key is soft-deleted by setting a deleted_at timestamp.
+
+
+        Every API key that was created with the deleted key, and every 2FA session
+        logged in
+
+        with it, is ended in the same request. Keys created otherwise are not affected.
 
 
         CLI Usage: `vastai delete api-key <id>`'

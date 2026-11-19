@@ -18,7 +18,10 @@ paths:
       description: |
         Creates a new API key with specified permissions for the authenticated user.
 
-        CLI Usage: `vastai create api-key --name <name> --permission_file <permissions_file> [--key_params <params>]`
+        A key may be given a lifetime, and may bind the `$name` parameters its permissions mention.
+        A key created with another key ends no later than that key and keeps that key's parameter bindings.
+
+        CLI Usage: `vastai create api-key --name <name> --permission_file <permissions_file> [--lifetime_sec <seconds>] [--key_params <json>]`
       security:
       - BearerAuth: []
       requestBody:
@@ -42,10 +45,22 @@ paths:
                     write: false
                 key_params:
                   type: object
-                  description: Optional wildcard parameters for advanced keys
+                  description: >-
+                    Binds the `$name` parameters the permissions mention. A constraint
+                    `{"id": {"eq": "$instance_id"}}` with `{"$instance_id": 1234}` pins the key to
+                    instance 1234. Names start with `$`. Every `$name` in the permissions must be bound.
+                    A key created with a key that already binds a name keeps that key's value.
+                  additionalProperties: true
                   example:
-                    ip_whitelist:
-                    - 1.2.3.4
+                    $instance_id: 1234
+                lifetime_sec:
+                  type: number
+                  minimum: 60
+                  maximum: 315360000
+                  description: >-
+                    Seconds the key lives. The key ends no later than the key it is created with.
+                    Omit for a key with no expiry of its own.
+                  example: 3600
       responses:
         '200':
           description: API key created successfully
@@ -62,6 +77,11 @@ paths:
                     type: string
                     description: The newly generated API key
                     example: vast-123456789abcdef
+                  expires_at:
+                    type: number
+                    nullable: true
+                    description: Unix time at which the key stops working, or null for a key with no expiry
+                    example: 1767229200.0
                   permissions:
                     anyOf:
                     - type: boolean
@@ -87,6 +107,8 @@ paths:
                     enum:
                     - invalid_permissions
                     - missing_permissions
+                    - unbound_key_param
+                    - invalid_key_params
                   msg:
                     type: string
                     example: Invalid permission format
@@ -135,10 +157,12 @@ x-input-validation:
     max_length: 255
     description: Optional name to identify the API key
   key_params:
-    description: Optional parameters for advanced key configuration
+    description: Object whose names start with `$`; binds the `$name` parameters in the permissions
+  lifetime_sec:
+    description: Seconds, 60 to 315360000 (ten years)
 x-cli-commands:
 - name: create api-key
   description: Create a new API key with restricted permissions
   endpoint: /api/v0/auth/apikeys/
   method: POST
-  example: vast create api-key --name "read-only" --permission_file permissions.json
+  example: vast create api-key --name "read-only" --permission_file permissions.json --lifetime_sec 3600

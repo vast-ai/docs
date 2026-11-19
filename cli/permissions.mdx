@@ -95,6 +95,62 @@ You can combine `gte` (greater than or equal) and `lte` (less than or equal) ope
 
 Available constraint operators: `eq`, `gte`, `lte`.
 
+### Give a Key an Expiry
+
+Pass a lifetime when you create the key. The key stops working that many seconds later, and so does anything created with it: a key created with a key that expires ends when that key does, whatever lifetime it asks for.
+
+```bash
+vastai create api-key --name ci --permission_file perms.json --lifetime_sec 3600
+```
+
+The response includes `expires_at`. Omit the lifetime for a key with no expiry of its own.
+
+### Pin a Key with Parameters
+
+A constraint value that starts with `$` is a parameter. The key supplies its value, so one permissions file serves many keys:
+
+```json
+{
+    "api": {
+        "instance_read": {
+            "api.instance": {
+                "constraints": {
+                    "id": {
+                        "eq": "$instance_id"
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+```bash
+vastai create api-key --name one-instance --permission_file instance.json --key_params '{"$instance_id": 1234}'
+```
+
+Every `$name` the permissions mention must be bound when the key is created, or the request is refused. A key created with a pinned key keeps its pins: it cannot be re-pinned to another value.
+
+### Require a Recent Second Factor
+
+A 2FA session knows when its code was verified. The `tfa_age` constraint bounds how many seconds ago that was, so a sensitive category can demand a fresh code:
+
+```json
+{
+    "api": {
+        "billing_write": {
+            "constraints": {
+                "tfa_age": {
+                    "lte": 900
+                }
+            }
+        }
+    }
+}
+```
+
+A key with these permissions is refused on `billing_write` until you log in with 2FA, admitted for 15 minutes after the code, and refused again until you renew the session with a new code. An API key on its own never satisfies `tfa_age`.
+
 <Warning>
 Keys with constraints must be created through the CLI or API. The web console only creates full-access keys.
 </Warning>
