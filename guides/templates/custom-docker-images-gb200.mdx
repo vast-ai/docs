@@ -39,11 +39,18 @@ Start from a compatible image and add your application dependencies. This minima
 ```dockerfile
 FROM vastai/pytorch:cuda-12.8.1-auto
 
-RUN . /venv/main/bin/activate && \
+RUN set -euo pipefail && \
+    . /venv/main/bin/activate && \
     uv pip install --no-cache-dir transformers accelerate
+
+# Keep this as the final RUN step
+RUN set -euo pipefail && \
+    env-hash > /.env_hash
 ```
 
 Save this as `Dockerfile` in your build directory, then add the files and packages your application needs. Check the exact base tag's platforms before building.
+
+Keep the `env-hash` step last, after every dependency change. Vast images can sync `/venv` to a volume and reuse a saved environment whose hash matches `/.env_hash`. If you install packages without refreshing the hash, an instance can reuse an older saved environment and your new packages will be missing at runtime.
 
 For a reproducible release, pin your dependencies and replace the moving `auto` tag with a tested image digest.
 
