@@ -67,7 +67,18 @@ Simple applications may need only packaging changes. An application with unsuppo
 
 ## 4 Build and publish both versions
 
-Use a Docker Buildx builder configured for both target platforms. Docker Desktop includes emulation support; other environments may need builder setup. See [Docker's multi-platform build guide](https://docs.docker.com/build/building/multi-platform/).
+Docker Desktop can build both platforms without extra setup. On Linux, the default builder may not be able to build and push a multi-platform image, especially on Docker Engine before 29.0 or an upgraded install that still uses classic storage. Run this once to install QEMU emulation, so an x86 machine can build the Arm version, and create a builder that supports multi-platform builds:
+
+```bash
+docker run --privileged --rm tonistiigi/binfmt --install all
+
+docker buildx create \
+  --name container-builder \
+  --driver docker-container \
+  --bootstrap --use
+```
+
+Images from this builder aren't loaded into your local Docker image store, so the build command below pushes them straight to your registry. See [Docker's multi-platform build guide](https://docs.docker.com/build/building/multi-platform/) for other setups, such as native Arm build nodes.
 
 Sign in to your container registry, then run this command from the directory containing your `Dockerfile`. Replace the image name with a registry location you can publish to.
 
