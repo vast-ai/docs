@@ -1,18 +1,26 @@
 ---
-title: "Custom Docker images for GB200"
-sidebarTitle: "Custom Images for GB200"
-description: "Check Arm compatibility, build a multi-platform Docker image, and test your application on GB200."
+title: "Custom Docker images for Arm machines (GB200, GB300, GB10)"
+sidebarTitle: "Custom Images for Arm"
+description: "Check Arm compatibility, build a multi-platform Docker image, and test your application on Arm machines such as GB200, GB300 and GB10."
 "canonical": "/guides/templates/custom-docker-images-gb200"
 ---
 
-GB200 systems pair Blackwell GPUs with Arm-based Grace CPUs. This guide shows how to check your Docker image, publish an Arm version alongside your existing x86 version, and test it on GB200.
+Some Vast machines use Arm CPUs instead of x86. Today these are NVIDIA's Grace Blackwell systems, which pair Blackwell GPUs with Arm-based CPUs:
+
+| Machine | GPU compute capability | Minimum CUDA for native support |
+| --- | --- | --- |
+| GB200 | 10.0 | 12.8 |
+| GB300 | 10.3 | 12.9 |
+| GB10 (DGX Spark) | 12.1 | 12.9 |
+
+An image built only for x86 will not run on these machines. This guide shows how to check your Docker image, publish an Arm version alongside your existing x86 version, and test it on an Arm machine.
 
 ## Prerequisites
 
 - Docker with Buildx and a builder configured for `linux/amd64` and `linux/arm64`.
 - A container registry account with permission to publish your image.
 - Your application files and `Dockerfile`.
-- A Vast.ai account for testing on a GB200 instance.
+- A Vast.ai account for testing on an Arm instance.
 
 ## 1 Check your existing image
 
@@ -28,16 +36,16 @@ A multi-platform image stores both versions under one tag. Docker automatically 
 
 ## 2 Choose a base image with Arm and Blackwell support
 
-Vast provides PyTorch images with AMD64 and ARM64 support. For this GB200 example, use a Blackwell-compatible PyTorch build with CUDA 12.8 or newer. CUDA 12.8 introduced native compiler support for Blackwell GPUs, including GB200's GPU architecture. Arm CPU support and Blackwell GPU support are separate requirements.
+Vast provides PyTorch images with AMD64 and ARM64 support. Use a Blackwell-compatible PyTorch build with CUDA 12.9 or newer to cover all current Arm machines. CUDA 12.8 introduced native compiler support for GB200's GPU architecture, and CUDA 12.9 added the architectures used by GB300 (10.3) and GB10 (12.1). Arm CPU support and Blackwell GPU support are separate requirements.
 
-Do not choose a tag with `-cu126-` or `-cuda-12.6.3-` for this example just because it has an Arm version. Those names indicate an older PyTorch CUDA backend or CUDA base. Choose a Blackwell-compatible framework build and check the exact image tag. The base image's CUDA version alone does not establish compatibility for every installed package.
+Do not choose a tag with `-cu126-` or `-cuda-12.6.3-` just because it has an Arm version. Those names indicate an older PyTorch CUDA backend or CUDA base. Choose a Blackwell-compatible framework build and check the exact image tag. The base image's CUDA version alone does not establish compatibility for every installed package.
 
-Some older CUDA applications can run on Blackwell through forward-compatible PTX. That is application-specific and should not be assumed for an arbitrary image. See the [CUDA 12.8 release notes](https://docs.nvidia.com/cuda/archive/12.8.0/cuda-toolkit-release-notes/index.html#new-features) and [NVIDIA Blackwell compatibility guide](https://docs.nvidia.com/cuda/blackwell-compatibility-guide/index.html).
+Some older CUDA applications can run on Blackwell through forward-compatible PTX. That is application-specific and should not be assumed for an arbitrary image. See the [CUDA 12.8 release notes](https://docs.nvidia.com/cuda/archive/12.8.0/cuda-toolkit-release-notes/index.html#new-features), [CUDA 12.9 release notes](https://docs.nvidia.com/cuda/archive/12.9.0/cuda-toolkit-release-notes/index.html), [NVIDIA's compute capability list](https://developer.nvidia.com/cuda-gpus) and [NVIDIA Blackwell compatibility guide](https://docs.nvidia.com/cuda/blackwell-compatibility-guide/index.html).
 
-Start from a compatible image and add your application dependencies. This minimal `Dockerfile` uses the base image shown in [Vast's PyTorch image documentation](https://github.com/vast-ai/base-image/blob/main/derivatives/pytorch/README.md), with `uv pip install` as specified in [Vast's contribution conventions](https://github.com/vast-ai/base-image/blob/main/CONTRIBUTING.md#conventions).
+Start from a compatible image and add your application dependencies. This minimal `Dockerfile` uses one of the base images listed in [Vast's PyTorch image documentation](https://github.com/vast-ai/base-image/blob/main/derivatives/pytorch/README.md), with `uv pip install` as specified in [Vast's contribution conventions](https://github.com/vast-ai/base-image/blob/main/CONTRIBUTING.md#conventions).
 
 ```dockerfile
-FROM vastai/pytorch:cuda-12.8.1-auto
+FROM vastai/pytorch:cuda-12.9.2-auto
 
 RUN set -euo pipefail && \
     . /venv/main/bin/activate && \
@@ -67,7 +75,18 @@ Simple applications may need only packaging changes. An application with unsuppo
 
 ## 4 Build and publish both versions
 
-Use a Docker Buildx builder configured for both target platforms. Docker Desktop includes emulation support; other environments may need builder setup. See [Docker's multi-platform build guide](https://docs.docker.com/build/building/multi-platform/).
+Docker Desktop can build both platforms without extra setup. On Linux, the default builder may not be able to build and push a multi-platform image, especially on Docker Engine before 29.0 or an upgraded install that still uses classic storage. Run this once to install QEMU emulation, so an x86 machine can build the Arm version, and create a builder that supports multi-platform builds:
+
+```bash
+docker run --privileged --rm tonistiigi/binfmt --install all
+
+docker buildx create \
+  --name container-builder \
+  --driver docker-container \
+  --bootstrap --use
+```
+
+Images from this builder aren't loaded into your local Docker image store, so the build command below pushes them straight to your registry. See [Docker's multi-platform build guide](https://docs.docker.com/build/building/multi-platform/) for other setups, such as native Arm build nodes.
 
 Sign in to your container registry, then run this command from the directory containing your `Dockerfile`. Replace the image name with a registry location you can publish to.
 
@@ -88,9 +107,9 @@ docker buildx imagetools inspect your-account/your-image:tag
 
 Next, use the published image in your Vast template. Successful builds confirm packaging; the next step checks execution on the actual hardware.
 
-## 5 Test on GB200
+## 5 Test on an Arm machine
 
-Launch a GB200 instance using your published image and an appropriate Vast template. For an image derived from Vast's PyTorch image, run the following inside the instance.
+Launch an Arm instance using your published image and an appropriate Vast template. To list only Arm machines in the CLI, add `cpu_arch=arm64` to your search, for example `vastai search offers 'cpu_arch=arm64'`. For an image derived from Vast's PyTorch image, run the following inside the instance.
 
 ```bash
 . /venv/main/bin/activate
