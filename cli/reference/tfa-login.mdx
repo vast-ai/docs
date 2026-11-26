@@ -8,7 +8,7 @@ Complete 2FA login by verifying your identity with a 2FA code or backup code. On
 ## Usage
 
 ```bash
-vastai tfa login [--code CODE] [--method-type METHOD_TYPE] [--secret SECRET] [--backup-code BACKUP_CODE] [--method-id ID]
+vastai tfa login [--code CODE] [--method-type METHOD_TYPE] [--secret SECRET] [--backup-code BACKUP_CODE] [--method-id ID] [--lifetime-sec SECONDS]
 ```
 
 ## Options
@@ -33,11 +33,22 @@ vastai tfa login [--code CODE] [--method-type METHOD_TYPE] [--secret SECRET] [--
   2FA method ID if you have more than one of the same type. Get the ID from `vastai tfa status`. (alias: `-id`)
 </ParamField>
 
+<ParamField path="--lifetime-sec" type="number">
+  Seconds the 2FA session lives (60 or more, at most a day). Default: a day. The session never outlives the API key you log in with.
+</ParamField>
+
+## Description
+
+Running `tfa login` again while the session is live renews it with a new code. An authenticator code works once: after a login, wait for your app to show the next code before using it for another 2FA action. A reused code is refused with `tfa_code_used`.
+
 ## Examples
 
 ```bash
 # Login with TOTP (Authenticator app)
 vastai tfa login --method-type totp -c 123456
+
+# A 15-minute session
+vastai tfa login --method-type totp -c 123456 --lifetime-sec 900
 
 # Login with SMS (get code and secret from send-sms first)
 vastai tfa login --method-type sms --code 123456 --secret abc123def456
